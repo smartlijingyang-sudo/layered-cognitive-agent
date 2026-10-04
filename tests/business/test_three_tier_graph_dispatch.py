@@ -119,6 +119,41 @@ BANNED_NODE_ID_PATTERNS: tuple[re.Pattern[str], ...] = (
 )
 
 
+# ADR-0220 §0.4 N9 closed set of action domains (the layer-1/2
+# vocabulary). Kept as an independent literal here so the exception
+# list below is pinned by the test instead of merely commented.
+N9_CLOSED_ACTION_DOMAINS: frozenset[str] = frozenset(
+    {
+        "tool",
+        "prompt",
+        "decision",
+        "gate",
+        "effect",
+        "context",
+        "skill",
+        "memory",
+        "state",
+        "observe",
+        "spine",
+        "capability",
+        "llm",
+        "shortcut",
+        "perceive",
+        "reflect",
+        "stop",
+    }
+)
+
+# Spec-gap exceptions deliberately layered on top of the N9 closed set —
+# one documented rationale block each in ``ALLOWED_ACTION_DOMAINS``
+# (``reason``/``act``/``remember``/``loop``/``primitive``). Adding a sixth
+# exception must update this set, so the pin below forces the addition
+# to be a deliberate, diff-visible change rather than a quiet comment.
+N9_SPEC_GAP_EXCEPTIONS: frozenset[str] = frozenset(
+    {"reason", "act", "remember", "loop", "primitive"}
+)
+
+
 def _list_yaml_files(directory: Path) -> list[Path]:
     """Return ``*.yaml`` files under ``directory`` (non-recursive)."""
     if not directory.is_dir():
@@ -379,6 +414,22 @@ class TestNodeIdVocabulary:
                 f"is not in the closed action-domain set "
                 f"{sorted(ALLOWED_ACTION_DOMAINS)}."
             )
+
+    def test_n9_spec_gap_exceptions_are_pinned(self) -> None:
+        """The allowed-domain set is exactly the N9 closed set plus the
+        five documented spec-gap exceptions — no silent sixth exception.
+
+        ``ALLOWED_ACTION_DOMAINS`` may only grow by editing
+        ``N9_SPEC_GAP_EXCEPTIONS`` in the same diff, which keeps any
+        closed-set erosion deliberate and reviewable.
+        """
+        expected = N9_CLOSED_ACTION_DOMAINS | N9_SPEC_GAP_EXCEPTIONS
+        assert expected == ALLOWED_ACTION_DOMAINS, (
+            "ADR-0220 §0.4 N9: ALLOWED_ACTION_DOMAINS drifted from the "
+            "closed set + pinned exceptions: extra="
+            f"{sorted(ALLOWED_ACTION_DOMAINS - expected)}, "
+            f"missing={sorted(expected - ALLOWED_ACTION_DOMAINS)}."
+        )
 
 
 class TestAuditBundleNodeNamingScript:
