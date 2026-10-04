@@ -87,7 +87,7 @@ class ConnectorVault:
 
     def get_connection(
         self, service: str, account_id: str = "default"
-    ) -> ConnectionMetadata | None:
+    ) -> ConnectionMetadata:
         service_norm = service.lower().strip()
         connections = self.list_connections()
         for conn in connections:

@@ -171,8 +171,8 @@ class AskHumanOperation(TerminalOperation):
 def _journal_blocked_call(decision: Decision, block: Observation) -> Observation:
     """Journal a call the wire gate refused, then hand the block back.
 
-    ``SafeExecutor`` is the only emitter of ``step.tool_call.record`` and
-    ``step.tool_result.record``, and a refused call never reaches it. Without
+    ``SafeExecutor`` emits ``step.tool_call.record`` and ``step.tool_result.record``
+    (among other emitters), and a refused call never reaches it. Without
     this pair the refusal is absent from the step tree, so ``ToolDeriver``
     reads no fact and reports ``tool=ok``: ``run_56c3352cd22e`` refused 2 of
     10 calls and doctor still said ``ok (3 steps, 8 tools)``.
@@ -186,9 +186,7 @@ def _journal_blocked_call(decision: Decision, block: Observation) -> Observation
         record_step_tool_result,
     )
 
-    call = next((tc for tc in decision.tool_calls if tc.call_id == block.tool_call_id), None)
-    if call is None:
-        return block
+    call = next(tc for tc in decision.tool_calls if tc.call_id == block.tool_call_id)
     invocation_id = (block.tool_call_id or "").strip() or new_id("inv")
     arguments = dict(call.arguments or {})
     error = block.error or ""
@@ -206,11 +204,7 @@ def _journal_blocked_call(decision: Decision, block: Observation) -> Observation
         ok=False,
         error=error or None,
         delta_summary=error[:120],
-        failure_kind=(
-            block.extra.get(FAILURE_KIND)
-            if isinstance(getattr(block, "extra", None), dict)
-            else None
-        ),
+        failure_kind=block.extra.get(FAILURE_KIND),
     )
     return block
 

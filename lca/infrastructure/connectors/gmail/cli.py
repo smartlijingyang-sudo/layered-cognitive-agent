@@ -1,4 +1,7 @@
-"""Gmail Connector CLI driver implementing Muse protocol & safety checks (INV-02, INV-03, INV-06)."""
+"""Gmail Connector CLI driver (demo: staged-file flow, not yet wired to Gmail API).
+
+Implements the INV-06 two-phase write guardrail (``--upload <staged_file>`` required).
+"""
 
 from __future__ import annotations
 
@@ -21,7 +24,6 @@ class GmailConnectorCLI:
     def execute(
         self,
         cmd_line: list[str],
-        user_id: str = "lca-local-user",
         account_id: str = "default",
     ) -> dict[str, Any]:
         if not cmd_line:
@@ -42,7 +44,7 @@ class GmailConnectorCLI:
 
     def _handle_status(self, account_id: str) -> dict[str, Any]:
         conn = self._vault.get_connection("gmail", account_id=account_id)
-        if conn and conn.state == ConnectionState.ACTIVE:
+        if conn.state == ConnectionState.ACTIVE:
             return {
                 "status": "active",
                 "service": "gmail",
@@ -50,10 +52,8 @@ class GmailConnectorCLI:
                 "connectionId": conn.connection_id or "",
             }
 
-        conn_id = (conn and conn.connection_id) or "ca_gmail_auth"
-        auth_url = (
-            conn and conn.auth_url
-        ) or f"https://backend.composio.dev/api/v1/auth/redirect?token={conn_id}"
+        conn_id = conn.connection_id or "ca_gmail_auth"
+        auth_url = conn.auth_url or f"https://backend.composio.dev/api/v1/auth/redirect?token={conn_id}"
         widget = format_connector_auth_widget(
             app_name="Gmail",
             auth_url=auth_url,
@@ -96,6 +96,7 @@ class GmailConnectorCLI:
         }
 
     def _handle_send(self, args: list[str], default_account_id: str) -> dict[str, Any]:
+        """Demo stub: stages a draft file and reports success; not wired to Gmail API."""
         # Parse arguments
         to_addr = ""
         subject = ""
@@ -154,6 +155,7 @@ class GmailConnectorCLI:
         }
 
     def _handle_read(self, args: list[str], account_id: str) -> dict[str, Any]:
+        """Demo stub: returns canned messages; not wired to Gmail API."""
         # Quick read metadata
         return {
             "success": True,
