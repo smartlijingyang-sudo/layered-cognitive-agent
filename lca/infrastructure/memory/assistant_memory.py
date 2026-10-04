@@ -94,7 +94,6 @@ class AssistantMemory(MemorySystem):
         self._profile_backfill = profile_backfill
         self._event_publisher = event_publisher
         self._last_curated_receipt: CuratedProjectionReceipt | None = None
-        self._open_claim: CuratedProjectionReceipt | None = self._load_latch()
 
     @property
     def last_curated_receipt(self) -> CuratedProjectionReceipt | None:
@@ -102,14 +101,27 @@ class AssistantMemory(MemorySystem):
 
     @last_curated_receipt.setter
     def last_curated_receipt(self, receipt: CuratedProjectionReceipt | None) -> None:
-        # Receipt is write evidence; _open_claim is the one unused acknowledgement.
+        # Receipt is write evidence; the latch file is the one unused acknowledgement.
         self._last_curated_receipt = receipt
-        self._open_claim = receipt if may_acknowledge_projection(receipt) else None
-        self._persist_latch(self._open_claim)
+        self._persist_latch(receipt if may_acknowledge_projection(receipt) else None)
 
     def take_claim_right(self) -> CuratedProjectionReceipt | None:
-        receipt = self._open_claim
-        self._open_claim = None
+        """Consume the open acknowledgement right, if one is on disk.
+
+        The latch file is the only state. A run builds two AssistantMemory
+        instances, one in tool scope and one in runtime scope, and the guard
+        that decides whether a reply may claim a write runs against whichever
+        the caller resolved. Caching the right in an instance field loaded
+        once at construction let the runtime-scope instance miss a write the
+        tool-scope instance made mid-run, refuse a claim that had succeeded,
+        and then unlink the latch the other instance had legitimately minted.
+        In run_4fcfb6d83c8c that refusal replaced the model's real reply with
+        这条还没有写入记忆文件, the next turn replayed the write, and the false
+        statement stayed in the session log for every later turn to read.
+        """
+        receipt = self._load_latch()
+        if receipt is None:
+            return None
         self._persist_latch(None)
         return receipt
 
@@ -737,7 +749,6 @@ def _explainable(entry: dict[str, Any]) -> ExplainableRecord:
         quote=str(metadata.get("quote") or "").strip(),
         revision_of=str(revision) if isinstance(revision, str) and revision else None,
     )
-
 
 
 def _recorded_on(created_at_ms: int | None) -> str:
