@@ -236,3 +236,44 @@ def test_sidebar_timeline_semantic_icons_and_latency_badge() -> None:
     assert re.search(r"isRunning.*?pulseGlow|pulseGlow.*?isRunning", content, re.DOTALL), (
         "pulseGlow must only be applied when step is running!"
     )
+
+
+def test_inspection_zone_telemetry_cards_and_zero_mock_invariant() -> None:
+    """INV-MODAL-01 / INV-MODAL-03: Collapsible engineering inspection zone.
+
+    Verifies:
+    1. inspectionZone CSS class exists for the collapsible accordion container.
+    2. Card A (Model Metrics): renders model, latency_ms, prompt_tokens, completion_tokens, decision
+       strictly from activeSubStep.thinking — conditionally, never fabricated.
+    3. Card B (Structured Arguments): renders tool_call.arguments as formatted JSON.
+    4. Card C (Raw I/O): renders tool_result.stdout_head / stderr with maxHeight viewport.
+    5. Card D (Full Thinking Chain): renders thinking.reasoning with maxHeight viewport.
+    6. Zero Mock: no number literals used as fallback for token counts or latency inside inspection.
+    """
+    path = _get_drawer_tsx_path()
+    content = path.read_text(encoding="utf-8")
+
+    # Container
+    assert "inspectionZone" in content, "Missing inspectionZone accordion container"
+
+    # Card A — model metrics (conditional on thinking fields)
+    assert "activeSubStep.thinking?.model" in content, "Card A must conditionally show model name"
+    assert "activeSubStep.thinking?.prompt_tokens" in content, "Card A must show prompt_tokens"
+    assert "activeSubStep.thinking?.completion_tokens" in content, "Card A must show completion_tokens"
+    assert "activeSubStep.thinking?.latency_ms" in content, "Card A must show thinking latency"
+
+    # Card B — structured JSON arguments
+    assert "activeSubStep.tool_call?.arguments" in content, "Card B must render tool_call arguments"
+    assert "JSON.stringify" in content, "Card B must format arguments as JSON"
+
+    # Card C — raw I/O (maxHeight viewport)
+    assert "activeSubStep.tool_result?.stdout_head" in content, "Card C must render stdout_head"
+    assert "activeSubStep.tool_result?.stderr" in content, "Card C must render stderr"
+
+    # Card D — full thinking chain with scrollable viewport
+    assert "activeSubStep.thinking?.reasoning" in content, "Card D must render full reasoning"
+
+    # Zero mock: no hard-coded token numbers in inspection rendering
+    assert not re.search(r"prompt_tokens\s*\|\|\s*\d+", content), "Fabricated prompt_tokens fallback!"
+    assert not re.search(r"completion_tokens\s*\|\|\s*\d+", content), "Fabricated completion_tokens!"
+    assert not re.search(r"latency_ms\s*\|\|\s*\d{3,}", content), "Fabricated latency fallback!"

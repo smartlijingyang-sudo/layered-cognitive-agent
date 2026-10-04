@@ -594,5 +594,5 @@
 | MODAL-TASK-1-CONTRACTS | 契约解析与遥测数据保留单测 (INV-MODAL-01 ~ 03) | Completed | ModalStepItem 扩充 thinking/tool_call/tool_result，subSteps 保留全部真值遥测，单测 12/12 100% 全绿 |
 | MODAL-TASK-2-TIMELINE | 左侧时间轴连续轨道、多态语义节点与耗时微标 (INV-MODAL-04) | Completed | timelineNodeCol/pulseGlow/stepLatencyBadge 实现，连续轨道连线，running 状态专属呼吸动画，真实耗时微标，单测 13/13 通过 |
 | MODAL-TASK-3-HERO-VIEWPORT | 顶部 Hero 结论卡前置与长思考/长代码视口防护 (INV-MODAL-02, INV-MODAL-03) | Completed | 结论卡前置（heroVerdictCard），叙述段 120 字渐隐 + 展开按钮，命令块行数统计栏 + maxHeight:240 视口锁定，热补丁已同步 |
-| MODAL-TASK-4-INSPECTION-ZONE | 按需深查区（模型指标/结构化JSON/原始终端IO/思考链） (INV-MODAL-01) | Pending | 待执行 |
+| MODAL-TASK-4-INSPECTION-ZONE | 按需深查区（模型指标/结构化JSON/原始终端IO/思考链） (INV-MODAL-01) | Completed | 落地 inspectionZone 折叠区含四张遥测卡（Card A 模型指标/Card B 结构化JSON/Card C 原始终端IO/Card D 完整思考链），严格零Mock条件渲染；14/14 测试全通，热补丁 APPLIED |
 | MODAL-TASK-5-VERIFY-REGRESSION | 全链路回归测试、补丁一致性核验与门禁体检 (INV-MODAL-05) | Pending | 待执行 |

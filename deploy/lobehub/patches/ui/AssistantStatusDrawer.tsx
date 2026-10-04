@@ -664,6 +664,55 @@ const styles = createStaticStyles(({ css, cssVar }) => {
       align-self: flex-start;
       &:hover { opacity: 0.75; }
     `,
+    inspectionZone: css`
+      border: 1px solid ${cssVar.colorBorderSecondary};
+      border-radius: 10px;
+      overflow: hidden;
+    `,
+    inspectionZoneHeader: css`
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 14px;
+      cursor: pointer;
+      background: ${cssVar.colorFillQuaternary};
+      font-size: 12px;
+      font-weight: 600;
+      color: ${cssVar.colorTextSecondary};
+      user-select: none;
+      &:hover { background: ${cssVar.colorFillTertiary}; }
+    `,
+    inspectionZoneBody: css`
+      padding: 14px 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      background: ${cssVar.colorBgContainer};
+    `,
+    telemetryCard: css`
+      border: 1px solid ${cssVar.colorBorderSecondary};
+      border-radius: 8px;
+      overflow: hidden;
+    `,
+    telemetryCardHeader: css`
+      font-size: 11px;
+      font-weight: 700;
+      color: ${cssVar.colorTextSecondary};
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      padding: 6px 12px;
+      background: ${cssVar.colorFillQuaternary};
+      border-bottom: 1px solid ${cssVar.colorBorderSecondary};
+    `,
+    telemetryCardBody: css`
+      padding: 10px 12px;
+      font-size: 12px;
+      font-family: monospace;
+      color: rgba(255,255,255,0.8);
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    `,
     detailMain: css`
       flex: 1;
       padding: 24px 28px;
@@ -1958,6 +2007,111 @@ export const AssistantStatusDrawer = memo<AssistantStatusDrawerProps>(
                       </Highlighter>
                     </div>
                   ) : null}
+
+                  {/* 7. 🔍 深度工程观测与诊断数据 — 按需折叠 */}
+                  {(() => {
+                    const th = activeSubStep.thinking;
+                    const tc = activeSubStep.tool_call;
+                    const tr = activeSubStep.tool_result;
+                    const hasAny = th || (tc?.arguments && Object.keys(tc.arguments).length > 0) || tr?.stdout_head || tr?.stderr || tr?.error;
+                    if (!hasAny) return null;
+                    const [inspOpen, setInspOpen] = React.useState(false);
+                    return (
+                      <div className={styles.inspectionZone}>
+                        <div
+                          className={styles.inspectionZoneHeader}
+                          onClick={() => setInspOpen((v) => !v)}
+                        >
+                          <span>🔍 深度工程观测与诊断数据</span>
+                          <span style={{ fontSize: 11 }}>{inspOpen ? '▴ 收起' : '▾ 按需展开'}</span>
+                        </div>
+                        {inspOpen && (
+                          <div className={styles.inspectionZoneBody}>
+
+                            {/* Card A: 模型与决策指标 */}
+                            {th && (th.model || th.latency_ms != null || th.prompt_tokens != null || th.completion_tokens != null || th.decision) && (
+                              <div className={styles.telemetryCard}>
+                                <div className={styles.telemetryCardHeader}>⚙ 模型与决策指标</div>
+                                <div className={styles.telemetryCardBody}>
+                                  {activeSubStep.thinking?.model && (
+                                    <span>模型: <span style={{ color: '#60b1ff' }}>{activeSubStep.thinking?.model}</span></span>
+                                  )}
+                                  {activeSubStep.thinking?.latency_ms != null && (
+                                    <span>思考耗时: <span style={{ color: '#c4f042' }}>{activeSubStep.thinking?.latency_ms}ms</span></span>
+                                  )}
+                                  {activeSubStep.thinking?.prompt_tokens != null && (
+                                    <span>Prompt Tokens: <span style={{ color: '#faad14' }}>{activeSubStep.thinking?.prompt_tokens}</span></span>
+                                  )}
+                                  {activeSubStep.thinking?.completion_tokens != null && (
+                                    <span>Completion Tokens: <span style={{ color: '#faad14' }}>{activeSubStep.thinking?.completion_tokens}</span></span>
+                                  )}
+                                  {activeSubStep.thinking?.decision && (
+                                    <span>决策: <span style={{ color: '#ffffff' }}>{activeSubStep.thinking?.decision}</span></span>
+                                  )}
+                                </div>
+                              </div>
+                            )}
+
+                            {/* Card B: 结构化调用参数 */}
+                            {tc && activeSubStep.tool_call?.arguments && Object.keys(activeSubStep.tool_call?.arguments).length > 0 && (
+                              <div className={styles.telemetryCard}>
+                                <div className={styles.telemetryCardHeader}>📋 结构化调用参数</div>
+                                <Highlighter
+                                  language="json"
+                                  copyable
+                                  variant="borderless"
+                                  style={{ maxHeight: 240, overflow: 'auto', margin: 0 }}
+                                >
+                                  {JSON.stringify(activeSubStep.tool_call?.arguments, null, 2)}
+                                </Highlighter>
+                              </div>
+                            )}
+
+                            {/* Card C: 原始终端 I/O */}
+                            {(tr?.stdout_head || tr?.stderr || tr?.error) && (
+                              <div className={styles.telemetryCard}>
+                                <div className={styles.telemetryCardHeader}>💻 原始终端 I/O</div>
+                                <div style={{ padding: '8px 12px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+                                  {activeSubStep.tool_result?.stdout_head && (
+                                    <div>
+                                      <div style={{ fontSize: 10, color: '#595959', marginBottom: 4, fontFamily: 'monospace' }}>STDOUT</div>
+                                      <pre style={{ margin: 0, padding: '6px 10px', background: '#0d1117', borderRadius: 6, fontSize: 11, color: '#c4f042', maxHeight: 200, overflow: 'auto', whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>
+                                        {activeSubStep.tool_result?.stdout_head}
+                                      </pre>
+                                    </div>
+                                  )}
+                                  {activeSubStep.tool_result?.stderr && (
+                                    <div>
+                                      <div style={{ fontSize: 10, color: '#595959', marginBottom: 4, fontFamily: 'monospace' }}>STDERR</div>
+                                      <pre style={{ margin: 0, padding: '6px 10px', background: '#0d1117', borderRadius: 6, fontSize: 11, color: '#faad14', maxHeight: 160, overflow: 'auto', whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>
+                                        {activeSubStep.tool_result?.stderr}
+                                      </pre>
+                                    </div>
+                                  )}
+                                  {activeSubStep.tool_result?.error && !activeSubStep.tool_result?.stderr && (
+                                    <pre style={{ margin: 0, padding: '6px 10px', background: '#0d1117', borderRadius: 6, fontSize: 11, color: '#f4416c', maxHeight: 120, overflow: 'auto', whiteSpace: 'pre-wrap' }}>
+                                      {activeSubStep.tool_result?.error}
+                                    </pre>
+                                  )}
+                                </div>
+                              </div>
+                            )}
+
+                            {/* Card D: 完整思考链溯源 */}
+                            {activeSubStep.thinking?.reasoning && (
+                              <div className={styles.telemetryCard}>
+                                <div className={styles.telemetryCardHeader}>🧠 完整思考链溯源</div>
+                                <div style={{ maxHeight: 380, overflow: 'auto', padding: '10px 14px', fontSize: 12.5, color: 'rgba(255,255,255,0.78)', lineHeight: 1.7, whiteSpace: 'pre-wrap' }}>
+                                  {activeSubStep.thinking?.reasoning}
+                                </div>
+                              </div>
+                            )}
+
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })()}
                 </div>
               );
             })()}
