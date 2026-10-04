@@ -30,17 +30,7 @@ class ConnectorAuthIntent(BaseModel):
 
     def mark_consumed(self) -> ConnectorAuthIntent:
         """Returns a new ConnectorAuthIntent instance marked as consumed."""
-        return ConnectorAuthIntent(
-            intent_id=self.intent_id,
-            service=self.service,
-            app_name=self.app_name,
-            auth_url=self.auth_url,
-            connection_id=self.connection_id,
-            user_id=self.user_id,
-            created_at=self.created_at,
-            expires_at=self.expires_at,
-            consumed=True,
-        )
+        return self.model_copy(update={"consumed": True})
 
 
 __all__ = ["ConnectorAuthIntent"]

@@ -88,11 +88,6 @@ class ConnectorAuthIntentVault:
             if intent.user_id != user_id:
                 return None
 
-            # Check expiration
-            if intent.is_expired(now):
-                self._intents.pop(intent_id, None)
-                return None
-
             # Mark consumed on resolution
             if not intent.consumed:
                 intent = intent.mark_consumed()

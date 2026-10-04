@@ -29,8 +29,8 @@ class ConnectorPreExecutionGuard:
         """
         service_norm = service.lower().strip()
         conn = self._vault.get_connection(service_norm)
-        if conn is None or conn.state != ConnectionState.ACTIVE:
-            state_str = conn.state.value if conn else ConnectionState.NOT_CONNECTED.value
+        if conn.state != ConnectionState.ACTIVE:
+            state_str = conn.state.value
             raise ConnectionNotActiveError(
                 service=service_norm,
                 user_id=self._vault.user_id,

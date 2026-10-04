@@ -433,6 +433,20 @@ class RunSessionWriter(RunSessionWriterProtocol):
         return session.request_header()
 
 
+_CONNECTOR_WIDGET_RE = re.compile(r"\[widget:connector_auth\?([^\]]+)\]")
+
+
+def _parse_connector_widget_qs(query: str) -> dict[str, str | None]:
+    """Parse a ``[widget:connector_auth?...]`` query string into intent fields."""
+    qs = parse_qs(query)
+    return {
+        "intent_id": (qs.get("intentId") or qs.get("intent_id") or [None])[0],
+        "app_name": (qs.get("appName") or qs.get("app_name") or ["Connector"])[0],
+        "connection_id": (qs.get("connectionId") or qs.get("connection_id") or [""])[0],
+        "mode": (qs.get("mode") or [""])[0],
+    }
+
+
 def extract_pending_intents_from_events(
     events: Sequence[Any],
 ) -> list[dict[str, str]]:
@@ -450,28 +464,24 @@ def extract_pending_intents_from_events(
 
         if event_type == "surface/assistant_message":
             content = data.get("content") or ""
-            for match in re.finditer(r"\[widget:connector_auth\?([^\]]+)\]", content):
-                qs = parse_qs(match.group(1))
-                intent_id = (qs.get("intentId") or qs.get("intent_id") or [None])[0]
+            for match in _CONNECTOR_WIDGET_RE.finditer(content):
+                intent_id = _parse_connector_widget_qs(match.group(1))["intent_id"]
                 if intent_id:
                     mounted_intent_ids.add(intent_id)
 
         elif event_type in ("surface/tool_result", SURFACE_TOOL_RESULT_TYPE):
             content = data.get("content") or ""
             found = False
-            for match in re.finditer(r"\[widget:connector_auth\?([^\]]+)\]", content):
-                qs = parse_qs(match.group(1))
-                intent_id = (qs.get("intentId") or qs.get("intent_id") or [None])[0]
-                app_name = (qs.get("appName") or qs.get("app_name") or ["Connector"])[0]
-                connection_id = (qs.get("connectionId") or qs.get("connection_id") or [""])[0]
-                mode = (qs.get("mode") or [""])[0]
+            for match in _CONNECTOR_WIDGET_RE.finditer(content):
+                fields = _parse_connector_widget_qs(match.group(1))
+                intent_id = fields["intent_id"]
                 if intent_id:
                     tool_intents.append(
                         {
                             "intent_id": intent_id,
-                            "app_name": app_name,
-                            "connection_id": connection_id,
-                            "mode": mode,
+                            "app_name": fields["app_name"],
+                            "connection_id": fields["connection_id"],
+                            "mode": fields["mode"],
                         }
                     )
                     found = True
