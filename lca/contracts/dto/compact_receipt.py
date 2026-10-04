@@ -37,6 +37,10 @@ class CompactReceipt(BaseModel):
         bytes_after: payload size after compaction; equal to ``bytes_before``
             when ``compacted=False``.
         strategy: the literal name of the operation actually applied.
+        sedimented: facts persisted by the sediment pass before a
+            semantic strategy ran (ADR-0283 C1). ``0`` when no sediment
+            ran (truncate_oldest path) or when the sediment pass found
+            nothing worth persisting.
         at: UTC timestamp captured at node-call entry.
     """
 
@@ -46,10 +50,11 @@ class CompactReceipt(BaseModel):
     bytes_before: int
     bytes_after: int
     strategy: CompactStrategy
+    sedimented: int = 0
     at: datetime
 
     @classmethod
-    def noop(cls, *, bytes_seen: int) -> CompactReceipt:
+    def noop(cls, *, bytes_seen: int, sedimented: int = 0) -> CompactReceipt:
         """Build the under-threshold receipt.
 
         ``bytes_after == bytes_before`` because nothing was compacted.
@@ -60,6 +65,7 @@ class CompactReceipt(BaseModel):
             bytes_before=bytes_seen,
             bytes_after=bytes_seen,
             strategy="noop",
+            sedimented=sedimented,
             at=utc_now(),
         )
 
@@ -70,6 +76,7 @@ class CompactReceipt(BaseModel):
         bytes_before: int,
         bytes_after: int,
         strategy: CompactStrategy,
+        sedimented: int = 0,
     ) -> CompactReceipt:
         """Build the over-threshold receipt for one applied strategy.
 
@@ -93,11 +100,12 @@ class CompactReceipt(BaseModel):
             bytes_before=bytes_before,
             bytes_after=bytes_after,
             strategy=strategy,
+            sedimented=sedimented,
             at=utc_now(),
         )
 
     @classmethod
-    def skipped(cls, *, bytes_seen: int) -> CompactReceipt:
+    def skipped(cls, *, bytes_seen: int, sedimented: int = 0) -> CompactReceipt:
         """Build the error-path receipt.
 
         The compaction module raised; the graph re-routes to
@@ -111,6 +119,7 @@ class CompactReceipt(BaseModel):
             bytes_before=bytes_seen,
             bytes_after=bytes_seen,
             strategy="noop",
+            sedimented=sedimented,
             at=utc_now(),
         )
 
