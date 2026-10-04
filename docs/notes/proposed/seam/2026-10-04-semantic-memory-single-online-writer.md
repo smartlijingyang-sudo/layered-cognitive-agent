@@ -38,11 +38,41 @@ ADR-0249（Accepted）§0.1 的问题陈述是「在主对话轮次（`reflect/r
 
 `run_dream` 的调度是前置条件。它当前的唯一调用方是 `lca/infrastructure/cli/commands/ops/memory.py`，`{home}/routines/` 为空目录，bundles / profiles / deploy 无引用，宿主 crontab 无条目。离线轨在拿到调度之前不承接任何写入。
 
-**认领权。** 来源改为本轮 memory 工具的 Observation。`claim-latch.json` 及其读写路径、`take_claim_right`、`last_curated_receipt` setter 的 latch 副作用退役。ADR-0260 C1 的不变量保持，「一次写盘至多支撑一次用户可见宣称」由轮次作用域保证。此项触及 ADR-0260 §3 明列的非目标，需 ADR 级确认。
+**认领权。** 来源改为本轮 memory 工具的 Observation。`claim-latch.json` 及其读写路径、`take_claim_right`、`last_curated_receipt` setter 的 latch 副作用退役。ADR-0260 C1 的不变量保持，「一次写盘至多支撑一次用户可见宣称」由轮次作用域保证。此项触及 ADR-0260 §3 明列的非目标，退役前必须先有 ADR 裁决，见 §交付门禁 Phase 2。
+
+轮次边界是 `run_id`。认领权是对本 run journal 中 memory 工具 Observation 的派生读，既不是运行时缓存也不落盘。HIL 暂停与恢复保持同一 `run_id`，`RunSession.ambit` 是跨暂停的 ambient 真值载体，恢复侧不重新解析 providers，见 [HIL resume 必须重绑 RunAmbit](../../implemented/seam/2026-09-05-hil-resume-rebinds-ambit.md)。因此 `askUserQuestion` 暂停后恢复的回复与暂停前的写盘属于同一轮，派生读自然重建认领权，跨暂停不存在悬挂状态。把认领权缓存进实例字段会复现 `run_4fcfb6d83c8c` 那一类双实例不同步，派生读从结构上排除它。
 
 **对账。** 收敛到单一具名闸，具备 ADD / UPDATE / DELETE / NOOP 四操作，重复输入产 NOOP 而不是退役旧行。承载体取决于 ADR-0277 待拍板⑥/⑦。`_append_semantic` 的内联去重与未中选的另一套退役。
 
 **守卫 remedy。** `_CLAIM` 命中且本轮无写盘证据时，经 act→think re-ask 边重写一轮，注入本轮写盘台账，受 [act→think re-ask loop guard](../../implemented/2026-09-16-act-think-reask-loop-guard.md) 的硬上限约束，触顶才落 `_REFUSAL`。`_CLAIM` 收窄以排除条件式能力提议，并补反向回归测试。`think.decision.repair` 不承担此职责，它的范围是 tool-call 参数的确定性 schema 修复。
+
+## 交付门禁
+
+四个 Phase。Phase 0 到 Phase 1 严格串行，前一个的验收未达成则后一个不启动。Phase 2 与 Phase 3 各以自己的 ADR 裁决为前置，在 Phase 1 之后互不依赖，可并行。这是门禁，不是建议顺序。
+
+**Phase 0，dream 调度落地并跑稳。** `{home}/routines/` 或 ADR-0268 CronJob 中存在 `run_dream` 条目，且有条目之外的真实触发证据，例如 `dreams/` 下产物时间戳或 dream 自身的 journal 记录。调度周期需给出上界并接受 §产品决策待接受 的约束。Phase 0 未达成时 extract 保持在线，本提案其余部分不启动。
+
+**Phase 1，extract 的 LLM 蒸馏移入离线轨。** 仅在 Phase 0 验收达成后启动。在线保留毫秒级残差门控。47 个 extract-only 维度的落盘时延从本 Phase 起才发生，因此调度必须在本 Phase 之前已经跑稳，退化窗口一天都不开。
+
+**Phase 2，认领权改派生读，latch 退役。** 前置是 ADR-0260 C1 回执来源的裁决已落地。ADR-0260 §3 把「不改 `take_claim_right` 的消费语义」列为非目标，Notes 体系不改老 ADR，因此这一项必须由 ADR 先行裁决，修订 0260 或新开均可，不得随实施 PR 顺手退役。
+
+**Phase 3，对账收敛到单一具名闸。** 前置是 ADR-0277 待拍板⑥/⑦ 的裁决。
+
+## 产品决策待接受
+
+47 个 extract-only 事实维度的落盘时机从当轮变为下一次 dream pass。这是用户可感知的行为变化，需要产品负责人明确接受，不因 ADR-0260 §6.3 已裁决而默认通过。§6.3 裁决的是归属，不是时延。
+
+机制事实决定时延的严重度。
+
+- 在线残差门控把信号写进 `{home}/memory/episodes/<fact_id>.json`（`EpisodeBuffer`）与每日流水 `memory/YYYY-MM-DD.md`。捕获是当轮的。
+- `AssistantMemory.retrieve` 只读 `semantic.json` 与 `episodic.json`，不读 `memory/episodes/`。捕获到的残差在提升为语义记录之前不进注入路径。
+- `memory_search` 的 FTS 索引覆盖 curated records 与 trail files，由 `run_dream` 重建。两次 dream 之间索引是旧的。
+
+所以间隔期内这条偏好既不在系统提示里，也搜不到。今天随口纠正的偏好，在下一次 dream 之前会持续被违反。
+
+时延的可接受度完全由 dream 调度周期决定，而当前周期不存在，`run_dream` 只有手动 CLI 入口。每日一次对偏好纠正不够。`memory_extract.py:64` 放宽成本门正是为了让「还是简洁一点好」这类无第一人称偏好句落盘，把它推迟一天与该意图冲突。
+
+建议的接受条件是 Phase 0 的调度周期上界不大于一次会话的自然间隔，例如会话结束触发或空闲 N 分钟触发，使间隔期落在用户不感知的范围内，并把该上界写进 Phase 0 验收。若只能做到每日一次，离线轨需要保留一条在线的偏好纠正例外通道，那会重新引入第二写者，本提案需要重新评估。
 
 ## Alternatives considered
 
@@ -72,29 +102,45 @@ remember 晚于 respond，extract 结构上无法为本轮宣称提供回执。�
 
 ## Acceptance criteria
 
+Phase 0。
+
+- `{home}/routines/` 或 ADR-0268 CronJob 中存在 `run_dream` 条目，且有真实触发证据。
+- 调度周期上界满足 §产品决策待接受 的接受条件，且该上界写在调度配置里而不是只写在文档里。
+
+Phase 1。
+
 - 在线 turn 的 spine 中不出现 `phase.reflect.memory.extract` 触发的 `adapter.complete`。
-- `run_dream` 由调度触发，`{home}/routines/` 或 ADR-0268 CronJob 中存在对应条目。
+- 在线 turn 之后 `{home}/memory/episodes/` 仍有新增，残差捕获没有随蒸馏一起移走。
+- 同 dedupe_key 同时存在 user 与 model 来源的维度占比从 17/89 降至 0。
+
+Phase 2。
+
 - run 结束后 `{home}/memory/claim-latch.json` 不存在。
 - 「本轮无写盘 + 回复含宣称」被拒；「上一轮有写盘 + 本轮无写盘 + 本轮含宣称」同样被拒。
-- 同一事实经工具写入后，离线对账产 NOOP，`semantic.json` 行数与退役行数都不增长。
+- 「act 相写盘 + `askUserQuestion` 暂停 + resume + 回复含宣称」放行；「暂停前无写盘 + resume + 回复含宣称」被拒。两种情形下 `claim-latch.json` 都不存在。
+- 一次 run 内构造两个 `AssistantMemory` 实例，工具侧写盘后 runtime 侧解析认领权，两侧结论一致。
+
+Phase 3 与守卫 remedy。
+
+- 同一事实经工具写入后，离线对账产 NOOP，`semantic.json` 的行数与退役行数都不增长。
 - 复现 `run_3a523914cc0a` 的 draft，回复原文保持不被替换。
-- 同 dedupe_key 同时存在 user 与 model 来源的维度占比从 17/89 降至 0。
 
 ## Risks
 
-- 离线轨拿到调度之前，47 个 extract-only 维度对应的行为退化。用户陈述但 agent 未调工具的事实要等 dream pass 才进库，当轮检索不到。ADR-0260 §6.3 接受这个代价，但调度必须先行，否则是丢失而不是延迟。
+- 47 个 extract-only 维度的落盘时延是产品决策，见 §产品决策待接受。Phase 0 门禁保证它在调度跑稳之前不发生，调度周期上界决定它是否可接受。
 - re-ask remedy 增加一次 LLM 调用，上限由已有的 re-ask 硬上限约束，触顶回落 `_REFUSAL`。
 - 对账承载体依赖 ADR-0277 待拍板⑥/⑦。若裁决结果是不引入 `SemanticClaim`，`LinkDecider` 需改造为在 `MemoryRecord` 上工作，`consolidation.py` 的类型层随之调整。
-- 撤回条件：若 dream pass 无法获得稳定调度，离线轨不成立，退回「在线双写者 + 轮次作用域认领权」，即上述 Acceptance criteria 中除调度与 extract 迁移外的条目。
+- 撤回条件有两条。dream pass 拿不到满足周期上界的调度时离线轨不成立，Phase 1 不启动，退回「在线双写者 + 轮次作用域认领权」，即只落 Phase 2 与守卫 remedy。ADR 裁决否决派生读时 Phase 2 不启动，latch 保留并补轮次身份，跨轮泄漏由轮次作用域关闭，此时 Alternatives considered 里「给 latch 加轮次身份，保留双写者」那一项成为次优落点。
 
 ## Open questions
 
-1. ADR-0260 §3 把「不改 `take_claim_right` 的消费语义与拒绝句文案」列为非目标。本提案退役 `take_claim_right`，需要 ADR-0260 C1 的回执来源重述。Notes 体系不改老 ADR，这一项走 ADR 流程。
-2. ADR-0277 待拍板⑥（typed 对象是运行时投影还是新存储真值，与 ADR-0254 v2 决策 A 的关系）与待拍板⑦（`SemanticClaim` 与 ADR-0247 `MemoryRecord` 是替代、包装还是并行）决定对账闸的承载体。见 [ADR-0277 四问深审](../../audit-2026-10-03-adr0277-review.md) Q4。
-3. ADR-0277 待拍板③（sleep-time 载体）与 `run_dream` 的调度归属是同一件事的两面，需一并裁决。
+1. ADR-0260 §3 把「不改 `take_claim_right` 的消费语义与拒绝句文案」列为非目标。本提案退役 `take_claim_right`，需要 ADR-0260 C1 的回执来源重述。Notes 体系不改老 ADR，这一项走 ADR 流程，修订 0260 或新开均可。它是 Phase 2 的硬前置，裁决前不启动实施。
+2. ADR-0277 待拍板⑥（typed 对象是运行时投影还是新存储真值，与 ADR-0254 v2 决策 A 的关系）与待拍板⑦（`SemanticClaim` 与 ADR-0247 `MemoryRecord` 是替代、包装还是并行）决定对账闸的承载体，是 Phase 3 的硬前置。见 [ADR-0277 四问深审](../../audit-2026-10-03-adr0277-review.md) Q4。
+3. ADR-0277 待拍板③（sleep-time 载体）与 `run_dream` 的调度归属是同一件事的两面，需一并裁决，并给出 Phase 0 要求的周期上界。
+4. §产品决策待接受 的落盘时延尚未获得产品负责人明确接受，接受前 Phase 1 不启动。
 
 ## Related
 
-- ADR：[0249 昼夜双轨记忆固化](../../../adr/0249-cadence-inspired-dual-track-memory-consolidation.md)（Accepted）、[0260 强制检索与写盘铁律](../../../adr/0260-forced-retrieval-and-write-before-claim.md) C1 / §3 / §6.1 / §6.3、[0277 记忆机制的认知重构](../../../adr/0277-cognitive-memory-reconstruction.md) §2.3（Proposed）
-- Note：[做梦慢路径消费流水、维护亲近度并产出对齐综述](../../implemented/seam/2026-09-30-dream-slow-path.md)、[surface/assistant_message 由 think.llm.persist 独家写入](../../implemented/seam/2026-10-03-assistant-surface-single-producer.md)（同类缺陷先例，一个事实两个生产者）
+- ADR：[0249 昼夜双轨记忆固化](../../../adr/0249-cadence-inspired-dual-track-memory-consolidation.md)（Accepted）、[0260 强制检索与写盘铁律](../../../adr/0260-forced-retrieval-and-write-before-claim.md) C1 / §3 / §6.1 / §6.3、[0268 Context Bus、异步执行器与 Cron 投影](../../../adr/0268-context-bus-async-executors-and-cron-projection.md)（Phase 0 调度载体）、[0277 记忆机制的认知重构](../../../adr/0277-cognitive-memory-reconstruction.md) §2.3（Proposed）
+- Note：[做梦慢路径消费流水、维护亲近度并产出对齐综述](../../implemented/seam/2026-09-30-dream-slow-path.md)、[surface/assistant_message 由 think.llm.persist 独家写入](../../implemented/seam/2026-10-03-assistant-surface-single-producer.md)（同类缺陷先例，一个事实两个生产者）、[HIL resume 必须重绑 RunAmbit](../../implemented/seam/2026-09-05-hil-resume-rebinds-ambit.md)（轮次边界跨暂停的依据）、[act→think re-ask loop guard](../../implemented/2026-09-16-act-think-reask-loop-guard.md)（remedy 的硬上限）
 - 证据 run：`run_d30e848f0230`、`run_f4ff17657570`、`run_3a523914cc0a`、`run_5eb9f012455e`、`run_4fcfb6d83c8c`
