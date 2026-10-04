@@ -9,7 +9,11 @@ const { Text } = Typography;
 export interface ConnectorAuthCardProps {
   /** 连接器名称，如 Gmail / GitHub / Slack / Google Drive */
   appName?: string;
-  /** OAuth 授权跳转 URL (直接模式或备选) */
+  /**
+   * @deprecated legacy 字段：永不直接用于打开链接（fail-closed）。
+   * 唯一可用的授权凭据是 intentId；authUrl 仅在值为 cai_xxx 票据形态时
+   * 被兼容为 intentId 使用（票据非 URL，仍须经后端兑换）。
+   */
   authUrl?: string;
   /** 能力凭据意图 ID（Zero Model URL Exposure，点击时异步向后端兑换真实 URL） */
   intentId?: string;
@@ -177,9 +181,9 @@ export const ConnectorAuthCard = memo<ConnectorAuthCardProps>(
       'pending' | 'authorizing' | 'connected' | 'timeout' | 'error'
     >('pending');
     const [checking, setChecking] = useState(false);
-    const [resolvedUrl, setResolvedUrl] = useState<string | undefined>(
-      authUrl && authUrl.startsWith('http') ? authUrl : undefined,
-    );
+    // Fail-closed: 永不从 authUrl 预填可直接打开的 URL。
+    // 真实授权 URL 只能经 intentId 向后端兑换后写入 resolvedUrl。
+    const [resolvedUrl, setResolvedUrl] = useState<string | undefined>(undefined);
     const pollTimerRef = useRef<NodeJS.Timeout | null>(null);
     const startTimeRef = useRef<number>(0);
 
@@ -225,11 +229,15 @@ export const ConnectorAuthCard = memo<ConnectorAuthCardProps>(
       [connectionId, appName, onConnected],
     );
 
+    // 唯一可信的授权凭据：intentId prop，或 cai_xxx 票据形态的 authUrl
+    // （过渡兼容；票据非 URL，仍须经后端兑换）。
+    // http(s) 形态的 authUrl 永不被视为可用凭据、永不直接打开。
+    const effectiveIntentId =
+      intentId || (authUrl && authUrl.startsWith('cai_') ? authUrl : undefined);
+
     // 唤起 OAuth 独立窗口并启动带超时阶梯退避的轮询（支持 intentId 异步兑换）
     const handleStartAuth = useCallback(async () => {
       let targetUrl = resolvedUrl;
-      const effectiveIntentId =
-        intentId || (authUrl && (authUrl.startsWith('cai_') || !authUrl.startsWith('http')) ? authUrl : undefined);
 
       // 如果有 intentId 且尚未解析出真实 URL，异步向网关兑换一次性授权 URL
       if (!targetUrl && effectiveIntentId) {
@@ -266,11 +274,8 @@ export const ConnectorAuthCard = memo<ConnectorAuthCardProps>(
         }
       }
 
-      // 如果未解析到但 authUrl 为有效 http 链接
-      if (!targetUrl && authUrl && authUrl.startsWith('http')) {
-        targetUrl = authUrl;
-      }
-
+      // Fail-closed: 已移除 legacy 回退 —— http 形态的 authUrl 不再直接打开。
+      // 无 intentId 的旧标签只会走到下方 warning，不会弹窗。
       if (!targetUrl) {
         antMessage.warning('未能获取有效的授权跳转链接。');
         return;
@@ -325,7 +330,7 @@ export const ConnectorAuthCard = memo<ConnectorAuthCardProps>(
       };
 
       scheduleNextPoll();
-    }, [resolvedUrl, authUrl, intentId, appName, checkConnectionStatus]);
+    }, [resolvedUrl, effectiveIntentId, appName, checkConnectionStatus]);
 
     // 组件卸载时清理定时器
     useEffect(() => {
@@ -403,7 +408,12 @@ export const ConnectorAuthCard = memo<ConnectorAuthCardProps>(
                 size="small"
                 loading={status === 'authorizing' && checking}
                 onClick={handleStartAuth}
-                disabled={!authUrl && !intentId && !resolvedUrl}
+                disabled={!effectiveIntentId && !resolvedUrl}
+                title={
+                  !effectiveIntentId && !resolvedUrl
+                    ? '缺少有效的授权凭据（intentId），请让助理重新发起连接'
+                    : undefined
+                }
               >
                 {status === 'authorizing'
                   ? '重新打开授权窗'
