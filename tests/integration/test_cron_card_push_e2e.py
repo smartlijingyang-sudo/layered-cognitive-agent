@@ -82,12 +82,15 @@ def _make_job(job_id: str = "e2e-cron-card-001") -> CronJob:
 
 async def test_worker_delivers_card_to_session() -> None:
     sessions = _FakeSessionStore()
+    # 85c8cd81b: worker no longer creates an orphan session on target miss;
+    # the target session must exist for delivery.
+    sessions.create(CHAT_ID)
     runner = CronWorkerRunner(store=None, session_store=sessions)  # type: ignore[arg-type]
     job = _make_job()
 
     result = await runner.execute_job(job)
 
-    assert result == "completed"
+    assert result.outcome == "completed"
     sess = sessions.sessions.get(CHAT_ID)
     assert sess is not None
     assert len(sess.appended) == 1
@@ -101,6 +104,7 @@ async def test_worker_delivers_card_to_session() -> None:
 
 async def test_card_payload_is_structured_not_plaintext() -> None:
     sessions = _FakeSessionStore()
+    sessions.create(CHAT_ID)
     runner = CronWorkerRunner(store=None, session_store=sessions)  # type: ignore[arg-type]
     job = _make_job(job_id="e2e-cron-card-002")
 
@@ -140,6 +144,7 @@ async def test_job_context_text_path_executes_and_cleans_up(tmp_path: Path) -> N
     """经文本上下文触发（scheduler 真实调用路径），用完即删。"""
     store = CronStore(tmp_path / "assistants")
     sessions = _FakeSessionStore()
+    sessions.create(CHAT_ID)
     runner = CronWorkerRunner(store=store, session_store=sessions)
     job = _make_job(job_id="e2e-cron-card-003")
 
@@ -147,7 +152,7 @@ async def test_job_context_text_path_executes_and_cleans_up(tmp_path: Path) -> N
     assert store.get_job(job.id) is not None
 
     result = await runner(f"cron due\n- job_id: {job.id}\n")
-    assert result == "completed"
+    assert result.outcome == "completed"
     assert len(sessions.sessions[CHAT_ID].appended) == 1
 
     # 用完即删：不污染 cron 表
@@ -164,4 +169,4 @@ async def test_worker_unknown_job_id_fails_clean() -> None:
 
     runner = CronWorkerRunner(store=_EmptyStore(), session_store=_FakeSessionStore())  # type: ignore[arg-type]
     result = await runner("cron due\n- job_id: no-such-job\n")
-    assert result == "runtime_failure"
+    assert result.outcome == "runtime_failure"

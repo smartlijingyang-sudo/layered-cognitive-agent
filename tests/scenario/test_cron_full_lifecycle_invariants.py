@@ -231,6 +231,7 @@ async def test_inv_cron_03_self_healing_anti_bombing(tmp_path: Path) -> None:
     store = CronStore(asst_dir)
     lock_dir = tmp_path / "locks"
     session_store = _FakeSessionStore()
+    session_store.create("session_inv03")
 
     now = datetime(2026, 10, 3, 21, 30, tzinfo=UTC)
 
@@ -316,6 +317,7 @@ async def test_inv_cron_04_session_log_card_contract(tmp_path: Path) -> None:
     store = CronStore(asst_dir)
     lock_dir = tmp_path / "locks"
     session_store = _FakeSessionStore()
+    session_store.create("session_inv04")
 
     now = datetime(2026, 10, 3, 21, 30, tzinfo=UTC)
     job = CronJob(

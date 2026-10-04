@@ -146,7 +146,8 @@ def test_inv_02_execution_evidence_provenance(tmp_path: Path) -> None:
     assert evidence["command"] == raw_step["tool_call"]["arguments"]["command"]
     assert evidence["duration_ms"] == 3841
     assert evidence["exit_code"] == 0
-    assert evidence["truncated_boundary"] == "ZZSTART / ZZEND"
+    # 34c2e7d36 purged mock magics: untruncated evidence carries empty boundary
+    assert evidence["truncated_boundary"] == ""
     assert len(evidence["search_results"]) >= 1
     assert "runner.py" in evidence["search_results"][0]["location"]
     assert "seed_from_traces" in evidence["search_results"][0]["match"]
