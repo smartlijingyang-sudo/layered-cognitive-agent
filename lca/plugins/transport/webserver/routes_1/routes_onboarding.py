@@ -38,12 +38,9 @@ from lca.plugins.transport.webserver.handlers.auth.user import (
     auth_config_of,
     user_id_from_request,
 )
-from lca.plugins.transport.webserver.handlers.cors.cors import CORS_HEADERS
 from lca.plugins.transport.webserver.route.register import register_routes
+from lca.plugins.transport.webserver.routes_1.routes_assistants.codecs import _json
 
-
-def _json(payload: dict[str, Any], *, status_code: int = 200) -> JSONResponse:
-    return JSONResponse(payload, status_code=status_code, headers=CORS_HEADERS)
 
 def _error(detail: str, *, status_code: int, code: str) -> JSONResponse:
     return _json(
