@@ -87,6 +87,13 @@ entries:
   name: phase_think_context_truncate
   $module: lca.nodes.think.context.truncate
   config: {}
+# ADR-0283: sediment-before-compact + structured summary. Replaces
+# ``phase.think.context.truncate`` on the think subgraph under-cap path
+# (truncate retired from the plan; its module stays registered).
+- id: phase.think.context.summarize
+  name: phase_think_context_summarize
+  $module: lca.nodes.think.context.summarize
+  config: {}
 - id: lca.nodes.plan.compose
   name: lca_nodes_plan_compose
   $module: lca.nodes.plan.compose

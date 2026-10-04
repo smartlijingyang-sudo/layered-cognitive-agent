@@ -138,7 +138,7 @@ def test_plan_tree_web_standard_profile_json_structure() -> None:
         "think.shortcut",
         "think.route.decide",
         "think.budget.gate",
-        "think.context.truncate",
+        "think.context.summarize",
         "think.route",
         "think.reason",
         "think.history.assemble",

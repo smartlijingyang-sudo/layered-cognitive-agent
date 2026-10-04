@@ -7,14 +7,17 @@
 # PR-B (typed-port cutover): ``think.llm.dispatch`` is split into
 # ``llm.invoke`` (adapter call) + ``llm.persist`` (writer
 # append), and ``think.context.compact`` is split into
-# ``think.budget.gate`` (typed budget gate) + ``think.context.truncate``
-# (truncate strategy). Each new node owns exactly one responsibility;
-# routing decisions live in gate, journal writes live in persist,
-# truncation lives in truncate.
+# ``think.budget.gate`` (typed budget gate) + ``think.context.summarize``
+# (sediment-before-compact + structured summary, ADR-0283). Each new node
+# owns exactly one responsibility; routing decisions live in gate, journal
+# writes live in persist, sediment+summary lives in summarize.
+# ``think.context.truncate`` is retired from this plan (its plugin module
+# remains registered; summarize fail-closes to ``truncate_oldest``
+# internally and owns the ``-> think.route`` continuation edge).
 
 id: think.subgraph
 region: think
-purpose: think 11 节点执行 — shortcut → route.decide → budget.gate → context.truncate → route → reason → history.assemble → llm.invoke → llm.persist → decision.parse → gate
+purpose: think 11 节点执行 — shortcut → route.decide → budget.gate → context.summarize → route → reason → history.assemble → llm.invoke → llm.persist → decision.parse → gate
 
 nodes:
   - id: think.shortcut
@@ -36,10 +39,10 @@ nodes:
   # and either stops the run (subgraph terminates here,
   # ``routing.should_terminate=true`` bubbles up to
   # ``phase.main.outer`` which routes ``think.main`` →
-  # ``terminal.commit``) or continues to ``think.context.truncate``.
+  # ``terminal.commit``) or continues to ``think.context.summarize``.
   #
   # Not marked ``terminal: true``: this node has one conditional
-  # outgoing edge (→ think.context.truncate on should_terminate=false)
+  # outgoing edge (→ think.context.summarize on should_terminate=false)
   # and the lift-time validator forbids outgoing edges on terminal
   # nodes. Termination is edge-driven per ADR-0217 D4 — when the
   # executor emits ``should_terminate=true`` the only edge's predicate
@@ -55,14 +58,13 @@ nodes:
     config:
 
   # PR-B typed-port rewrite: truncation node now takes the typed
-  # ``budget`` + ``context_payload`` ports and emits only a
-  # ``CompactReceipt`` (no routing). The gate decision moved up to
-  # ``think.budget.gate``; this node owns only the
-  # ``truncate_oldest`` strategy. The error path emits a
-  # ``skipped`` receipt so the typed-boundary contract is preserved
-  # downstream (consumers never see ``None``).
-  - id: think.context.truncate
-    factory: think.context.truncate
+  # ADR-0283: sediment-before-compact + structured summary. Fail-closed:
+  # when the sediment pass cannot run or persist, the node degrades to
+  # ``truncate_oldest`` internally (receipt honestly labeled). Like the
+  # retired ``think.context.truncate``, this node emits no routing port
+  # and always advances to ``think.route`` (edge below).
+  - id: think.context.summarize
+    factory: think.context.summarize
     outputs: [compact_receipt]
     config:
 
@@ -193,7 +195,7 @@ edges:
       port: { name: routing, field: next_node }
       value: think.route
   - from: think.budget.gate
-    to: think.context.truncate
+    to: think.context.summarize
     when:
       kind: eq
       port: { name: routing, field: should_terminate }
@@ -207,10 +209,12 @@ edges:
   # ``bundles/outer/phase_main.yaml``, not in this subgraph, and a
   # cross-subgraph edge fails the ``Plan._one_entry`` validator
   # (``terminal.commit`` is unknown in the inner node set).
-  # PR-B: context.truncate no longer emits a routing port; it
-  # always advances to think.route after emitting its receipt
-  # (the budget gate already routed the should-terminate case).
-  - from: think.context.truncate
+  # ADR-0283: context.summarize emits no routing port; it always
+  # advances to think.route after emitting its receipt (the budget
+  # gate already routed the should-terminate case). This replaces the
+  # PR-B ``think.context.truncate -> think.route`` edge; truncate is
+  # retired from this plan.
+  - from: think.context.summarize
     to: think.route
   - from: think.route.decide
     to: think.gate
