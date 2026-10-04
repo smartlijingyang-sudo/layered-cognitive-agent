@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from lca.contracts.models.cron.models import ChatDelivery, TargetReceipt
+from lca.contracts.models.cron.models import ChatDelivery, CronRunOutcome, TargetReceipt
 
 __all__ = ["CronWorkerResult", "WorkerProductContext", "assemble_worker_context"]
 
@@ -21,12 +21,13 @@ class CronWorkerResult:
 
     ``CronRun.receipts`` stays empty until a delivery decision is written
     (ADR-0268 §6). The worker is the only place that knows whether a target
-    was reachable, so it owns the receipts and the scheduler records them
-    verbatim. Lives in the domain layer because it crosses the
-    worker-to-scheduler seam and neither side may import the other.
+    was reachable, so it owns the receipts and whoever records the run writes
+    them verbatim, be that the scheduler or the manual run-now route. Lives in
+    the domain layer because it crosses the worker-to-scheduler seam and
+    neither side may import the other.
     """
 
-    outcome: str
+    outcome: CronRunOutcome
     receipts: tuple[TargetReceipt, ...] = ()
 
 

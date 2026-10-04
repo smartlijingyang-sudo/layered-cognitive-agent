@@ -15,9 +15,8 @@ import tempfile
 import uuid
 from datetime import datetime
 from pathlib import Path
-from typing import Literal
 
-from lca.contracts.models.cron.models import CronJob, CronRun, TargetReceipt
+from lca.contracts.models.cron.models import CronJob, CronRun, CronRunOutcome, TargetReceipt
 
 __all__ = ["CronStore", "MultiAssistantCronStore"]
 
@@ -90,7 +89,7 @@ class CronStore:
         self,
         job_id: str,
         *,
-        outcome: Literal["completed", "runtime_failure", "timed_out", "superseded"],
+        outcome: CronRunOutcome,
         finished_at: datetime | None = None,
         receipts: tuple[TargetReceipt, ...] = (),
         run_id: str | None = None,
@@ -176,7 +175,7 @@ class MultiAssistantCronStore:
         self,
         job_id: str,
         *,
-        outcome: Literal["completed", "runtime_failure", "timed_out", "superseded"],
+        outcome: CronRunOutcome,
         finished_at: datetime | None = None,
         receipts: tuple[TargetReceipt, ...] = (),
         run_id: str | None = None,

@@ -390,15 +390,25 @@ async def run_assistant_job(request: Request) -> JSONResponse:
 
     session_store = getattr(getattr(request.app, "state", None), "session_store", None)
     runner = CronWorkerRunner(store=service._store, session_store=session_store)
-    outcome = await runner.execute_job(existing)
+    result = await runner.execute_job(existing)
 
-    service._store.append_run(job_id, outcome="completed", finished_at=datetime.now(UTC))
+    run_id = service._store.append_run(
+        job_id,
+        outcome=result.outcome,
+        receipts=result.receipts,
+        finished_at=datetime.now(UTC),
+    )
 
     return _json(
         {
             "assistant_id": assistant_id,
             "job_id": job_id,
-            "outcome": outcome,
+            "run_id": run_id,
+            # ``outcome`` says the worker finished; ``receipts`` say whether the
+            # card actually reached a chat. A manual run with no live session
+            # comes back completed + not_sent, and the caller needs both halves.
+            "outcome": result.outcome,
+            "receipts": [receipt.model_dump() for receipt in result.receipts],
             "triggered_at": datetime.now(UTC).isoformat(),
         },
         status_code=200,

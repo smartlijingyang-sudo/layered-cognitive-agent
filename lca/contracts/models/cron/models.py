@@ -18,6 +18,7 @@ __all__ = [
     "CronJob",
     "CronListItem",
     "CronRun",
+    "CronRunOutcome",
     "CronValidationError",
     "DailySchedule",
     "HourlySchedule",
@@ -29,6 +30,12 @@ __all__ = [
     "TargetReceipt",
     "WeeklySchedule",
 ]
+
+
+#: Terminal states of one cron run (ADR-0268 §6). Every writer of a run
+#: record and every worker result that feeds one spells this same set, so the
+#: closed set lives here once.
+CronRunOutcome = Literal["completed", "runtime_failure", "timed_out", "superseded"]
 
 
 class CronValidationError(ValueError):
@@ -210,7 +217,7 @@ class CronRun(BaseModel):
     model_config = ConfigDict(frozen=True, extra="forbid")
 
     run_id: str = Field(..., min_length=1)
-    outcome: Literal["completed", "runtime_failure", "timed_out", "superseded"]
+    outcome: CronRunOutcome
     receipts: tuple[TargetReceipt, ...] = ()
     finished_at: datetime | None = None
 

@@ -27,7 +27,7 @@ import logging
 from collections.abc import Callable
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Literal
+from typing import Any
 
 from pydantic import BaseModel, SecretStr
 
@@ -42,7 +42,7 @@ from lca.contracts.harness.composition.plugin_contract import (
     PluginContract,
     PluginIdentity,
 )
-from lca.contracts.models.cron.models import CronJob, CronRun
+from lca.contracts.models.cron.models import CronJob, CronRun, CronRunOutcome
 from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import (
     OwnershipDeclaration,
 )
@@ -154,7 +154,7 @@ class _AvatarCronStore:
         self,
         job_id: str,
         *,
-        outcome: Literal["completed", "runtime_failure", "timed_out", "superseded"],
+        outcome: CronRunOutcome,
         finished_at: Any = None,
         receipts: tuple[Any, ...] = (),
         run_id: str | None = None,
