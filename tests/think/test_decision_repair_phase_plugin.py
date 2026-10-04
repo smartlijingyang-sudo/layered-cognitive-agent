@@ -340,13 +340,21 @@ async def test_decision_repair_empty_decision_returns_empty_output() -> None:
 
 @pytest.mark.asyncio
 async def test_decision_repair_no_registry_passes_known_calls() -> None:
-    """No ``tools`` registry on ``runtime`` → unknown-name check is skipped.
+    """No ``tools`` port → the argument-shape check is skipped entirely.
 
-    Per ADR-0047's wire-block split, schema repair lives here and
-    wire-level rejection lives in Body. Without a registry the
-    repair node cannot tell whether a name is unknown, so it lets
-    the call through and emits ``decision_ok`` — the wire gate at
-    Body remains the safety net for unknown-tool-name blocking.
+    This is a degraded state, not a safe fallback. The Body wire gate
+    only blocks a payload whose required keys are *all* absent
+    (``missing_arguments_block_observation``), so a wrong-shaped
+    argument dict with the required keys present walks straight through
+    to the tool. ``run_56f67fbf52d9`` reached ``cron.add`` that way and
+    was stopped only by ``CronAddTool.validate()``, which reported it
+    through the authorization vocabulary as ``phase.tool.denied``.
+
+    The production bundle always wires the port
+    (``bundles/think/think_subgraph.yaml``), and
+    ``scripts/check_bundle_ports.py`` fails the build if that wiring is
+    dropped again. This test pins the degraded behaviour so a future
+    change to it is deliberate.
     """
     executor = ThinkDecisionRepairExecutor()
     decision = _decision(_call(arguments={"text": "hello", "count": 1}))
@@ -359,6 +367,76 @@ async def test_decision_repair_no_registry_passes_known_calls() -> None:
     forwarded: Decision = output.port_values["decision"]
     routing: RoutingDecision = output.port_values["routing"]
     assert forwarded is decision
+    assert routing.next_node == "think.gate"
+    assert routing.next_hint == "decision_ok"
+
+
+# The exact arguments ``run_56f67fbf52d9`` sent to ``cron.add`` at spine
+# seq 570, rejected by the tool's own validate() and re-sent correctly at
+# seq 841. ``schedule`` is required and must be an object; this payload
+# flattens ``at`` and ``kind`` to the top level instead.
+_CRON_ADD_FLAT_SCHEDULE: dict[str, Any] = {
+    "at": "2026-10-04T14:33:33+08:00",
+    "body": "提醒用户：该睡觉了！",
+    "execution": {"kind": "agent"},
+    "id": "sleep_reminder_20261004",
+    "kind": "oneshot",
+    "title": "提醒睡觉",
+}
+
+_CRON_ADD_NESTED_SCHEDULE: dict[str, Any] = {
+    "body": "提醒用户：该睡觉了！",
+    "execution": {"kind": "agent"},
+    "id": "sleep_reminder_20261004",
+    "schedule": {"at": "2026-10-04T14:33:33+08:00", "kind": "oneshot"},
+    "title": "提醒睡觉",
+}
+
+
+def _registry_with_real_cron_add() -> _FakeRegistry:
+    """Registry carrying the production ``cron.add`` schema, not a fake."""
+    from lca.infrastructure.tools.cron.add import CronAddTool
+
+    return _FakeRegistry(
+        {"cron.add": _FakeTool("cron.add", CronAddTool.parameters)},
+    )
+
+
+@pytest.mark.asyncio
+async def test_decision_repair_rejects_recorded_cron_add_flat_schedule() -> None:
+    """Regression for run_56f67fbf52d9: the malformed payload must not reach Body.
+
+    With the real ``cron.add`` schema on the ``tools`` port, the flattened
+    ``schedule`` is rejected in Think and re-routed to ``think.route.decide``
+    for a re-reason. Before the port was wired the executor saw a ``None``
+    registry, skipped the check, and the call escaped to the tool layer.
+    """
+    executor = ThinkDecisionRepairExecutor()
+    decision = _decision(_call(name="cron.add", arguments=_CRON_ADD_FLAT_SCHEDULE))
+
+    output = await executor.node_execute(
+        _ctx(),
+        _input(decision, tools=_registry_with_real_cron_add()),
+    )
+
+    routing: RoutingDecision = output.port_values["routing"]
+    assert routing.next_node == "think.route.decide"
+    assert routing.next_hint == "decision_rejected_truncated"
+    assert output.port_values["decision"] is decision
+
+
+@pytest.mark.asyncio
+async def test_decision_repair_passes_recorded_cron_add_nested_schedule() -> None:
+    """The corrected payload from the same run passes on the real schema."""
+    executor = ThinkDecisionRepairExecutor()
+    decision = _decision(_call(name="cron.add", arguments=_CRON_ADD_NESTED_SCHEDULE))
+
+    output = await executor.node_execute(
+        _ctx(),
+        _input(decision, tools=_registry_with_real_cron_add()),
+    )
+
+    routing: RoutingDecision = output.port_values["routing"]
     assert routing.next_node == "think.gate"
     assert routing.next_hint == "decision_ok"
 
