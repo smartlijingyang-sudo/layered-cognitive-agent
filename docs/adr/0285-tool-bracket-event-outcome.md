@@ -1,88 +1,88 @@
-# ADR-0285：工具括号 EP 的 outcome 真值与双重发射收口
+# ADR-0285：工具调用结局的单一所有权与括号事件收口
 
 ## 状态
 
 **Proposed — 2026-10-04**
 
-> **一句话**：`act.dispatch` / `act.observe.normalize` 节点级 `emit_on_exit` 把 `body.tool.execute.end` / `phase.tool.call.end` 的 `outcome` 恒写 `"success"`，因为 `dispatch_node_emits` 只传 `state`；而同一 EP 名已被决策级发射以真值复用（`wrapper="decision"`）。ADR-0240 预言的「节点级 dispatch 与命令式发射双重发射」已经发生。本 ADR 在「让括号事件携带真实 outcome」「移除括号事件的 outcome 字段」「移除冗余括号事件」三条路之间裁决。
+本 ADR 从第一原理推导工具调用结局应如何落盘，裁决「节点级工具括号事件」的去留。第一次起草采用实证+候选表结构；2026-10-04 按第一原理重写：先定行为要求与不变量，再从零设计推导出目标，最后把现状差距和决策作为推导结论呈现。arch 轮裁决记录保留在 §决策记录。
 
-## 0. 接任务前 7 问（精简自检）
+## 1. 第一原理
 
-1. 谁受益？raw spine 读者、`lca-ops journal trace` 的 footer 计数、未来任何以这些 EP 为输入的消费者。
-2. 真实问题？(a) 括号事件的 `outcome="success"` 无条件成立，与 receipt 的事实相反时也成立（`run_56c3352cd22e` 有 2 次 `tool_wire` 失败，括号事件仍报 success）；(b) `lca-ops journal trace` 把 `phase.tool.call.end` 计数成「tool call」，括号事件让计数膨胀（10 次真实调用数成 18）；(c) 同一 EP 名存在两种语义载荷，只能靠 `wrapper` 字段区分。
-3. 删掉会坏什么？取决于方案：删字段（D）无行为变化；删事件（E）会移除一组 spine 事件，需要核对依赖测试。
-4. 更简单方案？在 backlog 记一笔然后不动。否决：raw spine 里已经躺着 18 个 `phase.tool.call.end`，其中 10 个没有 tool 身份、outcome 恒 success，任何新消费者都会读错。
-5. 契约先行？是。实现未动，本 ADR 是纯决策记录。
-6. 与现有 ADR 冲突？ADR-0240（node-emit dispatch）是父契约，其 §Risks 显式列出「与命令式 `publish_ep_bound` 双重发射」并标为 out of scope——本 ADR 正是收口那一条。ADR-0282 让被拒调用入 journal，括号事件与被拒路径无关。
-7. 状态诚实？Proposed。三条候选路线各有代价，待拍板见 §4。
+**每次工具调用尝试的结局必须可从运行记录判定，且任何运行记录不得声称与权威结局相反的事实。**
 
-## 1. 实证（main@2edc98c18）
+「尝试」包含三类：成功执行、派发后失败、派发前被拒。这三类都必须让读者（机器或人）判定结局。任何记录如果带有结局字段，其值不得与权威结局矛盾；如果该记录无法取得权威结局，它就不带结局字段。
 
-### 1.1 发射链路
+## 2. 不变量（非协商项）
 
-- `lca/loop/emit/node_emitter.py::dispatch_node_emits(node_config, key, state)` 只把 `state` 传给 `emit_for_node`；`emit_for_node(ep_id, state, **kwargs)` 本身有 `**kwargs` 转发能力（:93-99），但没有东西可传。
-- `lca/infrastructure/session/emit/cognitive_emit/tool_events.py`：`emit_body_tool_execute_end_for_state(state, *, outcome="success", ...)` 发布 `{"state_id": ..., "outcome": "success"}`；`emit_phase_tool_call_end_for_state` 同构。`outcome` 默认值因此永远生效。
-- `bundles/act/act_subgraph.yaml`：`act.validate` `emit_on_enter: [phase.tool.call.start]`；`act.dispatch` `emit_on_enter: [body.tool.execute.start]`、`emit_on_exit: [body.tool.execute.end]`、`outputs: [receipt]`；`act.observe.normalize` `emit_on_exit: [phase.tool.call.end]`、`inputs/outputs: [receipt]`。
-- `lca/framework/graph/interpreter.py:244,267`：`dispatch_node_emits(context.node_config, "emit_on_enter"/"emit_on_exit", outer_state)`。退出分支里 `output: NodeOutput = await strategy.execute(...)` 就在作用域内（:263-267），节点输出的 `receipt` 端口当时可得。
+- **回执单一所有权（AGENTS.md §2.2）**：`EffectReceipt` 是执行边界产生的权威结局；`step.tool_result.record` 是它在 journal 的单一真值。任何对象不能同时承担事实源和投影职责，因此同一结局事实不允许有第二个生产者。
+- **C11 事件闭集**：`EXECUTION_POINTS` 是白名单，每个 EP 名必须有一个注册的语义、一个注册的生产者集合。
+- **C14 图与业务隔离**：图框架不知道业务，业务不感知图框架。
+- **ADR-0240 节点 emit 契约**：`emit_on_enter` / `emit_on_exit` 是 yaml 声明的生命周期触发器；节点 executor 不得 import `node_emitter`。其 Risks 节已预言「节点级 dispatch 与命令式发射双重发射」并标为 out of scope。
+- **ADR-0282 派发前拒绝写实**：被拒调用必须留下 `step.tool_call.record(status="wire_blocked")` + `step.tool_result.record(ok=False)`。
+- **控制/观察分离（C7）**：`AgentState` 是业务状态，不是观测总线。
 
-### 1.2 同一 EP 名下的两种载荷
+## 3. 从零设计
 
-`run_56c3352cd22e` 的 `phase.tool.call.end` 共 18 个：
+以第一原理为唯一要求重新设计工具调用观测词表，得到的答案不含节点级括号事件：
 
-- 10 个节点括号事件，无 `tool_name`，载荷 `{state_id}` + `outcome="success"`；
-- 8 个 call 级事件，带 `tool_name` 与 `ok`（真实执行路径）。
+- `step.tool_call.record`：尝试身份（tool / invocation_id / arguments / status）。
+- `step.tool_result.record`：结局真值（ok / outcome / error / failure_kind）。
+- `body.tool.execute.start|end`：一次 `use_tool` 决策的括号，带 `wrapper="decision"` 与真实结局，用于包住多 call 批次。
+- `phase.tool.call.start|end`：每个派发到执行器的 call 的相位标记。
+- 节点访问本身由 `phase_graph.node.*` 观测，其结局（策略执行成功或抛异常）已经在那条事实里。
 
-`body.tool.execute.end` 同理 18 个：10 个括号事件 + 决策级/调用级 8 个带 `tool_name`、`wrapper="decision"`、`outcome`（`UseToolOperation` 里 `commit_body_tool_decision_end` 的真值）。
+工具结局真值只存在于 `step.tool_result.record`。任何节点生命周期标记都不携带工具结局字段，因为节点访问没有权威结局，只有回执有。
 
-### 1.3 没有任何消费者读括号事件的 outcome
+## 4. 现状与差距
 
-- `ToolDeriver` 只读 `step.tool_call.record` / `step.tool_result.record` / `body.sandbox.*` / `runtime.diagnostic`，不读这两个 EP。
-- `journal_step_tree.yaml` 的 `tool_result_span_end` 从 `body.tool.execute.end` 提取 `ok`（不是 `outcome`），括号事件不写 `ok`，因此不污染折叠。
-- `render.py:168-190` 渲染 `tool_name` / `ok` / `latency_ms`，不渲染 `outcome`。
-- `render.py:739` 的 footer 用 `ep_counter.get("phase.tool.call.end")` 当「tool call」计数，括号事件使其膨胀。
+现状在从零设计的目标之外多出一组「节点括号事件」：
 
-### 1.4 ADR-0240 的预言
+- `bundles/act/act_subgraph.yaml`：`act.validate` `emit_on_enter: [phase.tool.call.start]`；`act.dispatch` `emit_on_enter: [body.tool.execute.start]`、`emit_on_exit: [body.tool.execute.end]`；`act.observe.normalize` `emit_on_exit: [phase.tool.call.end]`。
+- `lca/loop/emit/node_emitter.py::dispatch_node_emits` 只把 `state` 传给 emitter，于是 `emit_phase_tool_call_end_for_state` / `emit_body_tool_execute_end_for_state` 的 `outcome="success"` 默认值永远生效（`tool_events.py:41,110`）。
+- 结果：`body.tool.execute.end` 与 `phase.tool.call.end` 各自有两种载荷——括号事件只有 `state_id` + `outcome="success"`，决策级/调用级事件带 `tool_name` 与真实结局（`wrapper="decision"`）。`run_56c3352cd22e` 中 `phase.tool.call.end` 共 18 个，10 个是没有工具身份、结局恒 success 的括号事件。
 
-ADR-0240 §Risks 原文：act executor 的命令式调用与新 driver-level dispatch 会同时发 `phase.tool.call.start/end`，spec 已将其标为 out of scope。本节给出该 out-of-scope 项的实证：双重发射已发生，且其中一重（节点括号）无业务数据。
+差距由两个独立缺陷组成：
 
-## 2. 候选路线
+1. **类别错误**：节点访问的结局（控制面）被写成了工具结局（业务面）。回执失败时，括号事件仍报 success，违反第一原理。
+2. **结构冗余**：节点括号与决策级 `wrapper="decision"` 括号功能相同（都是「一次 use_tool 决策的起止」），ADR-0240 预言的重复发射已经发生。
 
-| | 改动 | 括号 outcome | 双重发射 | footer 计数 | 成本 | 架构 |
+## 5. 决策
+
+1. **立即（D）**：`emit_phase_tool_call_end_for_state` 与 `emit_body_tool_execute_end_for_state` 不再写 `outcome` 字段。括号事件回归纯生命周期标记（`state_id`），消除违反第一原理的假字段。这是过渡步骤，不是终态。
+2. **收口（E）**：从 `bundles/act/act_subgraph.yaml` 移除上述 5 条括号 emit 声明，关闭 ADR-0240 的 out-of-scope 风险，使 `body.tool.execute.*` / `phase.tool.call.*` 回归单一语义。移除后被拒路径仍有完整事实（ADR-0282 的 step 记录），成功/失败路径仍有决策级与调用级事件，无空白。
+3. **计数口径**：`lca-ops journal trace` 的「tool call」改读 `step.tool_call.record`（它统计每次尝试并带 status）；`status="wire_blocked"` 不计入执行数，被拒数以独立计数保持可见。
+4. **契约钉住区分键**：决策级 `body.tool.execute.*` 的 `wrapper="decision"` 写入 spine 事件目录，成为该 EP 的显式区分字段，防止 raw 消费者把两种语义读混。
+
+## 6. 备选方案与不变量评估
+
+| 选项 | 满足第一原理 | C11 单一语义 | §2.2 单一所有权 | C14 | ADR-0240 | 结论 |
 |---|---|---|---|---|---|---|
-| A | `dispatch_node_emits` 增传 `outputs=output.port_values`，`node_emitter` 从 `receipt` 端口读 `EffectOutcome` 映射 | 真实 | 仍双（但两重都真） | 仍膨胀 | 中：interpreter + node_emitter + helper 契约 + spine.yaml 字段 | C14 保持（框架只转不透明端口值），但同一 outcome 真值出现第二个生产者，违反 §2.2「回执/投影单一所有权」 |
-| B | `AgentState` 加「最近 receipt outcome」字段 + Reducer `apply_*` + fold mirror（C12） | 真实 | 仍双 | 仍膨胀 | 大 | C4/C7 冲突：State 是业务状态，不是观测总线 |
-| C | act 节点 executor 自己 `publish_ep_bound` 发真实 outcome，从 yaml 声明移除 | 真实 | 三发风险 | — | 中 | 违反 ADR-0240「executors MUST NOT import node_emitter」，重开 strategy-skipping bug |
-| D | 括号 helper 不再发 `outcome` 字段（纯生命周期标记） | 无 | 仍双（一重无业务数据） | 仍膨胀（另行修） | 最小 | 诚实：不写无法填真的字段；与决策级事件靠 `wrapper` 区分 |
-| E | 从 yaml 移除 `act.validate`/`act.dispatch`/`act.observe.normalize` 的 5 条括号 emit 声明 | 移除事件 | 消除 | 正确（`phase.tool.call.end` 只剩 call 级） | 中：删 spine 事件 + 核对依赖测试 | 最净：决策级对（`commit_body_tool_decision_*`）+ call 级对 + ADR-0282 的 step 记录已覆盖全部语义 |
+| A 括号携带真实 outcome（driver 转发输出） | 是 | 否（EP 仍双语义） | 违反：第二个结局生产者 | 通过 | 通过 | 否决 |
+| B AgentState 承载结局 | 是 | 否 | 违反 C7（State 当观测总线） | — | 通过 | 否决 |
+| C 节点 executor 自发射 | 是 | 是 | 是 | 违反 | 违反 | 否决 |
+| D 移除 outcome 字段 | 是 | 否（过渡态） | 通过 | 通过 | 通过 | **先行** |
+| E 移除括号事件 | 是 | 是 | 通过 | 通过 | 通过 | **收口** |
+| 什么都不做 | 否 | 否 | 违反 | — | — | 否决 |
 
-被拒路径的行为：ADR-0282 之后，被拦调用有 `step.tool_call.record(status="wire_blocked")` + `step.tool_result.record(ok=False)`。因此 E 移除括号事件后，被拒调用仍有完整 journal 事实，无空白。
+否决理由均来自不变量，不是成本偏好：A 给回执结局制造第二个生产者，两份漂移时无法裁决；B 让业务状态承载观测值；C 重开 ADR-0240 关掉的 strategy-skipping bug；什么都不做保持恒假的 `outcome`。
 
-## 3. 推荐
+## 7. 后果
 
-**D 为最小修正，E 为架构收口，A 否决。**
+- **类型与失败语义**：工具结局事实唯一在 `step.tool_result.record`；`body.tool.execute.*` / `phase.tool.call.*` 只承担身份与相位，不再声称结局。被拒调用由 `status="wire_blocked"` 区分，失败调用由 `ok=False` 区分。
+- **时序**：决策级 `body.tool.execute.end` 仍在工具执行后由 `UseToolOperation` 的 finally 写；括号事件移除不影响它。
+- **所有权**：工具结局单一生产者 = `step.tool_result.record`；节点生命周期观测 = `phase_graph.node.*`；EP 语义单一。
+- **外部后果**：raw spine 里不再出现无身份、恒 success 的工具事件；`lca-ops journal trace` 计数恢复真实；`run_56c3352cd22e` 这类「10 次尝试被拒 2 次仍读 ok」的 run 在 ADR-0282 落地后健康判定已正确，本 ADR 进一步消除计数与 raw 数据里的残余误导。
+- **兼容**：D 与 E 都是删除性变更。E 会减少 spine 事件体积，需要盘点以括号事件为锚的测试（如 `tests/integration/test_act_dispatch_join_observe_e2e.py`）。
 
-- D：`emit_body_tool_execute_end_for_state` / `emit_phase_tool_call_end_for_state` 不再写 `outcome` 字段。括号回归纯生命周期标记（`state_id` 而已），不留假信号。改 `render.py:739` 的 footer 计数为读 `step.tool_call.record`（该 EP 有 `status` 可区分 wire_blocked），独立可做。
-- E：下一步把 5 条括号 emit 从 `bundles/act/act_subgraph.yaml` 移除，并核对 `tests/integration/test_act_dispatch_join_observe_e2e.py` 等测试是否以括号事件为锚。这一步才真正关闭 ADR-0240 的 out-of-scope 风险。
-- A 否决理由：让括号携带真实 outcome 等于给 `EffectOutcome` 造第二个事实源，§2.2 要求回执单一所有权。`step.tool_result.record` 已是 receipt 的 journal 真值；括号再加一份，两份漂移时无法裁决。
-- B、C 否决理由：分别违反 C4/C7 与 ADR-0240。
+## 8. 相关
 
-## 4. 待拍板（需 arch 轮裁决）
-
-1. **D 还是 E？** 本次只做 D（最小修正）还是连 E（移除冗余括号事件）一起立项？E 会改变 spine 事件体积与若干依赖测试，建议单独一轮。
-2. **footer 计数口径**：`lca-ops journal trace` 的「tool call」是否改读 `step.tool_call.record`？被拒调用（`status="wire_blocked"`）是否计入计数？
-3. **是否给决策级 `body.tool.execute.*` 增加显式 `wrapper="decision"` 契约**，让 raw spine 消费者能稳定区分两重语义（当前 `wrapper` 字段存在但无契约约束）？
-
-## 5. 验收（给 tests/quality lane）
-
-- 若选 D：`phase.tool.call.end` / `body.tool.execute.end` 的括号载荷不再含 `outcome`；新增/修改 `tests/framework/graph/test_interpreter_node_emit.py` 一类测试断言载荷形状；`lca-ops journal trace` footer 计数不再膨胀。
-- 若选 E：`bundles/act/act_subgraph.yaml` 移除 5 条声明；`test_act_dispatch_join_observe_e2e.py` 与任何依赖括号事件的测试同步更新；验证被拒路径仍有完整事实。
-- 任一方案：`ruff` + 受影响套件失败集与基线一致，`lint-imports` 无新增。
+- [ADR-0240](0240-node-emit-dispatch-whitelist-additions.md) — 节点 emit 调度契约；§Risks 预言本 ADR 收口的双重发射。
+- [ADR-0282](0282-blocked-tool-call-journal.md) — 派发前拒绝写实；被拒路径的事实来源。
+- AGENTS.md §2.2（回执/投影单一所有权）、§3 C7/C11/C14。
+- 关联缺口（不在本 ADR 范围）：`body.tool.execute.start` 存在调用级事件（按 `toolu_*` 键）但没有配对的调用级 end，属既有的 start/end 计数不对称问题，另立议题。
 
 ## 决策记录
 
-- 2026-10-04：ADR-0285 起草（Proposed），证据基于 `run_56c3352cd22e` 与 main@2edc98c18。
-- 2026-10-04：arch 轮裁决（ADR §4 明确委托本轮；裁决只落决策记录，代码改动按 lane 边界交 quality/tests 轮）：
-  1. **D 先行，E 另立一轮**：`emit_body_tool_execute_end_for_state` / `emit_phase_tool_call_end_for_state` 不再写 `outcome` 字段——括号回归纯生命周期标记（`state_id` 而已），不留假信号。E（从 yaml 移除 act 括号 emit 声明）需先盘点依赖测试（`tests/integration/test_act_dispatch_join_observe_e2e.py` 等是否以括号事件为锚），单独一轮处理，不与 D 捆绑。
-  2. **footer 计数口径**：`lca-ops journal trace` 的「tool call」改读 `step.tool_call.record`；`status="wire_blocked"` 不计入执行数（从未执行），建议另给「被拒」计数保持可见，不与执行数混同。
-  3. **`wrapper="decision"` 显式契约：采纳**。决策级 `body.tool.execute.*` 的 `wrapper="decision"` 钉为 spine 事件目录显式区分字段，防止 raw 消费者静默读错两重语义；tests lane 可钉区分字段断言。
-  - 裁决依据：实证复核通过——`tool_events.py:41/110/143` outcome 默认 `"success"`；`bundles/act/act_subgraph.yaml` 括号声明在位（validate enter `phase.tool.call.start`、dispatch enter/exit `body.tool.execute.start/end`、normalize exit `phase.tool.call.end`）；`dispatch_node_emits` 只传 state（ADR §1.1 链路与代码一致）；无消费者读括号 outcome（ADR §1.3）。路线与 ADR §3 推荐一致（D 最小修正先行，E 作为架构收口后续）；ADR-0240 Risks 已预言双重发射，本裁决收口 D 部分。
+- 2026-10-04：ADR-0285 第一次起草（Proposed），实证基于 `run_56c3352cd22e` 与 main@2edc98c18。
+- 2026-10-04：arch 轮裁决（记录于第一次起草后）：① D 先行、E 另立一轮；② footer 计数改读 `step.tool_call.record`，`wire_blocked` 不计执行数；③ `wrapper="decision"` 显式契约采纳。裁决依据与 §5 一致。
+- 2026-10-04：按第一原理重写（本版本）：引入 §1-3 的推导链，把 D/E/计数/wrapper 作为推导结论而非候选偏好呈现。
