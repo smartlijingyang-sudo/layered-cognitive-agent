@@ -10,9 +10,24 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from lca.contracts.models.cron.models import ChatDelivery
+from lca.contracts.models.cron.models import ChatDelivery, TargetReceipt
 
-__all__ = ["WorkerProductContext", "assemble_worker_context"]
+__all__ = ["CronWorkerResult", "WorkerProductContext", "assemble_worker_context"]
+
+
+@dataclass(frozen=True, slots=True)
+class CronWorkerResult:
+    """One worker execution: its outcome plus one receipt per delivery target.
+
+    ``CronRun.receipts`` stays empty until a delivery decision is written
+    (ADR-0268 §6). The worker is the only place that knows whether a target
+    was reachable, so it owns the receipts and the scheduler records them
+    verbatim. Lives in the domain layer because it crosses the
+    worker-to-scheduler seam and neither side may import the other.
+    """
+
+    outcome: str
+    receipts: tuple[TargetReceipt, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
