@@ -273,3 +273,42 @@
 - 验证结果: ruff check 1 文件全过;冒烟导入(spawn_member 属性消失、__all__ 条目消失、其余 7 符号就绪)SMOKE-OK;targeted pytest(tests/application/test_spawn_bind_plan.py + tests/architecture/test_new_architecture_closure.py):23 passed,0 failed,无预存失败.
 - commit: faaad754c48e3d7b4b0abccc8770b0b79ab3d438 (refactor(lca-1000): 第0480轮 application/api 零调用公开 facade spawn_member 删除(死接口路径收敛),1 file,20 deletions),未 push.
 - 备注: 工作区他人 untracked 项(.agent/skills/airtap-automation/、docs/notes/lca-1000/)未触碰;只 add 了本轮 1 个文件. 备份:/tmp/bak_0480/(252). 并发会话的 merge commit 未触碰.
+## 第0481轮 (2026-10-05 00:03-00:24 CST)
+- 改了什么: 新增 lca/nodes/_resolve.py（67 行，3 个共享 helper：resolve_typed_port / resolve_typed_port_or_runtime / resolve_runtime_state），删除 5 个 node 模块的本地重复实现并改写调用点传入 node 前缀：
+  - lca/nodes/delegate/compose.py（删 _resolve_port，2 调用点，node=delegate.compose）
+  - lca/nodes/think/llm/persist.py（删 _resolve_port + _resolve_state，2 调用点，node=llm.persist）
+  - lca/nodes/think/llm/invoke.py（删 _resolve_port + _resolve_state，2 调用点，node=llm.invoke）
+  - lca/nodes/think/decision/parse.py（删 _resolve_port，2 调用点，node=decision.parse）
+  - lca/nodes/think/history/assemble.py（删 _resolve_port，2 调用点，node=memory.derive）
+  6 files，83 insertions，94 deletions。错误消息逐字节保持一致（python 断言验证 3 类消息）。
+- 依据 skill 哪一节: SKILL.md Deletion test；DEEPENING.md 第1节 In-process（Always deepenable — merge the modules and test through the new interface directly）；LANGUAGE.md Depth（interface 处的 leverage）/ Interface（含 error modes）/ Locality（fix once, fixed everywhere）。
+- 为什么这是实质改动(非凑数): 5 份 helper 合计约 60 行，是同一条 typed-port fail-loud 约定的 5 份拷贝（除 node 前缀字串外逐字相同），典型的 shallow Module 集群。收敛后 fail-loud 约定的修改只改一处；不是浅层分发器（仅 node 前缀字串参数，无分支）。类比先例 779415a98 的 _json 三处收敛。调用者验证：grep 确认 7 个 helper 全为文件内自用、零跨模块引用；tests 均走 executor 接口驱动，未 pin 私有 helper 或错误字串；工作区干净后才动手。
+- 候选清单（本轮 explore，逐一验证后取舍）：
+  1. 上述 _resolve_port×5 + _resolve_state×2 收敛 —— 选中（并行探索子代理论证，本轮逐一复核代码与调用点后执行）。
+  2. agent_spawn.py 的 emit_agent_spawn / emit_agent_iteration / emit_agent_final（零调用公开函数，deletion-test clean，PR-4 引入已一月无调用者）—— 备选：加深优先于 slop，本轮先做加深。
+  3. kernel_loop.py 的 emit_kernel_boot_start / emit_kernel_boot_completed / emit_loop_fork —— 备选（同模式，留待后续轮次）。
+  4. set_default_ctx / LogicAddress 的 deprecated —— 驳回（ADR-0115 决定7 / ADR-0110 显式裁决，不重裁 ADR）。
+  5. get_or_create_default_ctx —— 驳回（有真实调用者）。
+  6. observation.py 的 now_iso —— 驳回（刻意收敛模块的命名接口，非自动垫片）。
+  7. skills/disk 与 ingest/integrity 双 content_hash 别名 —— 驳回（分属两平面，合并反增耦合）。
+  8. resolve_repo_root —— 驳回（7 调用者，deletion test 通过：删掉复杂度搬家）。
+  9. 各 settings 模块 get_*_settings —— 驳回（各域独立 env 前缀，合并=浅抽象）。
+  10. except Exception 返回默认值的 guard 3 处 —— 驳回（均为 best-effort / 可选依赖正当模式）。
+  11. 长注释块 7 处（graph_spec / subgraph_run / brain_composer / validators / plugin_shape / restart_report / default_context）—— 驳回（均为 load-bearing）。
+  12. fact_gateway.enrich_ep_payload —— 驳回（report_emit_points.md:335 文档仍引用）。
+  13. sediment.set_sediment_writer —— 驳回（ContextVar setter/getter 配对属刻意 seam）。
+  14. 注释掉的代码 —— 全库零命中。
+- 验证结果: ruff check 6 文件全过（修了 2 处 Any 未使用导入 + 1 处 import 排序）；targeted pytest 5 文件（test_persist / test_invoke / test_decision_parse_purity / test_compose_phase_plugin / test_history_assemble_plugin）：48 passed，0 failed，无预存失败；错误消息字节一致性 python 断言通过。
+- commit: b5bdf26af（refactor(lca-1000): 第0481轮 nodes 5 模块 _resolve_port/_resolve_state 重复约定收敛至共享 lca/nodes/_resolve(加深/Locality),6 files），未 push。
+- 备注: 只 add 了本轮 6 个文件；并发会话的 worker_context.py 未提交改动未触碰；备份 /tmp/bak_0481/（252，6 文件）。教训：ssh 外层双引号会吃掉 heredoc 里的单反引号（_resolve.py docstring 的 :func: 标记曾被命令替换吃掉，已修复为纯文本；以后经 ssh 传 heredoc 时内容避免反引号）。
+## 第0482轮 (2026-10-05 00:33-00:58 CST)
+- 改了什么: lca/loop/emit/cognitive/agent_spawn.py 删除零调用公开函数 emit_agent_spawn / emit_agent_iteration / emit_agent_final 及 __all__ 中对应 3 条目；保留有真实调用者的 emit_agent_loop_iteration_start/end。1 file，72 deletions。
+- 依据 skill 哪一节: SKILL.md Deletion test（删掉三函数后复杂度消失而非搬家，模块原为 pass-through）；LANGUAGE.md Interface（__all__ 从 5 条收敛到 2 条）/ Locality；deslop 清单：死接口路径。
+- 为什么这是实质改动(非凑数): 三函数 PR-4 引入一月有余；grep 全库确认零外部调用（仅文件内 __all__ 自引用；字符串字面引用检查零命中；docs/ADR 仅 ledger 自身候选清单提及）；生产代码(cognitive_agent.py/team_handle.py)与测试(test_fact_gateway.py)只导入两个存活函数。删除后行为零变化，公开 interface 收敛，消灭 3 条死公开路径。类比先例：480 轮 spawn_member 删除。
+- 候选清单（本轮 explore，逐一验证后取舍）：
+  1. 上述三死 emit 函数删除 —— 选中（上轮备选 #2，本轮逐一复核调用点/导入/字符串引用后执行）。
+  2. kernel_loop.py 的 emit_kernel_boot_start / emit_kernel_boot_completed / emit_loop_fork —— 备选（零外部调用，同模式，留待后续轮次）。
+  3. 新加深候选：本轮聚焦上轮遗留备选，未做全库新扫，如实记录。
+- 验证结果: ruff check 1 文件全过；import 冒烟 OK（__all__ 仅剩 emit_agent_loop_iteration_end/start）；targeted pytest(tests/loop/test_fact_gateway.py + tests/runtime/test_envelope_emitter_binding.py)：19 passed，0 failed，无预存失败。
+- commit: b2018d4ac（refactor(lca-1000): 第0482轮 agent_spawn 死 emit 公开函数 3 处删除(死接口路径收敛)，2 files），未 push。
+- 备注: 只 add 本轮 2 个文件（agent_spawn.py + ledger.md）；并发会话的大量未提交/已暂存改动未触碰。ledger.md 随带并发会话的 28 行格式微调（子条目缩进），内容未改动，如实披露。备份:/tmp/bak_0482/(252)。教训：经 ssh 双引号命令串传 heredoc 多行脚本不可靠（首版脚本断言异常），改用 python3 - + stdin 传脚本，一次成功；以后 252 上跑多行脚本统一走 stdin。
