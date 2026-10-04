@@ -19,17 +19,24 @@ _log = logging.getLogger(__name__)
 
 _ID_RE = re.compile(r"<!--\s*id:([A-Za-z0-9_.-]+)\s*-->")
 _SECTION_RE = re.compile(r"^##\s+(Preferences|Facts)\s*$", re.IGNORECASE)
-_PLACEHOLDERS = ("暂无偏好记录", "暂无事实记录", "（空）")
+_PLACEHOLDERS = ("暂无偏好记录", "暂无事实记录")
 
 
-def _clean_body(text: str) -> str:
-    """Extract clean claim body from rendered bullet text."""
-    no_id = _ID_RE.sub("", text).strip()
+def _clean_body(text: str) -> tuple[str, str | None]:
+    """Extract (clean claim body, embedded record id) from rendered bullet text."""
+    record_id: str | None = None
+
+    def _capture_id(m: re.Match) -> str:
+        nonlocal record_id
+        record_id = m.group(1)
+        return ""
+
+    no_id = _ID_RE.sub(_capture_id, text).strip()
     if " This came from " in no_id:
         body = no_id.split(" This came from ")[0].strip()
     else:
-        body = no_id.strip()
-    return body.rstrip("。").rstrip(".")
+        body = no_id
+    return body.rstrip("。").rstrip("."), record_id
 
 
 def parse_memory_markdown_claims(
@@ -49,9 +56,6 @@ def parse_memory_markdown_claims(
             )
             continue
 
-        if current_category is None:
-            continue
-
         if not (line_stripped.startswith("- ") or line_stripped.startswith("* ")):
             continue
 
@@ -59,9 +63,7 @@ def parse_memory_markdown_claims(
         if any(ph in bullet_content for ph in _PLACEHOLDERS):
             continue
 
-        id_match = _ID_RE.search(bullet_content)
-        record_id = id_match.group(1) if id_match else None
-        body = _clean_body(bullet_content)
+        body, record_id = _clean_body(bullet_content)
 
         if body:
             items.append((current_category, body, record_id))
@@ -148,8 +150,7 @@ class MemoryEditSyncService:
                 deleted_count += 1
 
         # Ensure projection is always fresh on disk even if 0 claim deltas occurred
-        if hasattr(self._memory, "_project_curated"):
-            self._memory._project_curated(())
+        self._memory._project_curated(())
 
         _log.info(
             "MemoryEditSync applied: added=%d superseded=%d deleted=%d",
