@@ -7,7 +7,7 @@
 
 from __future__ import annotations
 
-from datetime import UTC, datetime, timedelta
+from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 
 from lca.contracts.models.cron.models import (
@@ -19,21 +19,10 @@ from lca.contracts.models.cron.models import (
     NextFire,
     OneShotSchedule,
     WeeklySchedule,
+    wall_clock_exists,
 )
 
 __all__ = ["next_run"]
-
-
-def _wall_clock_exists(local: datetime) -> bool:
-    """该墙钟是否真实存在（不在 DST 缺口）。
-
-    ``ZoneInfo`` 对缺口时间返回 gap 前的偏移，``utcoffset() is None``
-    检测不到；正确做法是转 UTC 再转回，看墙钟是否一致。
-    """
-    if local.utcoffset() is None:
-        return False
-    back = local.astimezone(UTC).astimezone(local.tzinfo)
-    return back == local
 
 
 def _require_aware(value: datetime, name: str) -> None:
@@ -155,7 +144,7 @@ def _next_hourly(
             microsecond=0,
             fold=0,
         )
-    while not _wall_clock_exists(candidate):
+    while not wall_clock_exists(candidate):
         candidate = candidate + timedelta(hours=1)
         candidate = candidate.replace(
             minute=minute,
@@ -192,7 +181,7 @@ def _next_daily(
             microsecond=0,
             fold=0,
         )
-    while not _wall_clock_exists(candidate):
+    while not wall_clock_exists(candidate):
         candidate = candidate + timedelta(days=1)
         candidate = candidate.replace(
             hour=hour,
@@ -238,7 +227,7 @@ def _next_weekly(
             microsecond=0,
             fold=0,
         )
-    while not _wall_clock_exists(candidate):
+    while not wall_clock_exists(candidate):
         candidate = candidate + timedelta(days=7)
         candidate = candidate.replace(
             hour=hour,

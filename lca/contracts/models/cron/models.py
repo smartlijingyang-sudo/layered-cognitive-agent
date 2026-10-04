@@ -29,6 +29,7 @@ __all__ = [
     "SpaceActionExecution",
     "TargetReceipt",
     "WeeklySchedule",
+    "wall_clock_exists",
 ]
 
 
@@ -118,7 +119,7 @@ class ChatDelivery(BaseModel):
     chat_id: str = Field(..., min_length=1)
 
 
-def _wall_clock_exists(local: datetime) -> bool:
+def wall_clock_exists(local: datetime) -> bool:
     """该墙钟是否真实存在（不在 DST 缺口）。
 
     ``ZoneInfo`` 对缺口时间返回 gap 前的偏移，``utcoffset() is None``
@@ -179,7 +180,7 @@ class CronJob(BaseModel):
             if at.tzinfo is None or at.utcoffset() is None:
                 raise ValueError("oneshot at must be timezone-aware")
             local = at.astimezone(tz)
-            if not _wall_clock_exists(local):
+            if not wall_clock_exists(local):
                 raise ValueError("oneshot at falls in a DST gap")
         return self
 
