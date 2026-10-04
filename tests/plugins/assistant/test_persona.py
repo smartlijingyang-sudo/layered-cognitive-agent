@@ -27,14 +27,14 @@ class TestPersonaFromHome:
     def test_full_home_resolves_persona(self, tmp_path: Path) -> None:
         home = tmp_path / "asst_x"
         _materialize(home)
-        persona = persona_from_home(str(home))
+        persona = persona_from_home(str(home), platform_root=tmp_path / "shared")
         assert persona.role == "小研"
         assert persona.goal == "深度研究"
         assert "研究助理" in persona.backstory
         assert "USER" in persona.backstory
 
     def test_missing_home_degrades_to_empty(self, tmp_path: Path) -> None:
-        persona = persona_from_home(str(tmp_path / "nope"))
+        persona = persona_from_home(str(tmp_path / "nope"), platform_root=tmp_path / "shared")
         assert persona.role == ""
         assert persona.goal == ""
         assert persona.backstory == ""
@@ -42,9 +42,12 @@ class TestPersonaFromHome:
     def test_backstory_truncated(self, tmp_path: Path) -> None:
         home = tmp_path / "asst_big"
         _materialize(home)
-        (home / "SOUL.md").write_text("字" * 8000, encoding="utf-8")
-        persona = persona_from_home(str(home))
-        assert len(persona.backstory) <= 3000
+        (home / "SOUL.md").write_text("字" * 40000, encoding="utf-8")
+        persona = persona_from_home(str(home), platform_root=tmp_path / "shared")
+        assert len(persona.backstory) <= 36000
+        # the 40000-char flat section exceeds the protected budget: dropped whole,
+        # never cut mid-section.
+        assert "字字" not in persona.backstory
 
     def test_goal_falls_back_to_first_goal_name(self, tmp_path: Path) -> None:
         home = tmp_path / "asst_nongoal"
@@ -53,7 +56,7 @@ class TestPersonaFromHome:
             '{"name": "小研", "description": "", "emoji": "🔍", "status": "active"}',
             encoding="utf-8",
         )
-        persona = persona_from_home(str(home))
+        persona = persona_from_home(str(home), platform_root=tmp_path / "shared")
         assert persona.goal == "深度研究"  # goals.yaml 第一个 goal 的 name
 
 

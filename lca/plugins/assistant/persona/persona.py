@@ -20,6 +20,9 @@ import yaml
 from lca.infrastructure.assistant.io import read_json_soft
 from lca.infrastructure.memory.contextfiles.domain.layout import layout_for_home
 from lca.infrastructure.memory.contextfiles.domain.standing import assemble_standing
+from lca.infrastructure.memory.contextfiles.service.assembly import (
+    read_standing_documents,
+)
 
 _GOAL_MAX_CHARS = 300
 
@@ -33,7 +36,11 @@ class AssistantPersona:
     backstory: str = ""
 
 
-def persona_from_home(home_path: str) -> AssistantPersona:
+def persona_from_home(
+    home_path: str,
+    *,
+    platform_root: str | Path | None = None,
+) -> AssistantPersona:
     """从 AssistantHome 解析人设；任何文件缺失都降级为空字段。"""
     home = Path(home_path)
     profile = read_json_soft(home / "profile.json")
@@ -44,29 +51,20 @@ def persona_from_home(home_path: str) -> AssistantPersona:
 
     goal = description or first_goal
     layout = layout_for_home(home_path)
-    documents: list[tuple[str, str]] = []
-    for file_name in layout.standing_files:
-        text = _read_text(home / file_name)
-        if file_name == layout.agents_file and text.strip():
-            text = f"{layout.agents_heading}\n{text.strip()}"
-        documents.append((file_name, text))
+    documents = read_standing_documents(home_path, layout, platform_root=platform_root)
     backstory = assemble_standing(
         documents,
         budget_chars=layout.backstory_budget_chars,
-        order=layout.standing_files,
+        order=[name for name, _ in documents],
+        platform_files=layout.platform_files,
+        protected_files=layout.protected_files,
+        protected_budget_chars=layout.protected_budget_chars,
     )
     return AssistantPersona(
         role=name,
         goal=goal[:_GOAL_MAX_CHARS],
         backstory=backstory,
     )
-
-
-def _read_text(path: Path) -> str:
-    try:
-        return path.read_text(encoding="utf-8")
-    except OSError:
-        return ""
 
 
 def _first_goal_name(goals_path: Path) -> str:

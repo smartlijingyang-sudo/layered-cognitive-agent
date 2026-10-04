@@ -9,9 +9,86 @@ still waiting.
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+import logging
+import os
+import re
+from collections.abc import Callable, Sequence
 
 from lca.infrastructure.memory.contextfiles.domain.layout import packaged_layout
+
+logger = logging.getLogger(__name__)
+
+
+class StandingTruncationError(RuntimeError):
+    """Raised when a protected standing section is dropped in strict mode.
+
+    Enable with ``LCA_STRICT_STANDING=1`` (development). Production only logs.
+    """
+
+
+_SECTION_HEADING_RE = re.compile(r"^#{2,3}\s")
+
+
+def split_sections(body: str) -> list[tuple[str | None, str]]:
+    """Split a markdown body into ``(heading, section_text)`` in order.
+
+    Text before the first ``##``/``###`` heading is the preamble section
+    (heading ``None``). The heading line belongs to its section.
+    """
+    sections: list[tuple[str | None, list[str]]] = []
+    heading: str | None = None
+    current: list[str] = []
+    for line in body.splitlines():
+        if _SECTION_HEADING_RE.match(line):
+            if current or heading is not None:
+                sections.append((heading, current))
+            heading = line.strip()
+            current = [line]
+        else:
+            current.append(line)
+    if current or heading is not None:
+        sections.append((heading, current))
+    return [(h, "\n".join(ls).strip()) for h, ls in sections if "\n".join(ls).strip()]
+
+
+def pack_sections(
+    docs: Sequence[tuple[str, str]],
+    budget: int,
+    *,
+    on_drop_section: Callable[[str, str | None], None] | None = None,
+) -> tuple[list[str], int]:
+    """Pack documents section-by-section within ``budget``.
+
+    Every markdown section (``##``/``###``) is whole-in or whole-dropped;
+    sections are never cut mid-way. Returns ``(blocks, remaining)`` in
+    document order. ``on_drop_section(name, heading)`` fires per dropped
+    section.
+    """
+    blocks: list[str] = []
+    remaining = budget
+    for name, body in docs:
+        kept: list[str] = []
+        for heading, section in split_sections(body):
+            candidate = "\n\n".join([*kept, section])
+            if len(render_injected(name, candidate)) > remaining:
+                if on_drop_section is not None:
+                    on_drop_section(name, heading)
+                continue
+            kept.append(section)
+        if not kept:
+            continue
+        block = render_injected(name, "\n\n".join(kept))
+        blocks.append(block)
+        remaining -= len(block) + 2
+        if remaining <= 0:
+            break
+    return blocks, remaining
+
+
+def _warn_protected_drop(name: str, heading: str | None) -> None:
+    logger.warning("standing section dropped name=%s heading=%s", name, heading)
+    if os.environ.get("LCA_STRICT_STANDING") == "1":
+        raise StandingTruncationError(f"protected standing section dropped: {name} {heading}")
 
 
 def render_injected(name: str, body: str) -> str:
@@ -25,32 +102,49 @@ def assemble_standing(
     *,
     budget_chars: int,
     order: Sequence[str] | None = None,
+    platform_files: Sequence[str] = (),
+    protected_files: Sequence[str] = (),
+    protected_budget_chars: int = 0,
 ) -> str:
-    """Pack standing documents in ``order`` within ``budget_chars``.
+    """Assemble the three-tier standing backstory.
 
-    ``order`` defaults to the packaged layout. A home passes its own list
-    after merging ``memory/contextfiles.toml``.
+    - Tier 1 (platform): injected whole, outside any budget, zero truncation.
+    - Tier 2 (protected): packed by markdown section within
+      ``protected_budget_chars``; dropped sections log a warning
+      (``LCA_STRICT_STANDING=1`` raises instead).
+    - Tier 3 (projection): packed by section within
+      ``budget_chars - protected_budget_chars``.
+
+    ``order`` defaults to the packaged layout. ``budget_chars`` covers tiers
+    2+3; tier 1 never counts against it. Sections are never cut mid-way in
+    any tier. Output follows ``order``; tiers only decide the packing rule
+    (platform: whole/outside budget; protected: section-packed in its own
+    budget with drop warnings; projection: section-packed in the rest).
     """
-
-    if budget_chars <= 0:
-        return ""
-    names = _order(order)
+    names = list(dict.fromkeys([*platform_files, *_order(order)]))
+    platform_set = set(platform_files)
+    protected_set = set(protected_files)
     by_name = dict(files)
     pending = [(name, by_name.get(name, "")) for name in names]
     pending = [(name, body) for name, body in pending if body.strip()]
-    remaining = budget_chars
+
     blocks: list[str] = []
-    for index, (name, body) in enumerate(pending):
-        others_follow = index < len(pending) - 1
-        cap = _cap(remaining, others_follow=others_follow)
-        block = _fit(name, body, cap)
-        if block is None:
-            continue
-        blocks.append(block)
-        remaining -= len(block) + 2
-        if remaining <= 0:
-            break
-    return "\n\n".join(blocks)[:budget_chars]
+    remaining_protected = protected_budget_chars
+    remaining_projection = max(budget_chars - protected_budget_chars, 0)
+    for name, body in pending:
+        if name in platform_set:
+            blocks.append(render_injected(name, body.strip()))
+        elif name in protected_set:
+            packed, remaining_protected = pack_sections(
+                [(name, body)],
+                remaining_protected,
+                on_drop_section=_warn_protected_drop,
+            )
+            blocks.extend(packed)
+        else:
+            packed, remaining_projection = pack_sections([(name, body)], remaining_projection)
+            blocks.extend(packed)
+    return "\n\n".join(blocks)
 
 
 def rehydrate_after_compaction(
@@ -78,23 +172,6 @@ def rehydrate_after_compaction(
     if not trimmed.strip():
         return standing
     return f"{trimmed}{gap}{standing}"
-
-
-def _cap(remaining: int, *, others_follow: bool) -> int:
-    if not others_follow:
-        return remaining
-    return min(remaining, max(remaining // 2, min(240, remaining)))
-
-
-def _fit(name: str, body: str, cap: int) -> str | None:
-    wrapped = render_injected(name, body)
-    if len(wrapped) <= cap:
-        return wrapped
-    marker = render_injected(name, "")
-    room = cap - len(marker)
-    if room < 20:
-        return None
-    return render_injected(name, body.strip()[:room])
 
 
 def refresh_injected(
@@ -193,8 +270,11 @@ def _strip_injected(history: str) -> str:
 
 
 __all__ = [
+    "StandingTruncationError",
     "assemble_standing",
+    "pack_sections",
     "refresh_injected",
     "rehydrate_after_compaction",
     "render_injected",
+    "split_sections",
 ]

@@ -67,6 +67,7 @@ def test_preserve_standing_sections_reads_disk_and_publishes(tmp_path: Path) -> 
         render_injected("MEMORY.md", "用户住在上海"),
         DiskFileStore(tmp_path),
         publisher,
+        platform_root=tmp_path / "shared",
     )
     assert "用户住在杭州" in out
     assert "用户住在上海" not in out
