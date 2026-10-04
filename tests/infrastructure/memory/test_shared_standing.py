@@ -88,27 +88,27 @@ def test_broken_override_keeps_packaged_tiers(tmp_path: Path) -> None:
 
 
 def test_read_layout_rejects_platform_overlap() -> None:
-    text = (
-        _REPO / "lca" / "infrastructure" / "memory" / "contextfiles" / "layout.toml"
-    ).read_text(encoding="utf-8")
+    text = (_REPO / "lca" / "infrastructure" / "memory" / "contextfiles" / "layout.toml").read_text(
+        encoding="utf-8"
+    )
     broken = text.replace('platform_files = ["PLATFORM.md"]', 'platform_files = ["SOUL.md"]')
     with pytest.raises(ValueError):
         read_layout(broken)
 
 
 def test_read_layout_rejects_protected_outside_standing() -> None:
-    text = (
-        _REPO / "lca" / "infrastructure" / "memory" / "contextfiles" / "layout.toml"
-    ).read_text(encoding="utf-8")
+    text = (_REPO / "lca" / "infrastructure" / "memory" / "contextfiles" / "layout.toml").read_text(
+        encoding="utf-8"
+    )
     broken = text.replace('"CONSTITUTION.md", "SOUL.md"', '"CONSTITUTION.md", "NOPE.md"')
     with pytest.raises(ValueError):
         read_layout(broken)
 
 
 def test_read_layout_rejects_protected_budget_above_total() -> None:
-    text = (
-        _REPO / "lca" / "infrastructure" / "memory" / "contextfiles" / "layout.toml"
-    ).read_text(encoding="utf-8")
+    text = (_REPO / "lca" / "infrastructure" / "memory" / "contextfiles" / "layout.toml").read_text(
+        encoding="utf-8"
+    )
     broken = text.replace("protected_budget_chars = 32000", "protected_budget_chars = 99999")
     with pytest.raises(ValueError):
         read_layout(broken)
@@ -138,9 +138,7 @@ def test_platform_files_ignore_budget_entirely(tmp_path: Path) -> None:
     home = tmp_path / "asst"
     home.mkdir()
 
-    out = refresh_standing_backstory(
-        str(home), fallback="old", platform_root=platform_root
-    )
+    out = refresh_standing_backstory(str(home), fallback="old", platform_root=platform_root)
     assert big_rules in out
 
 
@@ -151,9 +149,7 @@ def test_platform_comes_before_everything(tmp_path: Path) -> None:
     _write(home, "CONSTITUTION.md", "## 身份\n宪法正文")
     _write(home, "MEMORY.md", "## 记忆\n投影正文")
 
-    out = refresh_standing_backstory(
-        str(home), fallback="old", platform_root=platform_root
-    )
+    out = refresh_standing_backstory(str(home), fallback="old", platform_root=platform_root)
     assert out.index("平台铁律") < out.index("宪法正文") < out.index("投影正文")
 
 
@@ -184,9 +180,7 @@ def test_read_platform_documents_stamps_heading(tmp_path: Path) -> None:
 # ------------------------------------------------- tier 2: protected
 def _constitution_three_sections() -> str:
     return (
-        "## Alpha\n" + "a" * 100 + "\n\n"
-        "## Beta\n" + "b" * 100 + "\n\n"
-        "## Gamma\n" + "c" * 100 + "\n"
+        "## Alpha\n" + "a" * 100 + "\n\n## Beta\n" + "b" * 100 + "\n\n## Gamma\n" + "c" * 100 + "\n"
     )
 
 
@@ -198,7 +192,8 @@ def test_protected_sections_never_cut_midsection() -> None:
         budget_chars=10000,
         order=["CONSTITUTION.md"],
         protected_files=["CONSTITUTION.md"],
-        protected_budget_chars=2 * (len(render_injected("CONSTITUTION.md", "## Alpha\n" + "a" * 100)) + 2),
+        protected_budget_chars=2
+        * (len(render_injected("CONSTITUTION.md", "## Alpha\n" + "a" * 100)) + 2),
     )
     assert "## Alpha" in out and "a" * 100 in out
     assert "## Beta" in out and "b" * 100 in out
@@ -258,11 +253,13 @@ def test_projection_drops_whole_sections_over_budget() -> None:
     assert "n" * 20 not in out
 
 
-def test_projection_drop_is_silent(caplog: pytest.LogCaptureFixture) -> None:
+def test_projection_drop_logs_warning(caplog: pytest.LogCaptureFixture) -> None:
+    # ADR-0284 decision 2: projection drops warn (name + heading only), like tier 2.
     body = "## M1\n" + "m" * 500 + "\n"
     with caplog.at_level(logging.WARNING):
         assemble_standing([("MEMORY.md", body)], budget_chars=10, order=["MEMORY.md"])
-    assert not [r for r in caplog.records if "standing section dropped" in r.message]
+    assert any("standing projection section dropped" in r.message for r in caplog.records)
+    assert not any("m" * 20 in r.message for r in caplog.records)  # never logs content
 
 
 def test_pack_sections_counts_wrapper_overhead() -> None:
@@ -283,9 +280,7 @@ def test_preserve_standing_sections_refreshes_platform_block(tmp_path: Path) -> 
     home.mkdir()
 
     text = render_injected("PLATFORM.md", "旧平台规则")
-    out = preserve_standing_sections(
-        text, DiskFileStore(home), platform_root=platform_root
-    )
+    out = preserve_standing_sections(text, DiskFileStore(home), platform_root=platform_root)
     assert "新平台规则" in out
     assert "旧平台规则" not in out
 
@@ -298,13 +293,76 @@ def test_preserve_standing_sections_platform_first(tmp_path: Path) -> None:
 
     # A prompt assembled with the platform tier has PLATFORM.md first;
     # refresh replaces it in place and keeps the order.
-    text = render_injected("PLATFORM.md", "旧平台规则") + "\n\n" + render_injected(
-        "MEMORY.md", "旧记忆"
+    text = (
+        render_injected("PLATFORM.md", "旧平台规则")
+        + "\n\n"
+        + render_injected("MEMORY.md", "旧记忆")
     )
-    out = preserve_standing_sections(
-        text, DiskFileStore(home), platform_root=platform_root
-    )
+    out = preserve_standing_sections(text, DiskFileStore(home), platform_root=platform_root)
     assert "平台铁律" in out
     assert "旧平台规则" not in out
     assert "用户住在杭州" in out
     assert out.index("平台铁律") < out.index("用户住在杭州")
+
+
+# --------------------------------- decision 1: seed template + boot check
+def test_platform_file_seeded_from_template(tmp_path: Path) -> None:
+    # A fresh lca_home without PLATFORM.md gets it from the packaged seed template.
+    from lca.infrastructure.memory.contextfiles.domain.layout import packaged_layout
+
+    root = tmp_path / "lca_home"
+    root.mkdir()
+    layout = packaged_layout()
+    docs = read_platform_documents(layout, root)
+    assert (root / "PLATFORM.md").is_file()
+    body = dict(docs)["PLATFORM.md"]
+    assert "URL \u94c1\u5f8b" in body
+    assert "\u51ed\u8bb0\u5fc6\u6216\u53c2\u6570\u77e5\u8bc6\u62fc\u88c5 URL" in body
+
+
+def test_platform_file_seed_never_overwrites(tmp_path: Path) -> None:
+    from lca.infrastructure.memory.contextfiles.domain.layout import packaged_layout
+
+    root = tmp_path / "lca_home"
+    _write(root, "PLATFORM.md", "## custom\ncustom rules")
+    read_platform_documents(packaged_layout(), root)
+    assert (root / "PLATFORM.md").read_text(encoding="utf-8") == "## custom\ncustom rules"
+
+
+def test_missing_platform_files_lists_absent(tmp_path: Path) -> None:
+    from lca.infrastructure.memory.contextfiles.domain.layout import packaged_layout
+    from lca.infrastructure.memory.contextfiles.service.assembly import (
+        missing_platform_files,
+    )
+
+    root = tmp_path / "lca_home"
+    root.mkdir()
+    assert missing_platform_files(root, packaged_layout()) == ["PLATFORM.md"]
+    _write(root, "PLATFORM.md", "x")
+    assert missing_platform_files(root, packaged_layout()) == []
+
+
+def test_boot_warns_on_missing_platform_file(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import lca_kernel.boot.boot as boot_mod
+
+    events: list[tuple[str, dict]] = []
+
+    class _Log:
+        def warning(self, event: str, **kw: object) -> None:
+            events.append((event, kw))
+
+    monkeypatch.setattr(boot_mod, "_log", _Log())
+    monkeypatch.setattr(
+        "lca.infrastructure.path.locator.get_lca_home",
+        lambda: str(tmp_path / "empty_home"),
+    )
+    boot_mod._warn_missing_platform_files()
+    assert any(e == "boot.platform_file_missing" for e, _ in events)
+
+    (tmp_path / "empty_home").mkdir()
+    _write(tmp_path / "empty_home", "PLATFORM.md", "x")
+    events.clear()
+    boot_mod._warn_missing_platform_files()
+    assert events == []

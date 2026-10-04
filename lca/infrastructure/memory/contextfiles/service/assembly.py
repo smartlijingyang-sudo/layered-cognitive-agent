@@ -12,6 +12,7 @@ backend is replaceable without touching the assembly logic.
 
 from __future__ import annotations
 
+import importlib.resources
 from pathlib import Path
 
 from lca.infrastructure.memory.contextfiles.adapters.disk import DiskFileStore
@@ -23,6 +24,40 @@ from lca.infrastructure.memory.contextfiles.domain.standing import assemble_stan
 from lca.infrastructure.memory.contextfiles.ports.file_store import FileStore
 from lca.infrastructure.path.locator import get_lca_home
 
+_TEMPLATE_PACKAGE = "lca.plugins.assistant.templates"
+
+
+def _seed_platform_file(root: Path, name: str) -> bool:
+    """Copy the packaged seed template into ``root`` when the file is missing.
+
+    Returns True when the file was seeded. Fail-soft: any error (no template,
+    unwritable home) returns False and the caller keeps the old skip-silently
+    behavior.
+    """
+    target = root / name
+    if target.is_file():
+        return False
+    try:
+        text = (
+            importlib.resources.files(_TEMPLATE_PACKAGE).joinpath(name).read_text(encoding="utf-8")
+        )
+    except (FileNotFoundError, TypeError):
+        return False
+    try:
+        target.write_text(text, encoding="utf-8")
+    except OSError:
+        return False
+    return True
+
+
+def missing_platform_files(
+    root: str | Path,
+    layout,
+) -> list[str]:
+    """Names from ``layout.platform_files`` absent under ``root`` (for boot checks)."""
+    home = Path(root)
+    return [name for name in layout.platform_files if not (home / name).is_file()]
+
 
 def read_platform_documents(
     layout: ContextLayout,
@@ -30,13 +65,16 @@ def read_platform_documents(
 ) -> list[tuple[str, str]]:
     """Read tier 1 platform standing files from ``root``.
 
-    A missing file is skipped silently (fail-soft). Each body is stamped with
+    A missing file is first seeded from the packaged seed template
+    (``lca/plugins/assistant/templates/<name>``); when no template exists it
+    is skipped silently (fail-soft). Each body is stamped with
     ``layout.platform_heading`` so the model sees the platform provenance.
     """
 
     store = DiskFileStore(root)
     documents: list[tuple[str, str]] = []
     for name in layout.platform_files:
+        _seed_platform_file(Path(root), name)
         try:
             text = store.read_text(name)
         except OSError:
@@ -95,6 +133,7 @@ def refresh_standing_backstory(
 
 
 __all__ = [
+    "missing_platform_files",
     "read_platform_documents",
     "read_standing_documents",
     "refresh_standing_backstory",

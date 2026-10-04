@@ -91,6 +91,10 @@ def _warn_protected_drop(name: str, heading: str | None) -> None:
         raise StandingTruncationError(f"protected standing section dropped: {name} {heading}")
 
 
+def _warn_projection_drop(name: str, heading: str | None) -> None:
+    logger.warning("standing projection section dropped name=%s heading=%s", name, heading)
+
+
 def render_injected(name: str, body: str) -> str:
     """Wrap one standing file so a later reload can find its bounds."""
 
@@ -113,7 +117,8 @@ def assemble_standing(
       ``protected_budget_chars``; dropped sections log a warning
       (``LCA_STRICT_STANDING=1`` raises instead).
     - Tier 3 (projection): packed by section within
-      ``budget_chars - protected_budget_chars``.
+      ``budget_chars - protected_budget_chars``; dropped sections log a
+      warning (name + heading only, never content).
 
     ``order`` defaults to the packaged layout. ``budget_chars`` covers tiers
     2+3; tier 1 never counts against it. Sections are never cut mid-way in
@@ -142,7 +147,11 @@ def assemble_standing(
             )
             blocks.extend(packed)
         else:
-            packed, remaining_projection = pack_sections([(name, body)], remaining_projection)
+            packed, remaining_projection = pack_sections(
+                [(name, body)],
+                remaining_projection,
+                on_drop_section=_warn_projection_drop,
+            )
             blocks.extend(packed)
     return "\n\n".join(blocks)
 
