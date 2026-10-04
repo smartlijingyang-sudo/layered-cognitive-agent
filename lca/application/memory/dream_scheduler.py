@@ -12,19 +12,21 @@ the event loop. The kernel process serves HTTP on the same loop.
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import logging
 from collections.abc import Callable, Sequence
 from pathlib import Path
 
 from lca.application.routine.locks import RoutineFileLock
+from lca.contracts.models.core.conversation.memory import MemoryRecord
 from lca.infrastructure.memory.dream import DreamReport, run_dream
 
 logger = logging.getLogger(__name__)
 
-_Backfill = Callable[[str, list], object]
-_Render = Callable[[Sequence], str]
+_Backfill = Callable[[str, list[MemoryRecord]], object]
+_Render = Callable[[Sequence[MemoryRecord]], str]
 DreamFn = Callable[..., DreamReport]
-EvidenceWriter = Callable[[Path, "DreamReport | None", int], object]
+EvidenceWriter = Callable[[Path, DreamReport | None, int], object]
 
 _ROUTINE_ID = "memory_dream"
 
@@ -63,10 +65,8 @@ class DreamScheduler:
                 await self.sweep_once()
             except Exception:
                 logger.exception("dream sweep failed")
-            try:
+            with contextlib.suppress(TimeoutError):
                 await asyncio.wait_for(self._stop.wait(), timeout=float(self._tick_seconds))
-            except TimeoutError:
-                continue
 
     async def sweep_once(self) -> tuple[DreamReport | None, ...]:
         """Run one pass over every home. Returns one report per home, None when skipped."""
@@ -76,7 +76,7 @@ class DreamScheduler:
         self._next_due_ms = now + self._tick_seconds * 1000
         reports: list[DreamReport | None] = []
         for home in self._homes():
-            reports.append(await self._run_home(Path(home), now))
+            reports.append(await self._run_home(home, now))
         return tuple(reports)
 
     async def _run_home(self, home: Path, now_ms: int) -> DreamReport | None:
