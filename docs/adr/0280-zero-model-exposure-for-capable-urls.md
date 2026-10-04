@@ -142,7 +142,7 @@ INV-CAP-02、INV-CAP-04、INV-CAP-05 的 v2 修订见 §5。实施 PR 落地时�
 
 ### 5.1 裁决
 
-交互授权卡片的挂载面从 assistant 散文收敛到 tool result。`composioConnect` 的 Observation payload（`intent_id`、`app_name`、`connection_id`）是票据在 wire 上的唯一结构化载体。前端 tool surface registry（`@lobechat/builtin-tools/register` 与 LCA `lca_tool_render_register`）拥有卡片挂载，两个消息渲染器（`Messages/Assistant` 与 `AssistantGroup`）经同一 registry 消费工具卡片。assistant 散文不再携带挂载标签，模型不再承担转述挂载指令的职责。
+交互授权卡片的挂载面从 assistant 散文收敛到 tool result。`composioConnect` 的 Observation payload（`intent_id`、`app_name`、`connection_id`）是票据在 wire 上的唯一结构化载体。前端 tool surface registry（`@lobechat/builtin-tools/register` 与 LCA `lca_tool_render_register`）拥有卡片挂载。composioConnect 的 tool 行只出现在 LCA gateway turn，该 turn 渲染为 assistantGroup，工具卡片经 `AssistantGroup/Tool/Inspector` 消费 registry；普通 `Messages/Assistant` 面不渲染 LCA 工具卡片。registry 挂载因此覆盖该事实能出现的全部面。assistant 散文不再携带挂载标签，模型不再承担转述挂载指令的职责。
 
 ### 5.2 理由
 
@@ -166,12 +166,14 @@ INV-CAP-02、INV-CAP-04、INV-CAP-05 的 v2 修订见 §5。实施 PR 落地时�
 
 ### 5.5 退役清单（实施 PR 同删）
 
-`[widget:connector_auth?...]` 字符串协议。`run_session_writer.py`、`Messages/Assistant/index.tsx`、`ConnectorAuthCard.tsx` 三处标签正则。INV-CAP-04 兜底函数与其测试。composio Observation 中要求原样输出标签的指令文案。`authUrl` 的 `cai_` 兼容分支。`Messages/Assistant/index.tsx` 卡片挂载块。`X-User-ID` 读取。死 getattr 分支。
+`[widget:connector_auth?...]` 字符串协议。`run_session_writer.py`、`Messages/Assistant/index.tsx`、`ConnectorAuthCard.tsx` 三处标签正则。INV-CAP-04 兜底函数与其测试。composio Observation 中要求原样输出标签的指令文案。`authUrl` 的 `cai_` 兼容分支与 `ConnectorAuthCard.tsx` 的 legacy fail-closed 处理（含 deprecated `authUrl` prop）。`Messages/Assistant/index.tsx` 卡片挂载块与 `connector_auth_card.py` 补丁对 `Assistant/index.tsx` 的挂载注入。`X-User-ID` 读取。死 getattr 分支。
+
+实施 PR 禁止半态：新 registry 挂载与旧补丁挂载不得在同一次部署中并存。PR 合入时旧挂载路径必须已删，评审以本节清单逐项核对。
 
 ### 5.6 验证门禁
 
 - 保留：`tests/connectors/test_auth_intent_vault.py`、`tests/connectors/test_zero_model_url_leakage.py`、`tests/transport/test_routes_auth_intents.py`（属主头断言改为 `x-lca-user-id`）。
-- 新增：registry surface 由 tool result state 渲染卡片的 vitest；分组 turn 渲染卡片的 vitest；reissue 端点测试；持久化 tool 行刷新后重渲染卡片的测试；浏览器端到端验证新 run 出现卡片且点击兑换弹窗。
+- 新增：registry surface 由 tool result state 渲染卡片的 vitest；分组 turn 渲染卡片节点的 vitest（该测试是实施 PR 的完成条件，不是清单愿望，缺它 PR 不合）；实施时复核不存在 registry 之外消费 tool 行的新消息面；reissue 端点测试；持久化 tool 行刷新后重渲染卡片的测试；浏览器端到端验证新 run 出现卡片且点击兑换弹窗。
 - 删除：`tests/runtime/test_gateway_intent_widget_fallback.py`；`tests/deploy/test_connector_auth_card_patch.py` 的标签解析断言（挂载断言迁入 registry surface 测试）。
 
 ### 5.7 联动
