@@ -21,6 +21,10 @@ MANIFEST = ToolManifest(
                 "type": "object",
                 "properties": {
                     "query": {"type": "string", "description": "搜索关键词"},
+                    "include_retired": {
+                        "type": "boolean",
+                        "description": "是否包含已退役 skill（默认 false）",
+                    },
                 },
                 "required": ["query"],
             },
@@ -48,6 +52,42 @@ MANIFEST = ToolManifest(
                 },
                 "required": ["name"],
             },
+        ),
+        ToolApi(
+            name="deactivateSkill",
+            description="停用已激活的 skill，释放本 run 激活预算。",
+            parameters={
+                "type": "object",
+                "properties": {
+                    "name": {"type": "string", "description": "skill 名称"},
+                },
+                "required": ["name"],
+            },
+            is_idempotent=True,
+        ),
+        ToolApi(
+            name="retireSkill",
+            description="退役一个 skill：默认搜索不可见、执行被拒绝。",
+            parameters={
+                "type": "object",
+                "properties": {
+                    "name": {"type": "string", "description": "skill 名称"},
+                },
+                "required": ["name"],
+            },
+            is_idempotent=True,
+        ),
+        ToolApi(
+            name="unretireSkill",
+            description="恢复一个已退役的 skill。",
+            parameters={
+                "type": "object",
+                "properties": {
+                    "name": {"type": "string", "description": "skill 名称"},
+                },
+                "required": ["name"],
+            },
+            is_idempotent=True,
         ),
         ToolApi(
             name="readReference",
