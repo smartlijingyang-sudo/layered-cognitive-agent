@@ -14,9 +14,8 @@ from pathlib import Path
 
 import typer
 
+from lca.infrastructure.cli.commands._shared.projection import spine_filename_for_run_cwd
 from lca.plugins.observability.health.run_health_fold import fold_run_health
-
-_DEFAULT_TRACES_ROOT = Path("traces")
 
 _STATUS_PRIORITY = {"failed": 0, "degraded": 1, "unknown": 2, "ok": 3}
 
@@ -51,7 +50,7 @@ def register(app: typer.Typer) -> None:
         ),
     ) -> None:
         if spine_path is None:
-            spine_path = _DEFAULT_TRACES_ROOT / "runs" / run_id / f"{run_id}.spine.jsonl"
+            spine_path = spine_filename_for_run_cwd(run_id)
         if not spine_path.exists():
             typer.echo(
                 f"error: spine file not found: {spine_path}",

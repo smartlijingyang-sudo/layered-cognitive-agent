@@ -61,6 +61,7 @@ import typer
 
 from lca.contracts.observability.registry.status import RunLifecycleStatus
 from lca.infrastructure.cli.commands.kernel._shared import spine_terminal_outcome
+from lca.infrastructure.observability.spine.sinks.naming import spine_filename_for_run
 from lca.plugins.observability.health.run_health_fold import fold_run_health
 
 _DEFAULT_TRACES_ROOT = Path("traces")
@@ -491,7 +492,7 @@ def _build_post_create_report(run_id: str, base_url: str) -> dict:
     del base_url  # spine is the truth; no HTTP polling
 
     started = time.monotonic()
-    spine_path = _DEFAULT_TRACES_ROOT / "runs" / run_id / f"{run_id}.spine.jsonl"
+    spine_path = _DEFAULT_TRACES_ROOT / "runs" / run_id / spine_filename_for_run(run_id)
 
     typer.echo("[post-create] folding spine into RunHealthReport…")
     report = fold_run_health(spine_path)

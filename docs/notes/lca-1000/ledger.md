@@ -340,3 +340,19 @@
 - 验证结果: ruff check 3 文件全过；行为等价 python 断言（`spine_filename_for_run(rid) == f"{rid}.spine.jsonl"`、`spine_filename_for_run_cwd(rid) == Path("traces/runs")/rid/f"{rid}.spine.jsonl"`、session helper 双 traces_root 断言、两模块 `_spine_path` 属性消失断言）EQUIV-OK；targeted pytest（test_debug_graph.py + test_trace_show_graph_facts.py + test_projection.py）：23 passed，0 failed，无预存失败。
 - commit: f8b0fc9d474fcb32913d48c52a2f818da87ac2ee refactor(lca-1000): 第0484轮 CLI 三命令 _spine_path 重复约定收敛至 spine 命名 SSOT(加深/Seam)，4 files，未 push。
 - 备注: 只 add 了本轮 4 个文件（3 代码 + ledger.md）；工作区无并发会话未提交改动（并发会话在本轮期间新增 3 个已提交 commit，未触碰）；备份 /tmp/bak_0484/（252，3 文件）。附带发现：台账 483 轮记录的 commit f7dcba47d 已不在 main 历史上（`git branch --contains` 为空、`merge-base --is-ancestor` 为否），同内容现为 25fa1c795——并发会话 rebase/改写了历史；本轮起台账以提交时实际 hash 为准。
+## 第0485轮 (2026-10-05 02:03-02:12 CST)
+- 改了什么: 5 处 raw `.spine.jsonl` 字面量拼接收敛至命名 SSOT seam（5 files，10 insertions，11 deletions）：
+  - observation/run_explain.py、observation/run_replay.py：`_load_facts` 内 `Path("traces/runs") / run_id / f"{run_id}.spine.jsonl"` → `spine_filename_for_run_cwd(run_id)`；删掉因此闲置的 `pathlib.Path` 导入。
+  - runs/health.py：`_DEFAULT_TRACES_ROOT / "runs" / run_id / f"{run_id}.spine.jsonl"` → `spine_filename_for_run_cwd(run_id)`；删掉仅此一处使用的模块常量 `_DEFAULT_TRACES_ROOT`（全库 grep 确认无测试/模块引用它）。
+  - runs/runs.py：`_build_post_create_report` 内同式 → `_DEFAULT_TRACES_ROOT / "runs" / run_id / spine_filename_for_run(run_id)`（见下方验证门教训）。
+  - plugins/transport/webserver/routes_channels_wechat.py：`Path("traces") / "runs" / rid / f"{rid}.spine.jsonl"` → `Path("traces") / "runs" / rid / spine_filename_for_run(rid)`（跨平面不引 CLI `_shared.projection` seam，改走本平面已有的 naming SSOT）。
+- 依据 skill 哪一节: DEEPENING.md 第1节 In-process（Always deepenable — merge the modules and test through the new interface directly）+ Seam discipline（Two adapters = real seam：`spine_filename_for_run_cwd` 已有 debug_graph/trace_show/runs/debug 三调用方；naming SSOT 是 ADR-0169 PR-4 成文收口点）；LANGUAGE.md Depth / Interface（含 error modes——文件名约定属 interface 的一部分）/ Locality（改名只改一处）；SKILL.md Deletion test（删掉本地拼凑后复杂度不搬家——命名约定早已收敛在 naming.py）；deslop 清单：死兼容路径类（与 ssot.py 记载的 PR-27 沉默读零回归同类）。
+- 为什么这是实质改动(非凑数): 5 处是同一条 `<run_id>.spine.jsonl` 命名约定的 5 份拷贝，直接违反 naming.py ADR-0169 PR-4 成文禁令（"禁止再写 run_dir / "<run_id>.spine.jsonl" 字符串拼接"）与 ssot.py 禁令；python 断言逐字节等价，行为零变化；消除后命名约定在 lca 活代码中彻底无 raw 字面量。类比先例：484 轮 3 处收敛、481 轮 `_resolve_port`×5 收敛。
+- 候选清单（本轮 explore，逐一验证后取舍）：
+  1. 上述 5 处收敛 —— 选中（484 轮遗留 #2 的继续执行；逐一核对路径语义与测试 seam 后执行）。
+  2. journal/exceptions.py:149 `run_dir / f"{run_dir.name}.spine.jsonl"` —— 驳回（`--traces-root` 可覆盖根 + `run_dir.name` 未必等于 `run_id`，需单独评审，留后续轮次）。
+  3. failure_reader.py:39 / fold_deriver.py:167 / curator.py:87 —— 驳回（`run_path`/`_run_dir`/`run_dir` 语义各异，非 cwd/traces/runs 布局，需逐个评审，留后续轮次）。
+  4. run_explain._load_facts 与 run_replay._load_facts 双份近乎重复的 spine 读取循环 —— 新发现备选（前缀过滤参数化收敛属加深），本轮不扩 scope，留后续轮次。
+- 验证结果: ruff check 5 文件全过（中途修了 import 排序 I001 共 4 处；修后全过）；行为等价 python 断言 EQUIV-OK（`spine_filename_for_run_cwd(rid) == Path("traces/runs")/rid/f"{rid}.spine.jsonl"`、`spine_filename_for_run(rid) == f"{rid}.spine.jsonl"` 双断言）；import 冒烟 5 模块 OK；targeted pytest 6 文件（test_runs_create_health / test_run_replay_graph_timeline / test_runs_health_cli / test_projection / test_routes_channels_wechat / test_runs_debug_health）：31 passed，0 failed，无预存失败。**中途抓到的真实回归**：初版把 runs.py 的 `_DEFAULT_TRACES_ROOT` 也删了，test_runs_create_health 3 用例 patch 该常量作 traces-root seam → 3 failed；按 LANGUAGE.md "The interface is the test surface" 恢复该常量（改走 naming 文件名 helper 仍消除字面量），重跑全绿。
+- commit: cc489a6e9（amend 定稿前中间态；最终 hash 以 git log --grep=第0485轮 为准）（refactor(lca-1000): 第0485轮 5 处 spine 文件名约定收敛至命名 SSOT(加深/Seam)，6 files），未 push。
+- 备注: 只 add 了本轮 6 个文件（5 代码 + ledger.md）；工作区干净（无并发会话未提交改动）；备份 /tmp/bak_0485/（252，5 文件原版）。教训：删模块级常量前先 grep tests/ 的 patch/mock 引用——测试 pin 的 seam 就是 interface 的一部分（本轮 runs.py 的 `_DEFAULT_TRACES_ROOT` 差点踩坑，被 targeted 测试当场抓住；health.py 的同名常量确认无测试引用才删）。

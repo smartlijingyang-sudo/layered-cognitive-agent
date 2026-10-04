@@ -9,7 +9,6 @@ from __future__ import annotations
 
 import json
 import logging
-from pathlib import Path
 from typing import Any
 
 import typer
@@ -21,6 +20,7 @@ from lca.contracts.observability.observation import (
     NodeExit,
     PlanBlueprint,
 )
+from lca.infrastructure.cli.commands._shared.projection import spine_filename_for_run_cwd
 from lca.plugins.diagnosis.failure_explainer.plugin import explain_failure
 
 _LOG = logging.getLogger(__name__)
@@ -52,7 +52,7 @@ def register(app: typer.Typer) -> None:
 
 
 def _load_facts(run_id: str) -> list[dict[str, Any]]:
-    spine_path = Path("traces/runs") / run_id / f"{run_id}.spine.jsonl"
+    spine_path = spine_filename_for_run_cwd(run_id)
     if not spine_path.exists():
         return []
     out: list[dict[str, Any]] = []

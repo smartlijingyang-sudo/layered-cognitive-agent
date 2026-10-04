@@ -35,6 +35,7 @@ from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 from lca.infrastructure.channels.wechat.client import WechatIlinkClient
 from lca.infrastructure.channels.wechat.formatter import WechatMessageFormatter
 from lca.infrastructure.channels.wechat.service import WechatChannelService
+from lca.infrastructure.observability.spine.sinks.naming import spine_filename_for_run
 from lca.plugins.transport.webserver.handlers.cors.cors import cors_headers
 from lca.plugins.transport.webserver.handlers.runs.terminal.port.port import RunRequest
 from lca.plugins.transport.webserver.read.runs.identity.identity import AgentRef
@@ -145,7 +146,7 @@ async def wechat_gateway_dispatch(
     if session is None or session.task is None:
         return "抱歉，助理执行初始化失败。"
 
-    spine_path = Path("traces") / "runs" / receipt.run_id / f"{receipt.run_id}.spine.jsonl"
+    spine_path = Path("traces") / "runs" / receipt.run_id / spine_filename_for_run(receipt.run_id)
     last_thought = ""
     last_tool = ""
 
