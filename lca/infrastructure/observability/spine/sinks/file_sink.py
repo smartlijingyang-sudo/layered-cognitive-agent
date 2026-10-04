@@ -40,6 +40,7 @@ from lca.infrastructure.observability.spine.event.record import EventRecord
 from lca.infrastructure.observability.spine.sinks.naming import (
     DEFAULT_SPINE_TEMPLATE,
     RUN_ARTIFACT_MODE,
+    exceptions_filename_for_run,
     resolve_filename,
     spine_filename_for_run,
 )
@@ -202,7 +203,7 @@ class FileSink:
         self._exceptions_fd: int | None = None
         self._exceptions_count = 0
         if self._write_exception_index:
-            exc_name = exceptions_file_name or f"{run_id}.exceptions.jsonl"
+            exc_name = exceptions_file_name or exceptions_filename_for_run(run_id)
             self._exceptions_path = self._run_dir / exc_name
             try:
                 self._exceptions_fd = os.open(

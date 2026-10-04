@@ -434,3 +434,19 @@
 - 验证结果: ruff check 2 文件首次即过；行为等价 python 断言 ALL-OK（命名 helper vs 旧字面量逐字节等价，4 种 run_id 含空串；curator 端到端：缺文件→None、含 procedural_candidate 行→正确提取；fold_deriver：缺文件→空事件、按旧公式路径建文件→读出 1 事件（证明新代码 fallback 解析到同一路径）、显式 spine_path override 分支不变）；targeted pytest（tests/plugins/session/derivers/step_tree/test_fold_deriver.py + tests/plugins/assistant/test_curator.py）：23 passed，0 failed，无预存失败；CI gate scripts/lca-cli-shape.py：touched file 零 findings（剩余 2 个 output_mode findings 在 ops/memory.py、runs/health.py——本轮未动文件，预存问题，与本轮无关）。
 - commit: 见 git log --grep='第0490轮'（refactor(lca-1000): 第0490轮 plugin 层两处 spine 文件名拼写收敛至 naming SSOT seam(Seam)，3 files，未 push）。
 - 备注: 只 add 本轮 3 个文件（2 代码 + ledger.md）；工作区干净（本轮期间无并发会话未提交改动）；备份 /tmp/bak_0490/（252，2 文件原版）。stdin 喂 python 编辑路径继续稳定可靠；中途一次 ssh 传输层重启（read-only 调用，无副作用），重试即过。
+
+## 第0491轮 (2026-10-05 05:03-05:16 CST)
+- 改了什么: writer 侧 exceptions 默认文件名收敛至 naming SSOT seam（1 file，2 insertions，1 deletion）：
+  - `lca/infrastructure/observability/spine/sinks/file_sink.py:206`：`exc_name = exceptions_file_name or f"{run_id}.exceptions.jsonl"` → `exc_name = exceptions_file_name or exceptions_filename_for_run(run_id)`；
+  - import 列表新增 `exceptions_filename_for_run`（isort 顺序正确：大写常量在前，小写按字母序 exceptions < resolve < spine）。
+- 依据 skill 哪一节: DEEPENING.md Seam discipline（naming.py 是 filename 命名 seam：本轮确认 read 侧收敛弧 484→490 已收口、exceptions 侧多调用方 run_paths / cli / failure_reader / ssot 文档化意图齐备，seam 真实；FileSink 是唯一 writer——写侧是约定真正落地的地方，旧 fallback 是绕开 seam 的影子拼写）+ LANGUAGE.md Locality（文件名约定只活在 naming.py 一处；SKILL.md Deletion test：删掉 raw 拼写后命名复杂度不搬家——只在 naming.py）/ Interface（error mode 未碰：`or` 短路顺序不变，显式 override 仍优先；`write_exception_index=False` 分支不动）。
+- 为什么这是实质改动(非凑数): 全库 grep（排除 tests/docs/naming 自身）证实这是最后一个该 pattern 的 code site（484 轮起的命名收敛弧：486 CLI 三命令、487 journal run-dir、488 CLI exceptions、489 webserver failure_reader、490 plugin 双 reader——本轮是 writer 侧收口）。写侧比读侧更 load-bearing：若将来 naming.py 改约定，旧写法会让 writer 写旧名、所有已收敛的 reader 找新名——ssot.py 记载的 PR-27 式"写读名不一、bug 沉默通过"回归根因，且是跨进程沉默失败。收敛后写读走同一 seam。字节级等价已断言（5 种 run_id 含空串/长串）。
+- 关键设计决策（夜间跳过 grilling，记台账）: 只收敛默认 fallback，不动 `exceptions_file_name` override 参数本身——grep 证实全库无任何调用方传非 None 值（仅 tracing_file_sink.py:89 透传），它是 hypothetical seam，但删构造函数参数是 interface 形状变更，需 grilling，夜间轮不擅自改；`or` 顺序保留显式 override 优先，不碰任何 error mode（LANGUAGE.md：error modes 是 interface 的一部分）。
+- 候选清单（本轮 explore，逐一验证后取舍）：
+  1. 上述 writer 侧 fallback 收敛 —— 选中（486/488/489/490 轮连续四次标注"需单独评审"的 deferred 项；本轮单独评审通过：写侧唯一真实路径、影子拼写、全库最后 code site）。
+  2. `activity_feed.py:248/399/420` glob discovery —— 驳回（discovery 语义非精确单路径，沿用 490 结论，留后续逐个评审）。
+  3. `profile/inspect.py`、journal/exceptions read 循环 —— 驳回（语义各异，沿用 490 结论）。
+  4. `spine_filename: bool` + `file_name` 模板双机制（FileSink/TracingFileSink 构造器）—— 发现，interface 形状问题需 grilling，夜间轮不动，留后续。
+- 验证结果: ruff check 1 文件首次即过；行为等价 python 断言全绿（helper vs 旧字面量逐字节等价 5 种 run_id；tmp run 端到端：默认 exceptions_path == 旧公式路径、主 ledger 路径不变、显式 override 仍被尊重、exception.caught 真实写入 exceptions.jsonl 非空）；targeted pytest `tests/observability/spine/sinks/test_tracing_file_sink.py` + `tests/observability/spine/test_exception_capture.py`：30 passed，0 failed，无预存失败；CI gate scripts/lca-cli-shape.py：与本轮相关的 findings 为零（仅剩 2 个 output_mode findings 在 ops/memory.py、runs/health.py——本轮未动文件，预存问题，与本轮无关）。verify 脚本初版 EventRecord 缺 step_id 参数致错——脚本自身 bug，非代码问题，修正后全绿。
+- commit: 见 git log --grep='第0491轮'（refactor(lca-1000): 第0491轮 file_sink writer 侧 exceptions 默认文件名收敛至 naming SSOT seam(Seam)，2 files，未 push）。
+- 备注: 只 add 本轮 2 个文件（代码 1 + ledger.md）；工作区干净（本轮期间无并发会话未提交改动；编辑前 git status --porcelain 仅见本轮文件）；备份 /tmp/bak_0491/（252，1 文件原版）。stdin 喂 python 编辑/验证路径继续稳定可靠。
