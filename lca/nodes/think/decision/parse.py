@@ -29,7 +29,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 from lca.cognition.brain.llm_turn.response_projection import project_llm_response
 from lca.cognition.memory.acknowledgement import guard_reply
@@ -61,6 +61,7 @@ from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import
     OwnershipDeclaration,
 )
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
+from lca.nodes._resolve import resolve_typed_port_or_runtime
 
 if TYPE_CHECKING:
     from lca.contracts.models.core.conversation.llm import LLMResponse
@@ -84,8 +85,8 @@ class DecisionParseExecutor:
         input: NodeInput,
     ) -> NodeOutput:
         """Project an :class:`LLMResponse` into a :class:`Decision`."""
-        _resolve_port(PortName("state"), input=input, context=context)
-        llm_response = _resolve_port(PortName("llm_response"), input=input, context=context)
+        resolve_typed_port_or_runtime(PortName("state"), input=input, context=context, node="decision.parse")
+        llm_response = resolve_typed_port_or_runtime(PortName("llm_response"), input=input, context=context, node="decision.parse")
         tool_calls, delegations, intent = _project_response(llm_response)
         action_type = _infer_action_type(tool_calls=tool_calls, delegations=delegations)
         decision_id = new_id("decision")
@@ -117,20 +118,6 @@ def _guard_acknowledgement(*, context: NodeContext, text: str | None) -> str | N
     ``may_acknowledge`` and is not spent.
     """
     return guard_reply(text, getattr(context, "runtime", None))
-
-
-def _resolve_port(name: PortName, *, input: NodeInput, context: NodeContext) -> Any:
-    """Read a declared port from ``input.port_values`` or ``context.runtime``."""
-    value = input.port_values.get(name)
-    if value is None and hasattr(context, "runtime") and context.runtime is not None:
-        value = getattr(context.runtime, name, None)
-        if value is None and hasattr(context.runtime, "get"):
-            value = context.runtime.get(name)
-    if value is None:
-        raise TypeError(
-            f"decision.parse: '{name}' port must be supplied via input.port_values or context.runtime"
-        )
-    return value
 
 
 def _project_response(

@@ -74,6 +74,7 @@ from lca.infrastructure.memory.contextfiles.service.assembly import (
 from lca.infrastructure.memory.contextfiles.service.compaction import (
     preserve_standing_sections,
 )
+from lca.nodes._resolve import resolve_typed_port_or_runtime
 
 
 def _tool_to_spec(tool: Tool) -> dict[str, Any]:
@@ -159,8 +160,8 @@ class HistoryDeriveExecutor:
         input: NodeInput,
     ) -> NodeOutput:
         """Resolve declared ports, build the request, return typed output."""
-        state = _resolve_port(PortName("state"), input=input, context=context)
-        writer = _resolve_port(PortName("writer"), input=input, context=context)
+        state = resolve_typed_port_or_runtime(PortName("state"), input=input, context=context, node="memory.derive")
+        writer = resolve_typed_port_or_runtime(PortName("writer"), input=input, context=context, node="memory.derive")
         del state
         messages = writer.derive_messages()
         header = writer.request_header()
@@ -210,22 +211,6 @@ def _strip_defer_catalog(system: str) -> str:
     if _DEFER_CATALOG_HEADER in system:
         system = _DEFER_CATALOG_PATTERN.sub("\n\n", system)
     return system.strip()
-
-
-def _resolve_port(name: PortName, *, input: NodeInput, context: NodeContext) -> Any:
-    """Read a declared port from ``input.port_values`` or ``context.runtime``."""
-    value = input.port_values.get(name)
-    if value is None and hasattr(context, "runtime") and context.runtime is not None:
-        # Mirror the think.shortcut convention: runtime is a namespace
-        # object; resolve by attribute first, then mapping-style .get.
-        value = getattr(context.runtime, name, None)
-        if value is None and hasattr(context.runtime, "get"):
-            value = context.runtime.get(name)
-    if value is None:
-        raise TypeError(
-            f"memory.derive: '{name}' port must be supplied via input.port_values or context.runtime"
-        )
-    return value
 
 
 def _append_standing_diff(system: str, *, runtime: object) -> str:

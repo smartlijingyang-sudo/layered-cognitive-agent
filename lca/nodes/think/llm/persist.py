@@ -20,7 +20,6 @@ Canonical shape: hand-written ``@dataclass(frozen=True, slots=True)`` +
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any
 
 from lca.contracts.atoms.control.slot import ControlSlot
 from lca.contracts.atoms.functional.group import FunctionalGroup
@@ -48,6 +47,7 @@ from lca.contracts.protocols.session.run_session_writer import (
     RunSessionWriterProtocol,
 )
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
+from lca.nodes._resolve import resolve_runtime_state, resolve_typed_port
 
 
 @dataclass(frozen=True, slots=True)
@@ -73,9 +73,9 @@ class LlmPersistExecutor:
         ``adapter`` is NOT in the port set — that path lives in the
         sibling ``think.llm.invoke``.
         """
-        state = _resolve_state(context=context)
+        state = resolve_runtime_state(context=context, node="llm.persist")
         writer = _resolve_writer(context=context)
-        response = _resolve_port(PortName("llm_response"), input=input)
+        response = resolve_typed_port(PortName("llm_response"), input=input, node="llm.persist")
         step = int(getattr(state, "step", 0) or 0)
         _persist_assistant(writer=writer, response=response, step=step)
         return NodeOutput(port_values={PortName("journaled"): True})
@@ -121,25 +121,6 @@ def _persist_assistant(
             name=tc.name,
             arguments=str(tc.arguments),
         )
-
-
-def _resolve_port(name: PortName, *, input: NodeInput) -> Any:
-    """Read a typed port from ``input.port_values``."""
-    value = input.port_values.get(name)
-    if value is None:
-        raise TypeError(f"llm.persist: '{name}' port must be supplied via input.port_values")
-    return value
-
-
-def _resolve_state(*, context: NodeContext) -> Any:
-    """Pull ``state`` from the whitelisted kernel runtime carrier."""
-    runtime = getattr(context, "runtime", None)
-    state_obj = getattr(runtime, "state", None) if runtime is not None else None
-    if state_obj is None and runtime is not None and hasattr(runtime, "get"):
-        state_obj = runtime.get("state")
-    if state_obj is None:
-        raise TypeError("llm.persist: 'state' must be supplied via context.runtime")
-    return state_obj
 
 
 def _resolve_writer(*, context: NodeContext) -> RunSessionWriterProtocol:

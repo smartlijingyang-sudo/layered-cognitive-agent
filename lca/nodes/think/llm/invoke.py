@@ -49,6 +49,7 @@ from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import
     OwnershipDeclaration,
 )
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
+from lca.nodes._resolve import resolve_runtime_state, resolve_typed_port
 
 
 @dataclass(frozen=True, slots=True)
@@ -84,8 +85,8 @@ class LlmInvokeExecutor:
         non-streaming or identity-less call leaves ``journal.steps``
         empty (regression guarded by ``test_invoke``).
         """
-        state = _resolve_state(context=context)
-        request = _resolve_port(PortName("model_visible_request"), input=input)
+        state = resolve_runtime_state(context=context, node="llm.invoke")
+        request = resolve_typed_port(PortName("model_visible_request"), input=input, node="llm.invoke")
         adapter = _resolve_adapter(context=context)
 
         prompt, history = _split_wire_turn(request.messages)
@@ -192,31 +193,6 @@ def _model_visible_identity(state: Any, request: Any) -> tuple[Any, Any]:
         system_prompt_text=str(request.system or ""),
     )
     return cursor, reasoner_prompt
-
-
-def _resolve_port(name: PortName, *, input: NodeInput) -> Any:
-    """Read a typed port from ``input.port_values``.
-
-    Typed-port-only read. Runtime-carrier resources (e.g. ``state``)
-    use :func:`_resolve_state` instead so the plan validator sees an
-    empty ``declared_inputs`` set and the kernel-carrier flow remains
-    unimpeded.
-    """
-    value = input.port_values.get(name)
-    if value is None:
-        raise TypeError(f"llm.invoke: '{name}' port must be supplied via input.port_values")
-    return value
-
-
-def _resolve_state(*, context: NodeContext) -> Any:
-    """Pull ``state`` from the whitelisted kernel runtime carrier."""
-    runtime = getattr(context, "runtime", None)
-    state_obj = getattr(runtime, "state", None) if runtime is not None else None
-    if state_obj is None and runtime is not None and hasattr(runtime, "get"):
-        state_obj = runtime.get("state")
-    if state_obj is None:
-        raise TypeError("llm.invoke: 'state' must be supplied via context.runtime")
-    return state_obj
 
 
 def _resolve_adapter(*, context: NodeContext) -> Any:

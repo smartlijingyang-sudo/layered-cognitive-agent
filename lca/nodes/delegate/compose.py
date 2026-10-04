@@ -55,6 +55,7 @@ from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import
 )
 from lca.contracts.protocols.graph.delegation import DelegationRequest
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
+from lca.nodes._resolve import resolve_typed_port
 
 # C5: capability key required on the parent's grant for fan-out.
 DELEGATE_CAPABILITY = "delegate"
@@ -88,8 +89,8 @@ class DelegateComposeExecutor:
         member (C5 monotonicity).
         """
         del context
-        decision = _resolve_port(PortName("decision"), input=input)
-        grant = _resolve_port(PortName("capability_grant"), input=input)
+        decision = resolve_typed_port(PortName("decision"), input=input, node="delegate.compose")
+        grant = resolve_typed_port(PortName("capability_grant"), input=input, node="delegate.compose")
         _enforce_delegate_capability(grant)
         targets = _targets_from_decision(decision)
         requests = tuple(
@@ -105,14 +106,6 @@ class DelegateComposeExecutor:
             for target in targets
         )
         return NodeOutput(port_values={PortName("delegation_request"): requests})
-
-
-def _resolve_port(name: PortName, *, input: NodeInput) -> Any:
-    """Pull a declared port from ``input.port_values``; missing → TypeError."""
-    value = input.port_values.get(name)
-    if value is None:
-        raise TypeError(f"delegate.compose: '{name}' port must be supplied via input.port_values")
-    return value
 
 
 def _targets_from_decision(decision: Any) -> tuple[str, ...]:
