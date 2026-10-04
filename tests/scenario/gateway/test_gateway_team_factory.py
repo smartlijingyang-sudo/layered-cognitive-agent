@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+__keep_llm_key__ = True  # scripted run + 真实 kernel boot，需过 reasoner fail-loud credential 门(见 tests/conftest.py)
+
 import json
 import unittest
 
@@ -23,6 +25,7 @@ from lca.plugins.collaboration.team_1.team_casting_prompt_renderer_seam import (
 )
 from tests.harness.collector import InMemoryObservability
 from tests.harness.scripted_llm import ScriptedLLMAdapter
+from tests.support.session_gate_helpers import bound_session
 
 
 class TestGatewaySoloFactory(unittest.TestCase):
@@ -133,16 +136,18 @@ class TestGatewayTeamCastingFactory(unittest.IsolatedAsyncioTestCase):
             {"caster": [LLMResponse(text=plan, model="scripted-llm")]}, default_respond=True
         )
         collector = InMemoryObservability()
-        runnable = await build_runnable_team(
-            "写一份发布方案",
-            llm,
-            observability=collector,
-            trace_id="trace-team",
-            run_id="run-team",
-            library=FileRoleLibrary(),
-            caster=LLMTeamCaster(BuiltinCastingPromptRenderer()),
-            tools=(),
-        )
+        # D3 裁决(todo-38/todo-50):casting 路径 record(CastingStarted) 需要 bound publish Session。
+        with bound_session("gateway-casting"):
+            runnable = await build_runnable_team(
+                "写一份发布方案",
+                llm,
+                observability=collector,
+                trace_id="trace-team",
+                run_id="run-team",
+                library=FileRoleLibrary(),
+                caster=LLMTeamCaster(BuiltinCastingPromptRenderer()),
+                tools=(),
+            )
         self.assertIsInstance(runnable, Team)
         roles = [member.profile.role for member in runnable.spec.members]
         self.assertEqual(roles, ["产品经理", "内容创作者"])
@@ -176,17 +181,19 @@ class TestGatewayTeamCastingFactory(unittest.IsolatedAsyncioTestCase):
         )
         collector = InMemoryObservability()
         scope = await ensure_default_ctx()
-        runnable = await build_runnable_team(
-            "写一份发布方案",
-            llm,
-            observability=collector,
-            trace_id="trace-team",
-            run_id="run-team",
-            library=FileRoleLibrary(),
-            caster=LLMTeamCaster(BuiltinCastingPromptRenderer()),
-            tools=(),
-            scope=scope,
-        )
+        # D3 裁决(todo-38/todo-50):casting 路径 record(CastingStarted) 需要 bound publish Session。
+        with bound_session("gateway-casting-lead"):
+            runnable = await build_runnable_team(
+                "写一份发布方案",
+                llm,
+                observability=collector,
+                trace_id="trace-team",
+                run_id="run-team",
+                library=FileRoleLibrary(),
+                caster=LLMTeamCaster(BuiltinCastingPromptRenderer()),
+                tools=(),
+                scope=scope,
+            )
         lead = runnable._handle.lead
         self.assertIsNotNone(lead)
         brain = getattr(lead.runtime, "brain", None)
