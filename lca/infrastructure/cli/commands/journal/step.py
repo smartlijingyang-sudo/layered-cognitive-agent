@@ -25,18 +25,9 @@ from typing import Any
 
 import typer
 
+from lca.infrastructure.cli.commands.kernel._shared import resolve_run_dir
+
 _DEFAULT_TRACES_ROOT = Path("traces")
-
-
-def _resolve_run_dir(run_id: str | None, traces_root: Path) -> Path | None:
-    resolved_run_id = run_id
-    if not resolved_run_id:
-        from lca.infrastructure.cli.commands.kernel._shared import find_latest_run_id
-
-        resolved_run_id = find_latest_run_id(traces_root)
-    if not resolved_run_id:
-        return None
-    return traces_root / "runs" / resolved_run_id
 
 
 def _load_journal(run_dir: Path) -> dict[str, Any] | None:
@@ -191,7 +182,7 @@ def register(app: typer.Typer) -> None:
         ),
     ) -> None:
         """打印单个 step 的全部事实(thinking / tool_call / tool_result)。"""
-        run_dir = _resolve_run_dir(run_id, traces_root)
+        run_dir = resolve_run_dir(run_id, traces_root)
         if run_dir is None:
             print(f"无 run 可用 (run_id={run_id!r})")
             raise typer.Exit(1)

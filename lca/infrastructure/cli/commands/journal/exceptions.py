@@ -33,18 +33,9 @@ from typing import Any
 
 import typer
 
+from lca.infrastructure.cli.commands.kernel._shared import resolve_run_dir
+
 _DEFAULT_TRACES_ROOT = Path("traces")
-
-
-def _find_run_dir(run_id: str | None, traces_root: Path) -> Path:
-    resolved_run_id = run_id
-    if not resolved_run_id:
-        from lca.infrastructure.cli.commands.kernel._shared import find_latest_run_id
-
-        resolved_run_id = find_latest_run_id(traces_root)
-    if not resolved_run_id:
-        raise typer.BadParameter("no run_id and no latest run found under traces/runs")
-    return traces_root / "runs" / resolved_run_id
 
 
 def _iter_records(path: Path) -> list[dict[str, Any]]:
@@ -144,7 +135,9 @@ def register(app: typer.Typer) -> None:
         ),
     ) -> None:
         """列出 run 的所有 traceback(只读 exceptions.jsonl sidecar)。"""
-        run_dir = _find_run_dir(run_id, traces_root)
+        run_dir = resolve_run_dir(run_id, traces_root)
+        if run_dir is None:
+            raise typer.BadParameter("no run_id and no latest run found under traces/runs")
         exc_path = run_dir / f"{run_dir.name}.exceptions.jsonl"
         spine_path = run_dir / f"{run_dir.name}.spine.jsonl"
         # Task 1.10 / G-11: sidecar is the ONLY source of truth.

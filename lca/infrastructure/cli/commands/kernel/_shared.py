@@ -224,6 +224,20 @@ def find_latest_run_id(traces_root: Path | None = None) -> str | None:
     return max(candidates, key=lambda p: p.stat().st_mtime).name
 
 
+def resolve_run_dir(run_id: str | None, traces_root: Path) -> Path | None:
+    """Resolve ``run_id`` (explicit) or the latest-mtime run (when empty) to its directory.
+
+    Composes :func:`find_latest_run_id` with the ``traces/runs`` layout so
+    command modules stop re-implementing the same resolution behind private
+    helpers. Fail-soft: returns ``None`` when no ``run_id`` was given and no
+    latest run exists -- callers own their missing-run error policy.
+    """
+    resolved = run_id or find_latest_run_id(traces_root)
+    if not resolved:
+        return None
+    return traces_root / "runs" / resolved
+
+
 def audit_roots(*names: str) -> list[Path]:
     """Build scan roots under the repo, ignoring missing dirs."""
     root = resolve_repo_root()
