@@ -14,11 +14,19 @@ declared" and passes every call through.
 
 Statically, no boot and no factory resolution:
 
-1. AST-scan ``lca/**/*.py`` for classes carrying a literal ``semantic_name`` and a
-   literal ``declared_inputs`` tuple of ``PortName("...")``.
-2. Scan ``bundles/**/*.yaml`` for ``nodes[]`` entries with a ``factory`` and ``inputs``.
-3. For every bundle node whose ``factory`` matches a discovered ``semantic_name``,
-   assert each declared input port appears in that node's ``inputs`` list.
+1. AST-scan ``lca/**/*.py`` for classes carrying a literal ``region``,
+   ``semantic_name`` and a literal ``declared_inputs`` tuple of
+   ``PortName("...")``.
+2. Scan ``bundles/**/*.yaml`` for ``nodes[]`` entries with a ``factory`` and
+   ``inputs``, plus the bundle's top-level ``region``.
+3. For every bundle node, match the executor by composite key
+   ``<bundle region>::<factory>`` (mirroring the runtime's
+   ``<region>::<factory>`` registry). A bare ``factory`` name is only used
+   when it is unambiguous; an ambiguous bare name fails loudly instead of
+   silently picking one executor's contract — the silent pick is what
+   mis-attributed primitive::llm.invoke's ``(render, tools, state)`` to
+   think's llm.invoke node in D4 batch-2 (2026-10-05).
+4. Assert each declared input port appears in that node's ``inputs`` list.
 
 Executors whose ``declared_inputs`` is computed rather than literal are reported as
 unresolved and do not fail the check.
@@ -79,12 +87,13 @@ def _literal_port_names(node: ast.expr) -> tuple[str, ...] | None:
     return tuple(names)
 
 
-def _class_contract(cls: ast.ClassDef) -> tuple[str, tuple[str, ...]] | None:
-    """Return ``(semantic_name, declared_inputs)`` for a NodeExecutor class."""
+def _class_contract(cls: ast.ClassDef) -> tuple[str | None, str, tuple[str, ...]] | None:
+    """Return ``(region, semantic_name, declared_inputs)`` for a NodeExecutor class."""
+    region: str | None = None
     semantic_name: str | None = None
     declared: tuple[str, ...] | None = None
     for statement in cls.body:
-        if not isinstance(statement, ast.AnnAssign) and not isinstance(statement, ast.Assign):
+        if not isinstance(statement, (ast.AnnAssign, ast.Assign)):
             continue
         targets = (
             [statement.target] if isinstance(statement, ast.AnnAssign) else list(statement.targets)
@@ -95,17 +104,27 @@ def _class_contract(cls: ast.ClassDef) -> tuple[str, tuple[str, ...]] | None:
             if target.id == "semantic_name" and isinstance(statement.value, ast.Constant):
                 if isinstance(statement.value.value, str):
                     semantic_name = statement.value.value
+            elif target.id == "region" and isinstance(statement.value, ast.Constant):
+                if isinstance(statement.value.value, str):
+                    region = statement.value.value
             elif target.id == "declared_inputs":
                 declared = _literal_port_names(statement.value)
     if semantic_name is None:
         return None
-    return semantic_name, declared or ()
+    return region, semantic_name, declared or ()
 
 
-def collect_executor_contracts() -> tuple[dict[str, tuple[str, ...]], dict[str, str]]:
-    """Map ``semantic_name`` to its declared input ports, plus its source location."""
+def collect_executor_contracts() -> (
+    tuple[dict[str, tuple[str, ...]], dict[str, str], dict[str, list[str]]]
+):
+    """Map ``<region>::<semantic_name>`` to its declared input ports, plus its source location.
+
+    Also returns ``bare factory name -> [composite keys]`` so callers can detect
+    ambiguous bare-name matches instead of silently picking one executor.
+    """
     contracts: dict[str, tuple[str, ...]] = {}
     locations: dict[str, str] = {}
+    bare_index: dict[str, list[str]] = {}
     unresolved: dict[str, str] = {}
     for path in sorted(SOURCE_ROOT.rglob("*.py")):
         try:
@@ -118,7 +137,8 @@ def collect_executor_contracts() -> tuple[dict[str, tuple[str, ...]], dict[str, 
             contract = _class_contract(node)
             if contract is None:
                 continue
-            name, declared = contract
+            region, name, declared = contract
+            key = f"{region}::{name}" if region else name
             relative = path.relative_to(REPO_ROOT)
             if any(
                 isinstance(statement, ast.AnnAssign)
@@ -128,16 +148,17 @@ def collect_executor_contracts() -> tuple[dict[str, tuple[str, ...]], dict[str, 
                 and _literal_port_names(statement.value) is None
                 for statement in node.body
             ):
-                unresolved[name] = f"{relative}:{node.lineno}"
+                unresolved[key] = f"{relative}:{node.lineno}"
                 continue
-            contracts[name] = declared
-            locations[name] = f"{relative}:{node.lineno}"
+            contracts[key] = declared
+            locations[key] = f"{relative}:{node.lineno}"
+            bare_index.setdefault(name, []).append(key)
     if unresolved:
         print("unresolved declared_inputs (computed, skipped):")
         for name in sorted(unresolved):
             print(f"  {name:38s} {unresolved[name]}")
         print()
-    return contracts, locations
+    return contracts, locations, bare_index
 
 
 def _port_spec_name(item: object) -> str | None:
@@ -155,8 +176,8 @@ def _port_spec_name(item: object) -> str | None:
     return None
 
 
-def collect_bundle_nodes() -> list[tuple[str, str, str, list[str], int]]:
-    """Yield ``(bundle_path, node_id, factory, inputs, line)`` for every bundle node."""
+def collect_bundle_nodes() -> list[tuple[str, str, str, str | None, list[str], int]]:
+    """Yield ``(bundle_path, node_id, factory, bundle_region, inputs, line)`` for every bundle node."""
     rows: list[tuple[str, str, str, list[str], int]] = []
     for path in sorted(BUNDLE_ROOT.rglob("*.yaml")):
         try:
@@ -170,6 +191,8 @@ def collect_bundle_nodes() -> list[tuple[str, str, str, list[str], int]]:
         if not isinstance(nodes, list):
             continue
         relative = str(path.relative_to(REPO_ROOT))
+        raw_region = document.get("region")
+        bundle_region = raw_region if isinstance(raw_region, str) and raw_region else None
         for index, node in enumerate(nodes):
             if not isinstance(node, dict):
                 continue
@@ -182,14 +205,21 @@ def collect_bundle_nodes() -> list[tuple[str, str, str, list[str], int]]:
             else:
                 inputs = []
             rows.append(
-                (relative, str(node.get("id") or f"nodes[{index}]"), factory, inputs, index)
+                (
+                    relative,
+                    str(node.get("id") or f"nodes[{index}]"),
+                    factory,
+                    bundle_region,
+                    inputs,
+                    index,
+                )
             )
     return rows
 
 
 def main() -> int:
     strict = "--strict" in sys.argv[1:]
-    contracts, locations = collect_executor_contracts()
+    contracts, locations, bare_index = collect_executor_contracts()
     rows = collect_bundle_nodes()
 
     new_violations: list[str] = []
@@ -199,12 +229,35 @@ def main() -> int:
     checked = 0
     wired: dict[str, list[str]] = defaultdict(list)
 
-    for relative, node_id, factory, inputs, _index in rows:
-        declared = contracts.get(factory)
-        if declared is None:
+    for relative, node_id, factory, bundle_region, inputs, _index in rows:
+        key: str | None = None
+        if bundle_region:
+            composite = f"{bundle_region}::{factory}"
+            if composite in contracts:
+                key = composite
+        if key is None:
+            # Bare factory names are only safe when unambiguous. A name
+            # claimed by executors in several regions cannot be attributed
+            # by name alone — failing loudly here is what D4 batch-2
+            # (2026-10-05) lacked.
+            candidates = bare_index.get(factory, [])
+            if len(candidates) == 1:
+                key = candidates[0]
+            elif len(candidates) > 1:
+                new_violations.append(
+                    f"  {relative}#{node_id}\n"
+                    f"    factory          : {factory}\n"
+                    f"    AMBIGUOUS        : claimed by {len(candidates)} executors: "
+                    + ", ".join(f"{c} ({locations.get(c, '?')})" for c in candidates)
+                    + "\n    Add a top-level 'region:' to the bundle (matching the "
+                    "executor's region) so the contract match is exact."
+                )
+                continue
+        if key is None:
             continue
+        declared = contracts[key]
         checked += 1
-        wired[factory].append(f"{relative}#{node_id}")
+        wired[key].append(f"{relative}#{node_id}")
         missing = frozenset(port for port in declared if port not in inputs)
         if not missing:
             seen_nodes.add(node_id)
@@ -212,7 +265,7 @@ def main() -> int:
         block = (
             f"  {relative}#{node_id}\n"
             f"    factory          : {factory}\n"
-            f"    executor         : {locations.get(factory, '?')}\n"
+            f"    executor         : {locations.get(key, '?')}\n"
             f"    declared_inputs  : {list(declared)}\n"
             f"    yaml inputs      : {inputs}\n"
             f"    MISSING          : {sorted(missing)}"
@@ -225,7 +278,7 @@ def main() -> int:
 
     print(f"executors with a literal port contract : {len(contracts)}")
     print(f"bundle nodes matched to an executor    : {checked}")
-    print(f"distinct factories wired               : {len(wired)}")
+    print(f"distinct executors wired               : {len(wired)}")
 
     declared_but_unbound = sorted(set(contracts) - set(wired))
     if declared_but_unbound:

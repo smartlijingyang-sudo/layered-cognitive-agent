@@ -107,13 +107,23 @@ nodes:
 
   - id: llm.invoke
     factory: llm.invoke
-    inputs: [model_visible_request, render, tools, state]
+    inputs: [model_visible_request]
     outputs: [llm_response, usage]
     config:
       # PR-B: typed-port typed-only node. Drives the LLM adapter once
       # per think turn and forwards (LLMResponse, TokenUsage). Does
       # NOT write the journal — that lives in the sibling persist
       # node (spec §C persist-before-execute split).
+      #
+      # Inputs mirror the bound think::llm.invoke executor's
+      # declared_inputs (lca/nodes/think/llm/invoke.py): only
+      # model_visible_request arrives as a typed port; state and the
+      # LLM adapter are runtime-carrier reads (see the executor's
+      # own comment). Do NOT copy primitive llm_call's
+      # [render, tools, state] here — that is a different executor
+      # (primitive::llm.invoke) with a different port contract;
+      # wiring its ports broke web-standard boot (PlanLiftError,
+      # 2026-10-05 D4 batch-2 mis-wire).
       emit_on_enter: []
       emit_on_exit:  []
 
