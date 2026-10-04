@@ -38,14 +38,18 @@ def emit_phase_tool_call_start_for_state(
 def emit_phase_tool_call_end_for_state(
     state: AgentState,
     *,
-    outcome: str = "success",
     session: object | None = None,
     actor: str = "act",
 ) -> AppendReceipt | None:
-    """Append one ``phase.tool.call.end`` spine fact."""
+    """Append one ``phase.tool.call.end`` spine fact.
+
+    Pure lifecycle marker for the act-subgraph bracket: it carries no
+    tool outcome (the authoritative outcome lives in
+    ``step.tool_result.record``).
+    """
     return publish_ep_bound(
         "phase.tool.call.end",
-        {"state_id": state.trace_id, "outcome": outcome},
+        {"state_id": state.trace_id},
         state=state,
         session=session,
         actor=actor,
@@ -107,14 +111,18 @@ def emit_body_tool_execute_start_for_state(
 def emit_body_tool_execute_end_for_state(
     state: AgentState,
     *,
-    outcome: str = "success",
     session: object | None = None,
     actor: str = "act",
 ) -> AppendReceipt | None:
-    """Append one ``body.tool.execute.end`` spine fact."""
+    """Append one ``body.tool.execute.end`` spine fact.
+
+    Pure lifecycle marker for the act-subgraph bracket: it carries no
+    tool outcome (the authoritative outcome lives in
+    ``step.tool_result.record``).
+    """
     return publish_ep_bound(
         "body.tool.execute.end",
-        {"state_id": state.trace_id, "outcome": outcome},
+        {"state_id": state.trace_id},
         state=state,
         session=session,
         actor=actor,

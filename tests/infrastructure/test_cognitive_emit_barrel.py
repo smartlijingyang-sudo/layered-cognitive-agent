@@ -14,6 +14,7 @@ from lca.infrastructure.session.emit.cognitive_emit import (
     emit_body_tool_execute_end_for_state,
     emit_body_tool_execute_start_for_state,
     emit_phase_perceive_fold_for_state,
+    emit_phase_tool_call_end_for_state,
     emit_phase_tool_call_start_for_state,
     emit_terminal_commit_for_state,
     emit_think_gate_start_for_state,
@@ -64,6 +65,7 @@ def test_tool_event_family_emits_through_barrel() -> None:
     try:
         state = _state()
         emit_phase_tool_call_start_for_state(state)
+        emit_phase_tool_call_end_for_state(state)
         emit_body_tool_execute_start_for_state(state)
         emit_body_tool_execute_end_for_state(state)
         emit_think_gate_start_for_state(state)
@@ -72,6 +74,13 @@ def test_tool_event_family_emits_through_barrel() -> None:
         assert "spine.body.tool.execute.start" in types
         assert "spine.body.tool.execute.end" in types
         assert "spine.cognition.think.gate.start" in types
+
+        # ADR-0285 D: bracket emitters carry state_id only — no outcome.
+        by_type = {event.type: event for event in session.snapshot_events()}
+        for ep in ("spine.phase.tool.call.end", "spine.body.tool.execute.end"):
+            fact_payload = by_type[ep].payload["payload"]
+            assert fact_payload.get("state_id") == "trace:barrel"
+            assert "outcome" not in fact_payload
     finally:
         reset_publish_session(token)
 
