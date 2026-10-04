@@ -99,18 +99,22 @@ async def send_task_traced(
     ) as handle:
         task_id = await transport.send_task(agent_card, subtask, context_refs)
         handle.attributes[ATTR_OK] = True
-    record_runtime(
-        DiagnosticCategory.TRANSPORT,
-        "transport.send",
-        plugin=type(transport).__name__,
-        attributes={
-            "callee_role": callee,
-            "protocol": protocol,
-            "subtask_preview": subtask,
-            "context_ref_count": len(context_refs),
-        },
-        output={"task_id": task_id},
-    )
+    from lca.infrastructure.session.bindings import active_publish_session
+
+    # 热路径 cheap 检查(todo-38,2026-10-05 裁决):无 Session 时跳过,不抛 RuntimeError。
+    if active_publish_session() is not None:
+        record_runtime(
+            DiagnosticCategory.TRANSPORT,
+            "transport.send",
+            plugin=type(transport).__name__,
+            attributes={
+                "callee_role": callee,
+                "protocol": protocol,
+                "subtask_preview": subtask,
+                "context_ref_count": len(context_refs),
+            },
+            output={"task_id": task_id},
+        )
     return task_id
 
 
