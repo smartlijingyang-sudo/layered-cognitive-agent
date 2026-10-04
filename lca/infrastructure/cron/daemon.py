@@ -31,7 +31,6 @@ class CronDaemonService:
         store: CronStore,
         lock_dir: str | Path,
         workspace_path: str,
-        session_store: Any | None = None,
         worker_runner: Callable[[str], Any] | None = None,
         tick_interval_s: int = 15,
         clock: Callable[[], datetime] | None = None,
@@ -39,18 +38,13 @@ class CronDaemonService:
         self._store = store
         self._lock_dir = Path(lock_dir)
         self._workspace_path = workspace_path
-        self._session_store = session_store
         self._tick_interval_s = max(1, tick_interval_s)
         self._clock = clock or (lambda: datetime.now(UTC))
 
         if worker_runner is not None:
             self._worker_runner = worker_runner
         else:
-            self._worker_runner = CronWorkerRunner(
-                store=store,
-                session_store=session_store,
-                clock=self._clock,
-            )
+            self._worker_runner = CronWorkerRunner(store=store)
 
         self._scheduler = CronScheduler(
             store=self._store,

@@ -155,7 +155,9 @@ class CronService:
         for job in self._store.list_jobs():
             if valid_owners and job.owner not in valid_owners:
                 continue
-            # 已完成且未被推迟至未来的单次任务不进入即将到来。
+            # 已完成且未被推迟至未来的单次任务不进入即将到来。回执为空表示
+            # handoff 轮还没做出投递决定（ADR-0268 §6），这种任务必须留在列表
+            # 上，否则一次没送达的触发连「未决」都显示不出来就消失了。
             runs = self._store.list_runs(job.id)
             latest = _latest_run(runs)
             if (
@@ -163,6 +165,7 @@ class CronService:
                 and latest is not None
                 and latest.finished_at is not None
                 and job.schedule.at <= latest.finished_at
+                and latest.receipts
             ):
                 continue
             last_run_dt = latest.finished_at if latest is not None else None

@@ -388,8 +388,7 @@ async def run_assistant_job(request: Request) -> JSONResponse:
 
     from lca.infrastructure.cron.worker_runner import CronWorkerRunner
 
-    session_store = getattr(getattr(request.app, "state", None), "session_store", None)
-    runner = CronWorkerRunner(store=service._store, session_store=session_store)
+    runner = CronWorkerRunner(store=service._store)
     result = await runner.execute_job(existing)
 
     run_id = service._store.append_run(
@@ -404,9 +403,9 @@ async def run_assistant_job(request: Request) -> JSONResponse:
             "assistant_id": assistant_id,
             "job_id": job_id,
             "run_id": run_id,
-            # ``outcome`` says the worker finished; ``receipts`` say whether the
-            # card actually reached a chat. A manual run with no live session
-            # comes back completed + not_sent, and the caller needs both halves.
+            # ``outcome`` says the worker finished. ``receipts`` say whether a
+            # delivery decision exists yet: an ``agent`` job comes back with
+            # none, because the handoff turn owns that decision (ADR-0268 §6).
             "outcome": result.outcome,
             "receipts": [receipt.model_dump() for receipt in result.receipts],
             "triggered_at": datetime.now(UTC).isoformat(),

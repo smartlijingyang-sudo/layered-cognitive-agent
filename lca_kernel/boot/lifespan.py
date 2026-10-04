@@ -68,7 +68,6 @@ def make_lifespan(
         # 启动常驻 Cron 调度守护协程（ADR-0268 生产运行态）
         cron_daemon = None
         try:
-            import contextlib
             from pathlib import Path
 
             from lca.domain.cron.store import MultiAssistantCronStore
@@ -80,21 +79,11 @@ def make_lifespan(
             raw_lock_dir = getattr(ctx, "lock_dir", None)
             lock_dir = Path(raw_lock_dir) if raw_lock_dir else (lca_home / "locks")
             workspace_path = str(getattr(ctx, "workspace", "") or lca_home)
-            session_store = None
-            with contextlib.suppress(Exception):
-                if hasattr(ctx, "inject"):
-                    session_store = ctx.inject("session.store") or ctx.inject("session_store")
-                elif hasattr(ctx, "require"):
-                    session_store = ctx.require("session.store")
-            if session_store is None:
-                with contextlib.suppress(Exception):
-                    session_store = getattr(app.state, "session_store", None)
 
             cron_daemon = CronDaemonService(
                 store=store,
                 lock_dir=lock_dir,
                 workspace_path=workspace_path,
-                session_store=session_store,
             )
             await cron_daemon.start()
             app.state.cron_daemon = cron_daemon

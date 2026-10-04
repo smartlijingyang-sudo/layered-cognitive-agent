@@ -122,16 +122,15 @@ async def test_run_assistant_job_now(tmp_path: Path):
     data = json.loads(resp.body.decode("utf-8"))
     assert data["job_id"] == "job-run-now-1"
     assert data["outcome"] == "completed"
-    # The fake app carries no session_store, so the only target is unreachable
-    # and the worker writes not_sent. Both the response and the record carry
-    # that receipt, since "completed" on its own reads as delivered.
-    unreachable = (TargetReceipt(chat_id="chat-1", state="not_sent"),)
-    assert data["receipts"] == [receipt.model_dump() for receipt in unreachable]
+    # An agent job's manual run reports that the worker finished and leaves
+    # receipts empty. The handoff turn owns the delivery decision (ADR-0268
+    # §6), so "completed" here must not read as delivered.
+    assert data["receipts"] == []
 
     runs = store.list_runs("job-run-now-1")
     assert len(runs) == 1
     assert runs[0].outcome == "completed"
-    assert runs[0].receipts == unreachable
+    assert runs[0].receipts == ()
     assert runs[0].run_id == data["run_id"]
 
 

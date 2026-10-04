@@ -17,17 +17,24 @@ __all__ = ["CronWorkerResult", "WorkerProductContext", "assemble_worker_context"
 
 @dataclass(frozen=True, slots=True)
 class CronWorkerResult:
-    """One worker execution: its outcome plus one receipt per delivery target.
+    """One worker execution: its outcome, its report, and any receipts it owns.
 
-    ``CronRun.receipts`` stays empty until a delivery decision is written
-    (ADR-0268 §6). The worker is the only place that knows whether a target
-    was reachable, so it owns the receipts and whoever records the run writes
-    them verbatim, be that the scheduler or the manual run-now route. Lives in
-    the domain layer because it crosses the worker-to-scheduler seam and
-    neither side may import the other.
+    ``worker_message`` is the report the parent turn receives inside a
+    :class:`~lca.contracts.models.cron.models.ScheduledHandoff` (ADR-0268 §6).
+    The worker never writes a chat bubble; the visible bubble is the parent's
+    reply, so the worker cannot know a delivery outcome.
+
+    ``receipts`` therefore stays empty for an ``agent`` handoff. Empty means
+    pending, and the handoff turn closes it. The two cases with no parent turn
+    are the exceptions and write ``not_sent`` here: a successful
+    ``space_action``, and a worker that could not resolve its job at all.
+
+    Lives in the domain layer because it crosses the worker-to-scheduler seam
+    and neither side may import the other.
     """
 
     outcome: CronRunOutcome
+    worker_message: str = ""
     receipts: tuple[TargetReceipt, ...] = ()
 
 

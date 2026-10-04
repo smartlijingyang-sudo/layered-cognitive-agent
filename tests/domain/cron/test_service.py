@@ -146,6 +146,37 @@ def test_list_items_hides_completed_oneshot(tmp_path: Path) -> None:
     assert items == []
 
 
+def test_list_items_keeps_a_fired_oneshot_whose_receipts_are_still_pending(
+    tmp_path: Path,
+) -> None:
+    """Empty receipts mean the handoff turn still owes a decision (ADR-0268 §6).
+
+    Hiding the job here would make an undelivered fire invisible: the run record
+    is the only carrier of ``last_delivery``, so filtering on it and reading the
+    badge from it cannot both happen.
+    """
+    svc = _service(tmp_path)
+    now = datetime(2026, 10, 2, 9, 0, tzinfo=UTC)
+    job = _job(
+        id="job_pending",
+        schedule=OneShotSchedule(at=datetime(2026, 10, 1, 9, 0, tzinfo=UTC)),
+    )
+    svc._store.save_job(job)
+    svc._store.append_run(
+        "job_pending",
+        run_id="run_pending",
+        outcome="completed",
+        receipts=(),
+        finished_at=datetime(2026, 10, 1, 9, 1, tzinfo=UTC),
+    )
+
+    items = svc.list_items(owner="user_1", now=now)
+
+    assert [item.id for item in items] == ["job_pending"]
+    assert items[0].last_delivery is None
+    assert items[0].last_run_local is not None
+
+
 def test_last_delivery_summary_prefers_failed(tmp_path: Path) -> None:
     svc = _service(tmp_path)
     job = _job(id="job_1")

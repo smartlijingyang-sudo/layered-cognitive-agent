@@ -4,7 +4,7 @@ Validates INV-CRON-01 through INV-CRON-06:
 - INV-CRON-01: 常驻守护与崩溃重启自愈 (Daemon Persistence & Recovery)
 - INV-CRON-02: 到期精准触发与执行记录落盘 (Accurate Tick & Run Persistence)
 - INV-CRON-03: 关机/挂机自愈防轰炸 (Self-Healing & Anti-Bombing)
-- INV-CRON-04: 会话日志原生注入与卡片契约 (Session Log Injection & Card Contract)
+- INV-CRON-04: worker 交回报告，不写会话 (Worker Report Without Chat Write)
 - INV-CRON-05: 交互式操作原地响应 (Interactive Actions API Response: Run Now & Snooze)
 - INV-CRON-06: 并发与文件锁安全 (Concurrency & Lock Safety)
 """
@@ -19,11 +19,6 @@ from zoneinfo import ZoneInfo
 import pytest
 from starlette.requests import Request
 
-from lca.contracts.models.cron.card import (
-    CronTaskCardAction,
-    CronTaskCardWidgetPayload,
-    parse_cron_task_card_widget,
-)
 from lca.contracts.models.cron.models import (
     AgentExecution,
     ChatDelivery,
@@ -34,12 +29,15 @@ from lca.contracts.models.cron.models import (
 from lca.domain.cron.service import CronService
 from lca.domain.cron.store import CronStore, MultiAssistantCronStore
 from lca.infrastructure.cron.daemon import CronDaemonService
+from lca.infrastructure.cron.worker_runner import CronWorkerRunner
 from lca.plugins.transport.webserver.routes_1.routes_assistants.jobs import (
     run_assistant_job,
     snooze_assistant_job,
 )
 
 
+# Only INV-CRON-04 uses these: the cron worker writes no Session, so the fake
+# exists to prove it stays that way.
 class _FakeSession:
     def __init__(self, session_id: str):
         self.id = session_id
@@ -169,7 +167,6 @@ async def test_inv_cron_02_accurate_tick_and_run_persistence(tmp_path: Path) -> 
     asst_dir.mkdir(parents=True, exist_ok=True)
     store = CronStore(asst_dir)
     lock_dir = tmp_path / "locks"
-    session_store = _FakeSessionStore()
 
     # 创建一个刚好到期的任务
     now = datetime(2026, 10, 3, 21, 30, tzinfo=UTC)
@@ -192,7 +189,6 @@ async def test_inv_cron_02_accurate_tick_and_run_persistence(tmp_path: Path) -> 
         store=store,
         lock_dir=lock_dir,
         workspace_path=str(tmp_path),
-        session_store=session_store,
         tick_interval_s=1,
         clock=lambda: now,
     )
@@ -207,16 +203,18 @@ async def test_inv_cron_02_accurate_tick_and_run_persistence(tmp_path: Path) -> 
 
     # 验证执行记录已写盘
     runs = store.list_runs(job_id="job_due_now")
-    assert len(runs) >= 1
+    assert len(runs) == 1
     run = runs[0]
     assert run.run_id.startswith("job_due_now-")
     assert run.outcome == "completed"
+    # agent 任务的投递决定属于 handoff 轮，调度器只记未决（ADR-0268 §6）。
+    assert run.receipts == ()
 
     # 验证磁盘物理文件存在
     runs_dir = asst_dir / "cron" / "job_due_now" / "runs"
     assert runs_dir.exists()
     run_files = list(runs_dir.glob("*.json"))
-    assert len(run_files) >= 1
+    assert len(run_files) == 1
 
 
 # ---------------------------------------------------------------------------
@@ -224,14 +222,12 @@ async def test_inv_cron_02_accurate_tick_and_run_persistence(tmp_path: Path) -> 
 # ---------------------------------------------------------------------------
 @pytest.mark.asyncio
 async def test_inv_cron_03_self_healing_anti_bombing(tmp_path: Path) -> None:
-    """Test oneshot job sends delayed compensation, and interval job aligns to future without bombing."""
+    """An overdue oneshot fires once; an interval job does not replay its missed occurrences."""
     asst_id = "asst_inv03"
     asst_dir = tmp_path / "assistants" / asst_id
     asst_dir.mkdir(parents=True, exist_ok=True)
     store = CronStore(asst_dir)
     lock_dir = tmp_path / "locks"
-    session_store = _FakeSessionStore()
-    session_store.create("session_inv03")
 
     now = datetime(2026, 10, 3, 21, 30, tzinfo=UTC)
 
@@ -272,50 +268,45 @@ async def test_inv_cron_03_self_healing_anti_bombing(tmp_path: Path) -> None:
         store=store,
         lock_dir=lock_dir,
         workspace_path=str(tmp_path),
-        session_store=session_store,
         tick_interval_s=1,
         clock=lambda: now,
     )
 
-    # 第一轮 Tick（开机恢复）
+    # 第一轮 Tick（开机恢复）：错过 2 小时的两个任务各补一次
     report1 = await daemon.tick()
-    assert report1.due >= 1
+    assert report1.due == 2
+    assert report1.started == 2
 
     await daemon._scheduler.wait_idle()
 
-    # 验证 oneshot 消息被投递到 session，且解析 Widget Payload 确认 delayed_by_seconds >= 7000
-    sess = session_store.get("session_inv03")
-    assert sess is not None
-    matching_events = [data for et, data in sess.events if "部门例会已开始" in data["content"]]
-    assert len(matching_events) == 1
+    # 防轰炸看 run 记录条数：oneshot 只补一次，interval 对齐到当前档，
+    # 不回放这 2 小时里错过的 8 次。
+    assert len(store.list_runs(job_id="job_missed_oneshot")) == 1
+    assert len(store.list_runs(job_id="job_missed_interval")) == 1
 
-    content = matching_events[0]["content"]
-    payload = parse_cron_task_card_widget(content)
-    assert payload is not None
-    assert payload.delayed_by_seconds is not None
-    assert payload.delayed_by_seconds >= 7000
-
-    # 验证第二轮 Tick 不会再轰炸 oneshot 任务
+    # 第二轮 Tick：两个任务都已有 run 记录，不再触发，也不再堆积记录
     report2 = await daemon.tick()
-    # 此时 oneshot 已有 run 记录，不会再触发
-    assert report2.due == 0 or report2.started == 0
+    await daemon._scheduler.wait_idle()
+    assert report2.due == 0
+    assert report2.started == 0
 
-    # 验证 interval 任务不会连续堆积多次 run 记录
-    interval_runs = store.list_runs(job_id="job_missed_interval")
-    assert len(interval_runs) <= 1
+    assert len(store.list_runs(job_id="job_missed_oneshot")) == 1
+    assert len(store.list_runs(job_id="job_missed_interval")) == 1
 
 
 # ---------------------------------------------------------------------------
-# INV-CRON-04: 会话日志原生注入与卡片契约 (Session Log Injection & Card Contract)
+# INV-CRON-04: worker 交回报告，不写会话 (Worker Report Without Chat Write)
 # ---------------------------------------------------------------------------
 @pytest.mark.asyncio
-async def test_inv_cron_04_session_log_card_contract(tmp_path: Path) -> None:
-    """Test injected session message satisfies CronTaskCardWidgetPayload contract."""
+async def test_inv_cron_04_worker_report_without_chat_write(tmp_path: Path) -> None:
+    """A due job yields a worker report and a pending run record, and no Session write."""
     asst_id = "asst_inv04"
     asst_dir = tmp_path / "assistants" / asst_id
     asst_dir.mkdir(parents=True, exist_ok=True)
     store = CronStore(asst_dir)
     lock_dir = tmp_path / "locks"
+    # Daemon 不收 session_store（ADR-0268 §6）。这个假的故意不接线：worker 若
+    # 重新长出投递，只能经由它写会话，所以「没被碰过」就是回归闸。
     session_store = _FakeSessionStore()
     session_store.create("session_inv04")
 
@@ -339,7 +330,6 @@ async def test_inv_cron_04_session_log_card_contract(tmp_path: Path) -> None:
         store=store,
         lock_dir=lock_dir,
         workspace_path=str(tmp_path),
-        session_store=session_store,
         tick_interval_s=1,
         clock=lambda: now,
     )
@@ -347,29 +337,23 @@ async def test_inv_cron_04_session_log_card_contract(tmp_path: Path) -> None:
     await daemon.tick()
     await daemon._scheduler.wait_idle()
 
+    runs = store.list_runs(job_id="job_contract_check")
+    assert len(runs) == 1
+    assert runs[0].outcome == "completed"
+    # 空 receipts 读作未决：投递决定属于 handoff 轮，不属于 worker。
+    assert runs[0].receipts == ()
+
+    # run 记录不存报告正文，所以直接问 worker：daemon 未注入自定义 runner，
+    # 默认建的就是 CronWorkerRunner(store=store)。
+    report = await CronWorkerRunner(store=store).execute_job(job)
+    assert report.outcome == "completed"
+    assert report.worker_message == job.body
+    assert report.receipts == ()
+
     sess = session_store.get("session_inv04")
     assert sess is not None
-    assert len(sess.events) == 1
-    event_type, event_data = sess.events[0]
-    assert event_type == "surface/assistant_message"
-    raw_content = event_data["content"]
-    assert "[widget:cron_task_card]" in raw_content
-    assert "[/widget:cron_task_card]" in raw_content
-
-    # 强类型反序列化校验
-    payload = parse_cron_task_card_widget(raw_content)
-    assert payload is not None
-    assert isinstance(payload, CronTaskCardWidgetPayload)
-    assert payload.job_id == "job_contract_check"
-    assert payload.title == "契约验证提醒"
-    assert payload.body == "包含操作指令与上下文"
-    assert payload.delivery_status == "delivered"
-
-    # 包含预设交互动作
-    assert CronTaskCardAction.SNOOZE in payload.actions
-    assert CronTaskCardAction.EDIT in payload.actions
-    assert CronTaskCardAction.DELETE in payload.actions
-    assert CronTaskCardAction.TOGGLE_PAUSE in payload.actions
+    assert sess.events == []
+    assert list(session_store.sessions) == ["session_inv04"]
 
 
 # ---------------------------------------------------------------------------
@@ -436,11 +420,14 @@ async def test_inv_cron_05_interactive_actions_run_and_snooze(tmp_path: Path) ->
     data_run = json.loads(resp_run.body.decode("utf-8"))
     assert data_run["job_id"] == "job_action_test"
     assert data_run["outcome"] == "completed"
+    # agent 任务手动跑同样交回未决：气泡由 handoff 轮决定（ADR-0268 §6）。
+    assert data_run["receipts"] == []
 
     # 验证立即运行产生新的 run 记录
     runs = store.list_runs(job_id="job_action_test")
     assert len(runs) >= 1
     assert runs[0].outcome == "completed"
+    assert runs[0].receipts == ()
 
 
 # ---------------------------------------------------------------------------
