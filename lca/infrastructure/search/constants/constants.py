@@ -63,6 +63,17 @@ SEARCH_INTENT_PATTERNS: tuple[str, ...] = (
     "recent updates",
     "latest release",
     "current status",
+    # Availability & price freshness (D2-T7: stock/price are time-varying
+    # facts parametric knowledge cannot answer; route to realtime search)
+    "有没有货",
+    "是否有货",
+    "库存",
+    "现价",
+    "最新价格",
+    "实时价格",
+    "当前价格",
+    "in stock",
+    "current price",
 )
 
 # Regex for matching 4-digit years (e.g. 2024, 2026, 2030)
