@@ -433,7 +433,7 @@ def _run_health_probe(host: str, port: int, findings: list[Finding]) -> PhaseRes
     body: dict[str, Any] | None = None
     error: str | None = None
     try:
-        with urllib.request.urlopen(url, timeout=2.0) as resp:
+        with urllib.request.urlopen(url, timeout=2.0) as resp:  # noqa: S310 -- URL is f-string http://{host}:{port}/health; scheme fixed
             raw = resp.read().decode("utf-8")
             body = cast("dict[str, Any]", json.loads(raw))
     except (urllib.error.URLError, TimeoutError, json.JSONDecodeError, OSError) as exc:
