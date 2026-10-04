@@ -196,6 +196,16 @@ def refresh_injected(
     historical system prompt without standing blocks stays intact. Bodies are
     not summarized. A file that is missing or blank drops its old block.
     A standing file that was not in the text is appended, in layout order.
+
+    One block per name survives, so the result is a fixed point of this
+    function. An upstream producer that wraps an already-marked-up bundle in
+    another block used to multiply every standing file on each turn: the walk
+    replaced each occurrence it found and ``seen`` only gated the append tail,
+    so a prompt carrying two copies kept carrying two copies refreshed from
+    disk. The END marker is matched by name for the same reason. Matching any
+    END let a nested block close its parent early and leak the rest of the
+    bundle through as free text. An END with no matching BEGIN is dropped
+    instead of being copied as prose.
     """
 
     if "<!-- INJECTED FILE:" not in text:
@@ -210,14 +220,19 @@ def refresh_injected(
     while index < len(lines):
         name = _injected_name(lines[index])
         if name is None:
+            if _injected_name(lines[index], end=True) is not None:
+                index += 1
+                continue
             output.append(lines[index])
             index += 1
             continue
         index += 1
-        while index < len(lines) and _injected_name(lines[index], end=True) is None:
+        while index < len(lines) and _injected_name(lines[index], end=True) != name:
             index += 1
         if index < len(lines):
             index += 1
+        if name in seen:
+            continue
         seen.add(name)
         body = by_name.get(name, "")
         if body:
