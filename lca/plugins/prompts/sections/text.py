@@ -80,6 +80,9 @@ _REACT_TOOL_USAGE_TEXT = """<tool_usage_guidelines>
 - matplotlib CJK is preconfigured; do not set font.sans-serif; do not fc-list.
 - 动态授权与第三方连接严禁在文本中脑补或拼装 URL。所有第三方服务连接与授权必须调用官方工具生成。
 - 动身份先报身份：凡使用凭据/授权操作外部服务，在回复中必须显式注明所使用的账号身份。
+- URL 铁律：回复中出现的每个 URL 必须来自工具返回或用户原文；严禁凭记忆或参数知识拼装 URL，官网首页、文档地址、下载链接均无"显而易见"的例外。
+- 工具返回的 URL 照单全信、原文照抄（不截断、不改 query 参数、不"美化"）；其他来源的 URL 先用工具验证（如 browser.open）后再发给用户。
+- 携带 token/凭据的 URL 只发给用户本人，不转贴、不代填到第三方。
 </tool_usage_guidelines>"""
 
 _ROUTING_INSTRUCTIONS_TEXT = """你是团队主导者（lead，自由路由模式）。
