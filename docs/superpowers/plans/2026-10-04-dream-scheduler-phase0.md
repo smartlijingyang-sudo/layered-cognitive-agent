@@ -266,6 +266,8 @@ git commit -m "feat(memory): add the dream sweep loop with an injected clock"
 
 ### Task 2: Lock contention and write collision
 
+**Shipped code is authoritative.** Task 2 landed as `5434ad6f1` and the `_run_home` and `sweep_once` code blocks below, plus the Interfaces paragraph's `DreamFn` line and the three original test bodies, no longer match it. Read `lca/application/memory/dream_scheduler.py` and `tests/application/memory/test_dream_scheduler.py` rather than copying from this section. The plan's prose and rulings still bind; only its code listings for this task are stale.
+
 **Superseding ruling (R16, R17).** The `_run_home` body specified below is replaced, not merely extended. Task 1's review found that `RoutineFileLock.acquire()` returns `False` whenever the lock file exists, stale or not (`lca/application/routine/locks.py:93-95`), and that nothing calls `reclaim_stale()`. After a `kill -9`, an OOM, or a `kernel-restart` escalating to SIGKILL mid-dream, the lock file survives with the dead pid in its owner string, so a restarted kernel cannot release it and that assistant home never dreams again until a human deletes the file. The failure is permanent and logged only at INFO. The review also found that `asyncio.to_thread` does not make executor threads interruptible, so a `CancelledError` at the await runs the `finally`, releases the lock, and leaves `run_dream` executing unlocked.
 
 The replacement structure hands one synchronous function to `asyncio.to_thread` that performs, in order: `reclaim_stale()` and log a WARNING carrying `previous_owner` and `held_ms` when it returns non-`None`; `acquire()`; `run_dream`; the evidence write; `release()`, logging when it returns `False`. This binds the lock's lifetime to the work rather than to the await, puts every file operation including `mkdir` and `os.open` off the event loop, and places the evidence write inside the mutual exclusion guarding the run that produced it. It resolves the reclaim gap, the discarded `release()` result, the cancellation window, and the evidence placement in one change.
@@ -398,6 +400,8 @@ git commit -m "fix(memory): contain dream write collisions instead of stranding 
 ---
 
 ### Task 3: File-based run evidence and change detection
+
+**Hazard carried from Task 2 (ruling R20).** Task 2 put the evidence write inside the same synchronous function as `run_dream`, under one `except OSError` that logs the failure as a dream pass failure. So an I/O error writing `{home}/dreams/last_run.json` is currently indistinguishable from `run_dream` itself failing, and the promotion that already succeeded is reported as lost. Task 3 must separate the two: the evidence write gets its own containment, so a failed artifact write logs as an evidence failure and still returns the report that says what was promoted. Evidence is a rebuildable projection and must not be able to mask a successful consolidation.
 
 ADR-0287 §4 Phase 0 requires "真实触发证据". A new execution point would need a whitelist entry, a SpineHandler, a test, and an ADR (C11), so the evidence is a file. `run_dream` emits nothing today, and its `backfill` reaches `revise_profile`, whose `assistant.profile.revised` EP is already dropped without an emitter.
 
