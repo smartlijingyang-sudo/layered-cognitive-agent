@@ -32,10 +32,7 @@ def _clean_body(text: str) -> tuple[str, str | None]:
         return ""
 
     no_id = _ID_RE.sub(_capture_id, text).strip()
-    if " This came from " in no_id:
-        body = no_id.split(" This came from ")[0].strip()
-    else:
-        body = no_id
+    body = no_id.split(" This came from ")[0].strip() if " This came from " in no_id else no_id
     return body.rstrip("。").rstrip("."), record_id
 
 
