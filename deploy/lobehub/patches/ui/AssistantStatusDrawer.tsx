@@ -180,6 +180,29 @@ export interface ModalStepItem {
   stage?: string;
   params?: Record<string, any>;
   result?: string;
+  thinking?: {
+    model?: string;
+    latency_ms?: number;
+    reasoning?: string;
+    prompt_tokens?: number;
+    completion_tokens?: number;
+    decision?: string;
+    raw_response_preview?: string;
+  };
+  tool_call?: {
+    name?: string;
+    arguments?: Record<string, any>;
+    arguments_summary?: string;
+  };
+  tool_result?: {
+    ok?: boolean;
+    exit_code?: number;
+    latency_ms?: number;
+    stdout_head?: string;
+    stderr?: string;
+    delta_summary?: string;
+    error?: string;
+  };
 }
 
 export interface AssistantStatusDrawerProps {
@@ -892,6 +915,7 @@ export const AssistantStatusDrawer = memo<AssistantStatusDrawerProps>(
         iconType: startedVisual.iconType,
         narrative: `智能体接收到任务目标：「${taskGoal}」。\n\n已成功初始化运行环境、挂载会话上下文与执行能力契约。`,
         conclusion: '验证结论：任务初始化完成，已开始执行认知决策与行动规划。',
+        exit_code: 0,
         stage: 'Lifecycle → Started',
       });
 
@@ -938,6 +962,9 @@ export const AssistantStatusDrawer = memo<AssistantStatusDrawerProps>(
                   ? '验证结论：动作执行完成，符合预期，无执行错误。'
                   : `验证结论：动作执行未达预期（退出码 ${exitCode}）。`),
               stage: s.phase || 'Act Phase',
+              thinking: th,
+              tool_call: tc,
+              tool_result: tr,
             });
           } else if (tc?.name) {
             const isOk = tr?.ok !== false && (exitCode === undefined || exitCode === 0);
@@ -962,6 +989,9 @@ export const AssistantStatusDrawer = memo<AssistantStatusDrawerProps>(
               stage: s.phase || 'Act Phase',
               params: tc.arguments,
               result: tr?.stdout_head || tr?.delta_summary,
+              thinking: th,
+              tool_call: tc,
+              tool_result: tr,
             });
           }
         });
@@ -976,6 +1006,7 @@ export const AssistantStatusDrawer = memo<AssistantStatusDrawerProps>(
             iconType: stateVisual.iconType,
             narrative: runDetail.output,
             conclusion: '验证结论：智能体已完成本轮执行并生成最终用户响应。',
+            exit_code: 0,
             stage: 'Reflect → Deliver',
           });
         }
@@ -1740,7 +1771,7 @@ export const AssistantStatusDrawer = memo<AssistantStatusDrawerProps>(
                     <span>· 退出码: </span>
                     <span
                       style={{
-                        color: activeSubStep.exit_code === 0 ? '#52c41a' : '#f4416c',
+                        color: (activeSubStep.exit_code === undefined || activeSubStep.exit_code === 0) ? '#52c41a' : '#f4416c',
                         fontWeight: 600,
                       }}
                     >
@@ -1812,38 +1843,38 @@ export const AssistantStatusDrawer = memo<AssistantStatusDrawerProps>(
                 ) : null}
 
                 {/* 6. 验证结论 */}
-                {activeSubStep.conclusion && (
-                  <div
-                    className={`${styles.verdictBanner} ${activeSubStep.stateVisual?.iconType === 'error' || activeSubStep.exit_code !== 0 ? styles.verdictBannerError : styles.verdictBannerSuccess}`}
-                  >
+                {activeSubStep.conclusion && (() => {
+                  const isStepError =
+                    activeSubStep.stateVisual?.iconType === 'error' ||
+                    (typeof activeSubStep.exit_code === 'number' && activeSubStep.exit_code !== 0);
+                  return (
                     <div
-                      className={styles.verdictTitle}
-                      style={{
-                        color:
-                          activeSubStep.stateVisual?.iconType === 'error' || activeSubStep.exit_code !== 0
-                            ? '#f4416c'
-                            : '#c4f042',
-                        fontWeight: 700,
-                        fontSize: 13,
-                        marginBottom: 4,
-                      }}
+                      className={`${styles.verdictBanner} ${isStepError ? styles.verdictBannerError : styles.verdictBannerSuccess}`}
                     >
-                      {activeSubStep.stateVisual?.iconType === 'error' || activeSubStep.exit_code !== 0
-                        ? '✕ 执行异常'
-                        : '验证结论'}
+                      <div
+                        className={styles.verdictTitle}
+                        style={{
+                          color: isStepError ? '#f4416c' : '#c4f042',
+                          fontWeight: 700,
+                          fontSize: 13,
+                          marginBottom: 4,
+                        }}
+                      >
+                        {isStepError ? '✕ 执行异常' : '验证结论'}
+                      </div>
+                      <div
+                        style={{
+                          color: '#ffffff',
+                          fontSize: 13,
+                          lineHeight: 1.6,
+                          whiteSpace: 'pre-line',
+                        }}
+                      >
+                        {activeSubStep.conclusion}
+                      </div>
                     </div>
-                    <div
-                      style={{
-                        color: '#ffffff',
-                        fontSize: 13,
-                        lineHeight: 1.6,
-                        whiteSpace: 'pre-line',
-                      }}
-                    >
-                      {activeSubStep.conclusion}
-                    </div>
-                  </div>
-                )}
+                  );
+                })()}
               </div>
             )}
           </div>

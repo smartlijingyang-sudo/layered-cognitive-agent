@@ -50,7 +50,11 @@ def _run_derive_step_state_in_node(
     if not match:
         raise ValueError("Could not extract deriveStepState from TSX")
 
-    fn_code = match.group(1).replace("export interface", "interface").replace("export function", "function")
+    fn_code = (
+        match.group(1)
+        .replace("export interface", "interface")
+        .replace("export function", "function")
+    )
 
     script = f"""
 {fn_code}
@@ -70,14 +74,18 @@ process.stdout.write(JSON.stringify(res));
         text=True,
     )
     if proc.returncode != 0:
-        raise RuntimeError(f"Node execution failed (code {proc.returncode}): {proc.stderr}\nScript: {script}")
+        raise RuntimeError(
+            f"Node execution failed (code {proc.returncode}): {proc.stderr}\nScript: {script}"
+        )
     return json.loads(proc.stdout)
 
 
 def test_derive_step_state_exists_in_drawer_tsx() -> None:
     path = _get_drawer_tsx_path()
     content = path.read_text(encoding="utf-8")
-    assert "deriveStepState" in content, "deriveStepState must be defined in AssistantStatusDrawer.tsx"
+    assert "deriveStepState" in content, (
+        "deriveStepState must be defined in AssistantStatusDrawer.tsx"
+    )
 
 
 def test_derive_step_state_started_phase() -> None:
@@ -107,7 +115,13 @@ def test_derive_step_state_error_on_nonzero_exit_code() -> None:
 
 
 def test_derive_step_state_file_operations() -> None:
-    for tool in ("writeFile", "editFile", "create_assistant_skill", "patch_config", "write_to_file"):
+    for tool in (
+        "writeFile",
+        "editFile",
+        "create_assistant_skill",
+        "patch_config",
+        "write_to_file",
+    ):
         res = _run_derive_step_state_in_node(tool_name=tool, exit_code=0)
         assert res["iconType"] == "file_op", f"Expected file_op for {tool}, got {res}"
         assert res["iconSymbol"] == "📄"
@@ -134,3 +148,71 @@ def test_derive_step_state_determinism_purity() -> None:
     first = _run_derive_step_state_in_node(tool_name="writeFile", exit_code=0)
     for _ in range(5):
         assert _run_derive_step_state_in_node(tool_name="writeFile", exit_code=0) == first
+
+
+def test_derive_step_state_undefined_exit_code_never_error() -> None:
+    """exit_code=None must NEVER yield error iconType."""
+    res_started = _run_derive_step_state_in_node(lifecycle_phase="started", exit_code=None)
+    assert res_started["iconType"] == "started"
+
+    res_tool = _run_derive_step_state_in_node(tool_name="bash", exit_code=None)
+    assert res_tool["iconType"] == "completed"
+
+    res_output = _run_derive_step_state_in_node(is_output=True, exit_code=None)
+    assert res_output["iconType"] == "completed"
+
+
+def test_drawer_tsx_verdict_banner_strict_type_guard() -> None:
+    """Verifies AssistantStatusDrawer.tsx never compares bare `exit_code !== 0` without typeof check.
+
+    In JavaScript `undefined !== 0` evaluates to true, causing normal started and delivery
+    steps to falsely render as '✕ 执行异常'.
+    """
+    path = _get_drawer_tsx_path()
+    content = path.read_text(encoding="utf-8")
+
+    bare_matches = re.findall(
+        r"(?<!typeof activeSubStep\.exit_code === 'number' && )activeSubStep\.exit_code\s*!==\s*0",
+        content,
+    )
+    assert not bare_matches, (
+        f"Found bare `activeSubStep.exit_code !== 0` without typeof guard: {bare_matches}! "
+        "Must use `typeof activeSubStep.exit_code === 'number' && activeSubStep.exit_code !== 0`."
+    )
+    assert "typeof activeSubStep.exit_code === 'number' && activeSubStep.exit_code !== 0" in content
+
+
+def test_modal_step_item_preserves_thinking_and_tool_call_telemetry() -> None:
+    """INV-MODAL-01: ModalStepItem interface and step assembly must preserve engineering telemetry.
+
+    Specifically:
+    1. ModalStepItem must declare optional thinking, tool_call, tool_result blocks.
+    2. runDetail.steps mapping must forward thinking (th), tool_call (tc), and tool_result (tr)
+       into each step item without dropping them.
+    """
+    path = _get_drawer_tsx_path()
+    content = path.read_text(encoding="utf-8")
+
+    # 1. Interface definition check
+    assert "thinking?:" in content, "ModalStepItem must declare thinking telemetry block"
+    assert "tool_call?:" in content, "ModalStepItem must declare tool_call telemetry block"
+    assert "tool_result?:" in content, "ModalStepItem must declare tool_result telemetry block"
+
+    # 2. Assembly check
+    assert "thinking: th" in content, "subSteps assembly must preserve thinking object"
+    assert "tool_call: tc" in content, "subSteps assembly must preserve tool_call object"
+    assert "tool_result: tr" in content, "subSteps assembly must preserve tool_result object"
+
+
+def test_modal_zero_mock_contract_no_fake_tokens() -> None:
+    """INV-MODAL-03: Zero mock numbers in token metrics or latencies.
+
+    All displayed telemetry must be strictly conditional on backend presence,
+    never falling back to fabricated constants like 1024, 2048, 500ms, or fake model names.
+    """
+    path = _get_drawer_tsx_path()
+    content = path.read_text(encoding="utf-8")
+
+    assert not re.search(r"prompt_tokens\s*\|\|\s*\d+", content), "Found fabricated prompt_tokens fallback!"
+    assert not re.search(r"completion_tokens\s*\|\|\s*\d+", content), "Found fabricated completion_tokens fallback!"
+    assert not re.search(r"model\s*\|\|\s*['\"]gpt-['\"]", content), "Found fabricated model name fallback!"
