@@ -366,6 +366,9 @@ def test_act_join_to_act_observe_carries_join_1to1_predicate_not_true() -> None:
     """Defect 1b (round-2 review): the duplicate ``when:`` keys on
     ``act.join → act.observe`` silently dropped the predicate map.
 
+    PR-3 split the observe node; the edge now targets
+    ``act.observe.normalize`` (same logical edge, renamed target).
+
     After parsing, the edge carried ``when: True`` instead of the
     intended ``routing.next_hint == "join_1to1"`` predicate, so the
     N:N reject path (which emits ``next_hint =
@@ -376,12 +379,14 @@ def test_act_join_to_act_observe_carries_join_1to1_predicate_not_true() -> None:
     """
     plan = _lift_bundle()
     edge = next(
-        (e for e in plan.edges if e.source == "act.join" and e.target == "act.observe"),
+        (e for e in plan.edges if e.source == "act.join" and e.target == "act.observe.normalize"),
         None,
     )
-    assert edge is not None, "act.join -> act.observe edge is missing from the lifted plan."
+    assert edge is not None, (
+        "act.join -> act.observe.normalize edge is missing from the lifted plan."
+    )
     assert isinstance(edge.when, Predicate), (
-        f"act.join -> act.observe predicate must be a typed Predicate, "
+        f"act.join -> act.observe.normalize predicate must be a typed Predicate, "
         f"got {type(edge.when).__name__}. If this is None/True, the bundle "
         f"has a duplicate `when:` key (YAML 1.1 silently keeps the last) "
         f"or the predicate map was dropped. Defect 1b."
@@ -392,7 +397,7 @@ def test_act_join_to_act_observe_carries_join_1to1_predicate_not_true() -> None:
     assert edge.when.value == "join_1to1", (
         f"expected value='join_1to1', got {edge.when.value!r}. "
         f"A True/None value here would let the N:N reject path "
-        f"route to act.observe and silently bypass the join barrier."
+        f"route to act.observe.normalize and silently bypass the join barrier."
     )
 
 
@@ -429,8 +434,8 @@ def test_lifted_bundle_has_exactly_ten_edges() -> None:
       - act.fanout -> effect.pre_dispatch.envelope_check (predicate)
       - effect.pre_dispatch.envelope_check -> act.dispatch
       - act.dispatch -> act.join
-      - act.join -> act.observe (predicate)
-      - act.observe -> act.observe.commit_fact
+      - act.join -> act.observe.normalize (predicate)
+      - act.observe.normalize -> act.observe.commit_fact
       - act.observe.commit_fact -> act.observe.terminate_decide
 
     The PR-1b ``intervene.resume → act.approve.gate`` inner stub edge was
@@ -778,10 +783,10 @@ async def test_act_subgraph_bundle_full_chain_visits_all_eight_nodes() -> None:
 
 __all__ = [
     "test_act_fanout_is_reachable_from_act_validate_in_bundle",
-    "test_act_fanout_to_act_dispatch_carries_fanout_1to1_predicate",
+    "test_act_fanout_to_envelope_check_carries_fanout_1to1_predicate",
     "test_act_join_to_act_observe_carries_join_1to1_predicate_not_true",
     "test_act_subgraph_bundle_full_chain_visits_all_eight_nodes",
     "test_bundle_yaml_has_no_duplicate_when_keys",
-    "test_lifted_bundle_has_exactly_nine_edges",
+    "test_lifted_bundle_has_exactly_ten_edges",
     "test_no_direct_act_envelope_to_act_dispatch_edge",
 ]
