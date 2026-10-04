@@ -589,6 +589,81 @@ const styles = createStaticStyles(({ css, cssVar }) => {
       flex: 1;
       color: inherit;
     `,
+    timelineNodeCol: css`
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      flex-shrink: 0;
+      width: 18px;
+    `,
+    timelineLineTop: css`
+      width: 1px;
+      flex: 0 0 6px;
+      background: #2a3140;
+    `,
+    timelineLineBottom: css`
+      width: 1px;
+      flex: 1;
+      min-height: 6px;
+      background: #2a3140;
+    `,
+    timelineNodeDot: css`
+      font-size: 12px;
+      line-height: 1;
+      flex-shrink: 0;
+    `,
+    stepLatencyBadge: css`
+      font-size: 10px;
+      color: #595959;
+      font-family: monospace;
+      letter-spacing: 0.3px;
+      flex-shrink: 0;
+      white-space: nowrap;
+    `,
+    pulseGlow: css`
+      @keyframes lca-pulse {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.4; }
+      }
+      animation: lca-pulse 1.6s ease-in-out infinite;
+    `,
+    heroVerdictCard: css`
+      border-radius: 10px;
+      padding: 14px 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      border: 1px solid;
+    `,
+    heroVerdictSuccess: css`
+      background: rgba(196, 240, 66, 0.07);
+      border-color: rgba(196, 240, 66, 0.2);
+    `,
+    heroVerdictError: css`
+      background: rgba(244, 65, 108, 0.09);
+      border-color: rgba(244, 65, 108, 0.25);
+    `,
+    codeHeaderBar: css`
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 6px 10px;
+      background: rgba(0,0,0,0.18);
+      border-radius: 8px 8px 0 0;
+      font-size: 11px;
+      font-family: monospace;
+      color: #595959;
+    `,
+    narrativeExpandBtn: css`
+      font-size: 11px;
+      color: #60b1ff;
+      cursor: pointer;
+      background: none;
+      border: none;
+      padding: 2px 0;
+      align-self: flex-start;
+      &:hover { opacity: 0.75; }
+    `,
     detailMain: css`
       flex: 1;
       padding: 24px 28px;
@@ -1698,185 +1773,194 @@ export const AssistantStatusDrawer = memo<AssistantStatusDrawerProps>(
           <div className={styles.detailModalLayout}>
             {/* 左侧列表：Muse 风格步骤树 */}
             <div className={styles.detailSidebar}>
-              {subSteps.map((step) => {
+              {subSteps.map((step, idx) => {
                 const isSelected = step.id === activeSubStep?.id;
                 const visual = step.stateVisual || deriveStepState(undefined, step.iconType === 'started' ? 'started' : undefined);
+                const isRunning = visual.iconType === 'running';
+                const isFirst = idx === 0;
+                const isLast = idx === subSteps.length - 1;
+                const latencyMs = step.duration_ms ?? step.tool_result?.latency_ms ?? step.thinking?.latency_ms;
+                const latencyLabel = latencyMs != null
+                  ? latencyMs < 1000 ? `${latencyMs}ms` : `${(latencyMs / 1000).toFixed(1)}s`
+                  : null;
                 return (
                   <div
                     key={step.id}
-                    className={`${styles.detailSidebarItem} ${isSelected ? 'active' : ''}`}
+                    style={{ display: 'flex', alignItems: 'stretch', cursor: 'pointer' }}
                     onClick={() => setSelectedSubStepId(step.id)}
                   >
-                    <Flex align="center" gap={8}>
+                    {/* Vertical timeline connector column */}
+                    <div className={styles.timelineNodeCol}>
+                      {!isFirst && <div className={styles.timelineLineTop} />}
                       <span
-                        style={{
-                          color: visual.color,
-                          fontSize: 13,
-                          fontWeight: visual.iconType === 'completed' || visual.iconType === 'error' ? 'bold' : 'normal',
-                          flexShrink: 0,
-                          lineHeight: 1,
-                        }}
+                        className={`${styles.timelineNodeDot} ${isRunning ? styles.pulseGlow : ''}`}
+                        style={{ color: visual.color }}
                       >
                         {visual.iconSymbol}
                       </span>
-                      <span
-                        className={styles.detailSidebarItemTitle}
-                        style={{
-                          fontWeight: isSelected ? 600 : 400,
-                        }}
-                      >
-                        {step.step_title}
-                      </span>
-                    </Flex>
+                      {!isLast && <div className={styles.timelineLineBottom} />}
+                    </div>
+
+                    {/* Step row content */}
+                    <div
+                      className={`${styles.detailSidebarItem} ${isSelected ? 'active' : ''}`}
+                      style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 2, minWidth: 0, marginLeft: 6 }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
+                        <span
+                          className={styles.detailSidebarItemTitle}
+                          style={{ fontWeight: isSelected ? 600 : 400 }}
+                        >
+                          {step.step_title}
+                        </span>
+                        {latencyLabel && (
+                          <span className={styles.stepLatencyBadge}>{latencyLabel}</span>
+                        )}
+                      </div>
+                    </div>
                   </div>
                 );
               })}
             </div>
 
-            {/* 右侧详情：高保真 5 要素证据面板 */}
-            {activeSubStep && (
-              <div className={styles.detailMain}>
-                {/* 1. 粗体步骤大标题 */}
-                <Title level={4} style={{ margin: 0, fontWeight: 700, fontSize: 16, color: '#ffffff' }}>
-                  {activeSubStep.step_title}
-                </Title>
-
-                {/* 2. 叙述段落 (直接紧接动作叙述，无冗余小标题) */}
-                <div className={styles.narrativeCard}>
-                  <Paragraph className={styles.narrativeText}>
-                    {activeSubStep.narrative}
-                  </Paragraph>
-                  <span style={{ display: 'none' }}>具体情况详细说明</span>
-                </div>
-
-                {/* 3. 执行的命令:: 代码块 */}
-                {activeSubStep.command && (
-                  <div className={styles.detailSection}>
-                    <span className={styles.detailSectionTitle}>执行的命令::</span>
-                    <Highlighter
-                      language="bash"
-                      copyable
-                      showLanguage
-                      variant="filled"
-                      style={{ maxHeight: 220, overflow: 'auto', borderRadius: 8 }}
-                    >
-                      {activeSubStep.command}
-                    </Highlighter>
-                  </div>
-                )}
-
-                {/* 4. 元数据信息点 (退出码、耗时、边界截取) */}
-                {(activeSubStep.exit_code !== undefined || activeSubStep.duration_ms !== undefined) && (
-                  <div style={{ fontSize: 12, color: '#8c8c8c', margin: '4px 0 8px 0', fontFamily: 'monospace' }}>
-                    <span>· 退出码: </span>
-                    <span
-                      style={{
-                        color: (activeSubStep.exit_code === undefined || activeSubStep.exit_code === 0) ? '#52c41a' : '#f4416c',
-                        fontWeight: 600,
-                      }}
-                    >
-                      {activeSubStep.exit_code !== undefined ? activeSubStep.exit_code : 0}
-                    </span>
-                    {activeSubStep.duration_ms !== undefined && (
-                      <span>, 耗时: {activeSubStep.duration_ms}ms</span>
-                    )}
-                    {activeSubStep.truncated_boundary && (
-                      <span style={{ color: '#faad14' }}> · 输出已通过边界截取</span>
-                    )}
-                  </div>
-                )}
-
-                {/* 5. 提取到的代码内容 / 检索结果 */}
-                {activeSubStep.search_results && activeSubStep.search_results.length > 0 ? (
-                  <div className={styles.detailSection}>
-                    <span className={styles.detailSectionTitle}>检索结果：</span>
-                    <Flexbox gap={8}>
-                      {activeSubStep.search_results.map((res, i) => (
-                        <Block key={i} variant="filled" padding={12} gap={6} style={{ borderRadius: 8 }}>
-                          <Flexbox horizontal align="center" gap={6}>
-                            <Tag color="cyan">{res.index || i + 1}</Tag>
-                            <Text code style={{ color: '#60b1ff', fontSize: 12 }}>
-                              {res.location}
-                            </Text>
-                          </Flexbox>
-                          <Highlighter
-                            language="bash"
-                            variant="borderless"
-                            copyable
-                            style={{ maxHeight: 100, overflow: 'auto' }}
-                          >
-                            {res.match}
-                          </Highlighter>
-                        </Block>
-                      ))}
-                    </Flexbox>
-                  </div>
-                ) : activeSubStep.code_snippets && activeSubStep.code_snippets.length > 0 ? (
-                  <div className={styles.detailSection}>
-                    {activeSubStep.code_snippets.map((snip, i) => (
-                      <div key={i} style={{ marginBottom: 12 }}>
-                        <Highlighter
-                          language={snip.language || 'bash'}
-                          fileName={snip.label || '提取到的代码内容'}
-                          copyable
-                          showLanguage
-                          variant="filled"
-                          style={{ maxHeight: 240, overflow: 'auto', borderRadius: 8 }}
-                        >
-                          {snip.code}
-                        </Highlighter>
-                      </div>
-                    ))}
-                  </div>
-                ) : activeSubStep.result ? (
-                  <div className={styles.detailSection}>
-                    <span className={styles.detailSectionTitle}>提取到的代码内容</span>
-                    <Highlighter
-                      language="bash"
-                      copyable
-                      variant="filled"
-                      style={{ maxHeight: 200, overflow: 'auto', borderRadius: 8 }}
-                    >
-                      {activeSubStep.result}
-                    </Highlighter>
-                  </div>
-                ) : null}
-
-                {/* 6. 验证结论 */}
-                {activeSubStep.conclusion && (() => {
-                  const isStepError =
-                    activeSubStep.stateVisual?.iconType === 'error' ||
-                    (typeof activeSubStep.exit_code === 'number' && activeSubStep.exit_code !== 0);
-                  return (
+            {/* 右侧详情：渐进式披露证据面板 */}
+            {activeSubStep && (() => {
+              const isStepError =
+                activeSubStep.stateVisual?.iconType === 'error' ||
+                (typeof activeSubStep.exit_code === 'number' && activeSubStep.exit_code !== 0);
+              return (
+                <div className={styles.detailMain}>
+                  {/* 1. Hero Verdict Card — 结论前置 */}
+                  {activeSubStep.conclusion && (
                     <div
-                      className={`${styles.verdictBanner} ${isStepError ? styles.verdictBannerError : styles.verdictBannerSuccess}`}
+                      className={`${styles.heroVerdictCard} ${isStepError ? styles.heroVerdictError : styles.heroVerdictSuccess}`}
                     >
-                      <div
-                        className={styles.verdictTitle}
-                        style={{
-                          color: isStepError ? '#f4416c' : '#c4f042',
-                          fontWeight: 700,
-                          fontSize: 13,
-                          marginBottom: 4,
-                        }}
-                      >
-                        {isStepError ? '✕ 执行异常' : '验证结论'}
+                      <div style={{ fontWeight: 700, fontSize: 12, color: isStepError ? '#f4416c' : '#c4f042', letterSpacing: 0.4 }}>
+                        {isStepError ? '✕ 执行异常' : '✓ 验证结论'}
                       </div>
-                      <div
-                        style={{
-                          color: '#ffffff',
-                          fontSize: 13,
-                          lineHeight: 1.6,
-                          whiteSpace: 'pre-line',
-                        }}
-                      >
+                      <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.88)', lineHeight: 1.6, whiteSpace: 'pre-line' }}>
                         {activeSubStep.conclusion}
                       </div>
                     </div>
-                  );
-                })()}
-              </div>
-            )}
+                  )}
+
+                  {/* 2. 步骤标题 */}
+                  <Title level={4} style={{ margin: 0, fontWeight: 700, fontSize: 16, color: '#ffffff' }}>
+                    {activeSubStep.step_title}
+                  </Title>
+
+                  {/* 3. 叙述段落 (长文本防爆：120字 → 渐隐遮罩 + 展开按钮) */}
+                  {activeSubStep.narrative && (() => {
+                    const LIMIT = 120;
+                    const isLong = activeSubStep.narrative.length > LIMIT;
+                    const [expanded, setExpanded] = React.useState(false);
+                    const shown = isLong && !expanded
+                      ? activeSubStep.narrative.slice(0, LIMIT) + '…'
+                      : activeSubStep.narrative;
+                    return (
+                      <div className={styles.narrativeCard}>
+                        <Paragraph className={styles.narrativeText} style={{ marginBottom: 0, whiteSpace: 'pre-line' }}>
+                          {shown}
+                        </Paragraph>
+                        {isLong && (
+                          <button
+                            className={styles.narrativeExpandBtn}
+                            onClick={() => setExpanded((v) => !v)}
+                          >
+                            {expanded
+                              ? '收起 ▴'
+                              : `展开全部思考 (共 ${activeSubStep.narrative.length} 字) ▾`}
+                          </button>
+                        )}
+                      </div>
+                    );
+                  })()}
+
+                  {/* 4. 执行的命令 (长脚本防爆：行数统计栏 + 视口锁定) */}
+                  {activeSubStep.command && (() => {
+                    const lines = activeSubStep.command.split('\n').length;
+                    const bytes = new Blob([activeSubStep.command]).size;
+                    const sizeLabel = bytes > 1024 ? `${(bytes / 1024).toFixed(1)} KB` : `${bytes} B`;
+                    return (
+                      <div className={styles.detailSection}>
+                        <div className={styles.codeHeaderBar}>
+                          <span>bash · {lines} 行 ({sizeLabel})</span>
+                        </div>
+                        <Highlighter
+                          language="bash"
+                          copyable
+                          showLanguage={false}
+                          variant="filled"
+                          style={{ maxHeight: 240, overflow: 'auto', overflowX: 'auto', borderRadius: '0 0 8px 8px', marginTop: 0 }}
+                        >
+                          {activeSubStep.command}
+                        </Highlighter>
+                      </div>
+                    );
+                  })()}
+
+                  {/* 5. 元数据信息行 (退出码、耗时、边界截取) */}
+                  {(activeSubStep.exit_code !== undefined || activeSubStep.duration_ms !== undefined) && (
+                    <div style={{ fontSize: 12, color: '#8c8c8c', fontFamily: 'monospace' }}>
+                      <span>· 退出码: </span>
+                      <span style={{ color: (activeSubStep.exit_code === undefined || activeSubStep.exit_code === 0) ? '#52c41a' : '#f4416c', fontWeight: 600 }}>
+                        {activeSubStep.exit_code !== undefined ? activeSubStep.exit_code : 0}
+                      </span>
+                      {activeSubStep.duration_ms !== undefined && (
+                        <span>, 耗时: {activeSubStep.duration_ms}ms</span>
+                      )}
+                      {activeSubStep.truncated_boundary && (
+                        <span style={{ color: '#faad14' }}> · 输出已通过边界截取</span>
+                      )}
+                    </div>
+                  )}
+
+                  {/* 6. 检索结果 / 代码切片 */}
+                  {activeSubStep.search_results && activeSubStep.search_results.length > 0 ? (
+                    <div className={styles.detailSection}>
+                      <span className={styles.detailSectionTitle}>检索结果：</span>
+                      <Flexbox gap={8}>
+                        {activeSubStep.search_results.map((res, i) => (
+                          <Block key={i} variant="filled" padding={12} gap={6} style={{ borderRadius: 8 }}>
+                            <Flexbox horizontal align="center" gap={6}>
+                              <Tag color="cyan">{res.index || i + 1}</Tag>
+                              <Text code style={{ color: '#60b1ff', fontSize: 12 }}>{res.location}</Text>
+                            </Flexbox>
+                            <Highlighter language="bash" variant="borderless" copyable style={{ maxHeight: 100, overflow: 'auto' }}>
+                              {res.match}
+                            </Highlighter>
+                          </Block>
+                        ))}
+                      </Flexbox>
+                    </div>
+                  ) : activeSubStep.code_snippets && activeSubStep.code_snippets.length > 0 ? (
+                    <div className={styles.detailSection}>
+                      {activeSubStep.code_snippets.map((snip, i) => (
+                        <div key={i} style={{ marginBottom: 12 }}>
+                          <Highlighter
+                            language={snip.language || 'bash'}
+                            fileName={snip.label || '提取到的代码内容'}
+                            copyable
+                            showLanguage
+                            variant="filled"
+                            style={{ maxHeight: 240, overflow: 'auto', borderRadius: 8 }}
+                          >
+                            {snip.code}
+                          </Highlighter>
+                        </div>
+                      ))}
+                    </div>
+                  ) : activeSubStep.result ? (
+                    <div className={styles.detailSection}>
+                      <span className={styles.detailSectionTitle}>提取到的代码内容</span>
+                      <Highlighter language="bash" copyable variant="filled" style={{ maxHeight: 200, overflow: 'auto', borderRadius: 8 }}>
+                        {activeSubStep.result}
+                      </Highlighter>
+                    </div>
+                  ) : null}
+                </div>
+              );
+            })()}
           </div>
         </Modal>
       </>

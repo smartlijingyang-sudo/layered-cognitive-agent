@@ -592,7 +592,7 @@
 | ACT-TASK-5-UI-PATCH | 纯函数状态机与前端高保真双栏补丁 (INV-05, INV-07) | Completed | 实现 pure function deriveStepState（覆盖5态图标），彻底清除 '验证Activity重启与事件完整性' 兜底串、Run: 调试标签与 '🧠 智能体意图与执行叙述'，状态药丸动态三态联动，单测 25/25 全绿 |
 | ACT-TASK-6-INTEGRATION-E2E | 全链路回归、Pre-push 门禁与真实端到端验收 | Completed | 8 大不变量套件 35/35 100% 全绿，前端补丁 45/45 verify 通过，ruff clean，git diff --check 干净，内核重启就绪，真实 run 校验无魔数/带 exit_code |
 | MODAL-TASK-1-CONTRACTS | 契约解析与遥测数据保留单测 (INV-MODAL-01 ~ 03) | Completed | ModalStepItem 扩充 thinking/tool_call/tool_result，subSteps 保留全部真值遥测，单测 12/12 100% 全绿 |
-| MODAL-TASK-2-TIMELINE | 左侧时间轴连续轨道、多态语义节点与耗时微标 (INV-MODAL-04) | Pending | 待执行 |
+| MODAL-TASK-2-TIMELINE | 左侧时间轴连续轨道、多态语义节点与耗时微标 (INV-MODAL-04) | In_Progress | 正在实现垂直连线轨道、多态节点与耗时微标 |
 | MODAL-TASK-3-HERO-VIEWPORT | 顶部 Hero 结论卡前置与长思考/长代码视口防护 (INV-MODAL-02, INV-MODAL-03) | Pending | 待执行 |
 | MODAL-TASK-4-INSPECTION-ZONE | 按需深查区（模型指标/结构化JSON/原始终端IO/思考链） (INV-MODAL-01) | Pending | 待执行 |
 | MODAL-TASK-5-VERIFY-REGRESSION | 全链路回归测试、补丁一致性核验与门禁体检 (INV-MODAL-05) | Pending | 待执行 |

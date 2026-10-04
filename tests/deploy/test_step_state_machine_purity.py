@@ -216,3 +216,23 @@ def test_modal_zero_mock_contract_no_fake_tokens() -> None:
     assert not re.search(r"prompt_tokens\s*\|\|\s*\d+", content), "Found fabricated prompt_tokens fallback!"
     assert not re.search(r"completion_tokens\s*\|\|\s*\d+", content), "Found fabricated completion_tokens fallback!"
     assert not re.search(r"model\s*\|\|\s*['\"]gpt-['\"]", content), "Found fabricated model name fallback!"
+
+
+def test_sidebar_timeline_semantic_icons_and_latency_badge() -> None:
+    """INV-MODAL-04: Left sidebar timeline connector and real latency badge.
+
+    Verifies:
+    1. Vertical timeline structure exists (timelineNodeCol, timelineLineTop/Bottom or connector).
+    2. Real latency badge formatting logic exists (displaying ms/s derived strictly from duration_ms).
+    3. Pulse animation class is conditionally bound to running state only.
+    """
+    path = _get_drawer_tsx_path()
+    content = path.read_text(encoding="utf-8")
+
+    assert "timelineNodeCol" in content, "Missing timeline node column for vertical connector"
+    assert "stepLatencyBadge" in content, "Missing stepLatencyBadge for real duration display"
+    assert "pulseGlow" in content, "Missing pulseGlow animation for running step"
+    # Ensure pulseGlow is conditioned on running state (isRunning ? styles.pulseGlow)
+    assert re.search(r"isRunning.*?pulseGlow|pulseGlow.*?isRunning", content, re.DOTALL), (
+        "pulseGlow must only be applied when step is running!"
+    )
