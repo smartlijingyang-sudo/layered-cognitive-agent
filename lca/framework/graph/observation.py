@@ -193,7 +193,7 @@ _PHASE_ALIAS_OF: dict[str, str] = {
     "phase": "perceive",  # phase.perceive.observe / phase.think.fold / 等
     # think subgraph 节点命名缺 ``think.`` 前缀 —— 全部归到 think。
     "tool": "think",       # tool.fork.dispatch  ── think.tool.fork_dispatch(计划中改名)
-    "history": "think",    # history.derive      ── think.history.assemble subgraph
+    "memory": "think",    # memory.derive       ── think.history.assemble subgraph
     "llm": "think",        # llm.call            ── think.llm.dispatch subgraph
     "decision": "think",   # decision.parse / decision.repair ── think.decision.*
     "gate": "think",       # gate.chain.run / gate.chain.reject ── think.gate subgraph

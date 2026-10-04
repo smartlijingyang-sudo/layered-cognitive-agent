@@ -217,7 +217,7 @@ class DeclarativeRuntimeBindings:
     def with_writer(self, writer: object) -> DeclarativeRuntimeBindings:
         """Return a copy with ``writer`` injected into the phase capabilities.
 
-        Think subgraph node executors (e.g. ``history.derive``,
+        Think subgraph node executors (e.g. ``memory.derive``,
         ``llm.call``) declare a ``writer`` port that flows in from
         the per-run :class:`RunSessionWriter` bound by
         :func:`lca.session.lifecycle.bind.bind_run_event_session_from_store`.

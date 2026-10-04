@@ -205,7 +205,7 @@ class CognitiveRuntime(Runtime):
                 # SessionProtocol requirement holds.
                 run_writer = RunSessionWriter(session=cast("SessionProtocol", session_reader))
                 # Layer the per-run writer into the phase capabilities so
-                # think subgraph node executors (``history.derive``,
+                # think subgraph node executors (``memory.derive``,
                 # ``llm.call``) can read it via ``context.runtime.writer``;
                 # otherwise their declared ``writer`` port fails the
                 # port-required TypeError before any reasoning fires.
