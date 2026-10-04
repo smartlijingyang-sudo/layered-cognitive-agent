@@ -25,6 +25,8 @@ ADR-0287 §4 Phase 0 names two carriers: "`{home}/routines/` 或 0268 CronJob �
 
 The cron daemon itself is real and running: `lca_kernel/boot/lifespan.py:69-100` constructs `CronDaemonService` with `MultiAssistantCronStore`, installed at `lca/plugins/transport/webserver/server/server.py:158`, and `/home/lichao/.lca/locks/cron.lock` cycles every ~15.3s owned by the live kernel PID. The daemon is healthy; the schedule predicate and the execution union are what block us.
 
+Routines are not a carrier either, and ADR-0263 now says so itself. It was accepted 2026-10-05 with the caveat "**Accepted≠Implemented，C1–C5 实施另行排期**". `RoutineSpec` requires a non-empty `prompt: str` and has no callable field (`lca/contracts/models/routine/models.py`), so hosting dream there means spending an LLM turn per assistant per interval to do deterministic file work. `RoutineTickDriver` still has zero callers outside `lca/application/routine/`.
+
 The plugin loop needs neither contract change. It is not constrained by the `CronJob` union and never routes through `next_run`.
 
 ## Global Constraints
