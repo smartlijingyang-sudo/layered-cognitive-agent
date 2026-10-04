@@ -47,7 +47,7 @@ def _format_schedule_label(job: CronJob) -> str:
         return f"每天 {s.hour:02d}:{s.minute:02d}"
     if isinstance(s, WeeklySchedule):
         days = ["周一", "周二", "周三", "周四", "周五", "周六", "周日"]
-        d = days[s.day_of_week] if 0 <= s.day_of_week < 7 else f"星期{s.day_of_week}"
+        d = days[s.weekday] if 0 <= s.weekday < 7 else f"星期{s.weekday}"
         return f"每{d} {s.hour:02d}:{s.minute:02d}"
     return "自定义计划"
 
