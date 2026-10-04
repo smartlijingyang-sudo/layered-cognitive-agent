@@ -3,7 +3,7 @@
 Verifies the typed ``budget.gate`` node that reads ``state.budget`` via
 the whitelisted kernel runtime carrier and emits a ``RoutingDecision``
 typed port whose ``next_node`` steers the think waterfall either to
-``terminal.commit`` (cap tripped) or ``think.context.truncate`` (under
+``terminal.commit`` (cap tripped) or ``think.context.summarize`` (under
 cap). Honors ADR-0225 (no per-node ``max_visits``).
 
 Each of the four resources (``steps`` / ``tokens`` / ``cost_usd`` /
@@ -69,12 +69,12 @@ def _state_with(budget: Budget) -> AgentState:
 
 
 @pytest.mark.asyncio
-async def test_gate_under_all_caps_routes_to_context_truncate() -> None:
-    """Under caps ⇒ continue to ``think.context.truncate`` (the truncate node)."""
+async def test_gate_under_all_caps_routes_to_context_summarize() -> None:
+    """Under caps ⇒ continue to ``think.context.summarize`` (ADR-0283)."""
     executor = ThinkBudgetThresholdGateExecutor()
     output = await executor.node_execute(_ctx(_state_with(_budget())), NodeInput(port_values={}))
     routing: RoutingDecision = output.port_values["routing"]
-    assert routing.next_node == "think.context.truncate"
+    assert routing.next_node == "think.context.summarize"
     assert routing.should_terminate is False
     assert routing.action_type == ActionType.RESPOND
     assert routing.next_hint == "budget_ok"

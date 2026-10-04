@@ -3,8 +3,8 @@
 Single responsibility: read a typed :class:`Budget` from the upstream
 ``budget`` port, decide whether the think waterfall may continue, and
 emit a :class:`RoutingDecision` typed port steering either toward
-``terminal.commit`` (cap tripped) or ``think.context.truncate`` (under
-cap).
+``terminal.commit`` (cap tripped) or ``think.context.summarize`` (under
+cap; sediment-before-compact, ADR-0283).
 
 This is a typed-port rewrite of the prior ``think.budget.check``
 node — same SSOT (``Budget.exceeded``), same declaration-order tie
@@ -115,7 +115,7 @@ def _decide(budget: Budget) -> RoutingDecision:
     return RoutingDecision(
         action_type=ActionType.RESPOND,
         should_terminate=False,
-        next_node="think.context.truncate",
+        next_node="think.context.summarize",
         next_hint="budget_ok",
     )
 

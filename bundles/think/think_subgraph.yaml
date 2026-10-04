@@ -7,14 +7,17 @@
 # PR-B (typed-port cutover): ``think.llm.dispatch`` is split into
 # ``llm.invoke`` (adapter call) + ``llm.persist`` (writer
 # append), and ``think.context.compact`` is split into
-# ``think.budget.gate`` (typed budget gate) + ``think.context.truncate``
-# (truncate strategy). Each new node owns exactly one responsibility;
-# routing decisions live in gate, journal writes live in persist,
-# truncation lives in truncate.
+# ``think.budget.gate`` (typed budget gate) + ``think.context.summarize``
+# (sediment-before-compact + structured summary, ADR-0283). Each new node
+# owns exactly one responsibility; routing decisions live in gate, journal
+# writes live in persist, sediment+summary lives in summarize.
+# ``think.context.truncate`` remains registered as a plugin but is no
+# longer on the under-cap edge (summarize fail-closes to truncate_oldest
+# internally).
 
 id: think.subgraph
 region: think
-purpose: think 11 节点执行 — shortcut → route.decide → budget.gate → context.truncate → route → reason → history.assemble → llm.invoke → llm.persist → decision.parse → gate
+purpose: think 11 节点执行 — shortcut → route.decide → budget.gate → context.summarize → route → reason → history.assemble → llm.invoke → llm.persist → decision.parse → gate
 
 nodes:
   - id: think.shortcut
@@ -36,10 +39,10 @@ nodes:
   # and either stops the run (subgraph terminates here,
   # ``routing.should_terminate=true`` bubbles up to
   # ``phase.main.outer`` which routes ``think.main`` →
-  # ``terminal.commit``) or continues to ``think.context.truncate``.
+  # ``terminal.commit``) or continues to ``think.context.summarize``.
   #
   # Not marked ``terminal: true``: this node has one conditional
-  # outgoing edge (→ think.context.truncate on should_terminate=false)
+  # outgoing edge (→ think.context.summarize on should_terminate=false)
   # and the lift-time validator forbids outgoing edges on terminal
   # nodes. Termination is edge-driven per ADR-0217 D4 — when the
   # executor emits ``should_terminate=true`` the only edge's predicate
@@ -63,6 +66,14 @@ nodes:
   # downstream (consumers never see ``None``).
   - id: think.context.truncate
     factory: think.context.truncate
+    outputs: [compact_receipt]
+    config:
+
+  # ADR-0283: sediment-before-compact + structured summary. Fail-closed:
+  # when the sediment pass cannot run or persist, the node degrades to
+  # ``truncate_oldest`` internally (receipt honestly labeled).
+  - id: think.context.summarize
+    factory: think.context.summarize
     outputs: [compact_receipt]
     config:
 
@@ -193,7 +204,7 @@ edges:
       port: { name: routing, field: next_node }
       value: think.route
   - from: think.budget.gate
-    to: think.context.truncate
+    to: think.context.summarize
     when:
       kind: eq
       port: { name: routing, field: should_terminate }

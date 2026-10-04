@@ -55,7 +55,8 @@ class BrainComposer:
         # PR-C: the deleted reasoner-composer plugin used to publish
         # ``reasoner`` and ``llm_adapter`` capabilities at boot. The typed
         # think nodes (``think.llm.invoke``, ``think.llm.persist``,
-        # ``think.budget.gate``, ``think.context.truncate``) now read
+        # ``think.budget.gate``, ``think.context.truncate``,
+        # ``think.context.summarize``) now read
         # ``state``, ``writer``, and ``adapter`` from the whitelisted
         # kernel runtime carrier; the kernel seeds the carrier on every
         # node visit, so BrainComposer does not need to publish anything.

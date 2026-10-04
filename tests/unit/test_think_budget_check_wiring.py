@@ -86,7 +86,7 @@ def test_think_budget_check_terminates_via_edge_predicate() -> None:
     budget = plan.node("think.budget.gate")
     assert budget.terminal is False, (
         "think.budget.gate must NOT be marked terminal: true — it "
-        "has an outgoing edge to think.context.truncate and the "
+        "has an outgoing edge to think.context.summarize and the "
         "lifter forbids outgoing edges on terminal nodes. "
         "Termination is edge-driven (no edge match → terminate)."
     )
@@ -119,19 +119,19 @@ def test_think_budget_check_routing_output_keeps_think_context_compact_path() ->
     """Under-cap edge stays wired so the happy path still works.
 
     Guards against a regression where someone deletes both the
-    terminal.commit edge AND the truncate edge while "cleaning up" the
-    budget-gate wiring. PR-B renamed the target
-    ``think.context.compact`` → ``think.context.truncate`` (the truncate
-    half of the split node); the under-cap edge must still exist.
+    terminal.commit edge AND the summarize edge while "cleaning up" the
+    budget-gate wiring. ADR-0283 rerouted the target
+    ``think.context.truncate`` → ``think.context.summarize``
+    (sediment-before-compact); the under-cap edge must still exist.
     """
     plan = _load_think_subgraph_plan()
     compact_edges = [
         e
         for e in plan.edges
-        if e.source == "think.budget.gate" and e.target == "think.context.truncate"
+        if e.source == "think.budget.gate" and e.target == "think.context.summarize"
     ]
     assert compact_edges, (
-        "the under-cap edge think.budget.gate → think.context.truncate "
+        "the under-cap edge think.budget.gate → think.context.summarize "
         "must remain so the normal think waterfall still routes through "
-        "the context-truncation node"
+        "the sediment-before-compact node"
     )
