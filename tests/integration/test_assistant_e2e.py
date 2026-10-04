@@ -19,6 +19,11 @@ PR-4 范围不实施真 LLM run;只验证助理域 boot / catalog / bootstrap / 
 
 from __future__ import annotations
 
+# This module boots a real kernel; the phase.think.reasoner.credentials
+# fail-loud gate requires the ambient dummy key (see tests/conftest.py
+# _ensure_no_env opt-out).
+__keep_llm_key__ = True
+
 from pathlib import Path
 from typing import Any
 
@@ -37,6 +42,16 @@ from lca.contracts.protocols.assistant.catalog import (
 from lca.contracts.protocols.state.scope_plan import BudgetCeiling, ScopePlan
 from lca.plugins.assistant.bootstrap.bootstrap import BootstrapProjectionService
 from lca.plugins.assistant.workspace.workspace import WorkspaceMaterializationService
+
+
+@pytest.fixture(autouse=True)
+def _dummy_avatar_key(monkeypatch: pytest.MonkeyPatch) -> None:
+    # web-assistant boots the avatar plugin, whose boot gate fail-louds
+    # without AVATAR_IMAGE_API_KEY (contract pinned in
+    # tests/plugins/avatar/test_plugin.py). These e2e tests never render
+    # images; a dummy key satisfies the gate like LLM_API_KEY=dummy does.
+    monkeypatch.setenv("AVATAR_IMAGE_API_KEY", "dummy")
+
 
 WEB_ASSISTANT = Path("profiles/web-assistant.yaml")
 WEB_STANDARD = Path("profiles/web-standard.yaml")
