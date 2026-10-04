@@ -52,15 +52,8 @@ BUNDLE_ROOT = REPO_ROOT / "bundles"
 
 #: Findings that predate this gate, keyed by bundle node id.
 BASELINE: dict[str, frozenset[str]] = {
-    "act.fanout": frozenset({"envelopes"}),
-    "memory.write.dispatch": frozenset({"memory"}),
-    "prompt.sections.assemble": frozenset({"prompt_template_provider"}),
-    "prompt.sections.fill": frozenset({"tools_provider", "prompt_section_registry"}),
-    "phase.perceive.observe": frozenset({"state"}),
-    "capability.fork.dispatch": frozenset({"bindings"}),
     "phase.reflect.score": frozenset({"state", "cognitive_reflection_pipeline"}),
     "phase.remember.write": frozenset({"effect_gateway"}),
-    "llm.invoke": frozenset({"render", "tools", "state"}),
 }
 
 

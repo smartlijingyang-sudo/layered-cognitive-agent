@@ -107,7 +107,7 @@ nodes:
 
   - id: llm.invoke
     factory: llm.invoke
-    inputs: [model_visible_request]
+    inputs: [model_visible_request, render, tools, state]
     outputs: [llm_response, usage]
     config:
       # PR-B: typed-port typed-only node. Drives the LLM adapter once

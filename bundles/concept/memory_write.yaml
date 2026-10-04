@@ -26,7 +26,7 @@ nodes:
 
   - id: memory.write.dispatch
     factory: memory.write.dispatch
-    inputs: [memory_receipt, observation, reflection, state]
+    inputs: [memory_receipt, observation, reflection, state, memory]
     outputs: [memory_receipt]
     config:
       emit_on_enter: []

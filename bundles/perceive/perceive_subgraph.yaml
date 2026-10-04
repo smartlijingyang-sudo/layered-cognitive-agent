@@ -15,6 +15,7 @@ purpose: perceive 三步执行 — observe (PerceiveHub) → memory_retrieve (Co
 nodes:
   - id: phase.perceive.observe
     factory: phase.perceive.observe
+    inputs: [state]
     outputs: [manifest, routing]
     config:
 

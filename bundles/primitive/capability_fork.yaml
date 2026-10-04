@@ -15,6 +15,7 @@ purpose: per-run capability fork — boot-time capability seam → typed per-run
 nodes:
   - id: capability.fork.dispatch
     factory: capability.fork.dispatch
+    inputs: [bindings]
     config:
       emit_on_enter: []
       emit_on_exit:  []
