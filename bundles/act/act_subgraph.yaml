@@ -45,7 +45,7 @@ nodes:
     # wiring layer independently).
     outputs: [decision]
     config:
-      emit_on_enter: [phase.tool.call.start]
+      emit_on_enter: []
       emit_on_exit: []
 
   - id: act.authorize
@@ -150,8 +150,8 @@ nodes:
     inputs: [envelope, verdict_refs, decision, state]
     outputs: [receipt]
     config:
-      emit_on_enter: [body.tool.execute.start]
-      emit_on_exit: [body.tool.execute.end]
+      emit_on_enter: []
+      emit_on_exit: []
       sub_spec_ref:
         plan_ref: bundles/concept/effect/effect_execute.yaml
         entry_node: effect.execute
@@ -172,7 +172,7 @@ nodes:
     outputs: [receipt]
     config:
       emit_on_enter: []
-      emit_on_exit: [phase.tool.call.end]
+      emit_on_exit: []
 
   # PR-3 (L-1): RunFact commit 独立节点。原 act.observe 通过
   # getattr(context.runtime, "journal") 偷图 runtime capability;改为本节点
