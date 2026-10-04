@@ -124,13 +124,13 @@ cognition/
 
 ```text
 loop/
-├── driver.py · transaction.py · fact_gateway.py · transport.py
+├── driver.py · fact_gateway.py · transport.py · observation.py · tool_error.py
 ├── emit/
-│   ├── spine/ep.py · phase_fact.py · kernel_loop.py
+│   ├── node_emitter.py
+│   ├── spine/ep.py
 │   └── cognitive/llm.py · reasoner.py · agent_spawn.py
 └── commit/
-    act_journal.py · memory_journal.py · delegation_journal.py
-    tool_journal.py · phase_spine.py
+    act_journal.py · memory_journal.py · delegation_journal.py · tool_journal.py
 ```
 
 `FactGateway` 是唯一事实生产门面；`emit/` 与 `commit/` 是机制分解，不是第二入口。
