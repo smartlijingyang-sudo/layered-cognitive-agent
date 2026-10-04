@@ -2,6 +2,11 @@
 
 from __future__ import annotations
 
+# This module boots a real kernel; the phase.think.reasoner.credentials
+# fail-loud gate requires the ambient dummy key (see tests/conftest.py
+# _ensure_no_env opt-out).
+__keep_llm_key__ = True
+
 from typing import Any
 
 import pytest
