@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+__keep_llm_key__ = True  # TestHonestFacade 经 ensure_default_ctx boot 真实 kernel，需过 reasoner fail-loud credential 门(见 tests/conftest.py)
+
 import inspect
 import unittest
 from pathlib import Path
@@ -21,6 +23,7 @@ from lca.contracts.protocols import TeamAssembly
 from lca.plugins.strategies.peer.relay import HandoffStrategy
 from lca.plugins.strategies.peer.swarm import SwarmStrategy
 from lca.plugins.strategies.pipeline.pipeline import SequentialStrategy
+from tests.support.session_gate_helpers import bound_session
 from tests.support.strategy_registry import build_strategy_registry
 from tests.support.team_stage import stage_with_invoker
 
@@ -143,7 +146,9 @@ class TestHonestFacade(unittest.IsolatedAsyncioTestCase):
         graph.add_edge(GraphEdge(source="entry", target="writer"))
         graph.add_edge(GraphEdge(source="writer", target="exit"))
         team = Team(members=[a], coordination=Graph(execution_graph=graph))
-        result = await team.run("write")
+        # D3 裁决(todo-38/todo-50):run 路径 record() 需要 bound publish Session。
+        with bound_session("team-graph-run"):
+            result = await team.run("write")
         self.assertEqual(result.status, TaskStatus.COMPLETED)
         self.assertEqual(result.output, "node-out")
 
