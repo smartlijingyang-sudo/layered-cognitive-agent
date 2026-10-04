@@ -39,7 +39,6 @@ __all__ = [
     "promote_lead",
     "spawn_agent",
     "spawn_lead",
-    "spawn_member",
     "spawn_team",
 ]
 
@@ -104,25 +103,6 @@ def spawn_lead(
         spec,
         transport=transport,
         mandate=mandate,
-        observability=bound_observability,
-        scope=bound_scope,
-    )
-
-
-def spawn_member(
-    spec: AgentSpec,
-    *,
-    shared_store: SharedMemoryStore | None = None,
-    observability: BoundObservability | None = None,
-    scope: Context | None = None,
-) -> CognitiveAgent:
-    """Close a team member through the production assembly adapter."""
-
-    bound_scope = _ensure_scope(scope)
-    bound_observability = observability or resolve_observability(spec, bound_scope)
-    return PlanBoundAgentAssembler().assemble_member(
-        spec,
-        shared_store=shared_store,
         observability=bound_observability,
         scope=bound_scope,
     )
