@@ -15,6 +15,7 @@ from pathlib import Path
 from lca.contracts.observability.registry.run_locator import RunLocator
 from lca.infrastructure.observability.backends.run_locator_fs import FilesystemRunLocator
 from lca.infrastructure.observability.journal.stream.live_tail import LiveTail
+from lca.infrastructure.persistence.run_paths import default_runs_root
 from lca.plugins.transport.webserver.handlers.runs.session.session.session import (
     RunRegistry,
     RunSession,
@@ -62,11 +63,14 @@ class _FakeLocator(RunLocator):
 class RunRegistryLocatorWiring(unittest.TestCase):
     """RunRegistry 把 path 解析委托给注入的 RunLocator。"""
 
-    def test_default_locator_is_filesystem_with_storage_root_traces(self) -> None:
+    def test_default_locator_is_filesystem_with_resolved_storage_root(self) -> None:
+        # e273a049e isolates test runs via LCA_RUNS_ROOT (conftest autouse
+        # fixture): the default locator root follows default_runs_root(),
+        # not the production "traces" path. Pin the seam, not the path.
         reg = RunRegistry()
         locator = reg.locator()
         self.assertIsInstance(locator, FilesystemRunLocator)
-        self.assertEqual(locator.storage_root, Path("traces"))
+        self.assertEqual(locator.storage_root, default_runs_root().parent)
 
     def test_explicit_locator_is_kept(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
