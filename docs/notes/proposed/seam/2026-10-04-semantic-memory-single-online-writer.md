@@ -34,7 +34,7 @@ ADR-0249（Accepted）§0.1 的问题陈述是「在主对话轮次（`reflect/r
 
 **在线轨。** `memory_add` / `memory_update` / `memory_remove` 是语义记忆唯一的在线写者。
 
-**离线轨。** `phase.reflect.memory.extract` 的 LLM 语义蒸馏移入 `run_dream`。在线保留毫秒级残差门控（`SalienceGate`、`filter_ingestion_modality`、`EpisodeBuffer`），即 ADR-0249 的 Fast Path。`EpisodeBuffer` 的写入受 `governor_enabled` 控制且插件默认关闭，Phase 0 的第二个条件要求目标 profile 打开它或补齐等价的捕获路径。`bundles/reflect/reflect_subgraph.yaml` 的三节点拓扑相应收窄，`bundles/base.yaml:172` 的组件声明随之调整。
+**离线轨。** `phase.reflect.memory.extract` 的 LLM 语义蒸馏移入 `run_dream`。在线保留毫秒级残差门控（`SalienceGate`、`filter_ingestion_modality`、`EpisodeBuffer`），即 ADR-0249 的 Fast Path。在线捕获已由 `phase.perceive.observe` 每轮无条件触发，其覆盖面受 `govern()` 的闭合模板限制，Phase 0 的第二个条件要求该覆盖面能承接隐式偏好，或补齐等价的捕获路径。`bundles/reflect/reflect_subgraph.yaml` 的三节点拓扑相应收窄，`bundles/base.yaml:172` 的组件声明随之调整。
 
 `run_dream` 的调度是前置条件。它当前的唯一调用方是 `lca/infrastructure/cli/commands/ops/memory.py`，`{home}/routines/` 为空目录，bundles / profiles / deploy 无引用，宿主 crontab 无条目。离线轨在拿到调度之前不承接任何写入。
 
@@ -52,9 +52,9 @@ ADR-0249（Accepted）§0.1 的问题陈述是「在主对话轮次（`reflect/r
 
 **Phase 0，离线轨可承接。** 两个条件都满足才算达成，缺一个都不启动 Phase 1。
 
-其一，dream 调度落地并跑稳。`{home}/routines/` 或 ADR-0268 CronJob 中存在 `run_dream` 条目，且有条目之外的真实触发证据，例如 `dreams/` 下产物时间戳或 dream 自身的 journal 记录。调度周期需给出上界并接受 §产品决策待接受 的约束。
+其一，dream 调度落地并跑稳。载体是插件托管的后台循环，照 `lca/plugins/avatar/plugin.py:302-312` 的 `AvatarCostumeScheduler` 形状，周期上界落在插件 `Config` 并由 profile YAML 设定，且有配置之外的真实触发证据，例如 `{home}/dreams/` 下产物时间戳。`{home}/routines/` 与 ADR-0268 CronJob 都不能作载体，理由见 [Phase 0 实施计划](../../../superpowers/plans/2026-10-04-dream-scheduler-phase0.md) 的载体选型节。调度周期需给出上界并接受 §产品决策待接受 的约束。
 
-其二，目标 profile 存在真实写入的在线残差捕获路径。`governor_enabled` 打开且 `{home}/memory/episodes/` 有本轮新增，或者每日流水补齐生产写入方。这条来自 §产品决策待接受 的实测结论，没开 governor 的 profile 上 extract 是隐式事实的唯一来源，移离线即丢失。
+其二，目标 profile 的在线残差捕获真的能覆盖隐式偏好。判据是实测而非开关，一个含「还是简洁一点好」这类无记忆动词偏好句的 turn 之后，`{home}/memory/episodes/` 出现 `dedupe_key=preference:verbosity` 且 `explicit_user_authority=true` 的新增文件，或者每日流水补齐生产写入方并由 `is_preference_statement` 命中。这条来自 §产品决策待接受 的实测结论，当前 `govern()` 的模板覆盖不到这类句子。
 
 Phase 0 未达成时 extract 保持在线，本提案其余部分不启动。
 
@@ -70,12 +70,13 @@ Phase 0 未达成时 extract 保持在线，本提案其余部分不启动。
 
 机制事实决定时延的严重度，其中两条比提案初稿假设的更差。
 
-- 在线残差捕获不是普遍开启的。`EpisodeBuffer` 只在 `governor_enabled` 为真时写 `{home}/memory/episodes/`，插件默认 `False`（`memory_extract.py:182`），只有 `profiles/web-assistant.yaml:99` 打开它，该处注释写明其它部署没有这块家目录、应继续走今天的提取器。24 个助理中 5 个有 `memory/episodes/`，本 Note 的证据助理 `asst_ce7fecd65188` 没有。
+- 在线残差捕获的门不是开关而是模板。`phase.perceive.observe` 每轮无条件调 `record_task_episode`（`observe.py:62-67`，`913a967ae` 引入），`governor_enabled` 只控制 reflect 侧那一份与 perceive 近冗余的重复写入。真正的门是 `episode_home(runtime)` 能否解析（`daytime.py:17-31`），以及 `govern()` 的三个闭合模板能否命中（`govern.py:18-21`）。verbosity 规则要求 `记住|以后` 合取（`govern.py:55`），因此「别那么啰嗦」「还是简洁一点好」返回 `None`；命中时 `explicit_user_authority` 又被硬编码为 `False`（`govern.py:58-63`），走不到 `_lifecycle` 的首次即提升分支（`contracts/models/memory/episode.py:74-82`）。
+- 证据助理跑的就是 `profiles/web-assistant.yaml`，`governor_enabled` 为 true，`memory/episodes/` 仍为空，因为其三轮陈述「i am lee」「上海啊」「我有女儿 儿子 老婆 一家四口」不匹配任何模板。524 个助理 home 中 5 个有 `episodes/`、共 6 个文件，全部是 `residual: instruction` 的身份事实，`preference:verbosity`、`correction`、`error` 各为 0。
 - 每日流水 `memory/YYYY-MM-DD.md` 没有生产写入方。`TrailWriter`（`contextfiles/service/trail.py:16`）只被测试构造，24 个助理的 memory 目录下 `20*.md` 计数为 0。`run_dream` 经 `parse_trail` 读它，FTS 索引覆盖它，但没有任何在线路径产生它。
 - `AssistantMemory.retrieve` 只读 `semantic.json` 与 `episodic.json`，不读 `memory/episodes/`。捕获到的残差在提升为语义记录之前不进注入路径。
 - `memory_search` 的 FTS 索引覆盖 curated records 与 trail files（`contextfiles/service/indexing.py:34`），由 `run_dream` 重建。两次 dream 之间索引是旧的。
 
-结论按部署分两种。开了 governor 的 profile 上，残差当轮进 `episodes/`，时延只影响提升，间隔期内这条偏好既不在系统提示里也搜不到，今天随口纠正的偏好在下一次 dream 之前会持续被违反。没开 governor 的 profile 上，extract 是隐式事实的唯一来源，移离线后不存在任何捕获路径，这 47 个维度对应的行为是丢失而不是延迟，直到在线捕获路径补齐为止。
+结论是捕获覆盖不足，而不是捕获开关未开。`govern()` 命中的残差当轮进 `episodes/`，时延只影响提升，间隔期内这条偏好既不在系统提示里也搜不到，今天随口纠正的偏好在下一次 dream 之前会持续被违反。`govern()` 命不中的隐式偏好，extract 是它唯一的来源，移离线后没有任何捕获路径，这部分维度对应的行为是丢失而不是延迟，直到在线捕获路径补齐为止。唯一能给偏好首次提升的是 trail 路径，`_trail_episode` 在 `is_preference_statement` 命中时设 `authority=True`（`dream.py:137-158`），该正则 `偏好|以后|不要|必须|记住|严禁|回复要|请记`（`contextfiles/domain/trail.py:17`）比 `govern()` 宽得多，而它没有写入方。
 
 时延的可接受度完全由 dream 调度周期决定，而当前周期不存在，`run_dream` 只有手动 CLI 入口。每日一次对偏好纠正不够。`memory_extract.py:64` 放宽成本门正是为了让「还是简洁一点好」这类无第一人称偏好句落盘，把它推迟一天与该意图冲突。
 
@@ -135,7 +136,7 @@ Phase 3 与守卫 remedy。
 
 ## Risks
 
-- 47 个 extract-only 维度的落盘时延是产品决策，见 §产品决策待接受。Phase 0 门禁保证它在离线轨可承接之前不发生，调度周期上界决定它是否可接受。在没开 governor 的 profile 上这个代价是丢失而不是延迟，Phase 0 的第二个条件就是为此设的。
+- 47 个 extract-only 维度的落盘时延是产品决策，见 §产品决策待接受。Phase 0 门禁保证它在离线轨可承接之前不发生，调度周期上界决定它是否可接受。`govern()` 模板覆盖不到的那部分维度，这个代价是丢失而不是延迟，Phase 0 的第二个条件就是为此设的。
 - 每日流水缺生产写入方是独立缺口。`run_dream` 与 FTS 索引都消费它，`TrailWriter` 却只被测试构造。补齐它属于 ADR-0254 的落地范围，不由本提案承担，但 Phase 0 的第二个条件在 governor 关闭的部署上会落到它身上。
 - re-ask remedy 增加一次 LLM 调用，上限由已有的 re-ask 硬上限约束，触顶回落 `_REFUSAL`。
 - 对账承载体依赖 ADR-0277 待拍板⑥/⑦。若裁决结果是不引入 `SemanticClaim`，`LinkDecider` 需改造为在 `MemoryRecord` 上工作，`consolidation.py` 的类型层随之调整。
