@@ -34,6 +34,10 @@ from typing import Any
 import typer
 
 from lca.infrastructure.cli.commands.kernel._shared import resolve_run_dir
+from lca.infrastructure.observability.spine.sinks.naming import (
+    exceptions_filename_for_run,
+    spine_filename_for_run,
+)
 
 _DEFAULT_TRACES_ROOT = Path("traces")
 
@@ -138,8 +142,8 @@ def register(app: typer.Typer) -> None:
         run_dir = resolve_run_dir(run_id, traces_root)
         if run_dir is None:
             raise typer.BadParameter("no run_id and no latest run found under traces/runs")
-        exc_path = run_dir / f"{run_dir.name}.exceptions.jsonl"
-        spine_path = run_dir / f"{run_dir.name}.spine.jsonl"
+        exc_path = run_dir / exceptions_filename_for_run(run_dir.name)
+        spine_path = run_dir / spine_filename_for_run(run_dir.name)
         # Task 1.10 / G-11: sidecar is the ONLY source of truth.
         # Spine-scan fallback removed — it produced misleading counts when
         # the sidecar was missing but spine had exception.caught events.
