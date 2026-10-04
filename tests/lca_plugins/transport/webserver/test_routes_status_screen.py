@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import asyncio
 import hashlib
-import json
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
@@ -26,6 +25,10 @@ from lca.plugins.domain.assistant.catalog.plugin import AssistantCatalogImpl
 from lca.plugins.transport.webserver.router.router import RouteRegistry
 from lca.plugins.transport.webserver.routes_1.routes_assistants import status_screen
 from lca.plugins.transport.webserver.routes_1.routes_assistants.router import setup
+from tests.support.run_artifacts import (
+    write_live_run,
+    write_terminated_run,
+)
 
 REPO_ROOT = Path(__file__).resolve().parents[4]
 
@@ -73,154 +76,6 @@ def _create_test_app(tmp_path: Path) -> tuple[Starlette, AssistantCatalogImpl, s
         )
     )
     return app, catalog, handle.assistant_id
-
-
-_ToolCalls = tuple[tuple[str, dict[str, Any]], ...]
-
-
-def _run_dir(runs_root: Path, run_id: str) -> Path:
-    run_dir = runs_root / run_id
-    run_dir.mkdir(parents=True)
-    return run_dir
-
-
-def _write_terminated_run(
-    runs_root: Path,
-    run_id: str,
-    *,
-    objective: str,
-    started_at: float,
-    closed_at: float,
-    outcome: str = "completed",
-    tool_calls: _ToolCalls = (),
-) -> Path:
-    run_dir = _run_dir(runs_root, run_id)
-    (run_dir / "manifest.json").write_text(
-        json.dumps({"schema": "lca.run_manifest/1", "run_id": run_id}, ensure_ascii=False),
-        encoding="utf-8",
-    )
-    (run_dir / "journal.json").write_text(
-        json.dumps(
-            {
-                "schema": "lca.journal/3.1",
-                "run_id": run_id,
-                "metadata": {
-                    "agent_role": "solo",
-                    "strategy_key": "solo",
-                    "plan_ref": "sha256:abc",
-                    "objective": objective,
-                    "attachments": [],
-                    "outcome": outcome,
-                    "started_at": started_at,
-                    "closed_at": closed_at,
-                    "total_steps": len(tool_calls),
-                    "extra": {},
-                },
-                "steps": [
-                    {
-                        "step_index": index,
-                        "entered_at": started_at,
-                        "tool_calls": [
-                            {
-                                "invocation_id": f"toolu_{index}",
-                                "name": name,
-                                "arguments": arguments,
-                            }
-                        ],
-                        "tool_results": [],
-                    }
-                    for index, (name, arguments) in enumerate(tool_calls, start=1)
-                ],
-            },
-            ensure_ascii=False,
-        ),
-        encoding="utf-8",
-    )
-    return run_dir
-
-
-def _write_ledger_run(
-    runs_root: Path,
-    run_id: str,
-    *,
-    objective: str,
-    started_ts: str,
-    tool_calls: _ToolCalls = (),
-    stop_outcome: str | None = None,
-    stop_ts: str | None = None,
-) -> Path:
-    """Write a run that has only its spine ledger, the shape of a run in flight."""
-    records: list[dict[str, Any]] = [
-        _record(
-            run_id,
-            seq=1,
-            execution_point="kernel.run.start",
-            payload={"run_id": run_id, "trace_id": f"trace_{run_id}"},
-            ts=started_ts,
-        ),
-        _record(
-            run_id,
-            seq=2,
-            execution_point="phase.think.fold",
-            payload={
-                "incarnation": 1,
-                "objective": objective,
-                "objective_kind": "user_text",
-                "phase": "think",
-                "summary": "started",
-            },
-            ts=started_ts,
-        ),
-    ]
-    seq = 3
-    for name, arguments in tool_calls:
-        records.append(
-            _record(
-                run_id,
-                seq=seq,
-                execution_point="step.tool_call.record",
-                payload={
-                    "arguments": arguments,
-                    "invocation_id": f"toolu_{seq}",
-                    "run_id": run_id,
-                    "step": seq,
-                    "tool_name": name,
-                },
-                ts=started_ts,
-            )
-        )
-        seq += 1
-    if stop_outcome is not None:
-        records.append(
-            _record(
-                run_id,
-                seq=seq,
-                execution_point="kernel.run.stop",
-                payload={"outcome": stop_outcome, "run_id": run_id, "trace_id": f"trace_{run_id}"},
-                ts=stop_ts or started_ts,
-            )
-        )
-    run_dir = _run_dir(runs_root, run_id)
-    lines = "".join(json.dumps(record, ensure_ascii=False) + "\n" for record in records)
-    (run_dir / f"{run_id}.spine.jsonl").write_text(lines, encoding="utf-8")
-    return run_dir
-
-
-def _record(
-    run_id: str, *, seq: int, execution_point: str, payload: dict[str, Any], ts: str
-) -> dict[str, Any]:
-    return {
-        "category": f"spine.{execution_point}",
-        "causation_id": None,
-        "channel": "fact",
-        "event_hash": None,
-        "event_id": f"{run_id}:{seq}",
-        "execution_point": execution_point,
-        "payload": payload,
-        "prev_event_hash": None,
-        "trace_id": None,
-        "ts": ts,
-    }
 
 
 def _tree_state(root: Path) -> dict[str, tuple[int, str]]:
@@ -286,7 +141,7 @@ def env(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> _SnapshotEnv:
 
 
 def test_status_snapshot_endpoint_returns_aggregated_views(env: _SnapshotEnv) -> None:
-    _write_ledger_run(
+    write_live_run(
         env.runs_root,
         "run_snap_live",
         objective="正在浏览 webhook 文档",
@@ -299,7 +154,7 @@ def test_status_snapshot_endpoint_returns_aggregated_views(env: _SnapshotEnv) ->
         ),
     )
     env.registry.set_status("run_snap_live", RunLifecycleStatus.RUNNING)
-    _write_terminated_run(
+    write_terminated_run(
         env.runs_root,
         "run_snap_new",
         objective="整理本周架构评审记录",
@@ -307,7 +162,7 @@ def test_status_snapshot_endpoint_returns_aggregated_views(env: _SnapshotEnv) ->
         closed_at=1791028830.0,
         tool_calls=(("listFiles", {"path": "."}),),
     )
-    _write_terminated_run(
+    write_terminated_run(
         env.runs_root,
         "run_snap_old",
         objective="检索记忆库中的分层原则",
@@ -349,14 +204,14 @@ def test_status_snapshot_endpoint_returns_aggregated_views(env: _SnapshotEnv) ->
 
 
 def test_status_snapshot_excludes_runs_nobody_is_executing(env: _SnapshotEnv) -> None:
-    _write_terminated_run(
+    write_terminated_run(
         env.runs_root,
         "run_snap_keep",
         objective="已落盘的运行",
         started_at=1791018000.0,
         closed_at=1791018005.0,
     )
-    _write_ledger_run(
+    write_live_run(
         env.runs_root,
         "run_snap_finished",
         objective="registry 里已终态的运行",
@@ -365,7 +220,7 @@ def test_status_snapshot_excludes_runs_nobody_is_executing(env: _SnapshotEnv) ->
         stop_ts="2026-10-03T16:00:09Z",
     )
     env.registry.set_status("run_snap_finished", RunLifecycleStatus.COMPLETED)
-    _write_ledger_run(
+    write_live_run(
         env.runs_root,
         "run_snap_abandoned",
         objective="registry 里没有的运行",
@@ -387,7 +242,7 @@ def test_status_snapshot_does_not_write_outside_the_runs_root(
     The projector this replaced kept ``traces/runtime/activity_cache.json``
     relative to the process CWD, so a status poll mutated the working tree.
     """
-    _write_terminated_run(
+    write_terminated_run(
         env.runs_root,
         "run_snap_ro",
         objective="只读快照",
