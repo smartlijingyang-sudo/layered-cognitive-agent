@@ -258,8 +258,10 @@ def _read_run_journal_detail(
                     },
                     "tool_result": {
                         "ok": tr.get("ok", True),
+                        "exit_code": tr.get("exit_code", 0 if tr.get("ok", True) else 1),
                         "latency_ms": tr.get("latency_ms"),
                         "stdout_head": tr.get("stdout_head"),
+                        "stderr": tr.get("stderr"),
                         "delta_summary": tr.get("delta_summary"),
                         "error": tr.get("error"),
                     },
