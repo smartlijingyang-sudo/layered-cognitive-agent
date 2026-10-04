@@ -63,6 +63,13 @@ BASELINE: dict[str, frozenset[str]] = {
     "phase.remember.write": frozenset({"effect_gateway"}),
     "think.route": frozenset({"in_assembled_manifest"}),
     "llm.invoke": frozenset({"render", "tools", "state"}),
+    # Listing ``tools`` here makes the boot-time plan lift reject the profile:
+    # think.decision.repair is not the entry node of think.subgraph, and no
+    # reachable predecessor inside that plan produces ``tools``. Seeded ports
+    # are only exempt on an entry node, which is why tool.fork.dispatch gets
+    # away with declaring it. ``forked_tools`` is produced by think.reason and
+    # is available at this point, so that is the port to validate against.
+    "think.decision.repair": frozenset({"tools"}),
 }
 
 
