@@ -16,8 +16,9 @@ from typing import Any
 import pytest
 
 from lca.contracts.atoms.enums.enums import ActionType
+from lca.contracts.models.cognition.boundary import ForkedTools
 from lca.contracts.models.core.conversation.llm import LLMResponse, NativeToolCall
-from lca.contracts.models.core.execution.decision import Decision, ToolCall
+from lca.contracts.models.core.execution.decision import Decision, Observation, ToolCall
 from lca.contracts.protocols.declarative.declarative_1.node_executor import (
     NodeContext,
     NodeInput,
@@ -28,47 +29,50 @@ from lca.nodes.think.decision_repair import ThinkDecisionRepairExecutor
 
 
 def _ctx() -> NodeContext:
-    """Minimal NodeContext; the repair node reads the ``tools`` typed port."""
+    """Minimal NodeContext; the repair node reads the ``forked_tools`` typed port."""
     return NodeContext(runtime={}, budget={}, metadata={})
 
 
-def _input(decision: Decision | None = None, *, tools: Any | None = None) -> NodeInput:
-    """Build a NodeInput with the ``decision`` + ``tools`` typed ports populated."""
+def _input(decision: Decision | None = None, *, forked_tools: Any | None = None) -> NodeInput:
+    """Build a NodeInput with the ``decision`` + ``forked_tools`` typed ports."""
     port_values: dict[str, Any] = {}
     if decision is not None:
         port_values["decision"] = decision
-    if tools is not None:
-        port_values["tools"] = tools
+    if forked_tools is not None:
+        port_values["forked_tools"] = forked_tools
     return NodeInput(port_values=port_values)
 
 
 class _FakeTool:
     """Typed stand-in for the ``Tool`` protocol.
 
-    Only ``name`` and ``parameters`` are exercised by the repair
-    node, so the rest of the protocol surface is left undefined.
+    ``ForkedTools.items`` validates every entry with ``isinstance`` against the
+    runtime-checkable protocol, so the fake carries the whole surface, not only
+    the ``name`` / ``parameters`` the repair node reads.
     """
 
-    def __init__(self, name: str, parameters: Mapping[str, Any]) -> None:
+    description: str = "test tool"
+    is_idempotent: bool = True
+    effect_kind: str = "ephemeral"
+    default_timeout_s: int = 5
+
+    def __init__(
+        self, name: str, parameters: Mapping[str, Any], *, namespace: str = "fake"
+    ) -> None:
         self.name = name
+        self.namespace = namespace
         self.parameters = parameters
 
+    async def execute(self, args: dict[str, Any]) -> Observation:
+        raise NotImplementedError
 
-class _FakeRegistry:
-    """Minimal ``ToolRegistry`` shape: ``register`` + ``get``.
+    def validate(self, args: dict[str, Any]) -> str | None:
+        return None
 
-    The repair node only calls ``get``; ``register`` is provided so
-    the fixture also matches the registered protocols at runtime.
-    """
 
-    def __init__(self, tools: dict[str, _FakeTool]) -> None:
-        self._tools = dict(tools)
-
-    def register(self, tool: _FakeTool) -> None:
-        self._tools[tool.name] = tool
-
-    def get(self, name: str) -> _FakeTool | None:
-        return self._tools.get(name)
+def _forked(*tools: _FakeTool) -> ForkedTools:
+    """Payload for the ``forked_tools`` port: this run's tool list."""
+    return ForkedTools(items=tuple(tools), binding_keys=frozenset())
 
 
 # Schema for the ``echo`` tool used by most tests. Mirrors the
@@ -86,8 +90,8 @@ _ECHO_SCHEMA: dict[str, Any] = {
 }
 
 
-def _registry_with_echo() -> _FakeRegistry:
-    return _FakeRegistry({"echo": _FakeTool("echo", _ECHO_SCHEMA)})
+def _forked_with_echo() -> ForkedTools:
+    return _forked(_FakeTool("echo", _ECHO_SCHEMA))
 
 
 def _decision(*tool_calls: ToolCall) -> Decision:
@@ -118,7 +122,7 @@ async def test_decision_repair_well_formed_passes_through_to_gate() -> None:
 
     output = await executor.node_execute(
         _ctx(),
-        _input(decision, tools=_registry_with_echo()),
+        _input(decision, forked_tools=_forked_with_echo()),
     )
 
     forwarded: Decision = output.port_values["decision"]
@@ -153,7 +157,7 @@ async def test_decision_repair_truncated_json_repairs_then_forwards_to_gate() ->
 
     output = await executor.node_execute(
         _ctx(),
-        _input(decision, tools=_registry_with_echo()),
+        _input(decision, forked_tools=_forked_with_echo()),
     )
 
     forwarded: Decision = output.port_values["decision"]
@@ -175,7 +179,7 @@ async def test_decision_repair_unknown_tool_name_rejects_to_route_decide() -> No
     """Unknown tool_name → ``decision_rejected_schema`` → ``think.route.decide``.
 
     Per spec §2.3 the repair node never silently passes a malformed
-    Decision downstream. When the registry does not recognize a
+    Decision downstream. When the forked list does not recognize a
     tool name, the node forwards the original Decision unchanged
     (so diagnostics can read it) and re-routes to
     ``think.route.decide`` for a full re-reason.
@@ -185,7 +189,7 @@ async def test_decision_repair_unknown_tool_name_rejects_to_route_decide() -> No
 
     output = await executor.node_execute(
         _ctx(),
-        _input(decision, tools=_registry_with_echo()),
+        _input(decision, forked_tools=_forked_with_echo()),
     )
 
     forwarded: Decision = output.port_values["decision"]
@@ -210,10 +214,10 @@ async def test_decision_repair_irreparable_arguments_rejects_to_route_decide() -
     """
     executor = ThinkDecisionRepairExecutor()
     raw_preview = '{"text": "hello"'  # missing closer; repairable
-    # Use a registry whose schema does not match the repairable
+    # Use a forked list whose schema does not match the repairable
     # payload so the schema check fails after the brace fix.
-    bad_schema_registry = _FakeRegistry(
-        {"echo": _FakeTool("echo", {"type": "object", "required": ["never_present"]})}
+    bad_schema_forked = _forked(
+        _FakeTool("echo", {"type": "object", "required": ["never_present"]})
     )
 
     decision = _decision(
@@ -227,7 +231,7 @@ async def test_decision_repair_irreparable_arguments_rejects_to_route_decide() -
 
     output = await executor.node_execute(
         _ctx(),
-        _input(decision, tools=bad_schema_registry),
+        _input(decision, forked_tools=bad_schema_forked),
     )
 
     forwarded: Decision = output.port_values["decision"]
@@ -252,7 +256,7 @@ async def test_incomplete_wire_passes_through_so_body_can_observe() -> None:
         },
         "required": ["path", "content"],
     }
-    registry = _FakeRegistry({"writeFile": _FakeTool("writeFile", write_schema)})
+    forked = _forked(_FakeTool("writeFile", write_schema))
     decision = _decision(
         ToolCall(
             call_id="call_wf",
@@ -264,7 +268,7 @@ async def test_incomplete_wire_passes_through_so_body_can_observe() -> None:
         )
     )
 
-    output = await executor.node_execute(_ctx(), _input(decision, tools=registry))
+    output = await executor.node_execute(_ctx(), _input(decision, forked_tools=forked))
     routing: RoutingDecision = output.port_values["routing"]
     forwarded: Decision = output.port_values["decision"]
 
@@ -284,8 +288,8 @@ async def test_decision_repair_is_idempotent() -> None:
     """
     executor = ThinkDecisionRepairExecutor()
     decision = _decision(_call(arguments={"text": "hello", "count": 1}))
-    registry = _registry_with_echo()
-    inp = _input(decision, tools=registry)
+    forked = _forked_with_echo()
+    inp = _input(decision, forked_tools=forked)
 
     out_a = await executor.node_execute(_ctx(), inp)
     out_b = await executor.node_execute(_ctx(), inp)
@@ -317,12 +321,12 @@ async def test_decision_repair_empty_decision_returns_empty_output() -> None:
     act→think re-ask loop guard note.
     """
     executor = ThinkDecisionRepairExecutor()
-    registry = _registry_with_echo()
+    forked = _forked_with_echo()
 
     # ``None`` decision.
     out_none = await executor.node_execute(
         _ctx(),
-        _input(decision=None, tools=registry),
+        _input(decision=None, forked_tools=forked),
     )
     assert out_none.port_values == {}
 
@@ -331,7 +335,7 @@ async def test_decision_repair_empty_decision_returns_empty_output() -> None:
     empty_decision = _decision()
     out_empty = await executor.node_execute(
         _ctx(),
-        _input(empty_decision, tools=registry),
+        _input(empty_decision, forked_tools=forked),
     )
     assert out_empty.port_values["decision"] is empty_decision
     routing = out_empty.port_values["routing"]
@@ -339,36 +343,27 @@ async def test_decision_repair_empty_decision_returns_empty_output() -> None:
 
 
 @pytest.mark.asyncio
-async def test_decision_repair_no_registry_passes_known_calls() -> None:
-    """No ``tools`` port → the argument-shape check is skipped entirely.
+async def test_decision_repair_missing_forked_tools_port_raises() -> None:
+    """No ``forked_tools`` port → fail loud instead of skipping the shape check.
 
-    This is a degraded state, not a safe fallback. The Body wire gate
-    only blocks a payload whose required keys are *all* absent
-    (``missing_arguments_block_observation``), so a wrong-shaped
-    argument dict with the required keys present walks straight through
-    to the tool. ``run_56f67fbf52d9`` reached ``cron.add`` that way and
-    was stopped only by ``CronAddTool.validate()``, which reported it
-    through the authorization vocabulary as ``phase.tool.denied``.
+    Skipping it is not a safe fallback. The Body wire gate only blocks a
+    payload whose required keys are *all* absent
+    (``missing_arguments_block_observation``), so a wrong-shaped argument
+    dict with the required keys present walks straight through to the tool.
+    ``run_56f67fbf52d9`` reached ``cron.add`` that way and was stopped only
+    by ``CronAddTool.validate()``, which reported it through the
+    authorization vocabulary as ``phase.tool.denied``.
 
-    The production bundle always wires the port
-    (``bundles/think/think_subgraph.yaml``), and
-    ``scripts/check_bundle_ports.py`` fails the build if that wiring is
-    dropped again. This test pins the degraded behaviour so a future
-    change to it is deliberate.
+    The production bundle wires the port
+    (``bundles/think/think_subgraph.yaml``); ``scripts/check_bundle_ports.py``
+    and ``scripts/check_plan_lift.py`` fail the build if that wiring is
+    dropped again.
     """
     executor = ThinkDecisionRepairExecutor()
     decision = _decision(_call(arguments={"text": "hello", "count": 1}))
 
-    output = await executor.node_execute(
-        _ctx(),  # no ``tools`` typed port either
-        _input(decision),
-    )
-
-    forwarded: Decision = output.port_values["decision"]
-    routing: RoutingDecision = output.port_values["routing"]
-    assert forwarded is decision
-    assert routing.next_node == "think.gate"
-    assert routing.next_hint == "decision_ok"
+    with pytest.raises(RuntimeError, match="'forked_tools' typed port missing"):
+        await executor.node_execute(_ctx(), _input(decision))
 
 
 # The exact arguments ``run_56f67fbf52d9`` sent to ``cron.add`` at spine
@@ -393,12 +388,20 @@ _CRON_ADD_NESTED_SCHEDULE: dict[str, Any] = {
 }
 
 
-def _registry_with_real_cron_add() -> _FakeRegistry:
-    """Registry carrying the production ``cron.add`` schema, not a fake."""
+def _forked_with_real_cron_add() -> ForkedTools:
+    """Forked list carrying the production ``cron.add`` name, namespace and schema.
+
+    The name and namespace come from ``CronAddTool`` itself so the lookup
+    keying cannot drift from what the model is offered on the wire.
+    """
     from lca.infrastructure.tools.cron.add import CronAddTool
 
-    return _FakeRegistry(
-        {"cron.add": _FakeTool("cron.add", CronAddTool.parameters)},
+    return _forked(
+        _FakeTool(
+            CronAddTool.name,
+            CronAddTool.parameters,
+            namespace=CronAddTool.namespace,
+        )
     )
 
 
@@ -416,7 +419,7 @@ async def test_decision_repair_rejects_recorded_cron_add_flat_schedule() -> None
 
     output = await executor.node_execute(
         _ctx(),
-        _input(decision, tools=_registry_with_real_cron_add()),
+        _input(decision, forked_tools=_forked_with_real_cron_add()),
     )
 
     routing: RoutingDecision = output.port_values["routing"]
@@ -433,7 +436,7 @@ async def test_decision_repair_passes_recorded_cron_add_nested_schedule() -> Non
 
     output = await executor.node_execute(
         _ctx(),
-        _input(decision, tools=_registry_with_real_cron_add()),
+        _input(decision, forked_tools=_forked_with_real_cron_add()),
     )
 
     routing: RoutingDecision = output.port_values["routing"]
@@ -443,18 +446,18 @@ async def test_decision_repair_passes_recorded_cron_add_nested_schedule() -> Non
 
 @pytest.mark.asyncio
 async def test_decision_repair_empty_tool_name_rejects() -> None:
-    """``tool_name == ""`` is rejected even without a registry.
+    """``tool_name == ""`` is rejected before any schema lookup.
 
-    Empty / whitespace-only tool names are always rejected because
-    they can never be a valid schema-bearing payload — no registry
-    is needed to detect the empty-string case.
+    Empty / whitespace-only tool names can never be a valid
+    schema-bearing payload, so the reject does not depend on what the
+    forked list happens to contain.
     """
     executor = ThinkDecisionRepairExecutor()
     decision = _decision(_call(name="", arguments={"text": "hello", "count": 1}))
 
     output = await executor.node_execute(
         _ctx(),
-        _input(decision),
+        _input(decision, forked_tools=_forked_with_echo()),
     )
 
     routing: RoutingDecision = output.port_values["routing"]
@@ -488,7 +491,7 @@ async def test_decision_repair_multi_call_one_repair_emits_repaired_decision() -
 
     output = await executor.node_execute(
         _ctx(),
-        _input(decision, tools=_registry_with_echo()),
+        _input(decision, forked_tools=_forked_with_echo()),
     )
 
     forwarded: Decision = output.port_values["decision"]
@@ -551,7 +554,7 @@ async def test_degenerate_markup_fragment_reroutes_instead_of_answering() -> Non
     assert _CLOSE_PARAM in decision.tool_calls[0].wire_raw_preview
 
     output = await ThinkDecisionRepairExecutor().node_execute(
-        _ctx(), _input(decision, tools=_registry_with_echo())
+        _ctx(), _input(decision, forked_tools=_forked_with_echo())
     )
     routing = output.port_values.get("routing")
     assert isinstance(routing, RoutingDecision)
@@ -572,20 +575,18 @@ async def test_well_formed_markup_block_becomes_an_executable_call() -> None:
     # An invoke/parameter block carries strings only, so validate against a
     # schema the encoding can actually satisfy; _ECHO_SCHEMA also requires an
     # integer and would reject on grounds unrelated to this test.
-    registry = _FakeRegistry(
-        {
-            "echo": _FakeTool(
-                "echo",
-                {
-                    "type": "object",
-                    "properties": {"text": {"type": "string"}},
-                    "required": ["text"],
-                },
-            )
-        }
+    forked = _forked(
+        _FakeTool(
+            "echo",
+            {
+                "type": "object",
+                "properties": {"text": {"type": "string"}},
+                "required": ["text"],
+            },
+        )
     )
     output = await ThinkDecisionRepairExecutor().node_execute(
-        _ctx(), _input(decision, tools=registry)
+        _ctx(), _input(decision, forked_tools=forked)
     )
     routing = output.port_values.get("routing")
     assert isinstance(routing, RoutingDecision)

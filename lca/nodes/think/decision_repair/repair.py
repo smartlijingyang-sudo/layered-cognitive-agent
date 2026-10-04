@@ -25,21 +25,6 @@ from lca.nodes.think.decision_repair.schema import (
 )
 
 
-def _resolve_registry(tools_obj: Any | None) -> Any | None:
-    """Return the ``ToolRegistry`` from the ``tools`` typed port, or ``None``.
-
-    Typed-boundary convention (PR-3.7.c): registries travel via the
-    typed ``tools`` port so the node stays free of import-time
-    coupling to the act layer. Returns ``None`` when no registry is
-    available so the schema-validation path can short-circuit
-    gracefully — empty / unknown tool names still reject per the
-    spec, but a missing registry only weakens the unknown-name check.
-    """
-    if tools_obj is None:
-        return None
-    return tools_obj
-
-
 def _validate_or_repair_calls(
     tool_calls: list[ToolCall],
     *,
