@@ -1,7 +1,7 @@
 # Layered Cognitive Agent：技术名词与结构化层次认知指南
 
 **作者：Manus AI**  
-**分析对象：** `smartlijingyang-sudo/layered-cognitive-agent`  ￼
+**分析对象：** `agents-builders/layered-cognitive-agent`  ￼
 **分析基线：** `main` 分支当前代码与仓库内架构文档 ￼
 
 ## 1. 先给出结论：这个项目是什么
@@ -407,6 +407,6 @@ LCA 的完整技术认知可以用下面五句话记忆：
 
 [1]: `../AGENTS.md` — 项目工程约束、五层依赖、六步闭集、双平面与插件机制  
 [2]: `../ARCHITECTURE_OPTIMIZATION_SUMMARY_2026-08-25.md` — 声明式计划、阶段图、执行契约和终态投影优化总结  
-[3]: [GitHub 仓库最新提交 `6ce374e3`](https://github.com/smartlijingyang-sudo/layered-cognitive-agent/commit/6ce374e3) — 架构术语命名重构  
+[3]: [GitHub 仓库最新提交 `6ce374e3`](https://github.com/agents-builders/layered-cognitive-agent/commit/6ce374e3) — 架构术语命名重构
 [4]: `harness-spine-spec.md` — Harness Spine 的 Agent、Session、Journal、Projection 与 Plugin Kernel 设计规约  
 [5]: `design/2026-08-19-cognitive-primitive-constitution-v3.md` — 认知原语宪法 v3：六步闭集、双平面、Reducer、Journal、能力衰减和配置层次

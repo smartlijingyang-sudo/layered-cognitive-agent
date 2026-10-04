@@ -1,6 +1,6 @@
 # 00 — LCA Phase-Graph Inventory (from live YAML)
 
-> Source: `gh api` reads of `smartlijingyang-sudo/layered-cognitive-agent` @ HEAD (no clone).  
+> Source: `gh api` reads of `agents-builders/layered-cognitive-agent` @ HEAD (no clone).
 > Primary production outer plan: `bundles/outer/phase_main.yaml` (wired by `profiles/web-standard.yaml`).  
 > Parallel three-tier lineage: `bundles/agent/*` → `bundles/concept/*` → `bundles/primitive/*` (ADR-0220).  
 > Inventory date: 2026-09-15 (Asia/Shanghai).

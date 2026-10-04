@@ -6,7 +6,7 @@
 
 **审查日期：2026-08-24**
 
-**审查对象：** `smartlijingyang-sudo/layered-cognitive-agent`
+**审查对象：** `agents-builders/layered-cognitive-agent`
 
 **审查基线：** `main @ 1808a71f73aadfbe9439189e82c57ec5cf65ede8`
 
@@ -252,21 +252,21 @@ Typed Command
 
 ## References
 
-[1]: https://github.com/smartlijingyang-sudo/layered-cognitive-agent/blob/1808a71f73aadfbe9439189e82c57ec5cf65ede8/AGENTS.md "Repository architecture and engineering constraints"
-[2]: https://github.com/smartlijingyang-sudo/layered-cognitive-agent/blob/1808a71f73aadfbe9439189e82c57ec5cf65ede8/docs/design/2026-08-19-cognitive-primitive-constitution-v3.md "Cognitive Primitive Constitution v3"
-[3]: https://github.com/smartlijingyang-sudo/layered-cognitive-agent/blob/1808a71f73aadfbe9439189e82c57ec5cf65ede8/docs/specs/harness-spine-spec.md "Harness Spine Specification"
-[4]: https://github.com/smartlijingyang-sudo/layered-cognitive-agent/blob/1808a71f73aadfbe9439189e82c57ec5cf65ede8/gateway/app.py "Starlette application and dual route paths"
-[5]: https://github.com/smartlijingyang-sudo/layered-cognitive-agent/blob/1808a71f73aadfbe9439189e82c57ec5cf65ede8/gateway/runs/execute.py "Production run and resume execution path"
-[6]: https://github.com/smartlijingyang-sudo/layered-cognitive-agent/blob/1808a71f73aadfbe9439189e82c57ec5cf65ede8/gateway/runs/session.py "RunSession and in-memory RunRegistry"
-[7]: https://github.com/smartlijingyang-sudo/layered-cognitive-agent/blob/1808a71f73aadfbe9439189e82c57ec5cf65ede8/lca/application/harness_live.py "Harness LiveAgent adapter"
-[8]: https://github.com/smartlijingyang-sudo/layered-cognitive-agent/blob/1808a71f73aadfbe9439189e82c57ec5cf65ede8/lca/harness/session/store.py "Durable SessionStore prototype"
-[9]: https://github.com/smartlijingyang-sudo/layered-cognitive-agent/blob/1808a71f73aadfbe9439189e82c57ec5cf65ede8/lca/harness/projection/registry.py "In-memory projection registry"
-[10]: https://github.com/smartlijingyang-sudo/layered-cognitive-agent/blob/1808a71f73aadfbe9439189e82c57ec5cf65ede8/lca/harness/declarative/compiler.py "Declarative plan compiler and phase/control binding"
-[11]: https://github.com/smartlijingyang-sudo/layered-cognitive-agent/blob/1808a71f73aadfbe9439189e82c57ec5cf65ede8/lca/runtime/declarative_runtime.py "Declarative runtime bridge"
-[12]: https://github.com/smartlijingyang-sudo/layered-cognitive-agent/blob/1808a71f73aadfbe9439189e82c57ec5cf65ede8/lca/harness/declarative/interpreter.py "Generic phase graph interpreter"
-[13]: https://github.com/smartlijingyang-sudo/layered-cognitive-agent/blob/1808a71f73aadfbe9439189e82c57ec5cf65ede8/ADR_66_69_74_75_76_IMPLEMENTATION_AUDIT.md "Current ADR implementation audit"
-[14]: https://github.com/smartlijingyang-sudo/layered-cognitive-agent/blob/1808a71f73aadfbe9439189e82c57ec5cf65ede8/profiles/web-standard.yaml "Default production profile"
-[15]: https://github.com/smartlijingyang-sudo/layered-cognitive-agent/blob/1808a71f73aadfbe9439189e82c57ec5cf65ede8/bundles/declarative-phase-graph.yaml "Declarative phase graph bundle"
-[16]: https://github.com/smartlijingyang-sudo/layered-cognitive-agent/blob/1808a71f73aadfbe9439189e82c57ec5cf65ede8/lca/plugins/composer/runtime_factory.py "Runtime dependency factory and fallback policy"
-[17]: https://github.com/smartlijingyang-sudo/layered-cognitive-agent/blob/1808a71f73aadfbe9439189e82c57ec5cf65ede8/lca/contracts/protocols/declarative_phase_graph.py "Declarative contracts, validators and plan rules"
-[18]: https://github.com/smartlijingyang-sudo/layered-cognitive-agent/blob/1808a71f73aadfbe9439189e82c57ec5cf65ede8/lca/plugins/phase_executors/common.py "Standard phase executor and effect envelope"
+[1]: https://github.com/agents-builders/layered-cognitive-agent/blob/1808a71f73aadfbe9439189e82c57ec5cf65ede8/AGENTS.md "Repository architecture and engineering constraints"
+[2]: https://github.com/agents-builders/layered-cognitive-agent/blob/1808a71f73aadfbe9439189e82c57ec5cf65ede8/docs/design/2026-08-19-cognitive-primitive-constitution-v3.md "Cognitive Primitive Constitution v3"
+[3]: https://github.com/agents-builders/layered-cognitive-agent/blob/1808a71f73aadfbe9439189e82c57ec5cf65ede8/docs/specs/harness-spine-spec.md "Harness Spine Specification"
+[4]: https://github.com/agents-builders/layered-cognitive-agent/blob/1808a71f73aadfbe9439189e82c57ec5cf65ede8/gateway/app.py "Starlette application and dual route paths"
+[5]: https://github.com/agents-builders/layered-cognitive-agent/blob/1808a71f73aadfbe9439189e82c57ec5cf65ede8/gateway/runs/execute.py "Production run and resume execution path"
+[6]: https://github.com/agents-builders/layered-cognitive-agent/blob/1808a71f73aadfbe9439189e82c57ec5cf65ede8/gateway/runs/session.py "RunSession and in-memory RunRegistry"
+[7]: https://github.com/agents-builders/layered-cognitive-agent/blob/1808a71f73aadfbe9439189e82c57ec5cf65ede8/lca/application/harness_live.py "Harness LiveAgent adapter"
+[8]: https://github.com/agents-builders/layered-cognitive-agent/blob/1808a71f73aadfbe9439189e82c57ec5cf65ede8/lca/harness/session/store.py "Durable SessionStore prototype"
+[9]: https://github.com/agents-builders/layered-cognitive-agent/blob/1808a71f73aadfbe9439189e82c57ec5cf65ede8/lca/harness/projection/registry.py "In-memory projection registry"
+[10]: https://github.com/agents-builders/layered-cognitive-agent/blob/1808a71f73aadfbe9439189e82c57ec5cf65ede8/lca/harness/declarative/compiler.py "Declarative plan compiler and phase/control binding"
+[11]: https://github.com/agents-builders/layered-cognitive-agent/blob/1808a71f73aadfbe9439189e82c57ec5cf65ede8/lca/runtime/declarative_runtime.py "Declarative runtime bridge"
+[12]: https://github.com/agents-builders/layered-cognitive-agent/blob/1808a71f73aadfbe9439189e82c57ec5cf65ede8/lca/harness/declarative/interpreter.py "Generic phase graph interpreter"
+[13]: https://github.com/agents-builders/layered-cognitive-agent/blob/1808a71f73aadfbe9439189e82c57ec5cf65ede8/ADR_66_69_74_75_76_IMPLEMENTATION_AUDIT.md "Current ADR implementation audit"
+[14]: https://github.com/agents-builders/layered-cognitive-agent/blob/1808a71f73aadfbe9439189e82c57ec5cf65ede8/profiles/web-standard.yaml "Default production profile"
+[15]: https://github.com/agents-builders/layered-cognitive-agent/blob/1808a71f73aadfbe9439189e82c57ec5cf65ede8/bundles/declarative-phase-graph.yaml "Declarative phase graph bundle"
+[16]: https://github.com/agents-builders/layered-cognitive-agent/blob/1808a71f73aadfbe9439189e82c57ec5cf65ede8/lca/plugins/composer/runtime_factory.py "Runtime dependency factory and fallback policy"
+[17]: https://github.com/agents-builders/layered-cognitive-agent/blob/1808a71f73aadfbe9439189e82c57ec5cf65ede8/lca/contracts/protocols/declarative_phase_graph.py "Declarative contracts, validators and plan rules"
+[18]: https://github.com/agents-builders/layered-cognitive-agent/blob/1808a71f73aadfbe9439189e82c57ec5cf65ede8/lca/plugins/phase_executors/common.py "Standard phase executor and effect envelope"

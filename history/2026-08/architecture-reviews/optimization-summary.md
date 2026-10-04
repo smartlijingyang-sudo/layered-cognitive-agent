@@ -2,7 +2,7 @@
 
 **目标分支：** `main`
 
-**最终远程提交：** [`fdb20c46`](https://github.com/smartlijingyang-sudo/layered-cognitive-agent/commit/fdb20c46)
+**最终远程提交：** [`fdb20c46`](https://github.com/agents-builders/layered-cognitive-agent/commit/fdb20c46)
 
 **状态：** 已推送，工作区与 `origin/main` 一致。
 
@@ -23,10 +23,10 @@ LCA 的声明式运行路径可以把一次 Agent 运行理解为“先把配置
 
 | 提交 | 单项优化 | 为什么要改 | 带来的好处 |
 |---|---|---|---|
-| [`d3dae65c`](https://github.com/smartlijingyang-sudo/layered-cognitive-agent/commit/d3dae65c) | `refactor(contracts): 按职责拆分声明式计划契约` | 原来的 `declarative_phase_graph.py` 同时存放插件 schema、阶段图、执行游标、结果和 Protocol。阅读一个概念会误触多个无关概念。 | 将共享词汇、插件声明、图与计划数据、执行协议拆开；旧导入路径仍以兼容门面保留，因此调用方不需要为文件整理承担行为风险。 |
-| [`d0e600fe`](https://github.com/smartlijingyang-sudo/layered-cognitive-agent/commit/d0e600fe) | `refactor(types): 收紧声明式执行契约边界` | 状态、预算、停止决定、事实等跨层数据使用宽泛 `Any`，错误只能在运行晚期暴露。 | 使用 `AgentState`、`Budget`、`StopDecision`、`RunFact`、`JournalCommitter` 等现有类型；真正开放的扩展载荷使用 `object`，让边界清楚但不强行假设业务载荷。 |
-| [`0e0e0aab`](https://github.com/smartlijingyang-sudo/layered-cognitive-agent/commit/0e0e0aab) | `fix(team-seam): 显式声明默认实现的协议继承` | 两个默认 Team seam 类虽然方法形状正确，但没有在签名中声明实现的 Protocol，架构门禁会失败。 | 通信装配器与共享内存解析器现在显式继承其 Protocol；阅读类定义即可知道替换契约，静态检查也能更早发现偏离。 |
-| [`fdb20c46`](https://github.com/smartlijingyang-sudo/layered-cognitive-agent/commit/fdb20c46) | `refactor(outcomes): 拆分失败终态投影职责` | `outcome_projection.py` 超过仓库 200 行上限，并同时处理成功、审批暂停、失败三种不同规则。 | 将验证/执行失败收口到 `outcome_failure.py`；成功呈现留在 `outcome_projection.py`，审批暂停复用已独立的 `approval_pause.py`。最终主模块为 **193 行**，符合门禁。 |
+| [`d3dae65c`](https://github.com/agents-builders/layered-cognitive-agent/commit/d3dae65c) | `refactor(contracts): 按职责拆分声明式计划契约` | 原来的 `declarative_phase_graph.py` 同时存放插件 schema、阶段图、执行游标、结果和 Protocol。阅读一个概念会误触多个无关概念。 | 将共享词汇、插件声明、图与计划数据、执行协议拆开；旧导入路径仍以兼容门面保留，因此调用方不需要为文件整理承担行为风险。 |
+| [`d0e600fe`](https://github.com/agents-builders/layered-cognitive-agent/commit/d0e600fe) | `refactor(types): 收紧声明式执行契约边界` | 状态、预算、停止决定、事实等跨层数据使用宽泛 `Any`，错误只能在运行晚期暴露。 | 使用 `AgentState`、`Budget`、`StopDecision`、`RunFact`、`JournalCommitter` 等现有类型；真正开放的扩展载荷使用 `object`，让边界清楚但不强行假设业务载荷。 |
+| [`0e0e0aab`](https://github.com/agents-builders/layered-cognitive-agent/commit/0e0e0aab) | `fix(team-seam): 显式声明默认实现的协议继承` | 两个默认 Team seam 类虽然方法形状正确，但没有在签名中声明实现的 Protocol，架构门禁会失败。 | 通信装配器与共享内存解析器现在显式继承其 Protocol；阅读类定义即可知道替换契约，静态检查也能更早发现偏离。 |
+| [`fdb20c46`](https://github.com/agents-builders/layered-cognitive-agent/commit/fdb20c46) | `refactor(outcomes): 拆分失败终态投影职责` | `outcome_projection.py` 超过仓库 200 行上限，并同时处理成功、审批暂停、失败三种不同规则。 | 将验证/执行失败收口到 `outcome_failure.py`；成功呈现留在 `outcome_projection.py`，审批暂停复用已独立的 `approval_pause.py`。最终主模块为 **193 行**，符合门禁。 |
 
 > 在同步远程 `main` 时，上游已经合入“统一终态结果投影”和“隔离审批暂停投影”两项等价方向的改动。因此没有保留重复的本地终态模块，而是基于上游的单一实现完成类型边界与失败投影拆分。这避免了两套终态规则并存。
 

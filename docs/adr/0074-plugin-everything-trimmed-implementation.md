@@ -19,7 +19,7 @@
 
 ## 背景
 
-ADR-0066 / 0067 / 0068 / 0069 由同一作者（远程 `smartlijingyang-sudo`）在 2026-08-21 12:34–13:13 UTC 三连 commit 提交（`a1b5496a` / `4f59338b` / `9d913a6c`），与代码对齐架构审计文档（`docs/design/2026-08-21-code-aligned-architecture-audit.md`）同步发布。审计明确指出当前 LCA 已具备 Manifest / Resolve / Cordis Fiber / PerceiveHub / Tool Pipeline / Composer / Creator 等基础设施，但**核心运行语义仍分散在 `spawn.py` / `runtime_loop.py` / `ModularBrain` / `ActionCatalog` / gateway helper 中**——插件存在但控制面由 Python 硬编码。
+ADR-0066 / 0067 / 0068 / 0069 由同一作者（远程 `agents-builders`）在 2026-08-21 12:34–13:13 UTC 三连 commit 提交（`a1b5496a` / `4f59338b` / `9d913a6c`），与代码对齐架构审计文档（`docs/design/2026-08-21-code-aligned-architecture-audit.md`）同步发布。审计明确指出当前 LCA 已具备 Manifest / Resolve / Cordis Fiber / PerceiveHub / Tool Pipeline / Composer / Creator 等基础设施，但**核心运行语义仍分散在 `spawn.py` / `runtime_loop.py` / `ModularBrain` / `ActionCatalog` / gateway helper 中**——插件存在但控制面由 Python 硬编码。
 
 四篇 ADR 共同给出"plugin-everything"路线的下一阶段答案：
 

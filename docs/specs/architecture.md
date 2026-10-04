@@ -119,7 +119,7 @@ Four kernel-side guarantees make this safe to write:
 | `factory` resolves to a registered plugin by id → region+phase → fail-loud | `FactoryResolver` in `lca/contracts/protocols/.../factory.py` |
 | `sub_spec_ref` recurses with a depth limit (`MAX_SUBGRAPH_DEPTH`, default 8) and a cycle detector (PG-007) | `lca/framework/graph/strategies/subgraph_strategy.py` |
 | `emit_on_enter` / `emit_on_exit` only emit names in the `EXECUTION_POINTS` whitelist | `lca/framework/graph/ep_table.py` |
-| All invariants above run at boot before the kernel serves traffic | `lca_kernel/boot/plan_validation/` ([03dc0def0](https://github.com/smartlijingyang-sudo/layered-cognitive-agent/commit/03dc0def0)) |
+| All invariants above run at boot before the kernel serves traffic | `lca_kernel/boot/plan_validation/` ([03dc0def0](https://github.com/agents-builders/layered-cognitive-agent/commit/03dc0def0)) |
 
 ### Interpreter × driver × strategies
 
@@ -179,10 +179,10 @@ Once [ADR-0220](../adr/0220-three-tier-graph-and-boundary-typing.md) lands, boun
 Build plans from Python without editing YAML by hand:
 
 - `Plan SDK` at `lca/framework/graph/plan_sdk.py` exposes a typed builder.
-- `PlanReader`, `PredicateEvaluator`, `PortRegistry` together form the read side ([read PR-D3](https://github.com/smartlijingyang-sudo/layered-cognitive-agent/commit/8dc7891ab)).
-- `PlanLiftError` carries `plan_id` to make runtime plan failures actionable ([read PR](https://github.com/smartlijingyang-sudo/layered-cognitive-agent/commit/447e41b20)).
+- `PlanReader`, `PredicateEvaluator`, `PortRegistry` together form the read side ([read PR-D3](https://github.com/agents-builders/layered-cognitive-agent/commit/8dc7891ab)).
+- `PlanLiftError` carries `plan_id` to make runtime plan failures actionable ([read PR](https://github.com/agents-builders/layered-cognitive-agent/commit/447e41b20)).
 
-The `atomic cutover to typed port graph (D4)` commit ([cc17d8f81](https://github.com/smartlijingyang-sudo/layered-cognitive-agent/commit/cc17d8f81)) makes port-name typos a compile-time error; production bundle YAMLs can no longer silently route to a missing port.
+The `atomic cutover to typed port graph (D4)` commit ([cc17d8f81](https://github.com/agents-builders/layered-cognitive-agent/commit/cc17d8f81)) makes port-name typos a compile-time error; production bundle YAMLs can no longer silently route to a missing port.
 
 ## Six-step cognition (closed set)
 
@@ -273,11 +273,11 @@ Boot-time graph validation runs every plan-level invariant before the kernel ser
 | Shipped | BundleGraphSpec v2 schema + factory→plugin resolution | [ADR-0217](../adr/0217-bundle-graph-schema-v2.md) |
 | Shipped | NodeGraphDriver for v2 sub-graphs; old declarative path untouched | [ADR-0218](../adr/0218-bundle-graph-v2-subgraph-driver.md) |
 | Shipped | `max_visits` removed across bundle yaml, plan traversal, boot checks, test fixtures | [ADR-0225](../adr/0225-drop-max-visits-graph-invariant.md) |
-| Shipped | Boot-time validation of every plan-level graph invariant | `feat(boot): validate every plan-level graph invariant at startup` ([03dc0def0](https://github.com/smartlijingyang-sudo/layered-cognitive-agent/commit/03dc0def0)) |
-| Shipped | Atomic cutover to typed port graph | `feat(graph): atomic cutover to typed port graph (D4)` ([cc17d8f81](https://github.com/smartlijingyang-sudo/layered-cognitive-agent/commit/cc17d8f81)) |
-| Shipped | Kernel boot migrated into Starlette lifespan (no eager `_load_harness_profile`) | `fix(gateway): move boot into Starlette lifespan` ([274d8cced](https://github.com/smartlijingyang-sudo/layered-cognitive-agent/commit/274d8cced)) |
-| Shipped | LobeHub gateway emits LCA-flavored shared event handler | `feat(lobehub-gateway): emit LCA-flavored shared event handler` ([6edc69eab](https://github.com/smartlijingyang-sudo/layered-cognitive-agent/commit/6edc69eab)) |
-| Shipped | Reasoning-shortcut trigger 3 re-keyed to `consecutive_repeat_max`, decoupled from projection | `fix(loop): re-key trigger 3 to consecutive_repeat_max` ([aeae90c13](https://github.com/smartlijingyang-sudo/layered-cognitive-agent/commit/aeae90c13)) |
+| Shipped | Boot-time validation of every plan-level graph invariant | `feat(boot): validate every plan-level graph invariant at startup` ([03dc0def0](https://github.com/agents-builders/layered-cognitive-agent/commit/03dc0def0)) |
+| Shipped | Atomic cutover to typed port graph | `feat(graph): atomic cutover to typed port graph (D4)` ([cc17d8f81](https://github.com/agents-builders/layered-cognitive-agent/commit/cc17d8f81)) |
+| Shipped | Kernel boot migrated into Starlette lifespan (no eager `_load_harness_profile`) | `fix(gateway): move boot into Starlette lifespan` ([274d8cced](https://github.com/agents-builders/layered-cognitive-agent/commit/274d8cced)) |
+| Shipped | LobeHub gateway emits LCA-flavored shared event handler | `feat(lobehub-gateway): emit LCA-flavored shared event handler` ([6edc69eab](https://github.com/agents-builders/layered-cognitive-agent/commit/6edc69eab)) |
+| Shipped | Reasoning-shortcut trigger 3 re-keyed to `consecutive_repeat_max`, decoupled from projection | `fix(loop): re-key trigger 3 to consecutive_repeat_max` ([aeae90c13](https://github.com/agents-builders/layered-cognitive-agent/commit/aeae90c13)) |
 | Shipped | v1 reasoner/sandbox retired (`PromptReasoner` SRP, GraphAssembler reachability removed, sandbox fork fail-loud) | [ADR-0222](../adr/0222-retire-v1-reasoner-sandbox.md) |
 | In flight (main) | typed `PortRegistry`, typed phase result, `think.gate` writes back `decision` slot | [ADR-0219](../adr/0219-phase-graph-unification.md) (Proposed) |
 | In flight (main) | three-tier graph schema, 11 boundary DTOs, `PromptReasoner` slimmed to `render_turn` + `complete_turn`, `AgentState._xxx_ref` removed | [ADR-0220](../adr/0220-three-tier-graph-and-boundary-typing.md) (Proposed) |

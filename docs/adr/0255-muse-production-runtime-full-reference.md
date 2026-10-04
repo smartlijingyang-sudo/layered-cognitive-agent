@@ -276,7 +276,7 @@ _What they care about, what they're working on, what to avoid. You're getting to
 - Google Drive 账号：ljyangboy@gmail.com（显示名 Loving Papa）。
 - Google Sheets 连接器已接通（用户 Google 账号下），账号管理在线表可直接读取，无需浏览器登录 Google。
 - 2026国庆（10.1–10.7）：老婆的表弟带武汉女朋友来长沙玩，同行共9人（三代：用户夫妇、儿女、岳父母、表弟母亲、表弟及女友），需高端宴请+行程规划。
-- 用户在开发自己的 agent 产品：layered-cognitive-agent（https://github.com/smartlijingyang-sudo/layered-cognitive-agent），前端借鉴 LobeHub，后端自研 Python；项目目标：吸取 Grok bot、Muse 等产品经验，打造成主动、持久化的 agent，而不只是 Hermes 那种对话式 agent。
+- 用户在开发自己的 agent 产品：layered-cognitive-agent（https://github.com/agents-builders/layered-cognitive-agent），前端借鉴 LobeHub，后端自研 Python；项目目标：吸取 Grok bot、Muse 等产品经验，打造成主动、持久化的 agent，而不只是 Hermes 那种对话式 agent。
 - 本阶段方向（用户亲选）：继续打磨现有架构；目标已存档：goal_51bac8a52374「打磨 Layered Cognitive Agent，迈向主动持久化 Agent」。
 - 持久化工作目录（2026-09-27 用户要求创建）：/home/hatch/pdata/scripts（脚本工作区）、/home/hatch/pdata/data（数据存储）。
 - 用户推广 Muse 用的邀请码：0OGQ1U（双方各得 10 亿词元，48 小时内兑换；2026-09-27 已群发 21 个邮箱）。

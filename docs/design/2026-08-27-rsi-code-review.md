@@ -1,6 +1,6 @@
 # Layered Cognitive Agent 的 RSI 可行性：基于源码的重新评估
 
-> **更正：** 本文基于 GitHub 连接器中 `smartlijingyang-sudo/layered-cognitive-agent` 的 `main @ d0128aac` 完整克隆代码进行静态审阅，而非前一版的通用架构推演。审阅未执行仓库代码或测试；结论以当前源文件、配置与测试覆盖为准。
+> **更正：** 本文基于 GitHub 连接器中 `agents-builders/layered-cognitive-agent` 的 `main @ d0128aac` 完整克隆代码进行静态审阅，而非前一版的通用架构推演。审阅未执行仓库代码或测试；结论以当前源文件、配置与测试覆盖为准。
 
 ## 结论
 
@@ -154,37 +154,37 @@ Self-distill/finetune 是最晚期能力。只有在 episode 质量、数据治�
 
 ## 参考
 
-[1] [CognitiveRuntime（`d0128aac`）](https://github.com/smartlijingyang-sudo/layered-cognitive-agent/blob/d0128aac/lca/runtime/runtime_loop.py)
+[1] [CognitiveRuntime（`d0128aac`）](https://github.com/agents-builders/layered-cognitive-agent/blob/d0128aac/lca/runtime/runtime_loop.py)
 
-[2] [DeclarativeRuntimeBindings（`d0128aac`）](https://github.com/smartlijingyang-sudo/layered-cognitive-agent/blob/d0128aac/lca/runtime/runtime_bindings.py)
+[2] [DeclarativeRuntimeBindings（`d0128aac`）](https://github.com/agents-builders/layered-cognitive-agent/blob/d0128aac/lca/runtime/runtime_bindings.py)
 
-[3] [AgentState（`d0128aac`）](https://github.com/smartlijingyang-sudo/layered-cognitive-agent/blob/d0128aac/lca/contracts/models/core/state.py)
+[3] [AgentState（`d0128aac`）](https://github.com/agents-builders/layered-cognitive-agent/blob/d0128aac/lca/contracts/models/core/state.py)
 
-[4] [Decision / Observation / Reflection（`d0128aac`）](https://github.com/smartlijingyang-sudo/layered-cognitive-agent/blob/d0128aac/lca/contracts/models/core/decision.py)
+[4] [Decision / Observation / Reflection（`d0128aac`）](https://github.com/agents-builders/layered-cognitive-agent/blob/d0128aac/lca/contracts/models/core/decision.py)
 
-[5] [SimpleCritic（`d0128aac`）](https://github.com/smartlijingyang-sudo/layered-cognitive-agent/blob/d0128aac/lca/cognition/brain/critic.py)
+[5] [SimpleCritic（`d0128aac`）](https://github.com/agents-builders/layered-cognitive-agent/blob/d0128aac/lca/cognition/brain/critic.py)
 
-[6] [SimpleMemorySystem（`d0128aac`）](https://github.com/smartlijingyang-sudo/layered-cognitive-agent/blob/d0128aac/lca/cognition/memory/simple_memory.py)
+[6] [SimpleMemorySystem（`d0128aac`）](https://github.com/agents-builders/layered-cognitive-agent/blob/d0128aac/lca/cognition/memory/simple_memory.py)
 
-[7] [基础运行 bundle（`d0128aac`）](https://github.com/smartlijingyang-sudo/layered-cognitive-agent/blob/d0128aac/bundles/base.yaml)
+[7] [基础运行 bundle（`d0128aac`）](https://github.com/agents-builders/layered-cognitive-agent/blob/d0128aac/bundles/base.yaml)
 
-[8] [Skills provider（`d0128aac`）](https://github.com/smartlijingyang-sudo/layered-cognitive-agent/blob/d0128aac/lca/plugins/providers/skills.py)
+[8] [Skills provider（`d0128aac`）](https://github.com/agents-builders/layered-cognitive-agent/blob/d0128aac/lca/plugins/providers/skills.py)
 
-[9] [Skill store factory（`d0128aac`）](https://github.com/smartlijingyang-sudo/layered-cognitive-agent/blob/d0128aac/lca/infrastructure/skills/factory.py)
+[9] [Skill store factory（`d0128aac`）](https://github.com/agents-builders/layered-cognitive-agent/blob/d0128aac/lca/infrastructure/skills/factory.py)
 
-[10] [Self-improving scenario bundle（`d0128aac`）](https://github.com/smartlijingyang-sudo/layered-cognitive-agent/blob/d0128aac/bundles/scenario-self-improving.yaml)
+[10] [Self-improving scenario bundle（`d0128aac`）](https://github.com/agents-builders/layered-cognitive-agent/blob/d0128aac/bundles/scenario-self-improving.yaml)
 
-[11] [Profile resolver（`d0128aac`）](https://github.com/smartlijingyang-sudo/layered-cognitive-agent/blob/d0128aac/lca/harness/profile/resolve.py)
+[11] [Profile resolver（`d0128aac`）](https://github.com/agents-builders/layered-cognitive-agent/blob/d0128aac/lca/harness/profile/resolve.py)
 
-[12] [默认 web-standard profile（`d0128aac`）](https://github.com/smartlijingyang-sudo/layered-cognitive-agent/blob/d0128aac/profiles/web-standard.yaml)
+[12] [默认 web-standard profile（`d0128aac`）](https://github.com/agents-builders/layered-cognitive-agent/blob/d0128aac/profiles/web-standard.yaml)
 
-[13] [PlanTemplate catalog（`d0128aac`）](https://github.com/smartlijingyang-sudo/layered-cognitive-agent/blob/d0128aac/lca/contracts/atoms/plan_template.py)
+[13] [PlanTemplate catalog（`d0128aac`）](https://github.com/agents-builders/layered-cognitive-agent/blob/d0128aac/lca/contracts/atoms/plan_template.py)
 
-[14] [EvalCase（`d0128aac`）](https://github.com/smartlijingyang-sudo/layered-cognitive-agent/blob/d0128aac/lca/contracts/harness/eval_case.py)
+[14] [EvalCase（`d0128aac`）](https://github.com/agents-builders/layered-cognitive-agent/blob/d0128aac/lca/contracts/harness/eval_case.py)
 
-[15] [EvalComparison（`d0128aac`）](https://github.com/smartlijingyang-sudo/layered-cognitive-agent/blob/d0128aac/lca/contracts/harness/eval_comparison.py)
+[15] [EvalComparison（`d0128aac`）](https://github.com/agents-builders/layered-cognitive-agent/blob/d0128aac/lca/contracts/harness/eval_comparison.py)
 
-[16] [Golden profile coverage（`d0128aac`）](https://github.com/smartlijingyang-sudo/layered-cognitive-agent/blob/d0128aac/tests/golden/test_8_profiles.py)
+[16] [Golden profile coverage（`d0128aac`）](https://github.com/agents-builders/layered-cognitive-agent/blob/d0128aac/tests/golden/test_8_profiles.py)
 
 [17] [Madaan et al., *Self-Refine: Iterative Refinement with Self-Feedback*](https://arxiv.org/abs/2303.17651)
 
@@ -192,9 +192,9 @@ Self-distill/finetune 是最晚期能力。只有在 episode 质量、数据治�
 
 [19] [Wang et al., *Voyager: An Open-Ended Embodied Agent with Large Language Models*](https://arxiv.org/abs/2305.16291)
 
-[20] [SessionPersistence protocol（`d0128aac`）](https://github.com/smartlijingyang-sudo/layered-cognitive-agent/blob/d0128aac/lca/contracts/protocols/session_persistence.py)
+[20] [SessionPersistence protocol（`d0128aac`）](https://github.com/agents-builders/layered-cognitive-agent/blob/d0128aac/lca/contracts/protocols/session_persistence.py)
 
-[21] [JSONL SessionPersistence provider（`d0128aac`）](https://github.com/smartlijingyang-sudo/layered-cognitive-agent/blob/d0128aac/lca/plugins/providers/session_persistence.py)
+[21] [JSONL SessionPersistence provider（`d0128aac`）](https://github.com/agents-builders/layered-cognitive-agent/blob/d0128aac/lca/plugins/providers/session_persistence.py)
 
 ---
 

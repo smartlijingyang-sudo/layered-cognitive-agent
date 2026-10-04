@@ -22,7 +22,7 @@ Status: implemented
 - 📋 PR-8: H-xref 退化 + ADR 提案(deferred — 当前 5-segment 检测保留,需新 ADR)
 - 📋 PR-9: model_visible 拆 LLMCallTrace Protocol + post-call capture(deferred)
 
-PR #5: https://github.com/smartlijingyang-sudo/layered-cognitive-agent/pull/5
+PR #5: https://github.com/agents-builders/layered-cognitive-agent/pull/5
 
 ## Consequences
 

@@ -442,46 +442,46 @@ Agent
 
 ## References
 
-[1][ref-plugin-api]: https://github.com/smartlijingyang-sudo/layered-cognitive-agent/blob/main/lca/harness/plugin_api.py
+[1][ref-plugin-api]: https://github.com/agents-builders/layered-cognitive-agent/blob/main/lca/harness/plugin_api.py
 
-[2][ref-agents]: https://github.com/smartlijingyang-sudo/layered-cognitive-agent/blob/main/AGENTS.md
+[2][ref-agents]: https://github.com/agents-builders/layered-cognitive-agent/blob/main/AGENTS.md
 
-[3][ref-resolve]: https://github.com/smartlijingyang-sudo/layered-cognitive-agent/blob/main/lca/harness/profile/resolve.py
+[3][ref-resolve]: https://github.com/agents-builders/layered-cognitive-agent/blob/main/lca/harness/profile/resolve.py
 
-[4][ref-boot]: https://github.com/smartlijingyang-sudo/layered-cognitive-agent/blob/main/lca/harness/profile/boot.py
+[4][ref-boot]: https://github.com/agents-builders/layered-cognitive-agent/blob/main/lca/harness/profile/boot.py
 
-[5][ref-control-slot]: https://github.com/smartlijingyang-sudo/layered-cognitive-agent/blob/main/lca/contracts/atoms/control_slot.py
+[5][ref-control-slot]: https://github.com/agents-builders/layered-cognitive-agent/blob/main/lca/contracts/atoms/control_slot.py
 
-[6][ref-phase-runtime]: https://github.com/smartlijingyang-sudo/layered-cognitive-agent/blob/main/lca/runtime/declarative_runtime.py
+[6][ref-phase-runtime]: https://github.com/agents-builders/layered-cognitive-agent/blob/main/lca/runtime/declarative_runtime.py
 
-[7][ref-seams]: https://github.com/smartlijingyang-sudo/layered-cognitive-agent/blob/main/lca/plugins/seam_definitions/__init__.py
+[7][ref-seams]: https://github.com/agents-builders/layered-cognitive-agent/blob/main/lca/plugins/seam_definitions/__init__.py
 
-[8][ref-tools-provider]: https://github.com/smartlijingyang-sudo/layered-cognitive-agent/blob/main/lca/plugins/providers/tools.py
+[8][ref-tools-provider]: https://github.com/agents-builders/layered-cognitive-agent/blob/main/lca/plugins/providers/tools.py
 
-[9][ref-coding-bundle]: https://github.com/smartlijingyang-sudo/layered-cognitive-agent/blob/main/lca/plugins/bundles/coding_agent_tools.py
+[9][ref-coding-bundle]: https://github.com/agents-builders/layered-cognitive-agent/blob/main/lca/plugins/bundles/coding_agent_tools.py
 
-[10][ref-functional-group]: https://github.com/smartlijingyang-sudo/layered-cognitive-agent/blob/main/lca/contracts/atoms/functional_group.py
+[10][ref-functional-group]: https://github.com/agents-builders/layered-cognitive-agent/blob/main/lca/contracts/atoms/functional_group.py
 
-[11][ref-plugin-contract]: https://github.com/smartlijingyang-sudo/layered-cognitive-agent/blob/main/lca/contracts/harness/plugin_contract.py
+[11][ref-plugin-contract]: https://github.com/agents-builders/layered-cognitive-agent/blob/main/lca/contracts/harness/plugin_contract.py
 
-[12][ref-logic-address]: https://github.com/smartlijingyang-sudo/layered-cognitive-agent/blob/main/lca/contracts/protocols/logic_address.py
+[12][ref-logic-address]: https://github.com/agents-builders/layered-cognitive-agent/blob/main/lca/contracts/protocols/logic_address.py
 
-[13][ref-scope]: https://github.com/smartlijingyang-sudo/layered-cognitive-agent/blob/main/lca/contracts/atoms/scope.py
+[13][ref-scope]: https://github.com/agents-builders/layered-cognitive-agent/blob/main/lca/contracts/atoms/scope.py
 
-[14][ref-relation]: https://github.com/smartlijingyang-sudo/layered-cognitive-agent/blob/main/lca/contracts/atoms/relation.py
+[14][ref-relation]: https://github.com/agents-builders/layered-cognitive-agent/blob/main/lca/contracts/atoms/relation.py
 
-[15][ref-control-resolver]: https://github.com/smartlijingyang-sudo/layered-cognitive-agent/blob/main/lca/harness/profile/control_plan_resolver.py
+[15][ref-control-resolver]: https://github.com/agents-builders/layered-cognitive-agent/blob/main/lca/harness/profile/control_plan_resolver.py
 
-[16][ref-plan-compiler]: https://github.com/smartlijingyang-sudo/layered-cognitive-agent/blob/main/lca/harness/profile/plan_compiler.py
+[16][ref-plan-compiler]: https://github.com/agents-builders/layered-cognitive-agent/blob/main/lca/harness/profile/plan_compiler.py
 
-[17][ref-runnable-assembly]: https://github.com/smartlijingyang-sudo/layered-cognitive-agent/blob/main/gateway/runs/runnable_assembly.py
+[17][ref-runnable-assembly]: https://github.com/agents-builders/layered-cognitive-agent/blob/main/gateway/runs/runnable_assembly.py
 
-[18][ref-phase-common]: https://github.com/smartlijingyang-sudo/layered-cognitive-agent/blob/main/lca/plugins/phase_executors/common.py
+[18][ref-phase-common]: https://github.com/agents-builders/layered-cognitive-agent/blob/main/lca/plugins/phase_executors/common.py
 
-[19][ref-web-profile]: https://github.com/smartlijingyang-sudo/layered-cognitive-agent/blob/main/profiles/web-standard.yaml
+[19][ref-web-profile]: https://github.com/agents-builders/layered-cognitive-agent/blob/main/profiles/web-standard.yaml
 
-[20][ref-creator-promotion]: https://github.com/smartlijingyang-sudo/layered-cognitive-agent/blob/main/lca/plugins/tools/cordis_control/creator_promotion.py
+[20][ref-creator-promotion]: https://github.com/agents-builders/layered-cognitive-agent/blob/main/lca/plugins/tools/cordis_control/creator_promotion.py
 
-[21][ref-capability-resolver]: https://github.com/smartlijingyang-sudo/layered-cognitive-agent/blob/main/lca/harness/profile/capability_plan_resolver.py
+[21][ref-capability-resolver]: https://github.com/agents-builders/layered-cognitive-agent/blob/main/lca/harness/profile/capability_plan_resolver.py
 
-[22][ref-runtime-loop]: https://github.com/smartlijingyang-sudo/layered-cognitive-agent/blob/main/lca/runtime/runtime_loop.py
+[22][ref-runtime-loop]: https://github.com/agents-builders/layered-cognitive-agent/blob/main/lca/runtime/runtime_loop.py

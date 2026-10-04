@@ -14,7 +14,7 @@
 
 ## 审查范围与可复现信息
 
-本次审查针对仓库 `smartlijingyang-sudo/layered-cognitive-agent` 的 `main` 分支提交 `87bc05f3`；工作树无未提交改动。检查了插件 API、默认 bundle/profile、组合器、运行时、网关装配路径，并运行了与插件对齐和声明式运行时有关的测试。
+本次审查针对仓库 `agents-builders/layered-cognitive-agent` 的 `main` 分支提交 `87bc05f3`；工作树无未提交改动。检查了插件 API、默认 bundle/profile、组合器、运行时、网关装配路径，并运行了与插件对齐和声明式运行时有关的测试。
 
 | 检查项 | 结果 |
 |---|---|
@@ -189,44 +189,44 @@ BodyComposer 必须消费 `action_handler_registry`，不能在 helper 内部自
 
 ## References
 
-[1][ref-plugin-api]: <https://github.com/smartlijingyang-sudo/layered-cognitive-agent/blob/main/lca/harness/plugin_api.py> — Plugin Manifest、PluginContext 与审计交互面。
+[1][ref-plugin-api]: <https://github.com/agents-builders/layered-cognitive-agent/blob/main/lca/harness/plugin_api.py> — Plugin Manifest、PluginContext 与审计交互面。
 
-[2][ref-bundles]: <https://github.com/smartlijingyang-sudo/layered-cognitive-agent/blob/main/bundles/base.yaml> — 基础 seam/provider；<https://github.com/smartlijingyang-sudo/layered-cognitive-agent/blob/main/bundles/web-app.yaml> — 默认认知与组合插件。
+[2][ref-bundles]: <https://github.com/agents-builders/layered-cognitive-agent/blob/main/bundles/base.yaml> — 基础 seam/provider；<https://github.com/agents-builders/layered-cognitive-agent/blob/main/bundles/web-app.yaml> — 默认认知与组合插件。
 
-[3][ref-llm-resolver]: <https://github.com/smartlijingyang-sudo/layered-cognitive-agent/blob/main/lca/plugins/seam_definitions/llm_resolver.py> — LLM credential/adapter resolver。
+[3][ref-llm-resolver]: <https://github.com/agents-builders/layered-cognitive-agent/blob/main/lca/plugins/seam_definitions/llm_resolver.py> — LLM credential/adapter resolver。
 
-[4][ref-plan-composition]: <https://github.com/smartlijingyang-sudo/layered-cognitive-agent/blob/main/lca/plugins/composer/plan_composition_support.py> — Brain、Gate、Memory、StateStore 等 capability 解析。
+[4][ref-plan-composition]: <https://github.com/agents-builders/layered-cognitive-agent/blob/main/lca/plugins/composer/plan_composition_support.py> — Brain、Gate、Memory、StateStore 等 capability 解析。
 
-[5][ref-plan-composers]: <https://github.com/smartlijingyang-sudo/layered-cognitive-agent/blob/main/lca/plugins/composer/plan_composers.py> — Body、Perceive、Team 组合器中的直接绑定。
+[5][ref-plan-composers]: <https://github.com/agents-builders/layered-cognitive-agent/blob/main/lca/plugins/composer/plan_composers.py> — Body、Perceive、Team 组合器中的直接绑定。
 
-[6][ref-plan-binding]: <https://github.com/smartlijingyang-sudo/layered-cognitive-agent/blob/main/lca/plugins/composer/plan_binding.py> — 从 compiled plan 发现 composer capability。
+[6][ref-plan-binding]: <https://github.com/agents-builders/layered-cognitive-agent/blob/main/lca/plugins/composer/plan_binding.py> — 从 compiled plan 发现 composer capability。
 
-[7][ref-declarative-bundle]: <https://github.com/smartlijingyang-sudo/layered-cognitive-agent/blob/main/bundles/declarative-phase-graph.yaml> — phase executor、phase edge 与 control contribution 默认 entries。
+[7][ref-declarative-bundle]: <https://github.com/agents-builders/layered-cognitive-agent/blob/main/bundles/declarative-phase-graph.yaml> — phase executor、phase edge 与 control contribution 默认 entries。
 
-[8][ref-declarative-runtime]: <https://github.com/smartlijingyang-sudo/layered-cognitive-agent/blob/main/lca/runtime/declarative_runtime.py> — effect/delta registry 为声明式 driver 的必需依赖。
+[8][ref-declarative-runtime]: <https://github.com/agents-builders/layered-cognitive-agent/blob/main/lca/runtime/declarative_runtime.py> — effect/delta registry 为声明式 driver 的必需依赖。
 
-[9][ref-runtime-loop]: <https://github.com/smartlijingyang-sudo/layered-cognitive-agent/blob/main/lca/runtime/runtime_loop.py> — `CognitiveRuntime` 直接构造声明式 driver 且未传入两个 registry。
+[9][ref-runtime-loop]: <https://github.com/agents-builders/layered-cognitive-agent/blob/main/lca/runtime/runtime_loop.py> — `CognitiveRuntime` 直接构造声明式 driver 且未传入两个 registry。
 
-[10][ref-effect-handlers]: <https://github.com/smartlijingyang-sudo/layered-cognitive-agent/blob/main/lca/plugins/providers/effect_handlers.py> — 默认 effect handlers。
+[10][ref-effect-handlers]: <https://github.com/agents-builders/layered-cognitive-agent/blob/main/lca/plugins/providers/effect_handlers.py> — 默认 effect handlers。
 
-[11][ref-delta-handlers]: <https://github.com/smartlijingyang-sudo/layered-cognitive-agent/blob/main/lca/plugins/providers/delta_handlers.py> — 默认 11 种 delta handlers。
+[11][ref-delta-handlers]: <https://github.com/agents-builders/layered-cognitive-agent/blob/main/lca/plugins/providers/delta_handlers.py> — 默认 11 种 delta handlers。
 
-[12][ref-action-handlers]: <https://github.com/smartlijingyang-sudo/layered-cognitive-agent/blob/main/lca/plugins/providers/action_handlers.py> — ActionHandler provider。
+[12][ref-action-handlers]: <https://github.com/agents-builders/layered-cognitive-agent/blob/main/lca/plugins/providers/action_handlers.py> — ActionHandler provider。
 
-[13][ref-composers]: <https://github.com/smartlijingyang-sudo/layered-cognitive-agent/blob/main/lca/plugins/composer/plan_composers.py> — BodyComposer、PerceiveComposer、TeamComposer。
+[13][ref-composers]: <https://github.com/agents-builders/layered-cognitive-agent/blob/main/lca/plugins/composer/plan_composers.py> — BodyComposer、PerceiveComposer、TeamComposer。
 
-[14][ref-action-catalog]: <https://github.com/smartlijingyang-sudo/layered-cognitive-agent/blob/main/lca/cognition/body/action_catalog.py> — builtin action 表与默认 registry builder。
+[14][ref-action-catalog]: <https://github.com/agents-builders/layered-cognitive-agent/blob/main/lca/cognition/body/action_catalog.py> — builtin action 表与默认 registry builder。
 
-[15][ref-control-standard]: <https://github.com/smartlijingyang-sudo/layered-cognitive-agent/blob/main/lca/plugins/control_contributions/standard.py> — 11 个 control capability 的聚合 provider。
+[15][ref-control-standard]: <https://github.com/agents-builders/layered-cognitive-agent/blob/main/lca/plugins/control_contributions/standard.py> — 11 个 control capability 的聚合 provider。
 
-[16][ref-component-registry]: <https://github.com/smartlijingyang-sudo/layered-cognitive-agent/blob/main/lca/plugins/registries/component_registry.py> — 多个具体默认实现的集中注册。
+[16][ref-component-registry]: <https://github.com/agents-builders/layered-cognitive-agent/blob/main/lca/plugins/registries/component_registry.py> — 多个具体默认实现的集中注册。
 
-[17][ref-runtime-factory]: <https://github.com/smartlijingyang-sudo/layered-cognitive-agent/blob/main/lca/plugins/composer/runtime_factory.py> — reducer/topology/stop rule fallback。
+[17][ref-runtime-factory]: <https://github.com/agents-builders/layered-cognitive-agent/blob/main/lca/plugins/composer/runtime_factory.py> — reducer/topology/stop rule fallback。
 
-[18][ref-runnable-assembly]: <https://github.com/smartlijingyang-sudo/layered-cognitive-agent/blob/main/gateway/runs/runnable_assembly.py> — mode adapter 和工具物化。
+[18][ref-runnable-assembly]: <https://github.com/agents-builders/layered-cognitive-agent/blob/main/gateway/runs/runnable_assembly.py> — mode adapter 和工具物化。
 
-[19][ref-gateway-modes]: <https://github.com/smartlijingyang-sudo/layered-cognitive-agent/blob/main/gateway/modes.py> — gateway mode 映射。
+[19][ref-gateway-modes]: <https://github.com/agents-builders/layered-cognitive-agent/blob/main/gateway/modes.py> — gateway mode 映射。
 
-[20][ref-plugin-shape-test]: <https://github.com/smartlijingyang-sudo/layered-cognitive-agent/blob/main/tests/test_plugin_alignment.py> — 插件目录声明形状与覆盖率门禁。
+[20][ref-plugin-shape-test]: <https://github.com/agents-builders/layered-cognitive-agent/blob/main/tests/test_plugin_alignment.py> — 插件目录声明形状与覆盖率门禁。
 
-[21][ref-loop-topology]: <https://github.com/smartlijingyang-sudo/layered-cognitive-agent/blob/main/lca/runtime/loop_topology.py> — 六阶段闭集拓扑实现。
+[21][ref-loop-topology]: <https://github.com/agents-builders/layered-cognitive-agent/blob/main/lca/runtime/loop_topology.py> — 六阶段闭集拓扑实现。

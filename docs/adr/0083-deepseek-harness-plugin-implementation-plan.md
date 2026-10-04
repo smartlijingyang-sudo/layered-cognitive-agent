@@ -9,7 +9,7 @@
 
 | 项目 | 内容 |
 |---|---|
-| 目标仓库 | `smartlijingyang-sudo/layered-cognitive-agent` |
+| 目标仓库 | `agents-builders/layered-cognitive-agent` |
 | 当前基线 | `main`，当前已包含 `ccbcde5d`：DeepSeek Harness 插件布局研究报告 |
 | 参考架构 | DeepSeek Harness / Cordis 的插件树、capability seam、profile/bundle layering、事件扩展与 append-only session log |
 | LCA 约束 | 六阶段认知闭集、Reducer 单写、Journal 事实源、CommandEnvelope 执行窄门、声明式控制投影、ScopePlan、权限单调收缩 |
@@ -359,14 +359,14 @@ DeepSeek Harness 的核心经验是把运行中的 Agent 看成一棵由 profile
 
 [4]: <https://github.com/deepseek-ai/deepseek-harness/blob/master/docs/cordis-primer.zh.md> "Cordis Primer"
 
-[5]: <https://github.com/smartlijingyang-sudo/layered-cognitive-agent/blob/main/lca/harness/plugin_api.py> "LCA Plugin API"
+[5]: <https://github.com/agents-builders/layered-cognitive-agent/blob/main/lca/harness/plugin_api.py> "LCA Plugin API"
 
-[6]: <https://github.com/smartlijingyang-sudo/layered-cognitive-agent/blob/main/lca/runtime/runtime_loop.py> "LCA Runtime Loop"
+[6]: <https://github.com/agents-builders/layered-cognitive-agent/blob/main/lca/runtime/runtime_loop.py> "LCA Runtime Loop"
 
-[7]: <https://github.com/smartlijingyang-sudo/layered-cognitive-agent/blob/main/bundles/base.yaml> "LCA Base Bundle"
+[7]: <https://github.com/agents-builders/layered-cognitive-agent/blob/main/bundles/base.yaml> "LCA Base Bundle"
 
-[8]: <https://github.com/smartlijingyang-sudo/layered-cognitive-agent/blob/main/bundles/web-app.yaml> "LCA Web App Bundle"
+[8]: <https://github.com/agents-builders/layered-cognitive-agent/blob/main/bundles/web-app.yaml> "LCA Web App Bundle"
 
-[9]: <https://github.com/smartlijingyang-sudo/layered-cognitive-agent/blob/main/bundles/declarative-phase-graph.yaml> "LCA Declarative Phase Graph"
+[9]: <https://github.com/agents-builders/layered-cognitive-agent/blob/main/bundles/declarative-phase-graph.yaml> "LCA Declarative Phase Graph"
 
-[10]: <https://github.com/smartlijingyang-sudo/layered-cognitive-agent/blob/main/docs/deepseek-harness-plugin-layout.zh-CN.md> "LCA DeepSeek Harness Plugin Layout Analysis"
+[10]: <https://github.com/agents-builders/layered-cognitive-agent/blob/main/docs/deepseek-harness-plugin-layout.zh-CN.md> "LCA DeepSeek Harness Plugin Layout Analysis"

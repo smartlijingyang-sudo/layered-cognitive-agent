@@ -2,7 +2,7 @@
 
 > **状态**：plans（对话材料 + 暂缓登记，非 note lifecycle）
 > **对话日期**：2026-09-09
-> **评审方案来源**：用户提交的外部文档《Agent Lab 群体智能架构评审与基建完善方案》（smartlijingyang-sudo/layered-cognitive-agent 的 InfoEdge prototype 图 B 评审）
+> **评审方案来源**：用户提交的外部文档《Agent Lab 群体智能架构评审与基建完善方案》（agents-builders/layered-cognitive-agent 的 InfoEdge prototype 图 B 评审）
 > **评审对象**：图 B（InfoEdge prototype）vs 图 A（生产 LCA 架构）
 
 ## Problem
