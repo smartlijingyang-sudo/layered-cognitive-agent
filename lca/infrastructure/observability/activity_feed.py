@@ -31,6 +31,7 @@ from lca.contracts.models.observability.activity import (
     ActivityItem,
     ActivityStatus,
 )
+from lca.infrastructure.observability.spine.sinks.naming import SPINE_FILE_SUFFIX
 from lca.infrastructure.persistence.run_paths import default_runs_root
 
 DEFAULT_RUNS_ROOT = Path("traces/runs")
@@ -245,7 +246,7 @@ def _spine_start_time(run_dir: Path) -> datetime | None:
     record holds the real moment. Reading it back keeps the row ordered by when
     the run actually began.
     """
-    spines = sorted(run_dir.glob("*.spine.jsonl"))
+    spines = sorted(run_dir.glob(f"*{SPINE_FILE_SUFFIX}"))
     if not spines:
         return None
     try:
@@ -396,7 +397,7 @@ class ActivityFeed:
         if from_journal:
             source = journal
         else:
-            spines = sorted(run_dir.glob("*.spine.jsonl"))
+            spines = sorted(run_dir.glob(f"*{SPINE_FILE_SUFFIX}"))
             if not spines:
                 return None
             source = spines[0]
@@ -417,7 +418,7 @@ class ActivityFeed:
             else _fold_spine(run_dir, source, terminated=terminated)
         )
         if facts is None and from_journal:
-            spines = sorted(run_dir.glob("*.spine.jsonl"))
+            spines = sorted(run_dir.glob(f"*{SPINE_FILE_SUFFIX}"))
             facts = _fold_spine(run_dir, spines[0], terminated=terminated) if spines else None
         if facts is not None and facts.started_at is None:
             facts = replace(facts, started_at=_spine_start_time(run_dir))

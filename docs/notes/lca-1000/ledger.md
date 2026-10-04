@@ -450,3 +450,19 @@
 - 验证结果: ruff check 1 文件首次即过；行为等价 python 断言全绿（helper vs 旧字面量逐字节等价 5 种 run_id；tmp run 端到端：默认 exceptions_path == 旧公式路径、主 ledger 路径不变、显式 override 仍被尊重、exception.caught 真实写入 exceptions.jsonl 非空）；targeted pytest `tests/observability/spine/sinks/test_tracing_file_sink.py` + `tests/observability/spine/test_exception_capture.py`：30 passed，0 failed，无预存失败；CI gate scripts/lca-cli-shape.py：与本轮相关的 findings 为零（仅剩 2 个 output_mode findings 在 ops/memory.py、runs/health.py——本轮未动文件，预存问题，与本轮无关）。verify 脚本初版 EventRecord 缺 step_id 参数致错——脚本自身 bug，非代码问题，修正后全绿。
 - commit: 见 git log --grep='第0491轮'（refactor(lca-1000): 第0491轮 file_sink writer 侧 exceptions 默认文件名收敛至 naming SSOT seam(Seam)，2 files，未 push）。
 - 备注: 只 add 本轮 2 个文件（代码 1 + ledger.md）；工作区干净（本轮期间无并发会话未提交改动；编辑前 git status --porcelain 仅见本轮文件）；备份 /tmp/bak_0491/（252，1 文件原版）。stdin 喂 python 编辑/验证路径继续稳定可靠。
+
+## 第0492轮 (2026-10-05 05:33-05:42 CST)
+- 改了什么: activity_feed.py 三处 spine discovery glob pattern 收敛至 naming SSOT seam 的后缀常量（1 file，4 insertions(+)，3 deletions(-)）：
+  - `lca/infrastructure/observability/activity_feed.py:248`（`_spine_start_time`）、`:399`（`ActivityFeed._fold` 主路径）、`:420`（`_fold` journal 失败回退）：`run_dir.glob("*.spine.jsonl")` → `run_dir.glob(f"*{SPINE_FILE_SUFFIX}")`；
+  - 新增模块级 import `from lca.infrastructure.observability.spine.sinks.naming import SPINE_FILE_SUFFIX`（isort 顺序正确：observability < persistence；naming.py 仅 `from __future__ import annotations`，零循环 import 风险）。
+- 依据 skill 哪一节: DEEPENING.md Seam discipline（naming.py 拥有 spine 文件名后缀 SSOT：`SPINE_FILE_SUFFIX` + 多调用方 adapter：FileSink writer、CLI projection 8+ reader、plugin reader、run_paths——seam 真实；3 处 glob 是 seam 之外的后缀知识影子拷贝）+ SKILL.md Deletion test（删掉该常量后后缀知识在 3 处 glob 重现——常量赚回了存在价值）+ LANGUAGE.md Locality（后缀约定改一处——naming.py）/ Interface（error mode 未碰：discovery 语义、sorted-first、fail-soft 结构原样保留）。
+- 为什么这是实质改动(非凑数): 484→491 轮命名收敛弧的最后一处 code site（全库 grep 证实：除 docstring/tests/naming 自身外，这是最后一个硬编码 `.spine.jsonl` 字面量的 code site；484 起所有精确路径 reader/writer 均已收敛，唯剩 discovery 语义的 glob）。沉默漂移风险真实且 load-bearing：若 `SPINE_FILE_SUFFIX` 变更（如 PR-27 式改名），三处 glob 沉默匹配零文件 → `_spine_start_time` 返回 None、`_fold` 返回 None → 用户可见面（status 端点 activity feed）行沉默消失，ssot.py 记载的同类历史回归（"未同步的 reader 沉默读空、bug 沉默通过"）的 discovery 版。字节级等价已断言（`f"*{SPINE_FILE_SUFFIX}" == "*.spine.jsonl"` 逐字节相等）。
+- 关键设计决策（夜间跳过 grilling，记台账）: 不用 `spine_filename_for_run(run_dir.name)` 替换 discovery——glob 是真正的枚举语义（run_dir.name 未必等于文件 stem；多文件时取 sorted 首个），换成精确路径会改变 fallback/error 语义（LANGUAGE.md：error modes 是 interface 的一部分），属设计决策，夜间轮不擅自改。只收敛 pattern 字串中的后缀知识，语义逐字节等价。
+- 候选清单（本轮 explore，逐一验证后取舍）：
+  1. 上述三处 glob 后缀收敛至 naming seam —— 选中（全库最后 code site；discovery 语义单独评审通过）。
+  2. `_JOURNAL_NAME = "journal.json"` / `_TERMINATED_MARKER = "manifest.json"` 硬编码 —— 驳回（journal 命名无 SSOT；新建 SSOT 是 interface 形状设计决策，需 grilling，夜间轮不动）。
+  3. `_fold` 内两处 glob 重复 → 抽 `_first_spine(run_dir)` helper —— 驳回（单文件内 3 调用点的微 locality 收益，弱于 seam 收敛；且与 1 是同一改动面，避免夹带）。
+  4. deslop 扫描（legacy/deprecated/backward-compat）：命中的 sandbox factory env override、locator.py `LCA_LOCAL_SANDBOX_ROOT` fallback 均有明文兼容理由，非死路径；touched area 无叙事性注释 slop —— 无动作。
+- 验证结果: ruff check 1 文件首次即过（All checks passed!）；行为等价 python 断言全绿（pattern 逐字节等价；import 冒烟无循环；tmp run 端到端：`_spine_start_time` 正确恢复 kernel.run.start 的 ts、discovery sorted-first 语义保留、非匹配后缀不被拾取；空目录 fail-soft → None 不变）；targeted pytest `tests/infrastructure/observability/test_activity_feed.py`：12 passed，0 failed，无预存失败；CI gate scripts/lca-cli-shape.py：touched file 零 findings（剩余 2 个 output_mode findings 在 ops/memory.py、runs/health.py——本轮未动文件，预存问题，与本轮无关）。
+- commit: 见 git log --grep='第0492轮'（refactor(lca-1000): 第0492轮 activity_feed 三处 spine discovery glob 后缀收敛至 naming SSOT seam(Seam)，2 files，未 push）。
+- 备注: 只 add 本轮 2 个文件（代码 1 + ledger.md）；工作区干净（编辑前 git status --porcelain 仅见本轮文件；并发会话其间新增 2 个 merge commit，均已入库，tree clean）；备份 /tmp/bak_0492/（252，1 文件原版）。stdin 喂 python 编辑/验证路径继续稳定可靠。
