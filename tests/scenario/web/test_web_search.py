@@ -27,6 +27,38 @@ class TestSearchIntent(unittest.TestCase):
         self.assertTrue(is_search_intent("查看这个库的更新说明"))
         self.assertFalse(is_search_intent("实现一个二叉树前序遍历算法"))
 
+    def test_availability_price_freshness_detected(self) -> None:
+        """D2-T7 contract: stock/price are time-varying facts parametric
+        knowledge cannot answer; they must route to realtime search
+        (ADR-0276 T7: tool routing verified on the real router)."""
+        positives = [
+            "查某商品现在有没有货",
+            "这款耳机是否有货",
+            "iPhone 17 还有库存吗",
+            "帮我看下这款手机的现价",
+            "这双鞋的最新价格是多少",
+            "实时价格",
+            "当前价格",
+            "Is the Pixel in stock right now?",
+            "What's the current price of the MacBook?",
+        ]
+        for query in positives:
+            with self.subTest(query=query):
+                self.assertTrue(is_search_intent(query))
+
+    def test_deliberately_excluded_patterns_stay_off(self) -> None:
+        """D2-T7 negative contract: 过宽的"现在"/"多少钱"被刻意排除（误路由只多一个
+        search hint，漏路由才幻觉），不得单独触发路由。"""
+        negatives = [
+            "现在几点",
+            "现在有空吗",
+            "这个多少钱",
+            "这双鞋现在多少钱",
+        ]
+        for query in negatives:
+            with self.subTest(query=query):
+                self.assertFalse(is_search_intent(query))
+
     def test_search_routing_hint_freshness(self) -> None:
         from datetime import datetime
 
