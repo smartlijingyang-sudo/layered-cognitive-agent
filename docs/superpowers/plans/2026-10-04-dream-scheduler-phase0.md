@@ -159,12 +159,13 @@ from collections.abc import Callable, Sequence
 from pathlib import Path
 
 from lca.application.routine.locks import RoutineFileLock
+from lca.contracts.models.core.conversation.memory import MemoryRecord
 from lca.infrastructure.memory.dream import DreamReport, run_dream
 
 logger = logging.getLogger(__name__)
 
-_Backfill = Callable[[str, list], object]
-_Render = Callable[[Sequence], str]
+_Backfill = Callable[[str, list[MemoryRecord]], object]
+_Render = Callable[[Sequence[MemoryRecord]], str]
 DreamFn = Callable[..., DreamReport]
 EvidenceWriter = Callable[[Path, DreamReport | None, int], object]
 
@@ -210,7 +211,7 @@ class DreamScheduler:
                     self._stop.wait(), timeout=float(self._tick_seconds)
                 )
             except TimeoutError:
-                continue
+                pass
 
     async def sweep_once(self) -> tuple[DreamReport | None, ...]:
         """Run one pass over every home. Returns one report per home, None when skipped."""
@@ -220,7 +221,7 @@ class DreamScheduler:
         self._next_due_ms = now + self._tick_seconds * 1000
         reports: list[DreamReport | None] = []
         for home in self._homes():
-            reports.append(await self._run_home(Path(home), now))
+            reports.append(await self._run_home(home, now))
         return tuple(reports)
 
     async def _run_home(self, home: Path, now_ms: int) -> DreamReport | None:
@@ -408,6 +409,8 @@ Change detection matters because every pass unconditionally rewrites `ALIGNMENT_
 **Interfaces:**
 - Consumes: `DreamReport` from `lca.infrastructure.memory.dream` (fields `promoted: tuple[str, ...]`, `upserted: int`, `trail_facts: int`, `synthesis_written: bool`, `index_documents: int`).
 - Produces: `write_dream_evidence(home: Path, report: DreamReport | None, now_ms: int) -> Path | None`, writing `{home}/dreams/last_run.json`. Returns `None` when the report shows no change and a previous evidence file already exists. Task 4 passes this as `evidence_writer`.
+
+Do not add the `_report(**overrides)` helper below. Task 1's fix round already put that helper in `tests/application/memory/test_dream_scheduler.py` verbatim, because annotating the test double honestly needed a minimal `DreamReport`. Redefining it here shadows the existing one. Use the helper that is already in the file; its call sites work unchanged.
 
 - [ ] **Step 1: Write the failing test**
 
