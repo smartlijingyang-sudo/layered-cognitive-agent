@@ -18,6 +18,7 @@ from lca.plugins.composer.composition.cordis_composer import (
     build_default_invariant_checker,
 )
 from lca.plugins.tools.cordis_control import build_cordis_control_tool
+from tests.support.session_gate_helpers import bound_session
 
 SCRATCH = Path(__file__).resolve().parent / ".scratch_cordis_creator"
 SCRATCH.mkdir(exist_ok=True)
@@ -26,7 +27,9 @@ SCRATCH.mkdir(exist_ok=True)
 @contextmanager
 def bind_journal():
     journal = MemoryJournal()
-    with bind_backends(BoundObservability(journal=journal)):
+    # D3 裁决(todo-38/todo-50):record() 需要 bound publish Session；无 Session 即抛。
+    # 生产 run 中工具执行恒有 Session，此处绑定即是对生产路径的忠实模拟。
+    with bound_session("cordis-e2e"), bind_backends(BoundObservability(journal=journal)):
         yield journal
 
 
