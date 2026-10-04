@@ -58,7 +58,14 @@ async def setup(ctx: PluginContext, config: Config) -> None:
     if not config.enabled:
         return
 
-    integration = ctx.require("composio")
+    # The composio provider plugin declares provides=["composio"] but skips
+    # the binding when unconfigured (no API key). Crashing boot with
+    # KeyError for every deployment without composio credentials is wrong,
+    # so degrade to "no composio tools" (missing binding -> KeyError).
+    try:
+        integration = ctx.require("composio")
+    except (KeyError, LookupError):
+        return
 
     def _factory(bindings: object) -> list[Tool]:
         from lca.infrastructure.tools.composio import build_tools

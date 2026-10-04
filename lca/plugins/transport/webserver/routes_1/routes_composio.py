@@ -83,6 +83,13 @@ ROUTE_SPECS: tuple[RouteSpec, ...] = (
     ),
 )
 async def setup(ctx: PluginContext, config: Any) -> None:
-    composio_handlers.bind_composio(ctx.require("composio"))
+    # The composio provider plugin declares provides=["composio"] but skips
+    # the binding when unconfigured (no API key). Skip route registration
+    # instead of crashing boot with KeyError.
+    try:
+        integration = ctx.require("composio")
+    except (KeyError, LookupError):
+        return
+    composio_handlers.bind_composio(integration)
     registry = ctx.require("route_registry")
     register_routes(registry, ctx, ROUTE_SPECS, plugin_id="lca-gateway-routes-composio")
