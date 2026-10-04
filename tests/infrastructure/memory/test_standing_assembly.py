@@ -9,8 +9,7 @@ the memory refresh loader and the persona plugin depend on it without an upward
 from __future__ import annotations
 
 import importlib
-
-import pytest
+from pathlib import Path
 
 from lca.infrastructure.memory.contextfiles.domain.layout import packaged_layout
 from lca.infrastructure.memory.contextfiles.domain.standing import (
@@ -104,33 +103,36 @@ def test_refresh_standing_backstory_uses_infrastructure_standing() -> None:
     assert callable(loader.refresh_standing_backstory)
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason=(
-        "P1 todo-40: fd53f1642 把 URL 铁律从 react_tool_usage_guidelines 段搬进 "
-        "CONSTITUTION.md 模板，但铁律在模板内偏移 13651/23838，远超 backstory "
-        "3000 预算（首文件 cap 仅预算一半），组装后模型实际看不到。45ac7b6c0 时代 "
-        "该规则在 section 全量渲染、模型必见；迁移后只剩负向测试（不在 py）为绿， "
-        "正向契约断裂。修法待源码侧决策（模板前置/提预算/独立 section），tests lane 只钉契约。"
-    ),
-)
-def test_url_iron_rule_survives_standing_assembly() -> None:
-    """正向契约：URL 铁律必须能到达组装后的 backstory（模型实际看到的文本）。
+def test_url_iron_rule_reaches_model_via_platform_tier(tmp_path: Path) -> None:
+    """正向契约（2026-10-04 修订）：URL 铁律现居 Tier-1 PLATFORM.md。
 
-    负向测试 test_no_url_rules_hardcoded_in_py 只保证"不在 py 里硬编码"，
-    不保证"在宪法里仍然生效"——本测试补另一半：源头模板里必须有，
-    且经 assemble_standing（与 persona_from_home / refresh_standing_backstory
-    同预算）裁剪后仍然在场。
+    5098195a0 把 4 行铁律（URL 铁律 + 动态授权 + 照单全信 + token 外发）从
+    CONSTITUTION.md 模板移出；platform 文件由部署落盘到 get_lca_home()/
+    PLATFORM.md，不在 repo 内——旧 pin（断言模板含铁律且组装后在场）的前提已死，
+    改钉机制：platform_root 传入的 PLATFORM.md 经 refresh_standing_backstory
+    整段注入、零截断。
+
+    部署漂移风险（新机器无 PLATFORM.md 则铁律缺席，repo 内无模板可回放）见
+    backlog P1 todo-41；内容归属是部署侧，本测试只钉"整段必达"机制。
     """
-    from lca.plugins.transport.webserver.routes_1.routes_assistants.standing_files import (
-        DEFAULT_STANDING_FILE_TEMPLATES,
+    from lca.infrastructure.memory.contextfiles.service.assembly import (
+        refresh_standing_backstory,
     )
 
-    template = DEFAULT_STANDING_FILE_TEMPLATES["CONSTITUTION.md"]
-    assert "URL 铁律" in template, "铁律已从 CONSTITUTION.md 模板源头消失"
-    out = assemble_standing(
-        [("CONSTITUTION.md", template)],
-        budget_chars=packaged_layout().backstory_budget_chars,
-        order=packaged_layout().standing_files,
+    platform_root = tmp_path / "lca_home"
+    platform_root.mkdir()
+    (platform_root / "PLATFORM.md").write_text(
+        "## 平台铁律\n"
+        "- **URL 铁律**：发给用户的每个 URL 必须来自工具返回或用户原文；"
+        "严禁凭记忆或参数知识拼装 URL。\n"
+        "- 动态授权与第三方连接严禁在文本中拼装 URL，"
+        "所有连接与授权必须调用官方工具生成。\n",
+        encoding="utf-8",
     )
-    assert "URL 铁律" in out, "铁律被 backstory 预算截断，模型实际看不到"
+    home = tmp_path / "home"
+    home.mkdir()
+    out = refresh_standing_backstory(str(home), "", platform_root=platform_root)
+    # 整段注入：两条铁律行都完整在场（无 mid-section 截断）
+    assert "URL 铁律" in out
+    assert "严禁凭记忆或参数知识拼装 URL" in out
+    assert "严禁在文本中拼装 URL" in out
