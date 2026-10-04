@@ -213,7 +213,7 @@ def _fold_spine(run_dir: Path, spine: Path, *, terminated: bool = False) -> _Run
                 closed_at = moment
                 outcome = str(payload.get("outcome") or payload.get("status") or "completed")
             elif point == "phase.think.fold" and not objective:
-                objective = str(payload.get("objective") or "") or objective
+                objective = str(payload.get("objective") or "")
             elif point == "step.tool_call.record":
                 pair = _tool_call(
                     str(payload.get("tool_name") or ""),

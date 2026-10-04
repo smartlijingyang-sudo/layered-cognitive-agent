@@ -561,7 +561,7 @@ class EventTranslator:
             return None
         outcome = str(payload.get("outcome") or "")
         ok = payload.get("ok")
-        is_success = ok if isinstance(ok, bool) else outcome not in ("failure", "failed", "error")
+        is_success = ok if isinstance(ok, bool) else outcome not in _FAILURE_OUTCOMES
         tool_calling = wire_tool_call(tool_name, invocation_id, {})
         # Tool result lands in ``payload["message"]`` as an OpenAI-shaped
         # ``{role, tool_call_id, content}`` envelope produced by
