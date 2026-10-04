@@ -3,8 +3,8 @@
 The hand-written :class:`HistoryDeriveExecutor` in
 :mod:`lca.nodes.think.history.assemble` wraps the writer→ModelVisibleRequest
 logic as a ``NodeExecutor``-shaped dataclass and is registered under the
-composite key ``phase:think::history.derive`` via the cordis ``@plugin(...)``
-carrier — matches the ``factory: history.derive`` node declared in
+composite key ``think::memory.derive`` via the cordis ``@plugin(...)``
+carrier — matches the ``factory: memory.derive`` node declared in
 ``bundles/concept/history_assemble.yaml``.
 
 delete-when: N/A — typed-boundary adapter required by the inner graph bundle.
@@ -102,8 +102,8 @@ def _node_context(runtime: dict[str, Any] | None = None) -> NodeContext:
 # ── Tests ────────────────────────────────────────────────────────
 
 
-def test_executor_declares_history_derive_semantic_name_in_think_region() -> None:
-    """``semantic_name`` must match ``factory: history.derive`` in the bundle.
+def test_executor_declares_memory_derive_semantic_name_in_think_region() -> None:
+    """``semantic_name`` must match ``factory: memory.derive`` in the bundle.
 
     ``declared_inputs`` grew from ``(state, writer)`` to
     ``(state, writer, forked_tools, turn_render)`` — ``forked_tools`` was
@@ -113,7 +113,7 @@ def test_executor_declares_history_derive_semantic_name_in_think_region() -> Non
     see ``test_node_execute_tools_empty_when_forked_tools_missing`` and
     ``test_system_empty_when_no_header_no_render_no_role_profile``.
     """
-    assert HistoryDeriveExecutor().semantic_name == "history.derive"
+    assert HistoryDeriveExecutor().semantic_name == "memory.derive"
     assert HistoryDeriveExecutor().region == "think"
     assert HistoryDeriveExecutor().declared_inputs == (
         "state",
@@ -208,15 +208,15 @@ async def test_node_execute_wrong_state_type_propagates_to_user_fn() -> None:
 
 
 async def test_setup_registers_executor_under_composite_key() -> None:
-    """``setup.setup()`` calls ``ctx.provide('think::history.derive', executor)``."""
+    """``setup.setup()`` calls ``ctx.provide('think::memory.derive', executor)``."""
     captured: dict[str, Any] = {}
     ctx = MagicMock()
     ctx.provide = MagicMock(side_effect=lambda key, value: captured.__setitem__(key, value))
 
     await history_module.setup.setup(ctx, config=None)
 
-    assert list(captured) == ["think::history.derive"]
-    assert isinstance(captured["think::history.derive"], HistoryDeriveExecutor)
+    assert list(captured) == ["think::memory.derive"]
+    assert isinstance(captured["think::memory.derive"], HistoryDeriveExecutor)
 
 
 # ── ForkedTools → ModelVisibleRequest.tools (spec §E) ────────────
@@ -229,13 +229,13 @@ def _stub_tool(name: str):
 async def test_node_execute_populates_tools_from_forked_tools_port() -> None:
     """ForkedTools 透传到 ``ModelVisibleRequest.tools``(spec §E)。
 
-    修复点:history.derive 之前 ``tools=()`` 写死,导致 LLM 看不到任何
+    修复点:memory.derive 之前 ``tools=()`` 写死,导致 LLM 看不到任何
     tool schema(spec §J test_run_with_tool_use 失败的原因)。
 
     用 ``model_construct`` 绕过 Pydantic ``is_instance_of`` Protocol 校验
     —— 真实生产路径上 ForkedTools 由 tool_fork.dispatch 构造,其 items
     来自 ToolsService.fork_for_run() 返回的真实 Tool 实现,本测试只关心
-    history.derive 是否正确读 ForkedTools.items 并序列化为 tool spec。
+    memory.derive 是否正确读 ForkedTools.items 并序列化为 tool spec。
     """
     executor = HistoryDeriveExecutor()
     writer = _FakeWriter(messages=[{"role": "user", "content": "q"}])
