@@ -110,11 +110,7 @@ def resolve_context_payload(*, context: NodeContext) -> tuple[Any, ...]:
     same source the prior single ``context.compact`` node read).
     """
     state_obj = _resolve_state(context=context)
-    value = (
-        getattr(state_obj, "retrieved_context", None)
-        if state_obj is not None
-        else None
-    )
+    value = getattr(state_obj, "retrieved_context", None) if state_obj is not None else None
     if value is None:
         return ()
     if isinstance(value, tuple):

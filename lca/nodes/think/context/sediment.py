@@ -35,9 +35,7 @@ from lca.contracts.atoms.enums.enums import MemoryCategory, MemoryLayer
 from lca.contracts.atoms.ids.ids import new_id
 from lca.contracts.models.core.conversation.memory import MemoryRecord
 
-SedimentCategory = Literal[
-    "decision", "commitment", "entity_state", "open_question", "fact"
-]
+SedimentCategory = Literal["decision", "commitment", "entity_state", "open_question", "fact"]
 """Fine-grained fact class. Persisted as ``MemoryCategory.FACT`` with this
 value in ``metadata["sediment_category"]`` (MemoryCategory is a closed
 enum; sediment classes are not members)."""
@@ -94,7 +92,7 @@ class SedimentCandidate:
 
 
 def _dedupe_key(category: str, content: str) -> str:
-    digest = hashlib.sha1(f"{category}:{content}".encode("utf-8")).hexdigest()[:16]
+    digest = hashlib.sha256(f"{category}:{content}".encode()).hexdigest()[:16]
     return f"compaction:{digest}"
 
 
@@ -134,9 +132,7 @@ def extract_sediment_candidates(
                 category = _CATEGORY_BY_MARKER.get(marker)
                 if category is None:
                     continue
-                candidate = _candidate(
-                    raw=match.group(2), category=category, source_index=index
-                )
+                candidate = _candidate(raw=match.group(2), category=category, source_index=index)
                 if candidate is not None:
                     found.append(candidate)
         elif isinstance(item, dict):
@@ -146,9 +142,7 @@ def extract_sediment_candidates(
                 category = _DICT_KEY_CATEGORY.get(key.strip().lower())
                 if category is None or not value.strip():
                     continue
-                candidate = _candidate(
-                    raw=value, category=category, source_index=index
-                )
+                candidate = _candidate(raw=value, category=category, source_index=index)
                 if candidate is not None:
                     found.append(candidate)
     return tuple(found)
