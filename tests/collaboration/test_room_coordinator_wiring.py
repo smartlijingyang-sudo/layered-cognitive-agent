@@ -117,13 +117,24 @@ async def test_routes_rooms_start_run_binds_coordinator_and_topic() -> None:
     # Track register_gateway_run call
     gateway_runs: list[dict[str, Any]] = []
 
-    async def _fake_register_gateway_run(request, *, run_id, topic_id, agent_id, body):
-        gateway_runs.append({
-            "run_id": run_id,
-            "topic_id": topic_id,
-            "agent_id": agent_id,
-            "body": body,
-        })
+    async def _fake_register_gateway_run(
+        app,
+        *,
+        run_id,
+        topic_id,
+        agent_id,
+        scope="main",
+        assistant_message_id=None,
+        user_id="",
+        assistant_id="",
+    ):
+        gateway_runs.append(
+            {
+                "run_id": run_id,
+                "topic_id": topic_id,
+                "agent_id": agent_id,
+            }
+        )
 
     import lca.plugins.transport.webserver.routes_3.routes_rooms as rr
     orig_reg = rr.register_gateway_run

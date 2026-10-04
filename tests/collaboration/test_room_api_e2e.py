@@ -107,11 +107,17 @@ def test_room_api_closed_loop(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     gateway_calls: list[dict[str, Any]] = []
 
     async def _fake_register_gateway_run(
-        request: Any, *, run_id: str, topic_id: str, agent_id: str, body: dict[str, Any]
+        app: Any,
+        *,
+        run_id: str,
+        topic_id: str,
+        agent_id: str,
+        scope: str = "main",
+        assistant_message_id: str | None = None,
+        user_id: str = "",
+        assistant_id: str = "",
     ) -> None:
-        gateway_calls.append(
-            {"run_id": run_id, "topic_id": topic_id, "agent_id": agent_id, "body": body}
-        )
+        gateway_calls.append({"run_id": run_id, "topic_id": topic_id, "agent_id": agent_id})
 
     monkeypatch.setattr(routes_rooms, "register_gateway_run", _fake_register_gateway_run)
     monkeypatch.setenv("LCA_HOME", str(tmp_path / ".lca"))

@@ -1,7 +1,7 @@
 """Register an LCA agent run with the gateway coordinator + running-op index.
 
-PR-2 Task 12 follow-up: after ``RunPort.create_and_dispatch`` succeeds,
-``create_run`` calls :func:`register_gateway_run` so:
+Any dispatcher calls :func:`register_gateway_run` after
+``RunPort.create_and_dispatch`` succeeds, so:
 
 1. ``LcaAgentRuntimeCoordinator.start`` publishes ``agent_runtime_init``
    (required by ``refresh_ws_token`` EXISTS check).
@@ -10,13 +10,16 @@ PR-2 Task 12 follow-up: after ``RunPort.create_and_dispatch`` succeeds,
 3. A background task observes the run's Session log and publishes
    AgentStreamEvents into Redis via ``coordinator.handle_stamped``
    (the WS broadcaster).
+
+The registrar takes the ``app`` and typed binding facts, never a ``Request``
+and never a raw HTTP body. In-process dispatchers (rooms, scheduled cron
+handoff) hold an ``app`` and have no body to fabricate. The three
+``*_from_body`` parsers keep HTTP-body shape knowledge on the HTTP side.
 """
 
 from __future__ import annotations
 
 from typing import Any
-
-from starlette.requests import Request
 
 from lca.application.runtime.coordinator.session_gateway_pump import (
     schedule_gateway_session_pump,
@@ -38,19 +41,34 @@ def topic_id_from_body(body: dict[str, Any]) -> str:
     return ""
 
 
+def scope_from_body(body: dict[str, Any]) -> str:
+    """Extract the gateway scope from POST /runs body; ``options.scope`` wins."""
+    options = body.get("options")
+    if isinstance(options, dict) and options.get("scope"):
+        return str(options["scope"])
+    return str(body.get("scope") or "main")
+
+
+def parent_message_id_from_body(body: dict[str, Any]) -> str | None:
+    """Extract the assistant message this run continues, if the body names one."""
+    raw = body.get("parent_message_id") or body.get("parentMessageId")
+    return raw if isinstance(raw, str) and raw else None
+
+
 async def register_gateway_run(
-    request: Request,
+    app: Any,
     *,
     run_id: str,
     topic_id: str,
     agent_id: str,
-    body: dict[str, Any],
+    scope: str = "main",
+    assistant_message_id: str | None = None,
     user_id: str = "",
     assistant_id: str = "",
 ) -> None:
     """Start gateway metadata + broadcast for one newly-created run."""
-    coordinator = getattr(request.app.state, "agent_runtime_coordinator", None)
-    registry = getattr(request.app.state, "registry", None)
+    coordinator = getattr(app.state, "agent_runtime_coordinator", None)
+    registry = getattr(app.state, "registry", None)
     if coordinator is None or registry is None:
         return
     get_session = getattr(registry, "get", None)
@@ -63,14 +81,6 @@ async def register_gateway_run(
     # 缺陷1修复：把 topic_id 落到 session，跨 run 会话自愈日志按 topic 归档。
     if topic_id:
         session.topic_id = topic_id
-
-    scope = str(body.get("scope") or "main")
-    options = body.get("options")
-    if isinstance(options, dict) and options.get("scope"):
-        scope = str(options["scope"])
-
-    parent_raw = body.get("parent_message_id") or body.get("parentMessageId")
-    assistant_message_id = parent_raw if isinstance(parent_raw, str) and parent_raw else None
 
     resolved_user_id = user_id or getattr(session, "user_id", "") or None
     resolved_assistant_id = assistant_id or getattr(session, "assistant_id", "") or None
@@ -99,4 +109,9 @@ async def register_gateway_run(
     )
 
 
-__all__ = ("register_gateway_run", "topic_id_from_body")
+__all__ = (
+    "parent_message_id_from_body",
+    "register_gateway_run",
+    "scope_from_body",
+    "topic_id_from_body",
+)

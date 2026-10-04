@@ -533,16 +533,19 @@ async def create_run(request: Request) -> JSONResponse:
         return _err(receipt.rejection_reason or "run creation rejected", status_code=400)
 
     from lca.plugins.transport.webserver.handlers.runs.terminal.streaming.gateway_lifecycle import (
+        parent_message_id_from_body,
         register_gateway_run,
+        scope_from_body,
     )
 
     try:
         await register_gateway_run(
-            request,
+            request.app,
             run_id=receipt.run_id,
             topic_id=topic_id_from_body(body),
             agent_id=str(decoded.agent.agent_id or "solo"),
-            body=body,
+            scope=scope_from_body(body),
+            assistant_message_id=parent_message_id_from_body(body),
             user_id=decoded.user_id,
             assistant_id=decoded.assistant_id,
         )

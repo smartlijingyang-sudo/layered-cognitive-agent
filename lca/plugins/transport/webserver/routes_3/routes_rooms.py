@@ -129,11 +129,10 @@ async def _start_run(
     receipt = await run_port.create_and_dispatch(run_request)
     if receipt.accepted:
         await register_gateway_run(
-            request,
+            request.app,
             run_id=receipt.run_id,
             topic_id=room_id,
             agent_id=str(agent.agent_id),
-            body={"messages": [{"role": "user", "content": objective}], "scope": "main"},
         )
     return RunDispatchResult(
         run_id=receipt.run_id,
