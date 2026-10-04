@@ -24,6 +24,9 @@ from lca.contracts.observability.journal.errors import JournalWriteError
 from lca.infrastructure.observability.journal.step.projector import (
     JournalDocumentWriter,
 )
+from lca.infrastructure.observability.spine.sinks.naming import (
+    spine_filename_for_run,
+)
 from lca.plugins.session.derivers.step_tree.journal_fold import (
     fold_step_tree,
 )
@@ -164,7 +167,7 @@ class StepTreeFoldDeriver:
         """
         path = self._spine_path
         if path is None:
-            path = self._run_dir / f"{self._run_id}.spine.jsonl"
+            path = self._run_dir / spine_filename_for_run(self._run_id)
         if path.exists():
             return iter(SpineReader(self._run_id, path=path).read_dicts())
         return iter(())

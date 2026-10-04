@@ -44,6 +44,9 @@ from lca.contracts.protocols.runtime.runtime.lifecycle import (
 )
 from lca.harness.plugin.manifest import EffectClass
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
+from lca.infrastructure.observability.spine.sinks.naming import (
+    spine_filename_for_run,
+)
 from lca.infrastructure.persistence.run_paths import default_runs_root
 
 if TYPE_CHECKING:
@@ -84,7 +87,7 @@ def _find_candidate(obj: Any) -> dict[str, Any] | None:
 
 def extract_procedural_candidate(run_dir: Path) -> dict[str, Any] | None:
     """Scan the run spine for the first ``ProceduralMemoryCandidate`` payload."""
-    spine = run_dir / f"{run_dir.name}.spine.jsonl"
+    spine = run_dir / spine_filename_for_run(run_dir.name)
     if not spine.is_file():
         return None
     for line in spine.read_text(encoding="utf-8", errors="ignore").splitlines():
