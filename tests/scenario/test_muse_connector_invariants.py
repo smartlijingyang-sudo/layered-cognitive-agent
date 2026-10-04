@@ -84,7 +84,9 @@ def test_inv_02_state_machine_soundness(tmp_path: Path) -> None:
     status_res = cli.execute(["status"])
     assert status_res["status"] == "not_connected"
     assert status_res["appName"] == "Gmail"
-    assert "authUrl" in status_res
+    # 51b3f2eef (zero model URL exposure): status 不再裸露 authUrl，改走 vault intent
+    assert "intentId" in status_res
+    assert "authUrl" not in status_res
     assert "connectionId" in status_res
 
 

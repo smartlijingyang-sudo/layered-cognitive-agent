@@ -1,4 +1,4 @@
-"""URL 铁律守卫：prompt 规则不许硬编码在 py 里，必须进 contextfiles 常驻 md（CONSTITUTION.md）。"""
+"""URL 铁律守卫：prompt 规则不许硬编码在 py 里，必须进 Tier-1 PLATFORM.md 常驻 md（5098195a0 起，不在 repo 内，由部署落盘）。"""
 
 from __future__ import annotations
 
@@ -23,4 +23,6 @@ def test_no_url_rules_hardcoded_in_py() -> None:
 
 
 def test_identity_disclosure_line_stays() -> None:
-    assert "动身份先报身份" in _REACT_TOOL_USAGE_TEXT
+    # 5098195a0：中文行改为英文措辞，语义不变
+    assert "Identity first" in _REACT_TOOL_USAGE_TEXT
+    assert "account identity" in _REACT_TOOL_USAGE_TEXT
