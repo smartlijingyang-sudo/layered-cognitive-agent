@@ -2,7 +2,7 @@
 
 ## 状态
 
-**Proposed — 2026-10-04**（待李超拍板；本 ADR 不改 ADR-0220 正文，0220 状态不变）
+**Accepted — 2026-10-04**（李超授权 Athena 裁决，证据逐项实证通过；本 ADR 不改 ADR-0220 正文，0220 状态不变）
 
 本 ADR 裁决 todo-44：`tests/business/test_three_tier_graph_dispatch.py::TestNodeIdVocabulary`
 （ADR-0220 §0.4 N9 守卫）稳定 3 红背后的契约歧义——`primitive.*` 家族命名空间节点 id 与
@@ -59,11 +59,21 @@ compat-era 顶层 bundle，已被测试显式豁免）。
 - **C3（ADR-0220 正文）**：不改。0220 的 N9 条款与 §14 验收保持原样；本 ADR 是裁决补充，
   不是对 0220 的修订。
 
-## 5. 待拍板（李超）
+## 5. 裁决决议（2026-10-04，李超授权 Athena 定夺）
 
-1. C1：`primitive` 例外是否接受（接受 → tests lane 落地，2 红转绿）。
-2. `history.derive` 改名方案（`memory.derive` 候选是否合适）与动手方（quality lane / 李超本人）。
-   裁决前 tests lane 保持 3 红钉不变（其中 2 个是 C1 待落地，1 个是 C2 命名债）。
+1. C1 接受：primitive 例外成立。tests lane 按既有 4 例外（reason/act/remember/loop）的
+   spec-gap 注释格式给 ALLOWED_ACTION_DOMAINS 加 primitive，运行时零变化；落地后 2 红转绿
+   （spine_emit.yaml 与 typed_transform.yaml 的 TestNodeIdVocabulary 用例）。
+2. C2 改名定案：history.derive 改为 memory.derive。定名依据：memory 在 N9 闭集内，改名后
+   直接合规、无需例外；ADR-0220 第 3.3 节 memory.* 词汇描述内层概念图，本节点正是
+   concept.history.assemble 的内层概念图节点；不取 primitive.history.derive（history
+   不在闭集里，取它反而要再加一个例外）。动手方：quality lane（wiring 变更，tests 目录
+   不动）。改名范围：bundles/concept/history_assemble.yaml（id 行与 factory 行）、
+   bundles/think/think_subgraph.yaml（entry_node 行）、
+   bundles/concept/llm_dispatch.yaml 注释（primitive.history.derive 改为 memory.derive）；
+   须过 todo-43 的 bundle ports 检查（check_bundle_ports.py 声明端口接线）；改完跑相关测试
+   全绿再 commit。改名落地前 tests lane 保持 C2 的 1 红钉（history_assemble.yaml 用例），
+   落地后 tests lane 同步复验（不加例外、无需改守卫）。
 
 ## 6. 交叉引用
 
