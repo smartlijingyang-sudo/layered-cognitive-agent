@@ -98,6 +98,21 @@ class SkillActivationReducerBridge:
         # reducer.apply_activation 已实现:extend(activated);空 tuple 早返回
         reducer.apply_activation(state, (ActivatedSkill(skill_id=skill_id, name=name),))
 
+    def handle_deactivation(self, *, skill_id: str) -> None:
+        """``unregister_activated`` 调用时触发 reducer.apply_deactivation。
+
+        不在 install 前调用 = no-op(避免 import-time / 测试 fixture 误触发)。
+        """
+        with self._lock:
+            if not self._installed:
+                return
+            reducer = self._reducer
+            state_getter = self._state_getter
+        if reducer is None or state_getter is None:
+            return
+        state = state_getter()
+        reducer.apply_deactivation(state, skill_id)
+
 
 # 进程级 singleton —— ``register_activated`` 这条 chokepoint 不持有 run 上下文,
 # 所以需要全局可寻址的 bridge。run 启动时 ``install``,run 结束 ``dispose``。

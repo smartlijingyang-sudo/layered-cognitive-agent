@@ -19,7 +19,11 @@ from lca.contracts.protocols.memory.operational_skills import (
 )
 from lca.infrastructure.search.service.service import any_search_provider_available
 from lca.infrastructure.search.skill.policy import is_redundant_cli_search_skill
-from lca.infrastructure.skills.activation.scope import register_activated
+from lca.infrastructure.skills.activation.scope import (
+    MAX_ACTIVATED_SKILLS_PER_RUN,
+    can_activate,
+    register_activated,
+)
 from lca.infrastructure.tools.contract.render.render import FieldSpec, RenderContract, contract
 from lca.infrastructure.tools.contract.schema.schema import COMMON
 
@@ -127,6 +131,7 @@ class SkillActivateTool(Tool):
         "再 run_command 调用预装 officecli CLI（--json）。"
         "PDF 用 anthropics-skills-pdf；纯表分析可用 pandas 无需 skill。"
         "参数: skill_id（安装时的 identifier 或 import 返回的 skill_id）。"
+        f"每 run 最多同时激活 {MAX_ACTIVATED_SKILLS_PER_RUN} 个，超限需先 deactivate_skill。"
     )
     parameters: ClassVar[dict[str, Any]] = {
         "type": "object",
@@ -165,6 +170,19 @@ class SkillActivateTool(Tool):
                 success=False,
                 payload=None,
                 error=_REDIRECT_WEB_SEARCH_MESSAGE,
+                latency_ms=latency_ms,
+                extra={FAILURE_KIND: FAILURE_KIND_VALIDATION},
+            )
+        if not can_activate(package.skill_id):
+            latency_ms = int((time.monotonic() - start) * 1000)
+            return Observation(
+                observation_id=new_id("obs"),
+                success=False,
+                payload=None,
+                error=(
+                    f"本 run 已激活 {MAX_ACTIVATED_SKILLS_PER_RUN} 个 skill，达上限；"
+                    "先 deactivate_skill 停用一个再激活"
+                ),
                 latency_ms=latency_ms,
                 extra={FAILURE_KIND: FAILURE_KIND_VALIDATION},
             )

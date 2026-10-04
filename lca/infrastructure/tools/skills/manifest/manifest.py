@@ -50,6 +50,18 @@ MANIFEST = ToolManifest(
             },
         ),
         ToolApi(
+            name="deactivateSkill",
+            description="停用已激活的 skill，释放本 run 激活预算。",
+            parameters={
+                "type": "object",
+                "properties": {
+                    "name": {"type": "string", "description": "skill 名称"},
+                },
+                "required": ["name"],
+            },
+            is_idempotent=True,
+        ),
+        ToolApi(
             name="readReference",
             description="读取 skill 的参考文档。",
             parameters={

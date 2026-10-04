@@ -19,18 +19,32 @@ from lca.infrastructure.skills.activation.bridge import bridge
 
 # Re-export for backward compatibility
 __all__ = [
+    "MAX_ACTIVATED_SKILLS_PER_RUN",
     "ActivatedSkill",
     "activated_skills_scope",
+    "can_activate",
     "get_activated_skills",
     "get_newly_activated",
     "register_activated",
     "resolve_skill_for_exec",
+    "unregister_activated",
 ]
 
 _activated_skills: ContextVar[tuple[ActivatedSkill, ...]] = ContextVar(
     "lca_activated_skills",
     default=(),
 )
+
+
+MAX_ACTIVATED_SKILLS_PER_RUN = 8
+"""Per-run cap on concurrently activated skills.
+
+Rationale: each activation injects a full SKILL.md (typically 2-8 KB) into the
+run's context, and the activated list is rendered into every prompt assembly.
+8 bounds the injected context to a manageable size while covering realistic
+multi-skill tasks; beyond that the model must explicitly deactivate one first
+instead of silently accumulating state the run can never shed.
+"""
 
 
 def get_activated_skills() -> tuple[ActivatedSkill, ...]:
@@ -45,6 +59,41 @@ def register_activated(skill_id: str, name: str) -> None:
     # PR-E:同步转发到 reducer(若 run 已 install bridge)。bridge 未 install
     # 时是 no-op,允许 import-time / 测试 fixture 早期调用不报错。
     bridge.handle(skill_id=skill_id, name=name)
+
+
+def can_activate(skill_id: str) -> bool:
+    """Whether activating ``skill_id`` fits the per-run budget.
+
+    Re-activating an already-activated skill is always allowed (idempotent and
+    does not grow the context).
+    """
+    sid = skill_id.strip()
+    current = _activated_skills.get()
+    if any(item.skill_id == sid or item.name == sid for item in current):
+        return True
+    return len(current) < MAX_ACTIVATED_SKILLS_PER_RUN
+
+
+def unregister_activated(skill_id: str) -> bool:
+    """Remove a skill from the run-scoped activation set. Idempotent.
+
+    Returns True when an entry was actually removed. Forwards to the reducer
+    bridge so ``state.activated_skills`` stays in sync (no-op when the bridge
+    is not installed, e.g. import-time or unit tests).
+    """
+    sid = skill_id.strip()
+    current = _activated_skills.get()
+    target = next(
+        (item for item in current if item.skill_id == sid or item.name == sid),
+        None,
+    )
+    if target is None:
+        return False
+    _activated_skills.set(
+        tuple(item for item in current if item.skill_id != target.skill_id)
+    )
+    bridge.handle_deactivation(skill_id=target.skill_id)
+    return True
 
 
 def get_newly_activated(
