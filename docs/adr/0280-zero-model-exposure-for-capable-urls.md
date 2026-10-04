@@ -4,6 +4,8 @@
 
 **Implemented — 2026-10-04**
 
+**v2 修正案 Accepted — 2026-10-04（待实施，见 §5）**：卡片挂载面收敛到 tool result 与 tool surface registry，散文标签协议与 INV-CAP-04 兜底退役。
+
 > **一句话**：终结特权授权短链（OAuth Redirect URL、敏感下载凭证等）穿透大模型上下文导致的安全隐患与前端渲染错乱——建立 **Zero LLM Exposure** 铁律：工具层向 `ConnectorAuthIntentVault` 暂存高特权 URL 并仅向大模型暴露 `intent_id`，网关层通过 `RunSessionWriter` 提供确定性卡片挂载保底，前端由 `ConnectorAuthCard` 凭 `intentId` 带外异步兑换真实 URL，彻底隔离认知决策与特权能力。
 
 **Extends**：
@@ -52,6 +54,9 @@
 | **INV-CAP-04** | **Gateway Deterministic Fallback** | 网关层（`RunSessionWriter`）在持久化 Assistant 消息时，若检测到上一轮存在未挂载的 Intent 且模型漏写卡片标签，确定性自动追加 `[widget:connector_auth?intentId=...]`，根除大模型漏格式导致的 UI 丢失。 |
 | **INV-CAP-05** | **Decoupled Frontend Card** | 前端 `ConnectorAuthCard` 统一接收 `intentId`，支持异步兑换、加载态反馈、居中模态弹窗与阶梯轮询状态检查。 |
 | **INV-CAP-06** | **E2E Traceability** | 审计与测试全链路可闭环追溯，各分层测试相互正交，不变量受确定性自动化测试守护。 |
+| **INV-CAP-07** | **Mount Follows the Fact** | 能力事实源自 tool result 的交互卡片一律经 tool surface registry 挂载；禁止以正则扫描消息内容作为挂载机制（v2 新增，见 §5）。 |
+
+INV-CAP-02、INV-CAP-04、INV-CAP-05 的 v2 修订见 §5。实施 PR 落地时同步本表与 §2、§4。
 
 ---
 
@@ -111,7 +116,7 @@
 1. **契约层**：[`lca/contracts/models/connectors/intent.py`](../../lca/contracts/models/connectors/intent.py)（`ConnectorAuthIntent` 冻结契约模型）
 2. **基础设施层**：[`lca/infrastructure/connectors/core/intent_vault.py`](../../lca/infrastructure/connectors/core/intent_vault.py)（`ConnectorAuthIntentVault` 暂存器与单例注入）
 3. **工具与适配层**：
-   - [`lca/infrastructure/tools/composio/executors/management.py`](../../lca/infrastructure/tools/composio/executors/management.py)
+   - [`lca/infrastructure/tools/composio/__init__.py`](../../lca/infrastructure/tools/composio/__init__.py)
    - [`lca/infrastructure/connectors/core/adapter.py`](../../lca/infrastructure/connectors/core/adapter.py)
    - [`lca/infrastructure/connectors/core/state.py`](../../lca/infrastructure/connectors/core/state.py)
 4. **运行时网关**：[`lca/runtime/session/run_session_writer.py`](../../lca/runtime/session/run_session_writer.py)（确定性卡片保底挂载器）
@@ -128,3 +133,48 @@
    - `tests/transport/test_routes_auth_intents.py`
    - `tests/deploy/test_connector_auth_card_patch.py`
    - `tests/scenario/test_connector_capability_intent_e2e.py`
+
+---
+
+## 5. 修订记录（v2 — 2026-10-04：卡片挂载面收敛到 tool result）
+
+**状态：Accepted，待实施。** 实施 PR 落地时同步 §1 不变量表、§2 数据流与 §4 实施清单，并移除本节的待实施标注。
+
+### 5.1 裁决
+
+交互授权卡片的挂载面从 assistant 散文收敛到 tool result。`composioConnect` 的 Observation payload（`intent_id`、`app_name`、`connection_id`）是票据在 wire 上的唯一结构化载体。前端 tool surface registry（`@lobechat/builtin-tools/register` 与 LCA `lca_tool_render_register`）拥有卡片挂载，两个消息渲染器（`Messages/Assistant` 与 `AssistantGroup`）经同一 registry 消费工具卡片。assistant 散文不再携带挂载标签，模型不再承担转述挂载指令的职责。
+
+### 5.2 理由
+
+1. 散文当协议有三个独立失效点：模型措辞、渲染器分支、markdown 变换。run_721c7ae6fc0c（2026-10-04）实证渲染器分支失效：标签经 wire 与持久化完整到达前端，分组渲染器 `AssistantGroup/components/ContentBlock.tsx` 无 `connector_auth` 分支，标签以裸文本呈现，卡片未挂载。
+2. INV-CAP-04 的字符串追加兜底是该失效点的消费者侧补丁。挂载面收敛后模型无标签可漏，兜底失去存在前提。
+3. tool result 已是 typed 事实，且工具卡片渲染在两个消息渲染器下共用 tool surface registry。挂载点单一、渲染器无关，新增渲染器不再构成失效面。
+
+### 5.3 不变量修订
+
+| 编号 | 修订 |
+|---|---|
+| INV-CAP-02 | 属主身份收敛为单一调用者头 `x-lca-user-id`（[ADR-0252](0252-multi-user-onboarding-and-identity.md)），经共享 helper 读取。`X-User-ID` 读取退役。票据属主在签发时取 run 调用者 user id，经工具上下文注入。`getattr(self._integration, "user_id", None)` 死分支退役。 |
+| INV-CAP-04 | 退役。`ensure_intent_widget_in_assistant_message` 与 `extract_pending_intents_from_events` 在实施 PR 删除，`tests/runtime/test_gateway_intent_widget_fallback.py` 同删。 |
+| INV-CAP-05 | 卡片从 tool result state 接收 `intentId`。`authUrl` 的 `cai_` 兼容分支退役。`Messages/Assistant/index.tsx` 的标签解析与挂载块退役。 |
+| INV-CAP-07 | 新增，见 §1。挂载跟随事实：能力事实源自 tool result 的交互卡片经 tool surface registry 挂载，禁止正则扫描消息内容作为挂载机制。 |
+
+### 5.4 失败与恢复语义
+
+- 票据过期或内核重启（vault 为进程内存）：卡片进入 timeout 态并提供重发动作，调用 `POST /composio/auth-intents/{intent_id}/reissue`，属主校验与 resolve 相同。reissue 以 `(user_id, service)` 为键替换未兑换票据并返回新 `intent_id`。恢复路径不经过模型。
+- 刷新后重渲染：tool 行持久化 shape 必须携带 `intent_id`、`app_name`、`connection_id`（pluginState 或 result state），卡片从持久化 tool 行重建。实施 PR 的第一个验证任务是确认现有持久化 shape 满足该契约，不满足则同 PR 修正。
+
+### 5.5 退役清单（实施 PR 同删）
+
+`[widget:connector_auth?...]` 字符串协议。`run_session_writer.py`、`Messages/Assistant/index.tsx`、`ConnectorAuthCard.tsx` 三处标签正则。INV-CAP-04 兜底函数与其测试。composio Observation 中要求原样输出标签的指令文案。`authUrl` 的 `cai_` 兼容分支。`Messages/Assistant/index.tsx` 卡片挂载块。`X-User-ID` 读取。死 getattr 分支。
+
+### 5.6 验证门禁
+
+- 保留：`tests/connectors/test_auth_intent_vault.py`、`tests/connectors/test_zero_model_url_leakage.py`、`tests/transport/test_routes_auth_intents.py`（属主头断言改为 `x-lca-user-id`）。
+- 新增：registry surface 由 tool result state 渲染卡片的 vitest；分组 turn 渲染卡片的 vitest；reissue 端点测试；持久化 tool 行刷新后重渲染卡片的测试；浏览器端到端验证新 run 出现卡片且点击兑换弹窗。
+- 删除：`tests/runtime/test_gateway_intent_widget_fallback.py`；`tests/deploy/test_connector_auth_card_patch.py` 的标签解析断言（挂载断言迁入 registry surface 测试）。
+
+### 5.7 联动
+
+- [ADR-0252](0252-multi-user-onboarding-and-identity.md)：`x-lca-user-id` 是调用者身份唯一拼写，本修正案不新增头。
+- §2 数据流图与 §4 实施清单在实施 PR 同步：`run_session_writer.py` 不再拥有挂载职责，tool surface registry 成为挂载 owner。
