@@ -81,3 +81,8 @@ ADR-0240 §Risks 原文：act executor 的命令式调用与新 driver-level dis
 ## 决策记录
 
 - 2026-10-04：ADR-0285 起草（Proposed），证据基于 `run_56c3352cd22e` 与 main@2edc98c18。
+- 2026-10-04：arch 轮裁决（ADR §4 明确委托本轮；裁决只落决策记录，代码改动按 lane 边界交 quality/tests 轮）：
+  1. **D 先行，E 另立一轮**：`emit_body_tool_execute_end_for_state` / `emit_phase_tool_call_end_for_state` 不再写 `outcome` 字段——括号回归纯生命周期标记（`state_id` 而已），不留假信号。E（从 yaml 移除 act 括号 emit 声明）需先盘点依赖测试（`tests/integration/test_act_dispatch_join_observe_e2e.py` 等是否以括号事件为锚），单独一轮处理，不与 D 捆绑。
+  2. **footer 计数口径**：`lca-ops journal trace` 的「tool call」改读 `step.tool_call.record`；`status="wire_blocked"` 不计入执行数（从未执行），建议另给「被拒」计数保持可见，不与执行数混同。
+  3. **`wrapper="decision"` 显式契约：采纳**。决策级 `body.tool.execute.*` 的 `wrapper="decision"` 钉为 spine 事件目录显式区分字段，防止 raw 消费者静默读错两重语义；tests lane 可钉区分字段断言。
+  - 裁决依据：实证复核通过——`tool_events.py:41/110/143` outcome 默认 `"success"`；`bundles/act/act_subgraph.yaml` 括号声明在位（validate enter `phase.tool.call.start`、dispatch enter/exit `body.tool.execute.start/end`、normalize exit `phase.tool.call.end`）；`dispatch_node_emits` 只传 state（ADR §1.1 链路与代码一致）；无消费者读括号 outcome（ADR §1.3）。路线与 ADR §3 推荐一致（D 最小修正先行，E 作为架构收口后续）；ADR-0240 Risks 已预言双重发射，本裁决收口 D 部分。
