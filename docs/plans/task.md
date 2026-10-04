@@ -584,4 +584,10 @@
 | BRAINSTORM-MUSE-MODAL-APPROACHES | 提出 2-3 种信息流生成、去重与状态机制架构方案及权衡对比 | Completed | 用户明确确认选定方案 A+（三层闭环 + 生产者契约源头归一架构），由生产者上移真值并收敛双写，fold 退化为纯按 ID 归组，彻底消灭硬编码 |
 | BRAINSTORM-MUSE-MODAL-DESIGN-SECTIONS | 逐步呈现设计细节（Owns/Does NOT own、生产者改动清单、纯函数状态机、测试断言）并获取审批 | Completed | 全部 4 大小节（边界自治哲学、生产者改动清单与身份全链透传契约、纯函数状态机与 Muse 渲染、INV-01~08 测试矩阵）全部获用户审核批准 |
 | BRAINSTORM-MUSE-MODAL-DESIGN-DOC | 沉淀设计文档至 docs/plans/ 并提交 git | Completed | 成功落盘 docs/plans/2026-10-04-muse-activity-modal-dynamic-alignment-design.md 并完成设计归档 |
-| BRAINSTORM-MUSE-MODAL-TRANSITION | 转换至实施计划制定（writing-plans） | In Progress | 正在调用 writing-plans 技能规划落地步骤 |
+| BRAINSTORM-MUSE-MODAL-TRANSITION | 转换至实施计划制定（writing-plans） | Completed | 成功落盘 docs/plans/2026-10-04-muse-activity-modal-dynamic-alignment-plan.md 并完成实施任务分解 |
+| ACT-TASK-1-PRODUCER | 生产者收敛与身份全链透传 (INV-01, INV-02) | Pending | 待执行 |
+| ACT-TASK-2-EXIT-CODE | 真值字段上移与退出码契约 (INV-03) | Pending | 待执行 |
+| ACT-TASK-3-PURGE-MOCK | 契约解析纯净化与魔法值清理 (INV-04, INV-06) | Pending | 待执行 |
+| ACT-TASK-4-COMPAT-SHIM | COMPAT 紧邻前驱单条合并 Shim (INV-08) | Pending | 待执行 |
+| ACT-TASK-5-UI-PATCH | 纯函数状态机与前端高保真双栏补丁 (INV-05, INV-07) | Pending | 待执行 |
+| ACT-TASK-6-INTEGRATION-E2E | 全链路回归、Pre-push 门禁与真实端到端验收 | Pending | 待执行 |
