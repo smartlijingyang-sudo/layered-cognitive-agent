@@ -7,10 +7,13 @@ Reactions are keyed by message_id. A message can carry multiple reactions
 from __future__ import annotations
 
 import json
+import logging
 import threading
 from pathlib import Path
 
 from lca.contracts.models.messaging.reaction import MessageReaction
+
+log = logging.getLogger(__name__)
 
 
 class ReactionStore:
@@ -58,10 +61,12 @@ class ReactionStore:
     # ── persistence ──────────────────────────────────────────────
 
     def _load(self) -> None:
-        assert self._persist_path is not None
+        if self._persist_path is None:
+            raise AssertionError("_persist_path is None in _load despite __init__ guard")
         try:
             raw = json.loads(self._persist_path.read_text(encoding="utf-8"))
-        except Exception:
+        except Exception as exc:
+            log.warning("reaction store: 持久化文件损坏，忽略历史数据: %s", exc)
             return
         if not isinstance(raw, dict):
             return
@@ -72,7 +77,8 @@ class ReactionStore:
             for item in items:
                 try:
                     parsed.append(MessageReaction.model_validate(item))
-                except Exception:
+                except Exception as exc:
+                    log.debug("reaction store: 跳过损坏的 reaction 条目: %s", exc)
                     continue
             if parsed:
                 self._reactions[str(message_id)] = parsed
@@ -89,6 +95,6 @@ class ReactionStore:
             tmp = self._persist_path.with_suffix(".tmp")
             tmp.write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
             tmp.replace(self._persist_path)
-        except Exception:
+        except Exception as exc:
             # 落盘失败不炸主流程：内存数据仍有效
-            pass
+            log.warning("reaction store: 落盘失败，内存数据仍有效: %s", exc)

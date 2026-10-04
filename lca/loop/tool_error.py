@@ -20,10 +20,13 @@ fail-closed 方向：分型未知默认可恢复（有预算兜底，不会无�
 
 from __future__ import annotations
 
+import logging
 from collections.abc import Iterator
 from dataclasses import dataclass
 from enum import StrEnum
 from typing import Any
+
+log = logging.getLogger(__name__)
 
 
 class ToolErrorKind(StrEnum):
@@ -171,7 +174,8 @@ def _iter_tool_observations(visits: Any) -> Iterator[tuple[str | None, bool | No
         for key, value in outputs.items():
             try:
                 record = _as_tool_record(key, value)
-            except Exception:
+            except Exception as exc:
+                log.debug("跳过无法解析的 tool record: %s", exc)
                 continue
             if record is not None:
                 yield record

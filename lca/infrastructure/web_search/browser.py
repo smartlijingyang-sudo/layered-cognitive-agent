@@ -12,11 +12,14 @@ playwright **延迟 import**：缺依赖时抛 :class:`FeatureUnavailableError`�
 
 from __future__ import annotations
 
+import logging
 import os
 from enum import StrEnum
 
 from lca.infrastructure.web_search.errors import FeatureUnavailableError, FetchError
 from lca.infrastructure.web_search.fetch import check_url
+
+log = logging.getLogger(__name__)
 
 
 class BrowserMode(StrEnum):
@@ -91,8 +94,8 @@ class BrowserBackend:
             ctxs = browser.contexts
             self._context = ctxs[0] if ctxs else browser.new_context()
             return browser
-        except Exception:
-            pass
+        except Exception as exc:
+            log.debug("CDP 连接失败，回退到 launch persistent context: %s", exc)
         if not self.user_data_dir:
             raise FeatureUnavailableError(
                 "cdp-persistent 需要 cdp_endpoint 可连，或传入 user-data-dir "
@@ -111,13 +114,13 @@ class BrowserBackend:
             try:
                 if obj is not None:
                     obj.close()
-            except Exception:
-                pass
+            except Exception as exc:
+                log.debug("browser close 忽略异常: %s", exc)
         try:
             if self._pw is not None:
                 self._pw.__exit__(None, None, None)
-        except Exception:
-            pass
+        except Exception as exc:
+            log.debug("playwright 退出忽略异常: %s", exc)
         self._context = self._browser = self._pw = None
 
     # -- action --------------------------------------------------------

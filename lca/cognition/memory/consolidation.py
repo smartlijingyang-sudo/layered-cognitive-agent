@@ -488,7 +488,8 @@ class SchemaExtractor(Protocol):
 def _schema_claim_id(who_key: tuple[str, ...], norm_what: str) -> str:
     """确定性 claim id：同一 (who, 主题) 重复提炼时 id 稳定。"""
     digest = hashlib.md5(
-        f"{'|'.join(who_key)}\x00{norm_what}".encode()
+        f"{'|'.join(who_key)}\x00{norm_what}".encode(),
+        usedforsecurity=False,  # 非安全用途：确定性 claim id
     ).hexdigest()[:12]
     return f"schema-{digest}"
 
