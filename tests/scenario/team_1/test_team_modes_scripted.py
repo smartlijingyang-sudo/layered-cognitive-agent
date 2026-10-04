@@ -37,6 +37,7 @@ from tests.harness.trace_assert import (
     assert_shared_trace_id,
     assert_trace_expect,
 )
+from tests.support.session_gate_helpers import bound_session
 from tests.support.strategy_registry import build_strategy_registry
 
 
@@ -183,7 +184,9 @@ async def test_edge_swarm_max_rounds_one() -> None:
     a = Agent(role="Alice", goal="g", backstory="b", tools=[], llm=llm, observability=col)
     b = Agent(role="Bob", goal="g", backstory="b", tools=[], llm=llm, observability=col)
     team = Team(members=[a, b], coordination=PeerSwarm(max_rounds=1), observability=col)
-    result = await team.run("swarm1")
+    # D3 裁决(todo-38/todo-50):run 路径 record() 需要 bound publish Session。
+    with bound_session("team-swarm-edge"):
+        result = await team.run("swarm1")
     assert result.status == "completed", format_case_digest(col.bundle(), result=result)
     rounds = col.bundle().by_name(SpanName.TEAM_ROUND.value)
     assert len(rounds) == 1 and rounds[0].attributes.get("max_rounds") == 1, format_case_digest(
