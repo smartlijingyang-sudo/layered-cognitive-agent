@@ -24,6 +24,7 @@ from lca.infrastructure.file.store import LocalFileStore
 from lca.infrastructure.observability import bind_backends, run_scope
 from lca.infrastructure.tools.write_file import build_tools as build_write_file_tools
 from tests.support.observability_helpers import make_test_bound
+from tests.support.session_gate_helpers import bound_session
 
 
 class _Collector:
@@ -119,7 +120,9 @@ class ToolInvokedFilesTests(unittest.IsolatedAsyncioTestCase):
         executor = SimpleSafeExecutor(
             permission_manifest=ToolPermissionManifest(allowed_tools=["writeFile"])
         )
-        with bind_backends(hub), run_scope(RunScope(trace_id="t", run_id="r")):
+        with bound_session("tool-invoked"), bind_backends(hub), run_scope(
+            RunScope(trace_id="t", run_id="r")
+        ):
             obs = await executor.execute(
                 tool,
                 {
@@ -153,7 +156,9 @@ class ToolInvokedFilesTests(unittest.IsolatedAsyncioTestCase):
             }
             for i in range(8)
         )
-        with bind_backends(hub), run_scope(RunScope(trace_id="t", run_id="r")):
+        with bound_session("tool-invoked"), bind_backends(hub), run_scope(
+            RunScope(trace_id="t", run_id="r")
+        ):
             from lca.infrastructure.observability import record
 
             record(
