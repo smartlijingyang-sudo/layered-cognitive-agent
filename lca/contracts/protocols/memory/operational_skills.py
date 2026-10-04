@@ -64,6 +64,8 @@ class SkillPackage:
     content_hash: str
     version: str = ""
     references: tuple[str, ...] = ()  # ADR-0214 §7: SKILL.md frontmatter 声明的引用路径索引
+    retired: bool = False  # 退役后 search 默认不可见、exec 拒绝
+    usage_count: int = 0  # activate 成功累计次数，供退役评审参考
 
 
 @dataclass(frozen=True)
@@ -94,6 +96,19 @@ class SkillPackageStore(Protocol):
     def resource_files(self, skill_id: str) -> dict[str, bytes]:
         """返回 skill 全部资源相对路径 → bytes，供沙箱挂载。"""
         ...
+
+    def update_package_meta(
+        self,
+        skill_id: str,
+        *,
+        retired: bool | None = None,
+        usage_count: int | None = None,
+    ) -> SkillPackage:
+        """更新包的退役标记 / 使用计数并落盘，返回更新后的包。
+
+        只读视图（如未实现该方法的 store）抛 NotImplementedError，调用方按需降级。
+        """
+        raise NotImplementedError
 
 
 class SkillPackageInstaller(SkillPackageStore, Protocol):

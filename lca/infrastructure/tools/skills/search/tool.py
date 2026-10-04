@@ -59,7 +59,8 @@ class SkillSearchTool(Tool):
         "优先查 LobeHub Market（需 market 鉴权：market-cli 凭证或 "
         "LCA_SKILL_MARKET_TOKEN / M2M client），否则搜本机已安装 skill。"
         "找到后用 import_skill 安装，再 activate_skill 加载指南。"
-        "参数: query（任务关键词，空则列出本地已安装）、page、page_size。"
+        "参数: query（任务关键词，空则列出本地已安装）、page、page_size、"
+        "include_retired（默认 false，退役 skill 不可见）。"
     )
     parameters: ClassVar[dict[str, Any]] = {
         "type": "object",
@@ -68,6 +69,7 @@ class SkillSearchTool(Tool):
             "q": {"type": "string", "description": "同 query（LobeHub wire 别名）"},
             "page": {"type": "integer", "default": 1},
             "page_size": {"type": "integer", "default": 20},
+            "include_retired": {"type": "boolean", "default": False},
         },
     }
     is_idempotent = True
@@ -82,8 +84,11 @@ class SkillSearchTool(Tool):
         query = str(args.get("query") or args.get("q") or "")
         page = int(args.get("page") or 1)
         page_size = int(args.get("page_size") or 20)
+        include_retired = bool(args.get("include_retired", False))
 
-        result = await self._search_with_degradation(query, page, page_size)
+        result = await self._search_with_degradation(
+            query, page, page_size, include_retired=include_retired
+        )
         result = filter_skill_search_result(
             result,
             unified_search_available=any_search_provider_available(),
@@ -113,8 +118,22 @@ class SkillSearchTool(Tool):
             latency_ms=latency_ms,
         )
 
+    def _is_retired(self, skill_id: str) -> bool:
+        """退役 skill 对默认搜索不可见；读不到元数据时按不可见处理。"""
+        from lca.contracts.protocols.memory.operational_skills import SkillNotFoundError
+
+        try:
+            return bool(self._store.get(skill_id).retired)
+        except (SkillNotFoundError, NotImplementedError, OSError):
+            return True
+
     async def _search_with_degradation(
-        self, query: str, page: int, page_size: int
+        self,
+        query: str,
+        page: int,
+        page_size: int,
+        *,
+        include_retired: bool = False,
     ) -> SkillSearchResult:
         """Three-level degradation: original → core terms → local installed.
 
@@ -137,6 +156,8 @@ class SkillSearchTool(Tool):
 
         # Level 3: list local installed skills
         local = self._store.list_installed()
+        if not include_retired:
+            local = tuple(entry for entry in local if not self._is_retired(entry.skill_id))
         if local:
             local_result = SkillSearchResult(
                 items=local,

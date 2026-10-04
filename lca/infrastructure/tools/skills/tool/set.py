@@ -18,6 +18,7 @@ from lca.infrastructure.tools.skills.deactivate.tool import SkillDeactivateTool
 from lca.infrastructure.tools.skills.exec.tool import SkillExecTool
 from lca.infrastructure.tools.skills.importer.import_tool import SkillImportTool
 from lca.infrastructure.tools.skills.read.reference_tool import SkillReadReferenceOnceTool
+from lca.infrastructure.tools.skills.retire.tool import SkillRetireTool, SkillUnretireTool
 from lca.infrastructure.tools.skills.search.tool import SkillSearchTool
 
 
@@ -50,6 +51,8 @@ def build_operational_skill_tools(
         SkillImportTool(resolved_importer),
         SkillActivateTool(resolved_store),
         SkillDeactivateTool(resolved_store),
+        SkillRetireTool(resolved_store),
+        SkillUnretireTool(resolved_store),
         SkillReadReferenceOnceTool(resolved_store),
     ]
     if sandbox is not None:

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 import time
 from pathlib import PurePosixPath
 from typing import Any, ClassVar
@@ -26,6 +27,8 @@ from lca.infrastructure.skills.activation.scope import (
 )
 from lca.infrastructure.tools.contract.render.render import FieldSpec, RenderContract, contract
 from lca.infrastructure.tools.contract.schema.schema import COMMON
+
+logger = logging.getLogger(__name__)
 
 ACTIVATE_SKILL_TOOL = "activate_skill"
 
@@ -187,6 +190,13 @@ class SkillActivateTool(Tool):
                 extra={FAILURE_KIND: FAILURE_KIND_VALIDATION},
             )
         register_activated(package.skill_id, package.name)
+        # Best effort: duck-typed stores without the capability are skipped.
+        update_meta = getattr(self._store, "update_package_meta", None)
+        if update_meta is not None:
+            try:
+                update_meta(package.skill_id, usage_count=package.usage_count + 1)
+            except (NotImplementedError, OSError) as exc:
+                logger.debug("skill usage_count persist skipped: %s", exc)
         from lca.infrastructure.observability.meta_event_emit import emit_skill_activated
 
         emit_skill_activated(

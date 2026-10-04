@@ -118,6 +118,15 @@ class SkillExecTool(Tool):
             )
 
         package = self._store.get(activated.skill_id)
+        if package.retired:
+            return Observation(
+                observation_id=new_id("obs"),
+                success=False,
+                payload=None,
+                error=(f"skill {package.skill_id} 已退役，拒绝执行；用 unretire_skill 恢复后再试"),
+                latency_ms=int((time.monotonic() - start) * 1000),
+                extra={FAILURE_KIND: FAILURE_KIND_VALIDATION},
+            )
         missing_resources = [
             ref
             for ref in package.references

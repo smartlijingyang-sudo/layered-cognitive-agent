@@ -105,6 +105,8 @@ class DiskSkillPackageStore(SkillPackageInstaller, SkillPackageStore):
             content_hash=str(meta.get("content_hash") or ""),
             version=str(meta.get("version") or ""),
             references=references,
+            retired=bool(meta.get("retired", False)),
+            usage_count=int(meta.get("usage_count", 0) or 0),
         )
 
     def read_resource(self, skill_id: str, rel_path: str) -> str:
@@ -212,6 +214,8 @@ class DiskSkillPackageStore(SkillPackageInstaller, SkillPackageStore):
             "resource_paths": normalized_resources,
             "references": list(declared_refs),
             "imported_at": datetime.now(tz=UTC).isoformat(),
+            "retired": False,
+            "usage_count": 0,
         }
         (dest / _MANIFEST).write_text(
             json.dumps(manifest, ensure_ascii=False, indent=2),
@@ -228,6 +232,31 @@ class DiskSkillPackageStore(SkillPackageInstaller, SkillPackageStore):
             version=version,
             references=tuple(declared_refs),
         )
+
+    def update_package_meta(
+        self,
+        skill_id: str,
+        *,
+        retired: bool | None = None,
+        usage_count: int | None = None,
+    ) -> SkillPackage:
+        """重写 manifest.json 中的退役标记 / 使用计数（其余字段原样保留）。"""
+        from lca.contracts.protocols.memory.operational_skills import SkillNotFoundError
+
+        sid = sanitize_skill_id(skill_id)
+        manifest_path = self._root / sid / _MANIFEST
+        if not manifest_path.is_file():
+            raise SkillNotFoundError(f"技能库中不存在 skill_id：{sid}")
+        meta = json.loads(manifest_path.read_text(encoding="utf-8"))
+        if retired is not None:
+            meta["retired"] = bool(retired)
+        if usage_count is not None:
+            meta["usage_count"] = max(0, int(usage_count))
+        manifest_path.write_text(
+            json.dumps(meta, ensure_ascii=False, indent=2),
+            encoding="utf-8",
+        )
+        return self.get(sid)
 
 
 def _rmtree(path: Path) -> None:
@@ -248,7 +277,7 @@ def safe_rel_path(name: str) -> str:
 def _strip_resources_prefix(path: str) -> str:
     """Strip a leading ``resources/`` prefix from a declared reference path."""
     prefix = f"{_RESOURCES}/"
-    return path[len(prefix):] if path.startswith(prefix) else path
+    return path[len(prefix) :] if path.startswith(prefix) else path
 
 
 def _to_resource_rel(path: str) -> str:
