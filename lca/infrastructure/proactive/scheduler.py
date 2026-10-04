@@ -210,6 +210,14 @@ class ProactiveScheduler:
                 job.id,
                 message.id,
             )
+            return "delivered"
+        if not receipt.get("delivered"):
+            # 没抛错不等于投递成功：目标 session 不存在时 deliver 返回
+            # delivered=False，这里必须记成 failed，否则 job 状态撒谎。
+            reason = str(receipt.get("reason") or "not_delivered")
+            js["last_error"] = reason
+            _log.warning("proactive.not_delivered job_id=%s reason=%s", job.id, reason)
+            return "failed"
         return "delivered"
 
     # ---- 文件锁（ADR-0263 §9①②） ----

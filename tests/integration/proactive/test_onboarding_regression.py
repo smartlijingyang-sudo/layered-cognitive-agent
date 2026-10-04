@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """Onboarding 主动欢迎消息回归测试。
 
 复现用户报告的 bug：onboarding naming_settle 完成后，期望中的主动欢迎消息

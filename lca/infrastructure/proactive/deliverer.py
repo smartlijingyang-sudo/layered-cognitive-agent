@@ -4,8 +4,11 @@
 ``surface/assistant_message`` 事件——与前端读的是同一份 session log
 （``derive_messages()``），不新开消息协议。
 
-- SESSION_APPEND：从 SessionStore 取 session，不存在则创建（幂等），
-  append 事件。事件 data 复用 run 路径的 surface taxonomy，
+- SESSION_APPEND：从 SessionStore 取 session，取不到就记为未投递
+  （``delivered=False, reason="session_not_found"``），绝不创建。生产 session
+  按 run_id 建键并在 run 终局时 dispose，凭空创建的 session 没有任何 gateway
+  pump / flush listener / WebSocket 会读它。命中时 append 事件，
+  事件 data 复用 run 路径的 surface taxonomy，
   ``turn=-1`` 标记非 run 上下文的主动消息，``proactive=true`` 供前端区分。
 - RESPONSE_CARRIED：不经过 session，由调用方把 ``carried_message``
   塞进 HTTP 响应（见 routes_onboarding.naming_settle）。
@@ -164,9 +167,11 @@ class ProactiveDeliverer:
         """投递一条消息，返回投递回执（fail-loud，不静默吞错）。
 
         precondition：target.kind 为 SESSION_APPEND 时 session_id 非空
-        （contracts 层已校验）。失败时抛错，由调用方决定重试/死信。
+        （contracts 层已校验）。写失败时抛错，由调用方决定重试/死信。
         同一 ``(session_id, proactive_id)`` 重复投递时不写 session，
-        回执 ``duplicate=True``（幂等命中）。
+        回执 ``duplicate=True``（幂等命中）。目标 session 不存在时也不写，
+        回执 ``delivered=False, reason="session_not_found"``；调用方必须读
+        ``delivered``，不能把「没抛错」当成「投递成功」。
         """
         if target.kind == DeliveryTargetKind.RESPONSE_CARRIED:
             return {
@@ -206,12 +211,21 @@ class ProactiveDeliverer:
             }
         session = self._store.get(target.session_id)
         if session is None:
-            session = self._store.create(target.session_id)
-            _log.info(
-                "proactive.session_created session_id=%s message_id=%s",
+            # Sessions are keyed by run_id and disposed at terminalization, so a
+            # miss means no live run owns this conversation. Creating one here
+            # fabricated an orphan no gateway pump, flush listener or WebSocket
+            # ever read, while the receipt still claimed a delivery.
+            _log.warning(
+                "proactive.session_not_found session_id=%s message_id=%s",
                 target.session_id,
                 message.id,
             )
+            return {
+                "delivered": False,
+                "reason": "session_not_found",
+                "kind": target.kind.value,
+                "session_id": target.session_id,
+            }
         event = session.append(
             SURFACE_ASSISTANT_MESSAGE,
             {

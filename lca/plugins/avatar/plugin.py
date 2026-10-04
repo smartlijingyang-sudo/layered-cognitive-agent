@@ -172,9 +172,8 @@ def _make_notifier(session_store: Any) -> Callable[[str, str], None]:
     """构造定时换装的轻量通知钩子（ProactiveDeliverer + SESSION_APPEND）。
 
     ``avatar_costume_scheduler._notify(assistant_id, text)`` 只给 assistant_id。
-    为避免 ``ProactiveDeliverer`` 在 session 缺失时 ``create`` 伪造会话，
-    只在 ``session_store.get(assistant_id)`` 命中已有 session 时才投递；
-    没有对应 session 则跳过并记录日志（通知是轻量附加，绝不产生会话）。
+    通知是轻量附加，绝不产生会话：目标 session 不存在时 deliverer 返回
+    ``delivered=False`` 并自己记 WARNING，这里不复述。
     """
     from lca.contracts.atoms.ids.ids import new_id
     from lca.contracts.models.proactive.message import (
@@ -188,12 +187,6 @@ def _make_notifier(session_store: Any) -> Callable[[str, str], None]:
     deliverer = ProactiveDeliverer(session_store)
 
     def notifier(assistant_id: str, text: str) -> None:
-        if session_store.get(assistant_id) is None:
-            logger.info(
-                "avatar costume notification skipped: no session for assistant_id=%s",
-                assistant_id,
-            )
-            return
         message = ProactiveMessage(
             id=new_id("avatar_notify"),
             content=text,

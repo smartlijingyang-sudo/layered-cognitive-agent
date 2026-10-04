@@ -1,10 +1,13 @@
-# -*- coding: utf-8 -*-
 """主动消息完整链集成测试：调度 tick → 裁决 → 投递 → session 可读回。
 
 用真实 SessionStore + 真实 ProactiveScheduler（文件锁/state 落 tmp），
 不 mock 关键链路（decide/deliver/session.append 全是真实调用）。
+
+投递目标 session 一律由测试预注册：生产中 session 由 run 绑定创建、终结时
+dispose，deliverer 在 store miss 时不再伪造会话，miss 即 ``delivered=False``。
 """
 
+import json
 import logging
 import sys
 import tempfile
@@ -41,15 +44,13 @@ def _make_scheduler(
 
 
 def _job(job_id, session_id, content="x", **kw):
-    base = dict(
-        id=job_id,
-        interval_seconds=60,
-        content=content,
-        target=DeliveryTarget(
-            kind=DeliveryTargetKind.SESSION_APPEND, session_id=session_id
-        ),
-        requested=True,
-    )
+    base = {
+        "id": job_id,
+        "interval_seconds": 60,
+        "content": content,
+        "target": DeliveryTarget(kind=DeliveryTargetKind.SESSION_APPEND, session_id=session_id),
+        "requested": True,
+    }
     base.update(kw)
     return ProactiveJob(**base)
 
@@ -57,6 +58,7 @@ def _job(job_id, session_id, content="x", **kw):
 def test_tick_delivers_due_job_to_session():
     tmp = Path(tempfile.mkdtemp())
     sched, store = _make_scheduler(tmp, [_job("job1", "sess-1", content="该喝水了")])
+    store.create("sess-1")
     try:
         report = sched.tick(now_ms=1_000_000)
         assert report.lock_acquired is True
@@ -81,6 +83,7 @@ def test_crash_between_deliver_and_state_save_does_not_duplicate():
     """
     tmp = Path(tempfile.mkdtemp())
     store = SessionStore()
+    store.create("sess-crash")
     deliverer = ProactiveDeliverer(store, state_dir=tmp / "state")
     sched = ProactiveScheduler(
         lock_dir=tmp / "locks",
@@ -112,6 +115,7 @@ def test_tick_skips_not_due_job():
         requested=True,
     )
     sched, store = _make_scheduler(tmp, [job])
+    store.create("sess-2")
     try:
         # 第一次 tick 投递
         r1 = sched.tick(now_ms=1_000_000)
@@ -132,7 +136,8 @@ def test_lock_contention_second_tick_skipped():
     tmp = Path(tempfile.mkdtemp())
     job = _job("job3", "sess-3")
     sched1, _ = _make_scheduler(tmp, [job])
-    sched2, _ = _make_scheduler(tmp, [job])
+    sched2, store2 = _make_scheduler(tmp, [job])
+    store2.create("sess-3")
     # sched1 模拟崩溃进程：只拿锁不走 tick（锁不释放）
     assert sched1._acquire_lock(1_000_000) is True
     try:
@@ -148,11 +153,10 @@ def test_lock_contention_second_tick_skipped():
 
 
 def test_stale_lock_reaped():
-    import json
-
     tmp = Path(tempfile.mkdtemp())
     job = _job("job4", "sess-4")
     sched, store = _make_scheduler(tmp, [job])
+    store.create("sess-4")
     # 手工写入一个 stale 锁（模拟崩溃残留）：mtime=1_000_000，
     # tick 时刻已过 130s > stale 阈值（2×60s=120s）
     lock_file = tmp / "locks" / "proactive.lock"
@@ -203,8 +207,30 @@ def test_failed_delivery_retries_then_dead_letters():
         sched.release_lock()
 
 
-def test_response_carried_does_not_touch_session():
+def test_due_job_without_target_session_counts_as_failed():
+    """到期任务的目标 session 不存在 → 计入 failed，绝不计入 delivered。
+
+    deliver 对 store miss 不抛错，只回 ``delivered=False,
+    reason=session_not_found``；scheduler 若把「没抛错」当成投递成功，
+    job 状态就在为一条从未送达的消息背书。
+    """
     tmp = Path(tempfile.mkdtemp())
+    job = _job("job-orphan", "sess-gone")
+    sched, store = _make_scheduler(tmp, [job])
+    try:
+        report = sched.tick(now_ms=1_000_000)
+        assert report.jobs_due == 1
+        assert report.delivered == 0
+        assert report.failed == 1
+        # 没伪造会话，也没有任何事件落地
+        assert store.list() == ()
+        state = json.loads((tmp / "state" / "state.json").read_text(encoding="utf-8"))
+        assert state["job-orphan"]["last_error"] == "session_not_found"
+    finally:
+        sched.release_lock()
+
+
+def test_response_carried_does_not_touch_session():
     store = SessionStore()
     deliverer = ProactiveDeliverer(store)
     from lca.contracts.models.proactive import ProactiveMessage
@@ -271,6 +297,7 @@ def test_requested_with_verified_ref_delivers_chat(caplog):
         request_ref="job:job-req",
     )
     sched, store = _make_scheduler(tmp, [job])
+    store.create("sess-req")
     try:
         report = sched.tick(now_ms=1_000_000)
         assert report.delivered == 1
