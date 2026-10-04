@@ -22,7 +22,7 @@ purpose: ReasonerContext + TemplateSelection + RoleSnapshot → ReasonerTurnRend
 nodes:
   - id: prompt.sections.assemble
     factory: prompt.sections.assemble
-    inputs: [template_selection]
+    inputs: [template_selection, prompt_template_provider]
     outputs: [prompt_template]
     config:
       emit_on_enter: []
@@ -30,7 +30,7 @@ nodes:
 
   - id: prompt.sections.fill
     factory: prompt.sections.fill
-    inputs: [prompt_template, context, role]
+    inputs: [prompt_template, context, role, tools_provider, prompt_section_registry]
     outputs: [prompt_text, prompt_trace]
     config:
       emit_on_enter: []
