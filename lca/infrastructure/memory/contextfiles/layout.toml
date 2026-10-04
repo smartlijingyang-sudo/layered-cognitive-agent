@@ -12,13 +12,34 @@ standing_files = [
     "memory/groups/INDEX.md",
     "dreams/alignment/derived/ALIGNMENT_SYNTHESIS.md",
 ]
+# Tier 1 (platform): always injected whole, outside any budget. Resolved
+# against get_lca_home() (~/.lca), NOT the assistant home. A missing file is
+# skipped silently (fail-soft).
+platform_files = ["PLATFORM.md"]
+# Heading stamped above each platform file when injected into the prompt.
+platform_heading = "## 平台共享规则（{name}，对所有助手生效）"
+# Tier 2 (protected): identity files, assembled by markdown section
+# (whole section in / whole section dropped, never cut mid-section) within
+# protected_budget_chars. Dropped sections log a warning. Must be a subset
+# of standing_files.
+protected_files = ["CONSTITUTION.md", "SOUL.md", "IDENTITY.md", "USER.md"]
+# Measured 2026-10-04: protected tier files total ~30705 chars
+# (CONSTITUTION 23646 + SOUL 6642 + IDENTITY 173 + USER 244). 32000 fits
+# them whole with headroom; further growth drops whole sections with a
+# warning instead of silent mid-sentence cuts.
+protected_budget_chars = 32000
 people_dir = "memory/people"
 people_index = "INDEX.md"
 groups_dir = "memory/groups"
 groups_index = "INDEX.md"
 live_note = "常驻文件是磁盘上的实时副本，分歧以最新文件为准。"
 home_override = "memory/contextfiles.toml"
-backstory_budget_chars = 3000
+# Total budget (chars) for tier 2 + tier 3. Tier 3 (projection) gets
+# backstory_budget_chars - protected_budget_chars (4000: measured projection
+# files total ~4185 chars). Tier 1 is outside any budget.
+# NOTE: ~36000 chars ~= 9-18k tokens per turn for the backstory. Lower these
+# numbers (or trim the standing files) to cut cost; drops stay section-atomic.
+backstory_budget_chars = 36000
 agents_file = "AGENTS.md"
 agents_heading = "## 工作约定（AGENTS.md）"
 projection_file = "MEMORY.md"

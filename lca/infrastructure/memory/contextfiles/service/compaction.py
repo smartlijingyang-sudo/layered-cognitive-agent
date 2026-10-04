@@ -8,12 +8,17 @@ through ``FileStore`` and replaces only the injected blocks.
 from __future__ import annotations
 
 import logging
+from pathlib import Path
 
 from lca.infrastructure.memory.contextfiles.domain.layout import ContextLayout, packaged_layout
 from lca.infrastructure.memory.contextfiles.domain.standing import refresh_injected
 from lca.infrastructure.memory.contextfiles.events.publisher import StandingPreserved
 from lca.infrastructure.memory.contextfiles.ports.events import DomainEventPublisher
 from lca.infrastructure.memory.contextfiles.ports.file_store import FileStore
+from lca.infrastructure.memory.contextfiles.service.assembly import (
+    read_platform_documents,
+)
+from lca.infrastructure.path.locator import get_lca_home
 
 logger = logging.getLogger(__name__)
 
@@ -24,15 +29,22 @@ def preserve_standing_sections(
     publisher: DomainEventPublisher | None = None,
     *,
     layout: ContextLayout | None = None,
+    platform_root: str | Path | None = None,
 ) -> str:
-    """Return ``text`` with injected standing blocks replaced from ``store``."""
+    """Return ``text`` with injected standing blocks replaced from ``store``.
+
+    Tier 1 platform files are refreshed from ``platform_root`` (default
+    ``get_lca_home()``) so a prompt reuse never drops the platform blocks.
+    """
 
     chosen = packaged_layout() if layout is None else layout
-    files = tuple((name, _read(store, name)) for name in chosen.standing_files)
+    root = platform_root if platform_root is not None else get_lca_home()
+    files = read_platform_documents(chosen, root)
+    files.extend((name, _read(store, name)) for name in chosen.standing_files)
     refreshed = refresh_injected(
         text,
         files,
-        order=chosen.standing_files,
+        order=[name for name, _ in files],
         live_note=chosen.live_note,
     )
     changed = refreshed != text

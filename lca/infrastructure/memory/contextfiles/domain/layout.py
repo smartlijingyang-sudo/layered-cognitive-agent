@@ -22,6 +22,10 @@ _PACKAGE_FILE = Path(__file__).resolve().parent.parent / "layout.toml"
 
 _FIELDS = (
     "standing_files",
+    "platform_files",
+    "platform_heading",
+    "protected_files",
+    "protected_budget_chars",
     "people_dir",
     "people_index",
     "groups_dir",
@@ -45,6 +49,10 @@ class ContextLayout:
     """Names and budgets for one assistant home's context files."""
 
     standing_files: tuple[str, ...]
+    platform_files: tuple[str, ...]
+    platform_heading: str
+    protected_files: tuple[str, ...]
+    protected_budget_chars: int
     people_dir: str
     people_index: str
     groups_dir: str
@@ -112,14 +120,20 @@ def read_layout(text: str) -> ContextLayout:
 
 
 def merge_layout(base: ContextLayout, text: str) -> ContextLayout:
-    """Replace fields present in ``text``. Absent fields stay on ``base``."""
+    """Replace fields present in ``text``. Absent fields stay on ``base``.
+
+    Tier invariants are sanitized rather than rejected: protected files not
+    in the new standing list are dropped, and the protected budget is clamped
+    to the total, so a home that customizes its file list or shrinks the
+    budget keeps working instead of falling back to the packaged layout.
+    """
 
     data = _table(text)
     if not data:
         return base
     current = {key: getattr(base, key) for key in _FIELDS}
     current.update(data)
-    return _from_mapping(current)
+    return _from_mapping(current, strict=False)
 
 
 @lru_cache(maxsize=1)
@@ -155,25 +169,57 @@ def _table(text: str) -> dict[str, object]:
     return data
 
 
-def _from_mapping(data: dict[str, object]) -> ContextLayout:
+def _from_mapping(data: dict[str, object], *, strict: bool = True) -> ContextLayout:
     standing = data["standing_files"]
     if not isinstance(standing, (list, tuple)) or not standing:
         raise ValueError("standing_files must be a non-empty list")
     names = tuple(_relative(item, key="standing_files") for item in standing)
     if len(set(names)) != len(names):
         raise ValueError("standing_files must be unique")
+    platform = data["platform_files"]
+    if not isinstance(platform, (list, tuple)):
+        raise ValueError("platform_files must be a list")
+    platform_names = tuple(
+        _relative(item, key="platform_files", single_segment=True) for item in platform
+    )
+    if len(set(platform_names)) != len(platform_names):
+        raise ValueError("platform_files must be unique")
+    protected = data["protected_files"]
+    if not isinstance(protected, (list, tuple)):
+        raise ValueError("protected_files must be a list")
+    protected_names = tuple(_relative(item, key="protected_files") for item in protected)
+    if len(set(protected_names)) != len(protected_names):
+        raise ValueError("protected_files must be unique")
+    if strict:
+        if not set(protected_names) <= set(names):
+            raise ValueError("protected_files must be a subset of standing_files")
+        if set(platform_names) & set(names):
+            raise ValueError("platform_files must not overlap standing_files")
+    else:
+        protected_names = tuple(f for f in protected_names if f in names)
+        platform_names = tuple(f for f in platform_names if f not in names)
+    total_budget = _positive_int(data["backstory_budget_chars"], key="backstory_budget_chars")
+    protected_budget = data["protected_budget_chars"]
+    if isinstance(protected_budget, bool) or not isinstance(protected_budget, int):
+        raise ValueError("protected_budget_chars must be an integer")
+    if protected_budget < 0:
+        raise ValueError("protected_budget_chars must be >= 0")
+    if strict and protected_budget > total_budget:
+        raise ValueError("protected_budget_chars must not exceed backstory_budget_chars")
+    protected_budget = min(protected_budget, total_budget)
     return ContextLayout(
         standing_files=names,
+        platform_files=platform_names,
+        platform_heading=_line(data["platform_heading"], key="platform_heading"),
+        protected_files=protected_names,
+        protected_budget_chars=protected_budget,
         people_dir=_relative(data["people_dir"], key="people_dir"),
         people_index=_relative(data["people_index"], key="people_index", single_segment=True),
         groups_dir=_relative(data["groups_dir"], key="groups_dir"),
         groups_index=_relative(data["groups_index"], key="groups_index", single_segment=True),
         live_note=_line(data["live_note"], key="live_note"),
         home_override=_relative(data["home_override"], key="home_override"),
-        backstory_budget_chars=_positive_int(
-            data["backstory_budget_chars"],
-            key="backstory_budget_chars",
-        ),
+        backstory_budget_chars=total_budget,
         agents_file=_relative(data["agents_file"], key="agents_file"),
         agents_heading=_line(data["agents_heading"], key="agents_heading"),
         projection_file=_relative(data["projection_file"], key="projection_file"),
