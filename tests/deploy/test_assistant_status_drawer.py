@@ -117,8 +117,19 @@ def test_assistant_status_drawer_activity_detail_contract() -> None:
 
     # 弹窗标题绑定为选中 item 的具体概要标题
     assert "selectedActivity.title" in content
-    # 右侧展示具体情况的清晰文本说明
-    assert "具体情况详细说明" in content
+    # 右侧详情：渐进式披露证据面板（MODAL-TASK-4 落地后的真实渲染标记，
+    # 0b9137881 删掉的"具体情况详细说明"是隐藏作弊 span，对空气断言，绝不复活）
+    assert "具体情况详细说明" not in content
+    # 1. 结论前置 Hero Verdict Card（activeSubStep.conclusion 驱动）
+    assert "heroVerdictCard" in content
+    assert "activeSubStep.conclusion" in content
+    # 2. 步骤标题
+    assert "activeSubStep.step_title" in content
+    # 3. 叙述段落卡片（120 字渐隐 + 展开按钮）
+    assert "narrativeCard" in content
+    assert "activeSubStep.narrative" in content
+    # 4. 详情主面板 testid
+    assert 'data-testid="lca-detail-main"' in content
 
 
 def test_modal_zero_hardcoding_and_debugging_labels() -> None:
