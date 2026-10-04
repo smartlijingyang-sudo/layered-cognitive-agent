@@ -19,6 +19,7 @@ from dataclasses import dataclass
 
 import structlog
 
+from lca.infrastructure.observability.spine.sinks.naming import kernel_log_filename
 from lca.infrastructure.persistence.run_paths import default_runs_root, ensure_run_dir
 
 _log = structlog.get_logger(__name__)
@@ -68,7 +69,7 @@ def _append_kernel_log(facts: RunFailureFacts) -> None:
             f"run_failure_observed run_id={facts.run_id} "
             f"trace_id={facts.trace_id} error={facts.error}\n"
         )
-        with (run_dir / "kernel.log").open("a", encoding="utf-8") as handle:
+        with (run_dir / kernel_log_filename(facts.run_id)).open("a", encoding="utf-8") as handle:
             handle.write(line)
     except Exception:
         _log.debug(

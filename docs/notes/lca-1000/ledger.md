@@ -466,3 +466,19 @@
 - 验证结果: ruff check 1 文件首次即过（All checks passed!）；行为等价 python 断言全绿（pattern 逐字节等价；import 冒烟无循环；tmp run 端到端：`_spine_start_time` 正确恢复 kernel.run.start 的 ts、discovery sorted-first 语义保留、非匹配后缀不被拾取；空目录 fail-soft → None 不变）；targeted pytest `tests/infrastructure/observability/test_activity_feed.py`：12 passed，0 failed，无预存失败；CI gate scripts/lca-cli-shape.py：touched file 零 findings（剩余 2 个 output_mode findings 在 ops/memory.py、runs/health.py——本轮未动文件，预存问题，与本轮无关）。
 - commit: 见 git log --grep='第0492轮'（refactor(lca-1000): 第0492轮 activity_feed 三处 spine discovery glob 后缀收敛至 naming SSOT seam(Seam)，2 files，未 push）。
 - 备注: 只 add 本轮 2 个文件（代码 1 + ledger.md）；工作区干净（编辑前 git status --porcelain 仅见本轮文件；并发会话其间新增 2 个 merge commit，均已入库，tree clean）；备份 /tmp/bak_0492/（252，1 文件原版）。stdin 喂 python 编辑/验证路径继续稳定可靠。
+
+## 第0493轮 (2026-10-05 06:03-06:20 CST)
+- 改了什么: kernel.log 写侧字面量收敛至 naming SSOT seam（1 file，2 insertions(+)，1 deletion(-)）：
+  - `lca/plugins/transport/webserver/handlers/runs/terminal/failure/failure.py:71`：`(run_dir / "kernel.log")` → `(run_dir / kernel_log_filename(facts.run_id))`；
+  - 新增 import `from lca.infrastructure.observability.spine.sinks.naming import kernel_log_filename`（isort 顺序正确：observability < persistence）。
+- 依据 skill 哪一节: DEEPENING.md Seam discipline（`naming.kernel_log_filename` 是 kernel.log 命名 seam：read 侧 SSOT finder `find_kernel_log`（ssot.py）已收敛到它、常量 SSOT 在 naming.py——seam 真实；唯一写者 `_append_kernel_log` 是绕开 seam 的影子拼写）+ SKILL.md Deletion test（删掉字面量后命名复杂度不搬家——全活在 naming.py；reader adapter `find_kernel_log` 已存在，seam 赚回存在价值）+ LANGUAGE.md Locality（文件名约定改一处——naming.py）/ Interface（error mode 未碰：best-effort try/except 结构、`open("a")`、`ensure_run_dir` 原样保留；writer 侧用 naming seam 函数而非 observation reader seam `find_kernel_log`——沿用 491 惯例：finder 是 reader seam，写侧收敛到命名函数）。
+- 为什么这是实质改动(非凑数): 484→492 命名收敛弧在 kernel.log 命名空间的写侧收口（read 侧早已在 ssot.py 收敛；全库 grep 确认这是最后一个该 pattern 的 code site）。写者比读侧更 load-bearing：`record_run_failure` 是 lifecycle 失败时的最后防线（ADR-0122 kernel.log intent）；若 `KERNEL_LOG_FILENAME` 变更，写者写旧名、`find_kernel_log` 读新名 → 兜底日志跨进程沉默丢失——与 491 轮同类的"写读名不一、bug 沉默通过"（ssot.py 记载的 PR-27 式回归根因）。字节级等价已断言（5 种 run_id 逐字节相等）。
+- 关键设计决策（夜间跳过 grilling，记台账）: 只收敛写侧字面量，不动 `kernel_log_filename` 的 run_id-independent 形状（函数返回常量是命名 seam 的既有设计，改形状需 grilling）；不碰 `debug/run.py:222` 读侧字面量（`_tail_lines` fail-soft 缺文件→""，而 `find_kernel_log` 在 run_dir 不存在时抛 `ObservationSSOTError`——error mode 变更属设计决策，留后续逐个评审）；不碰 `file_sink/__init__.py:42` boot-spine 默认路径（`.lca/spine` 目录无 SSOT；`boot_path` 是可 override 构造函数参数，hypothetical seam，需 grilling）。
+- 候选清单（本轮 explore，逐一验证后取舍）：
+  1. 上述 kernel.log 写侧收敛至 naming seam —— 选中（kernel.log 命名空间写侧唯一 code site；writer 侧单独评审通过）。
+  2. `debug/run.py:222` 读侧字面量 → `find_kernel_log` —— 驳回（error mode 不同，沿用 490/491"不碰 error mode"惯例，留后续）。
+  3. `file_sink/__init__.py:42` `_DEFAULT_BOOT_PATH = ".lca/spine/boot-spine.jsonl"` —— 驳回（boot 目录无 SSOT + boot_path 是 override 参数 hypothetical seam，需 grilling，夜间轮不动）。
+  4. deslop 扫描（改动面 failure.py 附近）：无叙事性注释 slop、无依据 guard、死兼容路径 —— 无动作。
+- 验证结果: ruff check 1 文件首次即过（All checks passed!）；行为等价 python 断言全绿（`kernel_log_filename(x) == "kernel.log"` 逐字节相等，5 种 run_id 含空串/长串/空格；import 冒烟无循环）；targeted pytest（`tests/transport/test_doctor_carrier_session_error.py` + `tests/observability/spine/sinks/test_run_artifact_writer_discipline.py`）：12 passed，6 skipped（skip 为预存的 os.open infrastructure 检查，与本轮无关）；其中 `test_record_run_failure_writes_kernel_log` 端到端通过（写到同一 `kernel.log` 路径）；CI gate scripts/lca-cli-shape.py：touched file 零 findings（剩余 2 个 output_mode findings 在 ops/memory.py、runs/health.py——本轮未动文件，预存问题，与本轮无关）。
+- commit: 见 git log --grep='第0493轮'（refactor(lca-1000): 第0493轮 kernel.log 写侧字面量收敛至 naming SSOT seam(Seam)，2 files，未 push）。
+- 备注: 只 add 本轮 2 个文件（代码 1 + ledger.md）；编辑前 git status --porcelain 干净（本轮期间无并发会话未提交改动）；备份 /tmp/bak_0493/（252，1 文件原版）。中途一次 heredoc 编辑传输层引号损坏（断言拦截，文件未动），改用 base64 喂脚本绕过，编辑成功。
