@@ -43,7 +43,7 @@ enum; sediment classes are not members)."""
 # v1 heuristic: explicit marker lines. Recall ceiling documented in ADR-0283 B2.
 _SEDIMENT_MARKER_RE = re.compile(
     r"^\s*(decision|决定|commitment|承诺|todo|待办|fact|事实|state|状态"
-    r"|open[ _-]?question|openquestion|未决事项|未决)"
+    r"|open[ _-]?question|未决事项|未决)"
     r"\s*[:：]\s*(.+?)\s*$",
     re.IGNORECASE,
 )
@@ -61,6 +61,7 @@ _CATEGORY_BY_MARKER: dict[str, SedimentCategory] = {
     "状态": "entity_state",
     "open question": "open_question",
     "open_question": "open_question",
+    "open-question": "open_question",
     "openquestion": "open_question",
     "未决事项": "open_question",
     "未决": "open_question",
