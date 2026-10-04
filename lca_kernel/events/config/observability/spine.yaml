@@ -179,6 +179,7 @@ events:
       invocation_id: str
       attempt: int
       activation_ref: str
+      wrapper: str
     publishers:
       - lca.loop.fact_gateway.DefaultFactGateway
 
@@ -196,6 +197,7 @@ events:
       # step.tool_result.record 互相对账,避免 journal.tool_result.ok
       # 与 phase.tool.call.end.ok 出现矛盾。
       ok: bool
+      wrapper: str
     publishers:
       - lca.loop.fact_gateway.DefaultFactGateway
 
