@@ -143,7 +143,7 @@ class HistoryDeriveExecutor:
     本节点不自行拼接提示词内容。
     """
 
-    semantic_name: str = "history.derive"
+    semantic_name: str = "memory.derive"
     region: str = "think"
     declared_inputs: tuple[PortName, ...] = (
         PortName("state"),
@@ -223,7 +223,7 @@ def _resolve_port(name: PortName, *, input: NodeInput, context: NodeContext) -> 
             value = context.runtime.get(name)
     if value is None:
         raise TypeError(
-            f"history.derive: '{name}' port must be supplied via input.port_values or context.runtime"
+            f"memory.derive: '{name}' port must be supplied via input.port_values or context.runtime"
         )
     return value
 
@@ -393,7 +393,7 @@ def _resolve_system(
 @plugin(
     id="phase.think.history.derive",
     Config=None,
-    provides=("think::history.derive",),
+    provides=("think::memory.derive",),
     requires=(),
     layer="L2",
     kind=PluginKind.PRIMITIVE,

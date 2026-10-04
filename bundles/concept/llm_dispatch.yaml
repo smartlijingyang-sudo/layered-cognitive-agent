@@ -6,7 +6,7 @@
 # 写到 Session,然后把 LLMResponse + TokenUsage 透传到下一节点。
 #
 # 跨图引用:
-#   inputs  -> primitive.history.derive 的 model_visible_request 端口
+#   inputs  -> memory.derive 的 model_visible_request 端口
 #   outputs -> primitive.decision.parse 节点的 llm_response 端口
 #
 # delete-when: N/A(纯加法,think.llm.dispatch 节点在 think.yaml 引用)。

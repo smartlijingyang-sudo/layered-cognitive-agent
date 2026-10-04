@@ -102,7 +102,7 @@ nodes:
       # applied. T3 wires llm.invoke + think.decision.parse after it.
       sub_spec_ref:
         plan_ref: bundles/concept/history_assemble.yaml
-        entry_node: history.derive
+        entry_node: memory.derive
         binding_edge: think.history.assemble
 
   - id: llm.invoke

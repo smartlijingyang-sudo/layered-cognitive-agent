@@ -73,7 +73,7 @@ graph-node-executors.
 lca/nodes/
 ├── think/                # region = "think" (closed-set phase)
 │   ├── history/          # sub-group: session-history assembly
-│   │   └── assemble.py   # id="history.derive" → think::history.derive
+│   │   └── assemble.py   # id="memory.derive" → think::memory.derive
 │   ├── dispatch/         # sub-group: LLM I/O
 │   │   └── llm.py        # id="llm.dispatch"   → think::llm.dispatch
 │   ├── decision/         # sub-group: decision-shape projection
