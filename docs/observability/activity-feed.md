@@ -1,7 +1,7 @@
 # Activity 动态栏：数据是什么、UI 怎么显示
 
 > 对应截图：任务详情视图「验证Activity重启与事件完整性」、助手动态栏「今天」分组。
-> 代码版本：main @ 2f13df17e（2026-10-04）。**版本弧**：`634fe4c4c`（李超 10-03 17:09 亲改，重写投影）曾移除 `ActivityItem` 的 `tool_name`/`current_step` 字段与 `ActivityIntentNamer.live_step()`；`fix-activity-honesty-20261003-1730` 分支（`c9bcb5b51`，merge `f17a7effe`）把两字段加回，`d89fc6e73` 去掉了 auto-merge 引入的重复 `tool_name` kwargs；**`6b33b474d`（李超 10-04 01:28）删除了 `ActivityProjector`（可变缓存）与 `seed_from_traces`，换成纯 fold 架构 `lca/infrastructure/observability/activity_feed.py`**——一行不再是一个工具调用，而是一个 run；后端不再有事件增量写入。下文均为新架构状态。
+> 代码版本：main @ e273a049e（2026-10-04）。**版本弧**：`634fe4c4c`（李超 10-03 17:09 亲改，重写投影）曾移除 `ActivityItem` 的 `tool_name`/`current_step` 字段与 `ActivityIntentNamer.live_step()`；`fix-activity-honesty-20261003-1730` 分支（`c9bcb5b51`，merge `f17a7effe`）把两字段加回，`d89fc6e73` 去掉了 auto-merge 引入的重复 `tool_name` kwargs；**`6b33b474d`（李超 10-04 01:28）删除了 `ActivityProjector`（可变缓存）与 `seed_from_traces`，换成纯 fold 架构 `lca/infrastructure/observability/activity_feed.py`**——一行不再是一个工具调用，而是一个 run；后端不再有事件增量写入。下文均为新架构状态。
 
 ## 一、图里是什么
 
