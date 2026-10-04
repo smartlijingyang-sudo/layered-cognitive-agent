@@ -266,6 +266,14 @@ git commit -m "feat(memory): add the dream sweep loop with an injected clock"
 
 ### Task 2: Lock contention and write collision
 
+**Superseding ruling (R16, R17).** The `_run_home` body specified below is replaced, not merely extended. Task 1's review found that `RoutineFileLock.acquire()` returns `False` whenever the lock file exists, stale or not (`lca/application/routine/locks.py:93-95`), and that nothing calls `reclaim_stale()`. After a `kill -9`, an OOM, or a `kernel-restart` escalating to SIGKILL mid-dream, the lock file survives with the dead pid in its owner string, so a restarted kernel cannot release it and that assistant home never dreams again until a human deletes the file. The failure is permanent and logged only at INFO. The review also found that `asyncio.to_thread` does not make executor threads interruptible, so a `CancelledError` at the await runs the `finally`, releases the lock, and leaves `run_dream` executing unlocked.
+
+The replacement structure hands one synchronous function to `asyncio.to_thread` that performs, in order: `reclaim_stale()` and log a WARNING carrying `previous_owner` and `held_ms` when it returns non-`None`; `acquire()`; `run_dream`; the evidence write; `release()`, logging when it returns `False`. This binds the lock's lifetime to the work rather than to the await, puts every file operation including `mkdir` and `os.open` off the event loop, and places the evidence write inside the mutual exclusion guarding the run that produced it. It resolves the reclaim gap, the discarded `release()` result, the cancellation window, and the evidence placement in one change.
+
+`sweep_once` also gains per-home containment around the whole `_run_home` call. Today one home raising aborts the rest of the sweep, so a single corrupt home silently starves every home after it in catalog order. A failing home yields `None` and logs; the sweep continues.
+
+The three tests below stay as the required behaviour, and gain a fourth asserting that a stale lock from a dead pid is reclaimed rather than skipped, and a fifth asserting that one home raising does not prevent the next home from being visited.
+
 A minutes-level timer makes collision with a live user turn routine rather than theoretical. Both the online memory tools and `run_dream` rewrite `{home}/memory/semantic.json` with a non-atomic `write_text` (`lca/infrastructure/memory/assistant_memory.py:215`), and the only guard is `StaleSnapshotOperationError` at `:213`, which aborts rather than waits. `run_dream` does not catch it, so a collision today leaves a half-promoted pass with no receipt.
 
 **Files:**
