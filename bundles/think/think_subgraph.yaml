@@ -147,22 +147,16 @@ nodes:
 
   # PR-3.8.3: typed-boundary repair node between decision.parse
   # and think.gate. Reads the parsed Decision + the per-run tools
-  # registry off the ``tools`` typed port and emits either the original
+  # registry (via context.runtime) and emits either the original
   # Decision (well-formed / irreparable) or the repaired Decision
   # (truncated JSON successfully repaired). The accompanying
   # RoutingDecision's reason gates downstream routing: decision_ok
   # and decision_repaired forward to think.gate;
   # decision_rejected_{schema,truncated} re-route to
   # think.route.decide for a full re-reason.
-  #
-  # ``tools`` must stay listed here. ThinkDecisionRepairExecutor
-  # declares it, but the port projection is driven by this yaml list,
-  # so omitting it hands the executor a None registry and every
-  # argument-schema check silently passes. scripts/check_bundle_ports.py
-  # fails the build when an executor's declared_inputs is not covered.
   - id: think.decision.repair
     factory: think.decision.repair
-    inputs: [decision, tools]
+    inputs: [decision]
     outputs: [decision, routing]
     config:
 
