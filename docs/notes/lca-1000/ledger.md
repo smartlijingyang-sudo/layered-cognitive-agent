@@ -498,3 +498,19 @@
 - 验证结果: ruff check 2 文件首次即过（All checks passed!）；import 冒烟无循环（naming 叶子模块上移安全）；行为等价 python 断言全绿（signature default `is` SSOT 对象；`FilesystemJournalStore.DEFAULT_FILENAME is` SSOT；两者与旧字面量逐字节相等；tmp run 端到端：`RoutingFileStorage(run_dir)` 写到 `run_abc.spine.jsonl` 内容正确、`FilesystemJournalStore(root)` 默认 `default-run.spine.jsonl`、`run_id`+显式 filename override 均被尊重）；targeted pytest（`tests/observability/test_writable_matrix_swaps.py` + `tests/observability/journal/test_journal_format_errors.py` + `tests/observability/spine/sinks/test_run_artifact_writer_discipline.py`）：29 passed，6 skipped（skip 为预存的 os.open infrastructure 检查，与本轮无关）；CI gate scripts/check_writable_matrix_boundaries.py：OK；lca-cli-shape.py：touched file 零 findings（剩余 2 个 output_mode findings 在 ops/memory.py、runs/health.py——本轮未动文件，预存问题）。verify 脚本初版按 docstring 误断 `run_id` 默认=root basename（实际签名默认 `"default-run"`）——脚本自身断言写错，非代码问题，修正后全绿。
 - commit: 4625d28ce3a5f78236b4c584cc543a973f350645（refactor(lca-1000): 第0494轮 spine 模板默认值两处影子拼写收敛至 DEFAULT_SPINE_TEMPLATE(Seam)，2 files，未 push）。
 - 备注: 只 add 本轮 2 个文件；编辑前 git status --porcelain 干净（无并发会话未提交改动）；备份 /tmp/bak_0494/（252，2 文件原版）。base64+stdin 喂 python 编辑/验证路径继续稳定可靠（此前直接 -c 传 base64 因嵌套引号失败一次，未造成任何文件改动）。
+
+## 第0495轮 (2026-10-05 07:03-07:07 CST)
+- 改了什么: boot 命名空间唯一 code site 影子拼写收敛至 naming SSOT seam（1 file，2 insertions(+)，1 deletion(-)）：
+  - `lca/plugins/events/sinks/file_sink/__init__.py:73`：`legacy.with_name("boot-spine.jsonl")` → `legacy.with_name(BOOT_SPINE_FILENAME)`；
+  - 模块级 import 块补上 `BOOT_SPINE_FILENAME`（isort 顺序正确：BOOT_SPINE_FILENAME < DEFAULT_SPINE_TEMPLATE）。
+- 依据 skill 哪一节: DEEPENING.md Seam discipline（`naming.BOOT_SPINE_FILENAME` 是 boot 命名空间的命名 seam：naming.py docstring 明确声明"Boot 命名空间文件名(PR-4 收口)"并在 `__all__` 导出——seam 真实；之前全库零消费者，:73 的字面量是绕开 seam 的唯一影子拼写）+ SKILL.md Deletion test（常量被删除前全库零引用：字面量存活则 seam 名存实亡；收敛后常量赚回存在价值）+ LANGUAGE.md Locality（boot 文件名改一处——naming.py）/ Interface（error mode 未碰：`_resolve_boot_path` 的三条分支——boot_path passthrough、非 legacy 名 passthrough、默认 `_DEFAULT_BOOT_PATH`——原样保留；legacy 判定 `legacy.name == _LEGACY_SINGLE_FILE_LAYOUT` 不动）。
+- 为什么这是实质改动(非凑数): 484→494 命名收敛弧在 boot 命名空间的收口（全库 grep 证实：除 naming.py 定义+doctest/导出与 docstring 文案外，这是唯一 code site）。负载路径真实：profile 仍传旧 `path`（events.jsonl）时 `_resolve_boot_path` 的 legacy 降级分支被触发（PR-4 退役声明后仍有 profile 传字面，注释 L63-66 为证）；若 `BOOT_SPINE_FILENAME` 变更，降级分支产出旧名、读侧按新名找 → boot 事件文件沉默错名——与 491/492/493/494 轮同类的"写读名不一、bug 沉默通过"。字节级等价已断言（`BOOT_SPINE_FILENAME == "boot-spine.jsonl"` 逐字节相等）。
+- 关键设计决策（夜间跳过 grilling（记台账）: 只收敛裸文件名（常量管辖的精确命名空间），不动 `_DEFAULT_BOOT_PATH`（全路径含目录，沿用 494 结论：hypothetical seam，需 grilling）；不动 `_LEGACY_SINGLE_FILE_LAYOUT`（"events.jsonl" 是已退役旧 layout 名，无 SSOT 主张，不强行建常量）；naming.py 零 import 叶子模块，无循环风险。
+- 候选清单（本轮 explore，逐一验证后取舍）：
+  1. 上述 boot-spine legacy fallback 字面量收敛至 `BOOT_SPINE_FILENAME` —— 选中（boot 命名空间唯一 code site；常量全库零消费者，收敛让 seam 真实生效）。
+  2. `_DEFAULT_BOOT_PATH = ".lca/spine/boot-spine.jsonl"` —— 驳回（沿用 494 结论：boot 目录无 SSOT + 可 override 配置参数，hypothetical seam，需 grilling，夜间轮不动）。
+  3. exceptions 后缀字面量 —— 驳回（全库 grep：除 docstring/注释文案外无 code site，`exceptions_filename_for_run` 已被 5 处调用方采用；按 494 惯例 docstring 不是 code site）。
+  4. deslop 扫描（改动坢 file_sink/__init__.py 附近）：无叙事性注释 slop、无依据防御性 guard、死兼容路径（legacy 分支有明文 PR-4 兼容理由，非死路径）—— 无动作。
+- 验证结果: ruff check 1 文件首次即过（All checks passed!）；amport 冒烟无循环（模块级补 import 后）；行为等价 python 断言全绿（SSOT 逐字节相等；legacy fallback → 同目录 boot-spine.jsonl；boot_path passthrough、非 legacy 名 passthrough、默认路径三条分支与旧行为逐一等价）；targeted pytest `tests/lca_plugins/observability/spine/test_sinks.py`（插件 @plugin 声明的 test_suite）：14 passed，0 failed。
+- commit: b3b610886a54b6cd7b092d86a4f6da0225e74a36（refactor(lca-1000): 第0495轮 boot-spine legacy fallback 影子拼写收敛至 BOOT_SPINE_FILENAME(Seam)；未 push）。
+- 备注: 只 add 本轮 2 个文件（代码 1 + ledger.md）；编辑前 git status --porcelain 仅见本轮文件（无并发会话未提交改动）；备份 /tmp/bak_0495_init.py（252，原文件完整备份，1 文件）。base64+stdin 喂 python 编辑/验证路径继续稳定可靠（直接 -c 因嵌套引号失败一次，文件未动，无影响）。
