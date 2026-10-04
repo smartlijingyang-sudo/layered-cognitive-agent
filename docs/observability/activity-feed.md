@@ -1,7 +1,7 @@
 # Activity 动态栏：数据是什么、UI 怎么显示
 
 > 对应截图：任务详情视图「验证Activity重启与事件完整性」、助手动态栏「今天」分组。
-> 代码版本：main @ 6b33b474d（2026-10-04）。**版本弧**：`634fe4c4c`（李超 10-03 17:09 亲改，重写投影）曾移除 `ActivityItem` 的 `tool_name`/`current_step` 字段与 `ActivityIntentNamer.live_step()`；`fix-activity-honesty-20261003-1730` 分支（`c9bcb5b51`，merge `f17a7effe`）把两字段加回，`d89fc6e73` 去掉了 auto-merge 引入的重复 `tool_name` kwargs；**`6b33b474d`（李超 10-04 01:28）删除了 `ActivityProjector`（可变缓存）与 `seed_from_traces`，换成纯 fold 架构 `lca/infrastructure/observability/activity_feed.py`**——一行不再是一个工具调用，而是一个 run；后端不再有事件增量写入。下文均为新架构状态。
+> 代码版本：main @ 2f13df17e（2026-10-04）。**版本弧**：`634fe4c4c`（李超 10-03 17:09 亲改，重写投影）曾移除 `ActivityItem` 的 `tool_name`/`current_step` 字段与 `ActivityIntentNamer.live_step()`；`fix-activity-honesty-20261003-1730` 分支（`c9bcb5b51`，merge `f17a7effe`）把两字段加回，`d89fc6e73` 去掉了 auto-merge 引入的重复 `tool_name` kwargs；**`6b33b474d`（李超 10-04 01:28）删除了 `ActivityProjector`（可变缓存）与 `seed_from_traces`，换成纯 fold 架构 `lca/infrastructure/observability/activity_feed.py`**——一行不再是一个工具调用，而是一个 run；后端不再有事件增量写入。下文均为新架构状态。
 
 ## 一、图里是什么
 
@@ -98,5 +98,6 @@ live run（调用方传 live_run_ids）       ┘      （pure fold，无写盘�
 
 - **feed 不 scope 到 assistant**：run 产物不带 assistant 绑定，`assistant_id=""` 明写；每个助手看到的都是同样的最近 runs（`status_screen.py` 注释原话）。要 scope 先得把绑定落盘到 run 上，这是后续项。
 - **遗弃 run 不展示**：terminated 标记缺失且不在 `live_run_ids` 里的 run 不进 feed——旧架构会把它显示成永远 running，新架构直接不展示。
+- ✅ **测试隔离已落地**：`tests/conftest.py` 通过 `LCA_RUNS_ROOT` 把整个 pytest 会话的 run 产物指到临时目录；`profiles/*` 的 `runs_root` 改为 `{from_env: LCA_RUNS_ROOT}`，生产 kernel 不设该 env，回落 `traces/runs`。`run_paths.default_runs_root()` 是唯一收口点。
 - ✅ **`tool_name` / `current_step` 已恢复**：`634fe4c4c` 的移除被 `f17a7effe`（honesty 分支 `c9bcb5b51`）撤销，`d89fc6e73` 去重；新架构下 `tool_name`= 该 run 首个真实工具名，`current_step`= running 行的 namer 短语；前端 `AssistantStatusDrawer.tsx:1006/1012/1308` 已消费。
-- ✅ **诚实边界有回归钉**：`tests/scenario/test_muse_activity_invariants.py`（INV-01 ~ INV-06，13 例）钉住场景级诚实边界（意图解构、证据溯源、抽屉纯自然语言、时间线拓扑、五要素证据结构、只读观测隔离）——注意其 fixture 里 `activity_projector.py` 字符串是**模拟的任务证据数据**（旧架构时期的场景），不是对已删模块的引用。
+- ✅ **诚实边界有回归钉**：`tests/scenario/test_muse_activity_invariants.py`（INV-01 ~ INV-06，13 例）钉住场景级诚实边界（意图解构、证据溯源、抽屉纯自然语言、时间线拓扑、五要素证据结构、只读观测隔离）——注意其 fixture 里 `runner.py` 字符串是**模拟的任务证据数据**（旧架构时期的场景），不是对已删模块的引用。

@@ -7,194 +7,25 @@ never writes to the ledger it describes.
 
 from __future__ import annotations
 
-import json
-from collections.abc import Sequence
 from pathlib import Path
-from typing import Any
 
 from lca.contracts.models.observability.activity import (
     ActivityCategory,
     ActivityStatus,
 )
 from lca.infrastructure.observability.activity_feed import (
-    DEFAULT_RUNS_ROOT,
     ActivityFeed,
     get_activity_feed,
 )
-
-OBJECTIVE = "把 Drive 里的合同汇总一下"
-TRACE_ID = "trace_f564881799d0"
-
-
-def _write_manifest(run_dir: Path, *, session_status: str = "completed") -> None:
-    (run_dir / "manifest.json").write_text(
-        json.dumps(
-            {
-                "schema": "lca.run_manifest/1",
-                "run_id": run_dir.name,
-                "plan_ref": "sha256:41a03bd9ce232ff6",
-                "session_error": "",
-                "session_status": session_status,
-                "terminal_event_seq": 0,
-                "ledger_high_watermark": 0,
-            },
-            ensure_ascii=False,
-        ),
-        encoding="utf-8",
-    )
-
-
-def _write_journal(
-    run_dir: Path,
-    *,
-    objective: str,
-    outcome: str,
-    started_at: float,
-    closed_at: float | None,
-    steps: Sequence[Sequence[tuple[str, dict[str, Any]]]],
-) -> None:
-    invocation = 0
-    journal_steps = []
-    for index, tool_calls in enumerate(steps, start=1):
-        calls = []
-        for name, arguments in tool_calls:
-            invocation += 1
-            calls.append(
-                {
-                    "invocation_id": f"toolu_{invocation:04d}",
-                    "name": name,
-                    "arguments": arguments,
-                }
-            )
-        journal_steps.append(
-            {
-                "step_index": index,
-                "entered_at": started_at,
-                "tool_calls": calls,
-                "tool_results": [],
-            }
-        )
-    (run_dir / "journal.json").write_text(
-        json.dumps(
-            {
-                "schema": "lca.journal/3.1",
-                "run_id": run_dir.name,
-                "metadata": {
-                    "agent_role": "solo",
-                    "strategy_key": "solo",
-                    "plan_ref": "sha256:41a03bd9ce232ff6",
-                    "objective": objective,
-                    "attachments": [],
-                    "outcome": outcome,
-                    "started_at": started_at,
-                    "closed_at": closed_at,
-                    "total_steps": len(journal_steps),
-                    "extra": {},
-                },
-                "steps": journal_steps,
-            },
-            ensure_ascii=False,
-        ),
-        encoding="utf-8",
-    )
-
-
-def _write_terminated_run(
-    runs_root: Path,
-    run_id: str,
-    *,
-    objective: str = OBJECTIVE,
-    outcome: str = "completed",
-    started_at: float = 1791041881.0,
-    closed_at: float | None = 1791041903.0,
-    steps: Sequence[Sequence[tuple[str, dict[str, Any]]]] = (),
-) -> Path:
-    run_dir = runs_root / run_id
-    run_dir.mkdir(parents=True)
-    _write_manifest(run_dir, session_status=outcome)
-    _write_journal(
-        run_dir,
-        objective=objective,
-        outcome=outcome,
-        started_at=started_at,
-        closed_at=closed_at,
-        steps=steps,
-    )
-    return run_dir
-
-
-def _spine_line(run_id: str, seq: int, point: str, payload: dict[str, Any], ts: str) -> str:
-    return json.dumps(
-        {
-            "category": f"spine.{point}",
-            "causation_id": None,
-            "channel": "fact",
-            "event_hash": None,
-            "event_id": f"{run_id}:{seq}",
-            "execution_point": point,
-            "payload": payload,
-            "prev_event_hash": None,
-            "trace_id": None,
-            "ts": ts,
-        },
-        ensure_ascii=False,
-    )
-
-
-def _tool_line(run_id: str, seq: int, name: str, arguments: dict[str, Any], ts: str) -> str:
-    return _spine_line(
-        run_id,
-        seq,
-        "step.tool_call.record",
-        {
-            "arguments": arguments,
-            "arguments_summary": ", ".join(f"{k}={v!r}" for k, v in arguments.items()),
-            "invocation_id": f"toolu_{seq:04d}",
-            "run_id": run_id,
-            "step": 0,
-            "tool_name": name,
-        },
-        ts,
-    )
-
-
-def _write_live_run(
-    runs_root: Path,
-    run_id: str,
-    *,
-    objective: str = OBJECTIVE,
-    start_ts: str = "2026-10-03T15:42:29Z",
-    tool_calls: Sequence[tuple[str, dict[str, Any]]] = (),
-) -> Path:
-    """Create a run that is still executing: a spine ledger and no manifest."""
-    run_dir = runs_root / run_id
-    run_dir.mkdir(parents=True)
-    lines = [
-        _spine_line(
-            run_id, 1, "kernel.run.start", {"run_id": run_id, "trace_id": TRACE_ID}, start_ts
-        ),
-        _spine_line(
-            run_id,
-            76,
-            "phase.think.fold",
-            {
-                "incarnation": 1,
-                "objective": objective,
-                "objective_kind": "user_text",
-                "phase": "think",
-                "plan_ref": "sha256:41a03bd9ce232ff6",
-                "summary": "started",
-            },
-            start_ts,
-        ),
-    ]
-    lines.extend(
-        _tool_line(run_id, 260 + offset, name, arguments, start_ts)
-        for offset, (name, arguments) in enumerate(tool_calls)
-    )
-    spine = run_dir / f"{run_id}.spine.jsonl"
-    spine.write_text("".join(f"{line}\n" for line in lines), encoding="utf-8")
-    return spine
+from lca.infrastructure.persistence.run_paths import default_runs_root
+from tests.support.run_artifacts import (
+    OBJECTIVE,
+    TRACE_ID,
+    spine_line,
+    tool_line,
+    write_live_run,
+    write_terminated_run,
+)
 
 
 def _tree_snapshot(root: Path) -> dict[str, tuple[int, int]]:
@@ -207,7 +38,7 @@ def _tree_snapshot(root: Path) -> dict[str, tuple[int, int]]:
 
 
 def test_terminated_run_folds_its_journal_into_one_row(tmp_path: Path) -> None:
-    _write_terminated_run(
+    write_terminated_run(
         tmp_path,
         "run_a1b2c3d4e5f6",
         steps=(
@@ -238,7 +69,7 @@ def test_terminated_run_folds_its_journal_into_one_row(tmp_path: Path) -> None:
 
 
 def test_live_run_folds_its_spine_into_a_running_row(tmp_path: Path) -> None:
-    _write_live_run(
+    write_live_run(
         tmp_path,
         "run_0f1e2d3c4b5a",
         tool_calls=[
@@ -261,8 +92,8 @@ def test_live_run_folds_its_spine_into_a_running_row(tmp_path: Path) -> None:
 
 
 def test_unterminated_run_nobody_is_executing_stays_out_of_the_feed(tmp_path: Path) -> None:
-    _write_terminated_run(tmp_path, "run_a1b2c3d4e5f6")
-    _write_live_run(tmp_path, "run_abandoned0001")
+    write_terminated_run(tmp_path, "run_a1b2c3d4e5f6")
+    write_live_run(tmp_path, "run_abandoned0001")
 
     rows = ActivityFeed(tmp_path).list_activities()
 
@@ -270,7 +101,7 @@ def test_unterminated_run_nobody_is_executing_stays_out_of_the_feed(tmp_path: Pa
 
 
 def test_start_time_is_recovered_from_the_spine_when_the_journal_has_none(tmp_path: Path) -> None:
-    run_dir = _write_terminated_run(
+    run_dir = write_terminated_run(
         tmp_path,
         "run_02419387128c",
         objective="ping",
@@ -280,7 +111,7 @@ def test_start_time_is_recovered_from_the_spine_when_the_journal_has_none(tmp_pa
     )
     spine = run_dir / "run_02419387128c.spine.jsonl"
     spine.write_text(
-        _spine_line(
+        spine_line(
             "run_02419387128c",
             1,
             "kernel.run.start",
@@ -301,9 +132,9 @@ def test_start_time_is_recovered_from_the_spine_when_the_journal_has_none(tmp_pa
 
 
 def test_rows_come_back_newest_first(tmp_path: Path) -> None:
-    _write_terminated_run(tmp_path, "run_oldest000001", started_at=1791041881.0)
-    _write_terminated_run(tmp_path, "run_middle000001", started_at=1791042000.0)
-    _write_terminated_run(tmp_path, "run_newest000001", started_at=1791042100.0)
+    write_terminated_run(tmp_path, "run_oldest000001", started_at=1791041881.0)
+    write_terminated_run(tmp_path, "run_middle000001", started_at=1791042000.0)
+    write_terminated_run(tmp_path, "run_newest000001", started_at=1791042100.0)
 
     rows = ActivityFeed(tmp_path).list_activities()
 
@@ -319,10 +150,21 @@ def test_rows_come_back_newest_first(tmp_path: Path) -> None:
     ]
 
 
+def test_limit_keeps_the_newest_start_times(tmp_path: Path) -> None:
+    # 后创建的 run 目录 mtime 更新，但其 start_time 更旧。limit 必须按
+    # start_time 排序后截断，而不是按目录 mtime 截断。
+    write_terminated_run(tmp_path, "run_new_start", started_at=1791042100.0)
+    write_terminated_run(tmp_path, "run_old_start", started_at=1791041881.0)
+
+    rows = ActivityFeed(tmp_path, limit=1).list_activities()
+
+    assert [row.id for row in rows] == ["run_new_start"]
+
+
 def test_harness_run_dirs_never_reach_the_feed(tmp_path: Path) -> None:
-    _write_terminated_run(tmp_path, "run_a1b2c3d4e5f6")
-    _write_terminated_run(tmp_path, "run_test_abc123")
-    _write_terminated_run(tmp_path, "run_e2e_smoke_0001")
+    write_terminated_run(tmp_path, "run_a1b2c3d4e5f6")
+    write_terminated_run(tmp_path, "run_test_abc123")
+    write_terminated_run(tmp_path, "run_e2e_smoke_0001")
 
     rows = ActivityFeed(tmp_path).list_activities(
         live_run_ids=("run_test_abc123", "run_e2e_smoke_0001")
@@ -332,7 +174,7 @@ def test_harness_run_dirs_never_reach_the_feed(tmp_path: Path) -> None:
 
 
 def test_injected_system_context_is_trimmed_off_the_objective(tmp_path: Path) -> None:
-    _write_terminated_run(
+    write_terminated_run(
         tmp_path,
         "run_a1b2c3d4e5f6",
         objective=(
@@ -352,7 +194,7 @@ def test_injected_system_context_is_trimmed_off_the_objective(tmp_path: Path) ->
 
 
 def test_zero_tool_run_reports_a_direct_reply(tmp_path: Path) -> None:
-    _write_terminated_run(tmp_path, "run_a1b2c3d4e5f6", objective="你好")
+    write_terminated_run(tmp_path, "run_a1b2c3d4e5f6", objective="你好")
 
     rows = ActivityFeed(tmp_path).list_activities()
 
@@ -365,8 +207,8 @@ def test_zero_tool_run_reports_a_direct_reply(tmp_path: Path) -> None:
 
 
 def test_listing_activities_writes_nothing_under_the_runs_root(tmp_path: Path) -> None:
-    _write_terminated_run(tmp_path, "run_a1b2c3d4e5f6")
-    live_spine = _write_live_run(
+    write_terminated_run(tmp_path, "run_a1b2c3d4e5f6")
+    live_spine = write_live_run(
         tmp_path, "run_0f1e2d3c4b5a", tool_calls=[("tool_search", {"query": "Google Drive"})]
     )
     before = _tree_snapshot(tmp_path)
@@ -380,7 +222,7 @@ def test_listing_activities_writes_nothing_under_the_runs_root(tmp_path: Path) -
 
 def test_the_memo_is_a_read_cache_over_the_spine(tmp_path: Path) -> None:
     run_id = "run_0f1e2d3c4b5a"
-    spine = _write_live_run(
+    spine = write_live_run(
         tmp_path, run_id, tool_calls=[("tool_search", {"query": "Google Drive"})]
     )
     feed = ActivityFeed(tmp_path)
@@ -391,7 +233,7 @@ def test_the_memo_is_a_read_cache_over_the_spine(tmp_path: Path) -> None:
 
     with spine.open("a", encoding="utf-8") as handle:
         handle.write(
-            _tool_line(
+            tool_line(
                 run_id, 480, "run_shell", {"command": "git status -s"}, "2026-10-03T15:43:02Z"
             )
             + "\n"
@@ -409,4 +251,4 @@ def test_get_activity_feed_returns_one_feed_on_the_default_root() -> None:
     feed = get_activity_feed()
 
     assert feed is get_activity_feed()
-    assert feed.runs_root == DEFAULT_RUNS_ROOT
+    assert feed.runs_root == default_runs_root()

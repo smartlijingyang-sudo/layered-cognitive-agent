@@ -29,6 +29,7 @@ from lca.contracts.protocols import JournalProjector
 from lca.infrastructure.observability import BoundObservability
 from lca.infrastructure.observability.facade.run.ambit import RunAmbit
 from lca.infrastructure.observability.loop_cursor.cursor_record import CursorRecord
+from lca.infrastructure.persistence.run_paths import default_runs_root
 from lca.plugins.transport.webserver.handlers.runs.session.event.session import (
     BoundRunEventSession,
     unbind_run_event_session,
@@ -55,7 +56,14 @@ from lca.plugins.transport.webserver.read.runs.journal.projection_binding import
 #         tracking: ADR-0183 PR-11 RunLifecycleStatus rename)
 RunStatus = RunLifecycleStatus
 
-_RUNS_ROOT = Path("traces")  # ADR-0065 §七: locator root, runs/ 是其子目录
+def _runs_root() -> Path:
+    """Locator root; ``runs/`` is its child (ADR-0065 §七).
+
+    Resolved at call time because the module imports before test fixtures set
+    ``LCA_RUNS_ROOT``; a module constant would freeze the production path.
+    """
+    return default_runs_root().parent
+
 
 
 @dataclass
@@ -196,11 +204,11 @@ class RunRegistry:
                 FilesystemRunLocator,
             )
 
-            locator = FilesystemRunLocator(root=_RUNS_ROOT)
+            locator = FilesystemRunLocator(root=_runs_root())
         self._locator: RunLocator = locator
-        storage_root = getattr(locator, "storage_root", _RUNS_ROOT)
+        storage_root = getattr(locator, "storage_root", _runs_root())
         if not isinstance(storage_root, Path):
-            storage_root = _RUNS_ROOT
+            storage_root = _runs_root()
         storage_root.mkdir(parents=True, exist_ok=True)
         (storage_root / "runs").mkdir(parents=True, exist_ok=True)
         self._index = RunSessionIndex(

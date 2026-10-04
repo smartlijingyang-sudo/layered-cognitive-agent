@@ -152,7 +152,7 @@ def test_modal_sidebar_has_started_root_node() -> None:
 def test_modal_sidebar_no_mechanical_subdivisions() -> None:
     """Sidebar must NOT split each step into think/tool/receipt fragments.
 
-    Muse shows one row per real action (e.g. '读取 activity_projector.py ...'),
+    Muse shows one row per real action (e.g. '读取 runner.py ...'),
     not three rows (思考决策与规划 / 调用 / 产出) per step.
     """
     path = _get_drawer_tsx_path()

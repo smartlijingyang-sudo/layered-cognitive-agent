@@ -5,8 +5,6 @@
 
 from __future__ import annotations
 
-from pathlib import Path
-
 from pydantic import BaseModel
 
 from lca.contracts.atoms.control.slot import ControlSlot
@@ -25,6 +23,7 @@ from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import
     OwnershipDeclaration,
 )
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
+from lca.infrastructure.persistence.run_paths import default_runs_root
 
 
 class Config(BaseModel):
@@ -62,6 +61,6 @@ async def setup(ctx: PluginContext, config: Config) -> None:
     from lca.infrastructure.observability.backends.run_locator_fs import FilesystemRunLocator
 
     del config
-    root = Path("traces")
+    root = default_runs_root().parent
     locator = FilesystemRunLocator(root=root)
     ctx.provide("run_locator", locator)

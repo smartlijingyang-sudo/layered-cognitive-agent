@@ -28,6 +28,7 @@ from lca.contracts.mechanisms.capability.capability import (
 )
 from lca.contracts.observability.registry.run_locator import RunLocator
 from lca.harness.profile.boot.products import resolved_profile_from_scope
+from lca.infrastructure.persistence.run_paths import default_runs_root
 from lca.plugins.observability.profile.snapshot_run_boot_provider import (
     PluginSnapshotEntry,
     RunBootSnapshot,
@@ -38,7 +39,7 @@ _log = structlog.get_logger(__name__)
 
 # Duplicated with lca.plugins.transport.webserver.handlers.runs.api.query_endpoints; keep both in lockstep (MVA-3).
 _PROFILE_SNAPSHOT_NAME = "profile_snapshot.json"
-_DEFAULT_PROFILE_SNAPSHOT_ROOT = Path("traces") / "runs"
+_DEFAULT_PROFILE_SNAPSHOT_ROOT = default_runs_root()
 
 
 def plugin_inventory_from_boot_products(ctx: Any) -> list[PluginSnapshotEntry]:

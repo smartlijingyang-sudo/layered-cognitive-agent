@@ -19,6 +19,8 @@ from dataclasses import dataclass
 
 import structlog
 
+from lca.infrastructure.persistence.run_paths import default_runs_root, ensure_run_dir
+
 _log = structlog.get_logger(__name__)
 
 
@@ -61,11 +63,7 @@ def record_run_failure(facts: RunFailureFacts) -> None:
 def _append_kernel_log(facts: RunFailureFacts) -> None:
     """Best-effort per-run kernel.log write; never raises into lifecycle."""
     try:
-        from pathlib import Path
-
-        from lca.infrastructure.persistence.run_paths import ensure_run_dir
-
-        run_dir = ensure_run_dir(Path("traces") / "runs" / facts.run_id)
+        run_dir = ensure_run_dir(default_runs_root() / facts.run_id)
         line = (
             f"run_failure_observed run_id={facts.run_id} "
             f"trace_id={facts.trace_id} error={facts.error}\n"

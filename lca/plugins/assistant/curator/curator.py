@@ -44,6 +44,7 @@ from lca.contracts.protocols.runtime.runtime.lifecycle import (
 )
 from lca.harness.plugin.manifest import EffectClass
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
+from lca.infrastructure.persistence.run_paths import default_runs_root
 
 if TYPE_CHECKING:
     from lca.contracts.protocols.assistant.skill_overlay import (
@@ -222,7 +223,7 @@ async def setup(ctx: PluginContext, config: object) -> None:
             "RuntimeLifecycleSubscriberRegistry"
         )
     overlay = ctx.require(ASSISTANT_SKILL_OVERLAY.key)
-    traces_root = Path("traces") / "runs"
+    traces_root = default_runs_root()
     curator = ProceduralCurator(
         overlay=overlay,
         traces_root=traces_root,

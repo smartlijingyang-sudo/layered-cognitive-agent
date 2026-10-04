@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import asyncio
 import hashlib
-import json
 from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
@@ -25,11 +24,15 @@ from lca.plugins.transport.webserver.handlers.runs.terminal.port.port import Run
 from lca.plugins.transport.webserver.router.router import RouteRegistry
 from lca.plugins.transport.webserver.routes_1.routes_assistants import status_screen
 from lca.plugins.transport.webserver.routes_1.routes_assistants.router import setup
+from tests.support.run_artifacts import (
+    run_dir,
+    write_journal,
+    write_manifest,
+    write_spine,
+)
 
 if TYPE_CHECKING:
     import pytest
-
-_ToolCalls = tuple[tuple[str, dict[str, Any]], ...]
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
@@ -78,153 +81,6 @@ def _setup_test_app(tmp_path: Path) -> tuple[Starlette, AssistantCatalogImpl, st
     return app, catalog, handle.assistant_id
 
 
-def _run_dir(runs_root: Path, run_id: str) -> Path:
-    run_dir = runs_root / run_id
-    run_dir.mkdir(parents=True)
-    return run_dir
-
-
-def _write_manifest(run_dir: Path, run_id: str) -> None:
-    (run_dir / "manifest.json").write_text(
-        json.dumps({"schema": "lca.run_manifest/1", "run_id": run_id}, ensure_ascii=False),
-        encoding="utf-8",
-    )
-
-
-def _write_journal(
-    run_dir: Path,
-    run_id: str,
-    *,
-    objective: str,
-    outcome: str,
-    started_at: float,
-    closed_at: float,
-    tool_calls: _ToolCalls = (),
-) -> None:
-    (run_dir / "journal.json").write_text(
-        json.dumps(
-            {
-                "schema": "lca.journal/3.1",
-                "run_id": run_id,
-                "metadata": {
-                    "agent_role": "solo",
-                    "strategy_key": "solo",
-                    "plan_ref": "sha256:abc",
-                    "objective": objective,
-                    "attachments": [],
-                    "outcome": outcome,
-                    "started_at": started_at,
-                    "closed_at": closed_at,
-                    "total_steps": len(tool_calls),
-                    "extra": {},
-                },
-                "steps": [
-                    {
-                        "step_index": index,
-                        "entered_at": started_at,
-                        "tool_calls": [
-                            {
-                                "invocation_id": f"toolu_{index}",
-                                "name": name,
-                                "arguments": arguments,
-                            }
-                        ],
-                        "tool_results": [],
-                    }
-                    for index, (name, arguments) in enumerate(tool_calls, start=1)
-                ],
-            },
-            ensure_ascii=False,
-        ),
-        encoding="utf-8",
-    )
-
-
-def _write_spine(
-    run_dir: Path,
-    run_id: str,
-    *,
-    started_ts: str,
-    objective: str = "",
-    tool_calls: _ToolCalls = (),
-    stop_outcome: str | None = None,
-    stop_ts: str | None = None,
-) -> None:
-    records: list[dict[str, Any]] = [
-        _record(
-            run_id,
-            seq=1,
-            execution_point="kernel.run.start",
-            payload={"run_id": run_id, "trace_id": f"trace_{run_id}"},
-            ts=started_ts,
-        )
-    ]
-    seq = 2
-    if objective:
-        records.append(
-            _record(
-                run_id,
-                seq=seq,
-                execution_point="phase.think.fold",
-                payload={
-                    "incarnation": 1,
-                    "objective": objective,
-                    "objective_kind": "user_text",
-                    "phase": "think",
-                    "summary": "started",
-                },
-                ts=started_ts,
-            )
-        )
-        seq += 1
-    for name, arguments in tool_calls:
-        records.append(
-            _record(
-                run_id,
-                seq=seq,
-                execution_point="step.tool_call.record",
-                payload={
-                    "arguments": arguments,
-                    "invocation_id": f"toolu_{seq}",
-                    "run_id": run_id,
-                    "step": seq,
-                    "tool_name": name,
-                },
-                ts=started_ts,
-            )
-        )
-        seq += 1
-    if stop_outcome is not None:
-        records.append(
-            _record(
-                run_id,
-                seq=seq,
-                execution_point="kernel.run.stop",
-                payload={"outcome": stop_outcome, "run_id": run_id, "trace_id": f"trace_{run_id}"},
-                ts=stop_ts or started_ts,
-            )
-        )
-    lines = "".join(json.dumps(record, ensure_ascii=False) + "\n" for record in records)
-    (run_dir / f"{run_id}.spine.jsonl").write_text(lines, encoding="utf-8")
-
-
-def _record(
-    run_id: str, *, seq: int, execution_point: str, payload: dict[str, Any], ts: str
-) -> dict[str, Any]:
-    return {
-        "category": f"spine.{execution_point}",
-        "causation_id": None,
-        "channel": "fact",
-        "event_hash": None,
-        "event_id": f"{run_id}:{seq}",
-        "execution_point": execution_point,
-        "payload": payload,
-        "prev_event_hash": None,
-        "trace_id": None,
-        "ts": ts,
-    }
-
-
 def _tree_state(root: Path) -> dict[str, tuple[int, str]]:
     return {
         str(path.relative_to(root)): (
@@ -271,9 +127,9 @@ def test_inv_01_single_track_fact_and_pure_projection_determinism(tmp_path: Path
     ``runs_root`` agree, and one feed re-read agree with itself.
     """
     runs_root = tmp_path / "runs"
-    list_dir = _run_dir(runs_root, "run_a1")
-    _write_manifest(list_dir, "run_a1")
-    _write_journal(
+    list_dir = run_dir(runs_root, "run_a1")
+    write_manifest(list_dir, "run_a1")
+    write_journal(
         list_dir,
         "run_a1",
         objective="帮我列出文件",
@@ -282,9 +138,9 @@ def test_inv_01_single_track_fact_and_pure_projection_determinism(tmp_path: Path
         closed_at=1791028830.0,
         tool_calls=(("listFiles", {"path": "."}),),
     )
-    git_dir = _run_dir(runs_root, "run_a2")
-    _write_manifest(git_dir, "run_a2")
-    _write_journal(
+    git_dir = run_dir(runs_root, "run_a2")
+    write_manifest(git_dir, "run_a2")
+    write_journal(
         git_dir,
         "run_a2",
         objective="查一下最近三次提交",
@@ -319,9 +175,9 @@ def test_inv_02_action_start_locks_human_title(tmp_path: Path) -> None:
     icon and the ``current_step`` of a running row.
     """
     runs_root = tmp_path / "runs"
-    mail_dir = _run_dir(runs_root, "run_b1")
-    _write_manifest(mail_dir, "run_b1")
-    _write_journal(
+    mail_dir = run_dir(runs_root, "run_b1")
+    write_manifest(mail_dir, "run_b1")
+    write_journal(
         mail_dir,
         "run_b1",
         objective="帮我搜索出行确认邮件 <!-- system-context: 用户偏好 -->",
@@ -335,8 +191,8 @@ def test_inv_02_action_start_locks_human_title(tmp_path: Path) -> None:
             ),
         ),
     )
-    browse_dir = _run_dir(runs_root, "run_b2")
-    _write_spine(
+    browse_dir = run_dir(runs_root, "run_b2")
+    write_spine(
         browse_dir,
         "run_b2",
         started_ts="2026-10-03T14:00:00+00:00",
@@ -390,10 +246,10 @@ def test_inv_03_reread_reflects_artifact_change(tmp_path: Path) -> None:
     rows without a second derivation drifting.
     """
     runs_root = tmp_path / "runs"
-    run_dir = _run_dir(runs_root, "run_c1")
-    _write_manifest(run_dir, "run_c1")
-    _write_journal(
-        run_dir,
+    c1_dir = run_dir(runs_root, "run_c1")
+    write_manifest(c1_dir, "run_c1")
+    write_journal(
+        c1_dir,
         "run_c1",
         objective="第一版目标",
         outcome="completed",
@@ -412,8 +268,8 @@ def test_inv_03_reread_reflects_artifact_change(tmp_path: Path) -> None:
 
     # Both the objective and the outcome change byte length, so the memo stamp
     # moves on size alone even where mtime resolution is coarse.
-    _write_journal(
-        run_dir,
+    write_journal(
+        c1_dir,
         "run_c1",
         objective="第二版目标（更长）",
         outcome="failed",
@@ -441,9 +297,9 @@ def test_inv_04_real_stop_cancellation_and_audit(tmp_path: Path) -> None:
     to any activity store.
     """
     runs_root = tmp_path / "runs"
-    stopped_dir = _run_dir(runs_root, "run_d1")
-    _write_manifest(stopped_dir, "run_d1")
-    _write_journal(
+    stopped_dir = run_dir(runs_root, "run_d1")
+    write_manifest(stopped_dir, "run_d1")
+    write_journal(
         stopped_dir,
         "run_d1",
         objective="跑一个很长的命令",
@@ -452,8 +308,8 @@ def test_inv_04_real_stop_cancellation_and_audit(tmp_path: Path) -> None:
         closed_at=1791028810.0,
         tool_calls=(("runCommand", {"command": "sleep 100"}),),
     )
-    canceled_dir = _run_dir(runs_root, "run_d2")
-    _write_spine(
+    canceled_dir = run_dir(runs_root, "run_d2")
+    write_spine(
         canceled_dir,
         "run_d2",
         started_ts="2026-10-03T16:00:00Z",
@@ -490,28 +346,18 @@ def test_inv_04_real_stop_cancellation_and_audit(tmp_path: Path) -> None:
     assert by_id["run_d2"].duration_ms == 5000
 
 
-def test_inv_05_upcoming_system_job_protection_and_chat_draft() -> None:
-    """INV-05: System jobs reject deletion with explicit guard."""
-    system_job = {
-        "id": "job_sys_01",
-        "title": "系统记忆归纳",
-        "is_system": True,
-    }
-    assert system_job["is_system"] is True
-
-
-def test_inv_06_snapshot_aggregation_and_eventual_consistency(
+def test_inv_05_snapshot_aggregation_and_eventual_consistency(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """INV-06: The snapshot aggregates Activity, Approvals, Upcoming and Identity.
+    """INV-05: The snapshot aggregates Activity, Approvals, Upcoming and Identity.
 
     Reads a ``tmp_path`` runs_root instead of the process-wide feed, which would
     fold whatever real runs happen to sit under ``traces/runs``.
     """
     runs_root = tmp_path / "runs"
-    newer = _run_dir(runs_root, "run_f1")
-    _write_manifest(newer, "run_f1")
-    _write_journal(
+    newer = run_dir(runs_root, "run_f1")
+    write_manifest(newer, "run_f1")
+    write_journal(
         newer,
         "run_f1",
         objective="整理本周架构评审记录",
@@ -520,9 +366,9 @@ def test_inv_06_snapshot_aggregation_and_eventual_consistency(
         closed_at=1791028830.0,
         tool_calls=(("listFiles", {"path": "."}),),
     )
-    older = _run_dir(runs_root, "run_f2")
-    _write_manifest(older, "run_f2")
-    _write_journal(
+    older = run_dir(runs_root, "run_f2")
+    write_manifest(older, "run_f2")
+    write_journal(
         older,
         "run_f2",
         objective="检索记忆库中的分层原则",
@@ -555,8 +401,8 @@ def test_inv_06_snapshot_aggregation_and_eventual_consistency(
     assert "IDENTITY.md" in [f["filename"] for f in data["identity"]["files"]]
 
 
-def test_inv_07_rows_carry_start_time_and_sort_newest_first(tmp_path: Path) -> None:
-    """INV-07: No row ships an empty start_time, and rows come back newest first.
+def test_inv_06_rows_carry_start_time_and_sort_newest_first(tmp_path: Path) -> None:
+    """INV-06: No row ships an empty start_time, and rows come back newest first.
 
     Locks the defect that motivated replacing the projector: rows built from a
     transport-fed cache could carry no timestamp at all, which both blanked the
@@ -564,9 +410,9 @@ def test_inv_07_rows_carry_start_time_and_sort_newest_first(tmp_path: Path) -> N
     is still ``0.0`` recovers the moment from the ledger's opening record.
     """
     runs_root = tmp_path / "runs"
-    stamped = _run_dir(runs_root, "run_e1")
-    _write_manifest(stamped, "run_e1")
-    _write_journal(
+    stamped = run_dir(runs_root, "run_e1")
+    write_manifest(stamped, "run_e1")
+    write_journal(
         stamped,
         "run_e1",
         objective="整理归档",
@@ -574,9 +420,9 @@ def test_inv_07_rows_carry_start_time_and_sort_newest_first(tmp_path: Path) -> N
         started_at=1791028800.0,
         closed_at=1791028810.0,
     )
-    recovered = _run_dir(runs_root, "run_e2")
-    _write_manifest(recovered, "run_e2")
-    _write_journal(
+    recovered = run_dir(runs_root, "run_e2")
+    write_manifest(recovered, "run_e2")
+    write_journal(
         recovered,
         "run_e2",
         objective="启动即失败的运行",
@@ -584,9 +430,9 @@ def test_inv_07_rows_carry_start_time_and_sort_newest_first(tmp_path: Path) -> N
         started_at=0.0,
         closed_at=0.0,
     )
-    _write_spine(recovered, "run_e2", started_ts="2026-10-03T14:00:00+00:00")
-    live = _run_dir(runs_root, "run_e3")
-    _write_spine(live, "run_e3", started_ts="2026-10-03T16:00:00Z", objective="正在进行")
+    write_spine(recovered, "run_e2", started_ts="2026-10-03T14:00:00+00:00")
+    live = run_dir(runs_root, "run_e3")
+    write_spine(live, "run_e3", started_ts="2026-10-03T16:00:00Z", objective="正在进行")
 
     rows = ActivityFeed(runs_root).list_activities(live_run_ids=("run_e3",))
 

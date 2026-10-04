@@ -8,9 +8,25 @@ shape ``"{session.id}:{seq}"`` and resolve spine / exceptions paths under
 from __future__ import annotations
 
 import contextlib
+import os
 from pathlib import Path
 
+_RUNS_ROOT_ENV = "LCA_RUNS_ROOT"
 _DEFAULT_RUNS_ROOT = Path("traces") / "runs"
+
+
+def default_runs_root() -> Path:
+    """Resolve the runs root: ``LCA_RUNS_ROOT`` when set, else ``traces/runs``.
+
+    The test suite sets ``LCA_RUNS_ROOT`` session-wide so profile-driven
+    sinks write into a temporary directory instead of the production tree.
+    The kernel launcher leaves it unset and keeps the on-disk default.
+    """
+    override = os.environ.get(_RUNS_ROOT_ENV)
+    if override:
+        return Path(override)
+    return _DEFAULT_RUNS_ROOT
+
 
 RUN_DIR_MODE = 0o700
 """Access bound for ``traces/runs/<run_id>/``.
@@ -60,7 +76,7 @@ def run_dir_for(run_id: str, *, run_dir: Path | None = None) -> Path:
     """Resolve the per-run directory (creates nothing)."""
     if run_dir is not None:
         return run_dir
-    return _DEFAULT_RUNS_ROOT / run_id
+    return default_runs_root() / run_id
 
 
 def spine_path_for_run(run_id: str, *, run_dir: Path | None = None) -> Path:
@@ -84,6 +100,7 @@ def exceptions_path_for_run(run_id: str, *, run_dir: Path | None = None) -> Path
 
 __all__ = [
     "RUN_DIR_MODE",
+    "default_runs_root",
     "ensure_run_dir",
     "exceptions_path_for_run",
     "run_dir_for",

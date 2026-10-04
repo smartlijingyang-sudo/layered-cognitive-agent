@@ -22,6 +22,7 @@ from lca.contracts.models.core.state.plane import PlaneBindings
 from lca.contracts.models.observability.activity import parse_step_evidence
 from lca.contracts.observability.registry.run_locator import RunLocator
 from lca.infrastructure.observability.journal.sse.frames import parse_last_event_id
+from lca.infrastructure.persistence.run_paths import default_runs_root
 from lca.plugins.transport.webserver.handlers.cors.cors import cors_headers
 from lca.plugins.transport.webserver.handlers.runs.api.command_endpoints import _run_port_of
 from lca.plugins.transport.webserver.handlers.runs.terminal.port.port import RunPort
@@ -33,7 +34,7 @@ from lca.plugins.transport.webserver.read.runs.evidence.evidence import (
 )
 
 _PROFILE_SNAPSHOT_NAME = "profile_snapshot.json"
-_DEFAULT_PROFILE_SNAPSHOT_ROOT = Path("traces") / "runs"
+_DEFAULT_PROFILE_SNAPSHOT_ROOT = default_runs_root()
 
 
 def _spine_path_of(request: Request, run_id: str) -> Path | None:
@@ -127,7 +128,7 @@ async def stream_journal_live(request: Request) -> StreamingResponse | JSONRespo
     )
 
 
-_DEFAULT_JOURNAL_ROOT = Path("traces") / "runs"
+_DEFAULT_JOURNAL_ROOT = default_runs_root()
 
 
 def _read_run_journal_detail(

@@ -35,7 +35,7 @@ patch:
   - id: spine.sink.file
     config:
       boot_path: .lca/spine/boot-spine.jsonl
-      runs_root: traces/runs
+      runs_root: {from_env: LCA_RUNS_ROOT}
 
   # EventSpine console sink — web-standard is the profile operators watch a
   # live run through, so the console opts into ``graph_timeline`` here while

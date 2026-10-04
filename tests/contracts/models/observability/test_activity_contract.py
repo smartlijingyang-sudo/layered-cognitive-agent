@@ -116,8 +116,8 @@ def test_activity_intent_namer_dynamic_deconstruction_no_running_command():
     test_cases = [
         (
             "run_shell",
-            {"command": "sed -n '285,340p' activity_projector.py"},
-            "读取 activity_projector.py (285-340行)",
+            {"command": "sed -n '285,340p' runner.py"},
+            "读取 runner.py (285-340行)",
         ),
         (
             "box_run_command",
@@ -155,10 +155,10 @@ def test_activity_intent_namer_memory_tool_discovery_and_github_queries() -> Non
 
     t_branch, s_branch, i_branch = ActivityIntentNamer.name(
         "GITHUB_LIST_BRANCHES",
-        {"owner": "smartlijingyang-sudo", "repo": "layered-cognitive-agent"},
+        {"owner": "agents-builders", "repo": "layered-cognitive-agent"},
     )
     assert t_branch == "检索 GitHub 分支"
-    assert s_branch == "smartlijingyang-sudo/layered-cognitive-agent"
+    assert s_branch == "agents-builders/layered-cognitive-agent"
     assert i_branch == "github"
 
     t_commit, s_commit, i_commit = ActivityIntentNamer.name(
@@ -197,13 +197,13 @@ def test_evidence_parser_five_elements_structure():
 
     parsed = parse_step_evidence(
         tool_name="box_run_command",
-        arguments={"command": 'ssh252 \'echo "ZZSTART"; sed -n "285,340p" activity_projector.py\''},
+        arguments={"command": 'ssh252 \'echo "ZZSTART"; sed -n "285,340p" runner.py\''},
         tool_result={
             "ok": True,
             "latency_ms": 3841,
             "stdout_head": "class ActivityProjector:\n    def __init__...",
         },
-        thinking={"reasoning": "读取 activity_projector 初始化逻辑并验证冷启动分支"},
+        thinking={"reasoning": "读取 runner 初始化逻辑并验证冷启动分支"},
     )
     assert isinstance(parsed, StepEvidence)
     assert "ssh252" in parsed.command

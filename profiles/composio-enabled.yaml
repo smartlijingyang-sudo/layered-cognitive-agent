@@ -47,4 +47,4 @@ patch:
   - id: spine.sink.file
     config:
       boot_path: .lca/spine/boot-spine.jsonl
-      runs_root: traces/runs
+      runs_root: {from_env: LCA_RUNS_ROOT}

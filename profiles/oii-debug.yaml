@@ -54,7 +54,7 @@ patch:
   - id: spine.sink.file
     config:
       boot_path: .lca/spine/oii-debug-boot-spine.jsonl
-      runs_root: traces/runs
+      runs_root: {from_env: LCA_RUNS_ROOT}
 
   # EventSpine console sink — oii-debug is the canonical debug profile; opt
   # the live console into ``graph_timeline`` so the operator sees the same

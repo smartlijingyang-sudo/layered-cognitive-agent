@@ -47,8 +47,8 @@ def _get_drawer_tsx_path() -> Path:
         ("run_shell", {"command": "git log -n 5"}, "查询 Git 提交历史"),
         (
             "box_run_command",
-            {"command": "sed -n '285,340p' activity_projector.py"},
-            "读取 activity_projector.py (285-340行)",
+            {"command": "sed -n '285,340p' runner.py"},
+            "读取 runner.py (285-340行)",
         ),
         (
             "shell",
@@ -117,7 +117,7 @@ def test_inv_02_execution_evidence_provenance(tmp_path: Path) -> None:
         "tool_result": {
             "ok": True,
             "latency_ms": 3841,
-            "stdout_head": "ZZSTART\nlca/infrastructure/observability/activity_projector.py:285:    def seed_from_traces\nZZEND",
+            "stdout_head": "ZZSTART\nlca/runtime/runner.py:285:    def seed_from_traces\nZZEND",
             "delta_summary": "检索到 1 处函数定义",
         },
     }
@@ -148,7 +148,7 @@ def test_inv_02_execution_evidence_provenance(tmp_path: Path) -> None:
     assert evidence["exit_code"] == 0
     assert evidence["truncated_boundary"] == "ZZSTART / ZZEND"
     assert len(evidence["search_results"]) >= 1
-    assert "activity_projector.py" in evidence["search_results"][0]["location"]
+    assert "runner.py" in evidence["search_results"][0]["location"]
     assert "seed_from_traces" in evidence["search_results"][0]["match"]
     assert "验证结论" in evidence["conclusion"]
 

@@ -31,6 +31,7 @@ from lca.contracts.models.observability.activity import (
     ActivityItem,
     ActivityStatus,
 )
+from lca.infrastructure.persistence.run_paths import default_runs_root
 
 DEFAULT_RUNS_ROOT = Path("traces/runs")
 DEFAULT_LIMIT = 50
@@ -46,8 +47,9 @@ LIVE_SPINE_BYTE_BUDGET = 64 * 1024 * 1024
 _SPINE_HEAD_BUDGET = 256 * 1024
 
 # The harness owns this run-id naming convention. owner: activity feed.
-# delete-when: pytest writes its runs under an isolated runs_root, so the
-# production root holds nothing but real assistant runs.
+# The test suite now writes its runs to ``LCA_RUNS_ROOT`` (see
+# ``run_paths.default_runs_root``), so this exclusion only matters for harness
+# runs that predate that isolation.
 _HARNESS_RUN_PREFIXES = ("run_test_", "run_e2e_smoke_")
 
 # Substring prefilter before json.loads. llm.stream.token and
@@ -332,12 +334,12 @@ class ActivityFeed:
 
     def __init__(
         self,
-        runs_root: Path | str = DEFAULT_RUNS_ROOT,
+        runs_root: Path | str | None = None,
         *,
         limit: int = DEFAULT_LIMIT,
         scan_limit: int = 400,
     ) -> None:
-        self._runs_root = Path(runs_root)
+        self._runs_root = Path(runs_root) if runs_root is not None else default_runs_root()
         self._limit = limit
         self._scan_limit = scan_limit
         self._memo: dict[str, _MemoEntry] = {}
@@ -361,10 +363,8 @@ class ActivityFeed:
             item = self._fold(run_dir, terminated=terminated)
             if item is not None:
                 rows.append(item)
-            if len(rows) >= self._limit:
-                break
         rows.sort(key=lambda row: row.start_time, reverse=True)
-        return rows
+        return rows[: self._limit]
 
     def invalidate(self) -> None:
         self._memo.clear()

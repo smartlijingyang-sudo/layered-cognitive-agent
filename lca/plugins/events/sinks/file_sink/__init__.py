@@ -37,9 +37,9 @@ from lca.infrastructure.observability.spine.sinks.naming import (
 from lca.infrastructure.observability.spine.sinks.routing_file_sink import (
     RunRoutingFileSink,
 )
+from lca.infrastructure.persistence.run_paths import default_runs_root
 
 _DEFAULT_BOOT_PATH = ".lca/spine/boot-spine.jsonl"
-_DEFAULT_RUNS_ROOT = "traces/runs"
 
 # 旧单文件 layout 名(PR-4 已退役)。模块顶部仅声明一次,避免
 # docstring / comments 散落旧字面触发 I-FW-SSOT-1 守护。
@@ -110,7 +110,7 @@ async def setup(ctx: PluginContext, config: Any) -> None:
     """Construct a routing file sink and provide ``file_sink``."""
     cfg: Mapping[str, Any] = config if isinstance(config, Mapping) else {}
     boot_path = _resolve_boot_path(cfg)
-    runs_root = Path(str(cfg.get("runs_root", _DEFAULT_RUNS_ROOT)))
+    runs_root = Path(str(cfg.get("runs_root") or default_runs_root()))
     # ADR-0169 PR-27 + PR-4:默认 file_name 模板 = $run_id.spine.jsonl。
     file_name = str(cfg.get("file_name", DEFAULT_SPINE_TEMPLATE))
 
