@@ -579,3 +579,15 @@
 | MEM-TASK-2-EDIT-SYNC-SERVICE | Markdown 编辑事件解析器 (`MemoryEditSyncService`) | Completed | 解析提交的 Markdown，比对活跃记录计算 ADD/SUPERSEDE/DELETE 原子操作并驱动 AssistantMemory，单测 25/25 全绿，commit d7671e324 (INV-MEM-04~05) |
 | MEM-TASK-3-ROUTE-GATE | Webserver Standing File 写入窄门拦截 (`standing_files.py`) | Completed | 拦截 PUT MEMORY.md 严禁直接写盘，转由 MemoryEditSyncService 同步至 semantic.json 并重新投影，测试 25/25 全绿 (INV-MEM-06) |
 | MEM-TASK-4-INTEGRATION-E2E | 端到端集成与 Prompt 实时感知验收 (`test_memory_stateless_projection_e2e.py`) | Completed | 落地端到端集成测试，覆盖工具写入、编辑回写、全链路往返及 persona_from_home Prompt 实时感知，150/150 测试全绿 (INV-MEM-01~06) |
+| BRAINSTORM-MUSE-MODAL-CONTEXT | 深度梳理右侧动态弹窗硬编码、重复条目、执行失败标识与 Muse 截图信息流差异 | Completed | 已结合 Muse 生产截图、Spine 事件账本与 Journal Fold 机制完成溯源：定位了 invocation_id 空值导致的双写重复条目、3841ms/fake-pytest/固定任务标题等硬编码、以及缺乏真实错误沉淀的机械失败标识 |
+| BRAINSTORM-MUSE-MODAL-QUESTIONS | 澄清动态信息流机制演进与端到端真实事件映射方案（单步提问） | Completed | 用户明确确认选定全链路纯事件驱动治理（后端 Fold 修复双写与消重 + 真实状态机与错误流贯穿 + 语义动态解构） |
+| BRAINSTORM-MUSE-MODAL-APPROACHES | 提出 2-3 种信息流生成、去重与状态机制架构方案及权衡对比 | Completed | 用户明确确认选定方案 A+（三层闭环 + 生产者契约源头归一架构），由生产者上移真值并收敛双写，fold 退化为纯按 ID 归组，彻底消灭硬编码 |
+| BRAINSTORM-MUSE-MODAL-DESIGN-SECTIONS | 逐步呈现设计细节（Owns/Does NOT own、生产者改动清单、纯函数状态机、测试断言）并获取审批 | Completed | 全部 4 大小节（边界自治哲学、生产者改动清单与身份全链透传契约、纯函数状态机与 Muse 渲染、INV-01~08 测试矩阵）全部获用户审核批准 |
+| BRAINSTORM-MUSE-MODAL-DESIGN-DOC | 沉淀设计文档至 docs/plans/ 并提交 git | Completed | 成功落盘 docs/plans/2026-10-04-muse-activity-modal-dynamic-alignment-design.md 并完成设计归档 |
+| BRAINSTORM-MUSE-MODAL-TRANSITION | 转换至实施计划制定（writing-plans） | Completed | 成功落盘 docs/plans/2026-10-04-muse-activity-modal-dynamic-alignment-plan.md 并完成实施任务分解 |
+| ACT-TASK-1-PRODUCER | 生产者收敛与身份全链透传 (INV-01, INV-02) | Completed | 确立 step.tool_call.record 与 step.tool_result.record 为唯一真值源，llm.request.header.assistant 隔离为 PredictedIntent 且严禁写入 target.tool_calls，body.tool.execute.end 降级为生命周期括弧且阻断重复 tool_result，覆盖 INV-01/02 测试全绿 (commit 4f1ab96b5) |
+| ACT-TASK-2-EXIT-CODE | 真值字段上移与退出码契约 (INV-03) | Completed | record_step_tool_result 增加 exit_code 结构化整型字段与保底推导，SafeExecutor 权威解析 observation.payload/extra 真实退出码透传，单测全绿 (commit ccab2a47e) |
+| ACT-TASK-3-PURGE-MOCK | 契约解析纯净化与魔法值清理 (INV-04, INV-06) | Completed | 彻底移除 3841ms、ZZSTART、fake pytest 及 asst_3dacffc01a90 硬编码魔数，实现真值 exit_code 与 stderr 动态直出，失败流合成标准动态结论，单测全绿 (commit 34c2e7d36) |
+| ACT-TASK-4-COMPAT-SHIM | COMPAT 紧邻前驱单条合并 Shim (INV-08) | Completed | 加固紧邻前驱单条合并边界（window=1 且 not invocation_id），增加清晰 delete-when 标记，落地 test_journal_fold_compat_shim.py 3/3 单测全绿，连续相同调用绝不误吞并 |
+| ACT-TASK-5-UI-PATCH | 纯函数状态机与前端高保真双栏补丁 (INV-05, INV-07) | Completed | 实现 pure function deriveStepState（覆盖5态图标），彻底清除 '验证Activity重启与事件完整性' 兜底串、Run: 调试标签与 '🧠 智能体意图与执行叙述'，状态药丸动态三态联动，单测 25/25 全绿 |
+| ACT-TASK-6-INTEGRATION-E2E | 全链路回归、Pre-push 门禁与真实端到端验收 | Completed | 8 大不变量套件 35/35 100% 全绿，前端补丁 45/45 verify 通过，ruff clean，git diff --check 干净，内核重启就绪，真实 run 校验无魔数/带 exit_code |

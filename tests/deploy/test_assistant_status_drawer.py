@@ -106,8 +106,8 @@ def test_assistant_status_drawer_activity_detail_contract() -> None:
     path = _get_drawer_tsx_path()
     content = path.read_text(encoding="utf-8")
 
-    # 点击单个 item 弹窗只展示当前活动/运行内部的思考与调用概要，不再展示跨 run 全局行动列表
-    assert "本次思考与调用概要" in content
+    # 点击单个 item 弹窗展示 Muse 风格步骤树与高保真 5 要素面板，不展示冗余小标题与跨 run 列表
+    assert "本次思考与调用概要" not in content
     assert "近期行动列表" not in content
 
     # 弹窗标题与内容绝不出现“人读”字样或“Agent 行动记录与人读日志”
@@ -119,6 +119,24 @@ def test_assistant_status_drawer_activity_detail_contract() -> None:
     assert "selectedActivity.title" in content
     # 右侧展示具体情况的清晰文本说明
     assert "具体情况详细说明" in content
+
+
+def test_modal_zero_hardcoding_and_debugging_labels() -> None:
+    """Verifies INV-07: Drawer TSX modal has zero hardcoded fallback strings, zero debugging labels, and zero narrative headers."""
+    path = _get_drawer_tsx_path()
+    content = path.read_text(encoding="utf-8")
+
+    # 1. No hardcoded mock task fallback string
+    assert "验证Activity重启与事件完整性" not in content
+    # 2. No debugging Run: run_xxx label in modal header
+    assert "Run: {" not in content
+    assert "Run: run_" not in content
+    # 3. No redundant narrative section heading
+    assert "🧠 智能体意图与执行叙述" not in content
+    # 4. No redundant sidebar header
+    assert "本次思考与调用概要" not in content
+    # 5. Contains pure function deriveStepState
+    assert "deriveStepState" in content
 
 
 def test_drawer_list_pure_natural_language_no_tool_badge() -> None:

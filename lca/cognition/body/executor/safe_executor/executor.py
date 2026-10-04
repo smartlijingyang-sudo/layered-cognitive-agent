@@ -275,11 +275,32 @@ class SimpleSafeExecutor(SafeExecutor):
                 record_step_tool_result,
             )
 
+            exit_code = 0
+            if (
+                isinstance(getattr(observation, "payload", None), dict)
+                and "exit_code" in observation.payload
+            ):
+                try:
+                    exit_code = int(observation.payload["exit_code"])
+                except (ValueError, TypeError):
+                    exit_code = 0 if observation.success else 1
+            elif (
+                isinstance(getattr(observation, "extra", None), dict)
+                and "exit_code" in observation.extra
+            ):
+                try:
+                    exit_code = int(observation.extra["exit_code"])
+                except (ValueError, TypeError):
+                    exit_code = 0 if observation.success else 1
+            elif not observation.success:
+                exit_code = 1
+
             record_step_tool_result(
                 tool_name=tool.name,
                 invocation_id=invocation_id,
                 outcome="ok" if observation.success else "failure",
                 ok=observation.success,
+                exit_code=exit_code,
                 latency_ms=_elapsed_ms(invocation_started),
                 error=observation.error or None,
                 stdout_head=_extract_stdout_head(observation),
@@ -307,6 +328,7 @@ class SimpleSafeExecutor(SafeExecutor):
                     invocation_id=invocation_id,
                     outcome="failure",
                     ok=False,
+                    exit_code=1,
                     latency_ms=_elapsed_ms(invocation_started),
                     error=str(exc),
                     delta_summary=str(exc)[:120],

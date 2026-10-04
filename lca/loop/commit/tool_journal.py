@@ -384,6 +384,7 @@ def record_step_tool_result(
     invocation_id: str,
     outcome: Literal["ok", "failure", "timeout", "denied"],
     ok: bool,
+    exit_code: int = 0,
     latency_ms: int = 0,
     stdout_head: str = "",
     stdout_chars_total: int = 0,
@@ -415,6 +416,7 @@ def record_step_tool_result(
             f"got ok=True (tool={tool_name!r})"
         )
     step, run_id = _phase_tool_context()
+    resolved_exit_code = int(exit_code) if exit_code != 0 else (0 if ok else 1)
     payload: dict[str, Any] = {
         "step": step,
         "run_id": run_id,
@@ -422,6 +424,7 @@ def record_step_tool_result(
         "invocation_id": invocation_id,
         "outcome": outcome,
         "ok": ok,
+        "exit_code": resolved_exit_code,
         "latency_ms": latency_ms,
         "stdout_chars_total": stdout_chars_total,
         "stdout_truncated": stdout_truncated,

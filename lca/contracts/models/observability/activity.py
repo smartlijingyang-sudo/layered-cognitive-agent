@@ -74,9 +74,7 @@ def _deconstruct_command(cmd: str) -> tuple[str, str, str]:
     if raw_cmd.startswith("ssh") and ("'" in raw_cmd or '"' in raw_cmd):
         m = re.search(r"ssh\S*\s+['\"](.*?)['\"]", raw_cmd)
         if m:
-            inner_cmd = (
-                m.group(1).replace('echo "ZZSTART";', "").replace('echo "ZZEND";', "").strip()
-            )
+            inner_cmd = m.group(1).strip()
 
     main_cmd = re.split(r"[|;&]", inner_cmd)[0].strip()
     tokens = main_cmd.split()
@@ -468,25 +466,15 @@ def parse_step_evidence(
         narrative = specific_narrative
 
     duration_ms = int(res.get("latency_ms") or res.get("duration_ms") or th.get("latency_ms") or 0)
-    if duration_ms == 0:
-        duration_ms = (
-            120
-            if "read" in lowered_name or "soul" in lowered_name
-            else (3841 if "grep" in lowered_cmd else 350)
-        )
     ok = res.get("ok", True)
-    exit_code = 0 if ok else 1
-    if "exit_code" in res:
-        exit_code = int(res["exit_code"])
+    exit_code = int(res["exit_code"]) if "exit_code" in res else (0 if ok else 1)
 
     stdout = str(res.get("stdout_head") or res.get("stdout") or res.get("output") or "")
+    stderr = str(res.get("stderr") or "")
     truncated_boundary = ""
-    if (
-        "ZZSTART" in stdout
-        or "ZZSTART" in cmd
-        or any(k in lowered_name for k in ("command", "shell", "bash"))
-    ):
-        truncated_boundary = "ZZSTART / ZZEND"
+    if res.get("stdout_truncated"):
+        chars_total = res.get("stdout_chars_total", 0)
+        truncated_boundary = f"已截断（共 {chars_total} 字符）" if chars_total else "输出已截断"
 
     code_snippets: list[dict[str, str]] = []
     search_results: list[dict[str, Any]] = []
@@ -522,50 +510,6 @@ def parse_step_evidence(
                     sub_lines = all_lines[max(0, start_l - 1) : end_l]
                     stdout = "\n".join(sub_lines)
 
-        if not stdout.strip() and ("grep" in lowered_cmd or "rg" in lowered_cmd):
-            kw_m = re.search(r"(?:grep|rg)\s+(?:-[a-zA-Z0-9]+\s+)*['\"]?([^'\"\s]+)['\"]?", cmd)
-            kw = kw_m.group(1).strip("\"'") if kw_m else ""
-            if kw:
-                target_token = [
-                    t.strip("\"'").replace("/mnt/data/", "")
-                    for t in cmd.split()
-                    if "." in t and not t.startswith("-") and t.strip("\"'") != kw
-                ]
-                target_file = Path(target_token[0]) if target_token else None
-                if target_file and not target_file.is_file() and "/" in str(target_file):
-                    for i in range(len(target_file.parts)):
-                        cand = Path(*target_file.parts[i:])
-                        if cand.is_file():
-                            target_file = cand
-                            break
-                if target_file and target_file.is_file():
-                    with suppress(Exception):
-                        matches = []
-                        for lno, line in enumerate(
-                            target_file.read_text(encoding="utf-8").splitlines(), start=1
-                        ):
-                            if kw in line:
-                                matches.append(f"{target_file.name}:{lno}:{line}")
-                                if len(matches) >= 15:
-                                    break
-                        stdout = "\n".join(matches)
-
-        if not stdout.strip() and ("pytest" in lowered_cmd or "pytest" in lowered_name):
-            stdout = "pytest 9.0.1" if "version" in lowered_cmd else "=== 1 passed in 0.42s ==="
-
-        if not stdout.strip() and ("self_config" in lowered_name or "soul" in lowered_name):
-            soul_candidates = [
-                Path.home() / ".lca" / "assistants" / "asst_3dacffc01a90" / "SOUL.md",
-                Path("roles/architect/SOUL.md"),
-            ]
-            for sc in soul_candidates:
-                if sc.is_file():
-                    with suppress(Exception):
-                        stdout = sc.read_text(encoding="utf-8")[:1000]
-                        break
-            if not stdout.strip():
-                stdout = "# SOUL.md\n\n## 🧠 身份与职责\n- 认知架构设计与事件流投影验证\n- 契约单写与事实唯一真值"
-
     if "grep" in tool_name.lower() or "search" in tool_name.lower() or "grep" in cmd or "rg" in cmd:
         lines = stdout.strip().splitlines()
         for idx, line in enumerate(lines[:15]):
@@ -594,7 +538,7 @@ def parse_step_evidence(
             if "soul" in lowered_name or "self_config" in lowered_name or "markdown" in stdout:
                 lang = "markdown"
             label = (
-                "提取到的自治配置 (SOUL.md)"
+                "提取到的自治配置"
                 if "soul" in lowered_name or "self_config" in lowered_name
                 else f"提取到的代码内容 ({len(stdout.splitlines())} 行)"
             )
@@ -605,6 +549,15 @@ def parse_step_evidence(
                     "language": lang,
                 }
             )
+
+    if stderr.strip():
+        code_snippets.append(
+            {
+                "label": f"错误输出 (stderr, exit {exit_code})",
+                "code": stderr[:3000],
+                "language": "bash",
+            }
+        )
 
     if ok:
         if search_results:
@@ -621,8 +574,8 @@ def parse_step_evidence(
             else:
                 conclusion = f"验证结论：{step_title} 已执行完成，符合预期，无执行错误，信息完整。"
     else:
-        err = res.get("error") or "未知错误"
-        conclusion = f"执行异常：动作未达预期，错误信息：{err}"
+        err = res.get("error") or res.get("stderr") or "未知错误"
+        conclusion = f"验证结论：动作执行未达预期（退出码 {exit_code}）。原因：{err}。"
 
     return StepEvidence(
         id=step_id,
