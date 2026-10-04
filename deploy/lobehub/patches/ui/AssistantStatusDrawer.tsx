@@ -128,10 +128,47 @@ export interface UpcomingJob {
   delivery?: string;
 }
 
+export interface StepStateVisual {
+  color: string;
+  iconSymbol: string;
+  iconType: 'started' | 'running' | 'completed' | 'file_op' | 'error';
+}
+
+export function deriveStepState(
+  toolName?: string,
+  lifecyclePhase?: string,
+  exitCode?: number,
+  isOutput?: boolean,
+): StepStateVisual {
+  if (lifecyclePhase === 'started') {
+    return { color: '#aaaaaa', iconSymbol: '●', iconType: 'started' };
+  }
+  if (lifecyclePhase === 'running' || lifecyclePhase === 'pending') {
+    return { color: '#60b1ff', iconSymbol: '◐', iconType: 'running' };
+  }
+  if (isOutput) {
+    return { color: '#c4f042', iconSymbol: '✔', iconType: 'completed' };
+  }
+  if (typeof exitCode === 'number' && exitCode !== 0) {
+    return { color: '#f4416c', iconSymbol: '✕', iconType: 'error' };
+  }
+  const isFileOp =
+    toolName &&
+    (toolName.includes('write') ||
+      toolName.includes('edit') ||
+      toolName.includes('create') ||
+      toolName.includes('patch'));
+  if (isFileOp) {
+    return { color: '#cccccc', iconSymbol: '📄', iconType: 'file_op' };
+  }
+  return { color: '#c4f042', iconSymbol: '✔', iconType: 'completed' };
+}
+
 export interface ModalStepItem {
   id: string;
   step_title: string;
-  iconType: 'started' | 'completed' | 'pending' | 'running' | 'error';
+  stateVisual?: StepStateVisual;
+  iconType?: 'started' | 'completed' | 'pending' | 'running' | 'file_op' | 'error';
   narrative: string;
   command?: string;
   exit_code?: number;
@@ -846,11 +883,13 @@ export const AssistantStatusDrawer = memo<AssistantStatusDrawerProps>(
       const steps: ModalStepItem[] = [];
 
       // 1. 首节点：● 已开始 (gray bullet, no icon)
-      const taskGoal = runDetail?.question || act.title || '验证Activity重启与事件完整性';
+      const taskGoal = runDetail?.question || act.title || act.summary || '智能体执行任务';
+      const startedVisual = deriveStepState(undefined, 'started');
       steps.push({
         id: `${act.id}-started`,
         step_title: '已开始',
-        iconType: 'started',
+        stateVisual: startedVisual,
+        iconType: startedVisual.iconType,
         narrative: `智能体接收到任务目标：「${taskGoal}」。\n\n已成功初始化运行环境、挂载会话上下文与执行能力契约。`,
         conclusion: '验证结论：任务初始化完成，已开始执行认知决策与行动规划。',
         stage: 'Lifecycle → Started',
@@ -863,12 +902,29 @@ export const AssistantStatusDrawer = memo<AssistantStatusDrawerProps>(
           const tr = s.tool_result;
           const th = s.thinking;
           const ev = (s as any).evidence;
+          const toolName = tc?.name || ev?.tool_name;
+          const exitCode =
+            ev?.exit_code !== undefined
+              ? ev.exit_code
+              : tr?.exit_code !== undefined
+                ? tr.exit_code
+                : tr?.ok === false
+                  ? 1
+                  : tr
+                    ? 0
+                    : undefined;
 
           if (ev) {
+            const stateVisual = deriveStepState(
+              toolName,
+              s.phase === 'pending' || s.phase === 'running' ? s.phase : undefined,
+              exitCode,
+            );
             steps.push({
               id: s.step_id || `step-${s.step_index}`,
-              step_title: ev.step_title || tc?.name || '执行操作',
-              iconType: ev.exit_code === 0 ? 'completed' : 'error',
+              step_title: ev.step_title || tc?.arguments_summary || tc?.name || '执行操作',
+              stateVisual,
+              iconType: stateVisual.iconType,
               narrative: ev.narrative || th?.reasoning || '执行动作指令',
               command: ev.command,
               exit_code: ev.exit_code,
@@ -876,27 +932,33 @@ export const AssistantStatusDrawer = memo<AssistantStatusDrawerProps>(
               truncated_boundary: ev.truncated_boundary,
               code_snippets: ev.code_snippets,
               search_results: ev.search_results,
-              conclusion: ev.conclusion || '验证结论：动作执行完成，符合预期，无执行错误。',
+              conclusion:
+                ev.conclusion ||
+                (exitCode === 0
+                  ? '验证结论：动作执行完成，符合预期，无执行错误。'
+                  : `验证结论：动作执行未达预期（退出码 ${exitCode}）。`),
               stage: s.phase || 'Act Phase',
             });
           } else if (tc?.name) {
-            const isOk = tr?.ok !== false;
+            const isOk = tr?.ok !== false && (exitCode === undefined || exitCode === 0);
             const dur = tr?.latency_ms || s.duration_ms || 0;
             const cmdStr = `${tc.name}(${Object.keys(tc.arguments || {}).join(', ')})`;
+            const stateVisual = deriveStepState(tc.name, undefined, exitCode);
             steps.push({
               id: s.step_id || `step-${s.step_index}`,
               step_title: tc.arguments_summary || tc.name,
-              iconType: isOk ? 'completed' : 'error',
+              stateVisual,
+              iconType: stateVisual.iconType,
               narrative: th?.reasoning ? `${th.reasoning}\n\n执行工具调用：${tc.name}` : `执行工具调用：${tc.name}`,
               command: cmdStr,
-              exit_code: isOk ? 0 : 1,
+              exit_code: exitCode,
               duration_ms: dur,
               code_snippets: tr?.stdout_head
                 ? [{ label: '提取到的代码内容', code: tr.stdout_head, language: 'bash' }]
                 : undefined,
               conclusion: isOk
                 ? '验证结论：动作执行完成，符合预期，无执行错误。'
-                : `执行异常：动作未达预期，错误信息：${tr?.error || '未知错误'}`,
+                : `执行异常：动作未达预期（退出码 ${exitCode ?? 1}），错误信息：${tr?.error || '未知错误'}`,
               stage: s.phase || 'Act Phase',
               params: tc.arguments,
               result: tr?.stdout_head || tr?.delta_summary,
@@ -906,10 +968,12 @@ export const AssistantStatusDrawer = memo<AssistantStatusDrawerProps>(
 
         // 最终交付
         if (runDetail.output) {
+          const stateVisual = deriveStepState(undefined, undefined, 0, true);
           steps.push({
             id: `${act.id}-output`,
             step_title: '交付任务结果与答复',
-            iconType: 'completed',
+            stateVisual,
+            iconType: stateVisual.iconType,
             narrative: runDetail.output,
             conclusion: '验证结论：智能体已完成本轮执行并生成最终用户响应。',
             stage: 'Reflect → Deliver',
@@ -921,10 +985,17 @@ export const AssistantStatusDrawer = memo<AssistantStatusDrawerProps>(
           ? activities.filter((a) => a.detail?.runId === targetRunId)
           : [act];
         sameRunActs.forEach((item) => {
+          const exitCode = item.status === 'error' ? 1 : 0;
+          const stateVisual = deriveStepState(
+            item.detail?.toolName,
+            item.status === 'running' ? 'running' : undefined,
+            exitCode,
+          );
           steps.push({
             id: item.id,
             step_title: item.title,
-            iconType: item.status === 'success' ? 'completed' : item.status === 'running' ? 'pending' : 'error',
+            stateVisual,
+            iconType: stateVisual.iconType,
             narrative:
               item.detail?.humanExplanation ||
               (item.summary && item.summary.length > 20
@@ -937,9 +1008,9 @@ export const AssistantStatusDrawer = memo<AssistantStatusDrawerProps>(
                   ? `${item.detail.toolName}(${Object.entries(item.detail.params).map(([k, v]) => `${k}=${JSON.stringify(v)}`).join(', ')})`
                   : `${item.detail.toolName}()`
                 : undefined),
-            exit_code: item.status === 'error' ? 1 : 0,
-            duration_ms: item.detail?.durationMs || 300,
-            truncated_boundary: item.detail?.result?.includes('ZZSTART') ? 'ZZSTART / ZZEND' : undefined,
+            exit_code: exitCode,
+            duration_ms: item.detail?.durationMs,
+            truncated_boundary: undefined,
             code_snippets: item.detail?.result
               ? [{ label: '提取到的代码内容', code: item.detail.result, language: 'bash' }]
               : undefined,
@@ -1518,33 +1589,74 @@ export const AssistantStatusDrawer = memo<AssistantStatusDrawerProps>(
           width={860}
           className={styles.detailModal}
           title={
-            selectedActivity ? (
-              <Flexbox gap={6} style={{ paddingRight: 32 }}>
-                <Flexbox horizontal align="center" gap={8}>
-                  {selectedActivity.status === 'running' ? (
-                    <Tag color="processing" style={{ fontWeight: 600 }}>
-                      ● 进行中
-                    </Tag>
-                  ) : selectedActivity.status === 'error' ? (
-                    <Tag color="error" style={{ fontWeight: 600 }}>
-                      ✕ 执行失败
-                    </Tag>
-                  ) : (
-                    <Tag color="success" style={{ fontWeight: 600 }}>
-                      ✓ 已完成
-                    </Tag>
-                  )}
-                  {selectedActivity.detail?.runId && (
-                    <Text type="secondary" style={{ fontSize: 11, fontFamily: 'monospace' }}>
-                      Run: {selectedActivity.detail.runId.slice(0, 8)}
-                    </Text>
-                  )}
+            selectedActivity ? (() => {
+              const isFailed = selectedActivity.status === 'error' ||
+                (runDetail as any)?.status === 'failed' ||
+                subSteps.some((s) => s.stateVisual?.iconType === 'error' || (typeof s.exit_code === 'number' && s.exit_code !== 0));
+              const isRunning = selectedActivity.status === 'running' || (runDetail as any)?.status === 'running';
+
+              return (
+                <Flexbox gap={6} style={{ paddingRight: 32 }}>
+                  <Flexbox horizontal align="center" gap={8}>
+                    {isRunning ? (
+                      <span
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: 4,
+                          background: '#111d2c',
+                          border: '1px solid #173d66',
+                          color: '#60b1ff',
+                          padding: '2px 10px',
+                          fontSize: 12,
+                          fontWeight: 600,
+                          borderRadius: 12,
+                        }}
+                      >
+                        ● 进行中
+                      </span>
+                    ) : isFailed ? (
+                      <span
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: 4,
+                          background: '#2a1215',
+                          border: '1px solid #4d1c24',
+                          color: '#f4416c',
+                          padding: '2px 10px',
+                          fontSize: 12,
+                          fontWeight: 600,
+                          borderRadius: 12,
+                        }}
+                      >
+                        ✕ 执行失败
+                      </span>
+                    ) : (
+                      <span
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: 4,
+                          background: '#132c18',
+                          border: '1px solid #234c2a',
+                          color: '#c4f042',
+                          padding: '2px 10px',
+                          fontSize: 12,
+                          fontWeight: 600,
+                          borderRadius: 12,
+                        }}
+                      >
+                        ✓ 已完成
+                      </span>
+                    )}
+                  </Flexbox>
+                  <Title level={4} style={{ margin: 0, fontWeight: 700, fontSize: 16, color: '#ffffff' }}>
+                    {runDetail?.question || selectedActivity.title || selectedActivity.summary || '活动详情'}
+                  </Title>
                 </Flexbox>
-                <Title level={4} style={{ margin: 0, fontWeight: 700, fontSize: 16, color: '#ffffff' }}>
-                  {selectedActivity.title || selectedActivity.summary || '活动详情'}
-                </Title>
-              </Flexbox>
-            ) : (
+              );
+            })() : (
               <Title level={4} style={{ margin: 0, fontWeight: 700, fontSize: 16, color: '#ffffff' }}>
                 活动详情
               </Title>
@@ -1555,11 +1667,9 @@ export const AssistantStatusDrawer = memo<AssistantStatusDrawerProps>(
           <div className={styles.detailModalLayout}>
             {/* 左侧列表：Muse 风格步骤树 */}
             <div className={styles.detailSidebar}>
-              <div className={styles.detailSidebarHeader}>
-                本次思考与调用概要
-              </div>
               {subSteps.map((step) => {
                 const isSelected = step.id === activeSubStep?.id;
+                const visual = step.stateVisual || deriveStepState(undefined, step.iconType === 'started' ? 'started' : undefined);
                 return (
                   <div
                     key={step.id}
@@ -1567,15 +1677,17 @@ export const AssistantStatusDrawer = memo<AssistantStatusDrawerProps>(
                     onClick={() => setSelectedSubStepId(step.id)}
                   >
                     <Flex align="center" gap={8}>
-                      {step.iconType === 'started' ? (
-                        <span style={{ color: '#aaaaaa', fontSize: 13, flexShrink: 0 }}>●</span>
-                      ) : step.iconType === 'completed' ? (
-                        <span style={{ color: '#c4f042', fontSize: 13, fontWeight: 'bold', flexShrink: 0 }}>✓</span>
-                      ) : step.iconType === 'pending' || step.iconType === 'running' ? (
-                        <span style={{ color: '#60b1ff', fontSize: 13, flexShrink: 0 }}>☐</span>
-                      ) : (
-                        <span style={{ color: '#f4416c', fontSize: 13, fontWeight: 'bold', flexShrink: 0 }}>✕</span>
-                      )}
+                      <span
+                        style={{
+                          color: visual.color,
+                          fontSize: 13,
+                          fontWeight: visual.iconType === 'completed' || visual.iconType === 'error' ? 'bold' : 'normal',
+                          flexShrink: 0,
+                          lineHeight: 1,
+                        }}
+                      >
+                        {visual.iconSymbol}
+                      </span>
                       <span
                         className={styles.detailSidebarItemTitle}
                         style={{
@@ -1598,11 +1710,8 @@ export const AssistantStatusDrawer = memo<AssistantStatusDrawerProps>(
                   {activeSubStep.step_title}
                 </Title>
 
-                {/* 2. 叙述段落 */}
+                {/* 2. 叙述段落 (直接紧接动作叙述，无冗余小标题) */}
                 <div className={styles.narrativeCard}>
-                  <div className={styles.detailSectionTitle}>
-                    🧠 智能体意图与执行叙述
-                  </div>
                   <Paragraph className={styles.narrativeText}>
                     {activeSubStep.narrative}
                   </Paragraph>
@@ -1627,26 +1736,23 @@ export const AssistantStatusDrawer = memo<AssistantStatusDrawerProps>(
 
                 {/* 4. 元数据信息点 (退出码、耗时、边界截取) */}
                 {(activeSubStep.exit_code !== undefined || activeSubStep.duration_ms !== undefined) && (
-                  <Flexbox horizontal gap={8} wrap="wrap" align="center">
-                    <Tag color={activeSubStep.exit_code === 0 ? 'success' : 'error'}>
-                      {activeSubStep.exit_code === 0 ? '✓ 退出码: 0' : `✕ 退出码: ${activeSubStep.exit_code}`}
-                    </Tag>
+                  <div style={{ fontSize: 12, color: '#8c8c8c', margin: '4px 0 8px 0', fontFamily: 'monospace' }}>
+                    <span>· 退出码: </span>
+                    <span
+                      style={{
+                        color: activeSubStep.exit_code === 0 ? '#52c41a' : '#f4416c',
+                        fontWeight: 600,
+                      }}
+                    >
+                      {activeSubStep.exit_code !== undefined ? activeSubStep.exit_code : 0}
+                    </span>
                     {activeSubStep.duration_ms !== undefined && (
-                      <Tag color="default">
-                        ⏱ 耗时: {activeSubStep.duration_ms}ms
-                      </Tag>
-                    )}
-                    {activeSubStep.stage && (
-                      <Tag color="cyan">
-                        阶段: {activeSubStep.stage}
-                      </Tag>
+                      <span>, 耗时: {activeSubStep.duration_ms}ms</span>
                     )}
                     {activeSubStep.truncated_boundary && (
-                      <Tag color="warning">
-                        边界截取: {activeSubStep.truncated_boundary}
-                      </Tag>
+                      <span style={{ color: '#faad14' }}> · 输出已通过边界截取</span>
                     )}
-                  </Flexbox>
+                  </div>
                 )}
 
                 {/* 5. 提取到的代码内容 / 检索结果 */}
@@ -1707,22 +1813,36 @@ export const AssistantStatusDrawer = memo<AssistantStatusDrawerProps>(
 
                 {/* 6. 验证结论 */}
                 {activeSubStep.conclusion && (
-                  <Alert
-                    type={activeSubStep.iconType === 'error' || activeSubStep.exit_code !== 0 ? 'error' : 'success'}
-                    message={
-                      <span style={{ fontWeight: 700, fontSize: 13, color: activeSubStep.iconType === 'error' || activeSubStep.exit_code !== 0 ? '#f4416c' : '#c4f042' }}>
-                        {activeSubStep.iconType === 'error' || activeSubStep.exit_code !== 0 ? '✕ 执行异常' : '🛡️ 验证结论'}
-                      </span>
-                    }
-                    description={
-                      <div style={{ color: '#ffffff', fontSize: 13, lineHeight: 1.6, whiteSpace: 'pre-line', marginTop: 4 }}>
-                        {activeSubStep.conclusion}
-                      </div>
-                    }
-                    variant="filled"
-                    showIcon
-                    style={{ borderRadius: 10 }}
-                  />
+                  <div
+                    className={`${styles.verdictBanner} ${activeSubStep.stateVisual?.iconType === 'error' || activeSubStep.exit_code !== 0 ? styles.verdictBannerError : styles.verdictBannerSuccess}`}
+                  >
+                    <div
+                      className={styles.verdictTitle}
+                      style={{
+                        color:
+                          activeSubStep.stateVisual?.iconType === 'error' || activeSubStep.exit_code !== 0
+                            ? '#f4416c'
+                            : '#c4f042',
+                        fontWeight: 700,
+                        fontSize: 13,
+                        marginBottom: 4,
+                      }}
+                    >
+                      {activeSubStep.stateVisual?.iconType === 'error' || activeSubStep.exit_code !== 0
+                        ? '✕ 执行异常'
+                        : '验证结论'}
+                    </div>
+                    <div
+                      style={{
+                        color: '#ffffff',
+                        fontSize: 13,
+                        lineHeight: 1.6,
+                        whiteSpace: 'pre-line',
+                      }}
+                    >
+                      {activeSubStep.conclusion}
+                    </div>
+                  </div>
                 )}
               </div>
             )}

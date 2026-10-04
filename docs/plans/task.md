@@ -589,5 +589,5 @@
 | ACT-TASK-2-EXIT-CODE | 真值字段上移与退出码契约 (INV-03) | Completed | record_step_tool_result 增加 exit_code 结构化整型字段与保底推导，SafeExecutor 权威解析 observation.payload/extra 真实退出码透传，单测全绿 (commit ccab2a47e) |
 | ACT-TASK-3-PURGE-MOCK | 契约解析纯净化与魔法值清理 (INV-04, INV-06) | Completed | 彻底移除 3841ms、ZZSTART、fake pytest 及 asst_3dacffc01a90 硬编码魔数，实现真值 exit_code 与 stderr 动态直出，失败流合成标准动态结论，单测全绿 (commit 34c2e7d36) |
 | ACT-TASK-4-COMPAT-SHIM | COMPAT 紧邻前驱单条合并 Shim (INV-08) | Completed | 加固紧邻前驱单条合并边界（window=1 且 not invocation_id），增加清晰 delete-when 标记，落地 test_journal_fold_compat_shim.py 3/3 单测全绿，连续相同调用绝不误吞并 |
-| ACT-TASK-5-UI-PATCH | 纯函数状态机与前端高保真双栏补丁 (INV-05, INV-07) | In Progress | 正在开发纯函数状态机单测与前端补丁更新（对齐 Muse 截图、移除固定标题与调试文本、真实退出码渲染） |
-| ACT-TASK-6-INTEGRATION-E2E | 全链路回归、Pre-push 门禁与真实端到端验收 | Pending | 待执行 |
+| ACT-TASK-5-UI-PATCH | 纯函数状态机与前端高保真双栏补丁 (INV-05, INV-07) | Completed | 实现 pure function deriveStepState（覆盖5态图标），彻底清除 '验证Activity重启与事件完整性' 兜底串、Run: 调试标签与 '🧠 智能体意图与执行叙述'，状态药丸动态三态联动，单测 25/25 全绿 |
+| ACT-TASK-6-INTEGRATION-E2E | 全链路回归、Pre-push 门禁与真实端到端验收 | In Progress | 正在执行 8 大不变量全量回归、补丁一致性核验与真实端到端验收 |
