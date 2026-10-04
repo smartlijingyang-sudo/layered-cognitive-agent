@@ -12,8 +12,12 @@
 - tag 含 intentId，不含裸 http URL（URL 永不经过模型/前端文本）
 - vault 往返：create → resolve 拿回原 URL；跨 user 拒绝；消费标记；过期语义
 - 前端 ConnectorAuthCard.tsx 静态断言：intentId prop、resolve 端点、三态机
-- 负向：无 intent_id 的旧分支仍会嵌入裸 authUrl —— 契约在"有真实 URL 必走 vault"，
-  旧分支钉住以便后续收敛（诚实标注，非回归）
+- 收敛（缺口一）：gmail CLI _handle_status 已迁到 vault intent 路径；
+  test_no_bare_auth_url_callers_in_production 用 AST 断言 lca/ 生产代码
+  不再向 format_connector_auth_widget 传 auth_url（formatter 形参仅为
+  旧持久化标签保留）。
+- 前端 fail-closed 静态断言：resolvedUrl 不再从 http authUrl 预填；
+  handleStartAuth 无 http 回退；按钮禁用态只看 intentId/resolvedUrl。
 
 不动：不调真实 Composio/OAuth；不启动浏览器/前端 dev server。
 前端渲染断言为静态源码分析（252 无 node/jsdom 渲染链），诚实降级。
@@ -25,8 +29,13 @@ import re
 from pathlib import Path
 from urllib.parse import parse_qsl
 
-from lca.infrastructure.connectors.core.intent_vault import ConnectorAuthIntentVault
+from lca.infrastructure.connectors.core.intent_vault import (
+    ConnectorAuthIntentVault,
+    set_default_intent_vault,
+)
 from lca.infrastructure.connectors.core.state import format_connector_auth_widget
+from lca.infrastructure.connectors.core.vault import ConnectorVault
+from lca.infrastructure.connectors.gmail.cli import GmailConnectorCLI
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 TSX = REPO_ROOT / "deploy/lobehub/patches/ui/ConnectorAuthCard.tsx"
@@ -151,14 +160,87 @@ def test_frontend_patch_mounts_widget_parser() -> None:
     assert "ConnectorAuthCard" in src
 
 
-def test_legacy_branch_without_intent_still_embeds_raw_url() -> None:
-    """诚实标注：无 intent_id 的旧分支仍会嵌入裸 authUrl。
+def test_legacy_formatter_branch_retained_for_old_persisted_tags() -> None:
+    """formatter 的 auth_url 分支仅为旧持久化标签保留。
 
-    契约在"有真实 URL 必走 vault"（composio tool 路径）；gmail CLI _handle_status
-    等旧调用方未走 vault。此测试把旧行为钉住，收敛前不得 silently 改变。
+    缺口一已收敛：生产调用方不再传 auth_url（见
+    test_no_bare_auth_url_callers_in_production）。此测试锁定 formatter
+    对历史标签的兼容能力，而非生产行为；前端对这类标签渲染禁用态。
     """
     tag = format_connector_auth_widget(
         app_name="Gmail", auth_url=FAKE_AUTH_URL, connection_id="conn_1"
     )
     assert "authUrl=" in tag
     assert "TOKEN123" in tag
+
+
+def test_gmail_status_path_emits_intent_not_url(tmp_path) -> None:
+    """缺口一收敛：gmail status 全链路走 vault，widget/返回体无裸 URL。"""
+    set_default_intent_vault(ConnectorAuthIntentVault())
+    cli = GmailConnectorCLI(vault=ConnectorVault(user_id="e2e_user", lca_home=tmp_path))
+    res = cli.execute(["status"])
+    assert res["status"] == "not_connected"
+    assert "authUrl" not in res
+    intent_id = res["intentId"]
+    assert intent_id.startswith("cai_")
+    tag = res["widget"]
+    assert f"intentId={intent_id}" in tag
+    assert "authUrl" not in tag
+    assert "http" not in tag
+    # 前端 patch 正则能解析出 intentId
+    match = _WIDGET_RE.search(tag)
+    assert match is not None
+    params = dict(parse_qsl(match.group(1)))
+    assert params.get("intentId") == intent_id
+
+
+def test_no_bare_auth_url_callers_in_production() -> None:
+    """契约：lca/ 生产代码不得再向 format_connector_auth_widget 传 auth_url。
+
+    用 AST 精确匹配调用点（非文本 grep，避免误报）；formatter 自身的
+    形参定义是 FunctionDef 而非 Call，不会被计入。
+    """
+    import ast
+
+    lca_root = REPO_ROOT / "lca"
+    violations: list[str] = []
+    for py_file in sorted(lca_root.rglob("*.py")):
+        if "__pycache__" in py_file.parts:
+            continue
+        # utf-8-sig：个别文件带 BOM，直接 ast.parse 会报 U+FEFF
+        tree = ast.parse(py_file.read_text(encoding="utf-8-sig"))
+        for node in ast.walk(tree):
+            if not isinstance(node, ast.Call):
+                continue
+            func = node.func
+            name = ""
+            if isinstance(func, ast.Name):
+                name = func.id
+            elif isinstance(func, ast.Attribute):
+                name = func.attr
+            if name != "format_connector_auth_widget":
+                continue
+            for kw in node.keywords:
+                if kw.arg == "auth_url":
+                    violations.append(f"{py_file.relative_to(REPO_ROOT)}:{node.lineno}")
+    assert not violations, f"bare auth_url callers remain: {violations}"
+
+
+def test_frontend_fail_closed_no_http_prefill() -> None:
+    """静态断言：resolvedUrl 不再从 http authUrl 预填。"""
+    src = TSX.read_text(encoding="utf-8")
+    assert "authUrl && authUrl.startsWith('http') ? authUrl : undefined" not in src
+
+
+def test_frontend_fail_closed_no_http_fallback() -> None:
+    """静态断言：handleStartAuth 内无 http 回退直接打开。"""
+    src = TSX.read_text(encoding="utf-8")
+    assert "targetUrl = authUrl" not in src
+
+
+def test_frontend_fail_closed_intent_only_credential() -> None:
+    """静态断言：唯一凭据是 effectiveIntentId；按钮禁用态 fail-closed。"""
+    src = TSX.read_text(encoding="utf-8")
+    assert "effectiveIntentId" in src
+    assert "disabled={!effectiveIntentId && !resolvedUrl}" in src
+    assert "@deprecated" in src
