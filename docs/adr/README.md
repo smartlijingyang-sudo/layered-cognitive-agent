@@ -226,6 +226,7 @@
 | [0286](0286-n9-node-id-family-namespace-adjudication.md) | N9 节点命名闭集的家族命名空间裁决（todo-44）：primitive.* 接受为 ADR-0220 自有层家族命名空间合法例外（concept 零节点 id 使用，不加）；history.derive 是 wiring 级命名债，维持红钉不洗绿，改名归 quality lane/李超；不改 0220 正文 | Accepted |
 | [0287](0287-semantic-memory-single-online-writer.md) | 语义记忆在线单写者与离线对账归位（李超 note 转 ADR 提案）：F1 认领权跨轮泄漏=0260 C1 fail-open 缺口、F2 对账三套实现在线跑临时版、F4 TrailWriter 零生产写入方；D1 在线单写者（工具路径）、D2 认领权改 run_id 派生读（0260 裁决硬前置）、D3 对账收敛四操作闸（0277 ⑥/⑦ 裁决硬前置）、D5 四阶段交付门禁、D6 落盘时延待产品接受 | Proposed |
 | [0288](0288-nextrun-cross-slot-due-amendment.md) | ADR-0268 修正案：next_run 跨越式 due 语义（微秒相等判据→越过即 due、档归属防重、只补最近一档；tests lane 已钉住 5 个 xfail 契约测试，待 quality 语义修） | Proposed |
+| [0289](0289-bundle-wiring-region-qualified-executor-identity.md) | Bundle 接线执行体身份：region-qualified 复合键+歧义裸名 fail-loud（D4 batch-2 think/primitive 同名双 executor 误接线事故复盘；与 0256 接线时 fail-fast 同哲学） | Implemented |
 | [0255](0255-muse-production-runtime-full-reference.md) | Muse 生产运行时全量参考：每 turn 上下文装配顺序、9 个 standing 文件全文与权限矩阵、36 工具命名空间函数清单与关键参数、9 大机制（记忆三层/强制检索/落笔写盘/provenance/压缩豁免/子 agent 继承/自省投影）与 12 条验收用例；ADR-0254 的实证 companion | Proposed |
 
 > 同名 `0165` 系列有两份(stub + 执行点强制):[0165-event-spine-unified-log.md](0165-event-spine-unified-log.md) 与 [0165-execution-point-enforcement.md](0165-execution-point-enforcement.md)(原 0165.1)。SSOT / 轨迹文件组织以 [0167](0167-spine-ssot-and-step-materialization.md) 为准。
