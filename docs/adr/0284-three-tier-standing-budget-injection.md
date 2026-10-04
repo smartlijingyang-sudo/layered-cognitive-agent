@@ -2,9 +2,9 @@
 
 ## 状态
 
-**Proposed — 2026-10-04**
+**Accepted / Implemented — 2026-10-04**
 
-> **一句话**：standing 组装从字符级截断（`_cap`/`_fit` + 末尾 `[:budget_chars]` 兜底切片）升级为三层注入架构——Tier-1 platform 整段注入、预算外、零截断；Tier-2 protected 整节装包、自有预算、丢节告警；Tier-3 projection 剩余预算内整节装包。本 ADR 是已实现（`5098195a0`，李超 2026-10-04）的事后契约化，四个待拍板项收敛给李超。
+> **一句话**：standing 组装从字符级截断（`_cap`/`_fit` + 末尾 `[:budget_chars]` 兜底切片）升级为三层注入架构——Tier-1 platform 整段注入、预算外、零截断；Tier-2 protected 整节装包、自有预算、丢节告警；Tier-3 projection 剩余预算内整节装包。本 ADR 是已实现（`5098195a0`，李超 2026-10-04）的事后契约化，四个待拍板项已由李超裁决（2026-10-04，见 §5 决策记录）。
 
 ## 0. 接任务前 7 问
 
@@ -14,7 +14,7 @@
 4. 更简单方案？只给 platform 免截断、其余保持旧截断。否决：`_cap` 的"减半封顶"本身就是不可解释的启发式；整节原子性同时修了 protected 文件被拦腰斩的诚实问题（斩断的半句话比整节丢失更危险——模型会按残句脑补）。
 5. 契约先行？反向：实现已先落地（见 §1 证据链），本 ADR 是事后契约化 + 待拍板收敛。诚实声明，不伪装成"先设计后实现"。
 6. 与现有 ADR 冲突？无。ADR-0258 C1（standing 永不进压缩流）：`preserve_standing_sections` 改为连 platform 块一起从磁盘刷新（"prompt 复用不丢 platform 块"），是对 0258 的实现补强而非冲突。ADR-0266 写权限矩阵：本 ADR 只定读注入规则，不动写路径。
-7. 状态诚实？Proposed。实现已合 main，但待拍板①②③④需李超裁决后才能转 Accepted/Implemented。
+7. 状态诚实？Accepted / Implemented。四个待拍板项已裁决（§5），实现 + 测试 + 2026-10-04 独立渲染验证（prompt 34k chars、铁律完整、断句消除）齐备。
 
 ## 1. 实证（main@a9fa65e0f）
 
@@ -35,7 +35,7 @@
 - **C5（输出顺序）**：输出按 documents 顺序（platform 块在前 + standing 原顺序），tier 只决定装包规则、不决定排序（`assemble_standing` docstring 原话）。
 - **C6（merge sanitize）**：home override（`memory/contextfiles.toml`）的 tier 不变量走 sanitize 不拒绝——protected∩standing 保留、其余丢弃；platform 与 standing 重叠部分剔除；`protected_budget_chars` 钳制 `≤ backstory_budget_chars`；packaged 布局的 `read_layout` 保持 strict 抛错。设计意图：自定义 home 不因改文件清单/缩预算而整体回退到 packaged 布局（fail-soft 优先于 fail-fast，沿 ADR-0256 Task 3 修订先例）。
 
-## 3. 待拍板（交李超）
+## 3. 待拍板（已裁决，结论见 §5）
 
 1. **Tier-1 fail-soft vs 启动存在性检查**：缺失 PLATFORM.md 时静默跳过——铁律"静默消失"是最危险的失效模式（todo-41：repo 无模板 + fail-soft 跳过 = 新机器上铁律缺席且无告警）。接受现状，还是 kernel boot 时做存在性检查（缺文件发 warning 事件，todo-41 提案③）？
 2. **Tier-3 丢弃静默 vs 同 tier-2 打 warning**：不对称是故意（projection 本来就是投影、可丢）还是疏漏？现实意义：projection 文件实测 ~4185 chars > 4000 预算，整节丢弃**正在发生**且无声。
@@ -52,4 +52,35 @@
 
 ## 5. 决策记录
 
-（待李超裁决后填写）
+李超 2026-10-04 裁决（"我自己定，按正规的来"），以下为最终结论，直接落地：
+
+1. **Tier-1 缺文件：fail-soft 保留 + boot 存在性检查**。loader 保持 fail-soft（缺文件静默跳过，run 不挂）；
+   kernel boot（`lca_kernel/boot/boot.py::_emit_boot_events`）加存在性检查：`~/.lca/PLATFORM.md`
+   缺失 → `_log.warning("boot.platform_file_missing")`（log + 可观测事件，不 fatal）。
+   另新增 repo 种子模板 `lca/plugins/assistant/templates/PLATFORM.md`（内容与线上 4 句铁律一字不差，
+   文件头注释写明同步规则）；`read_platform_documents` 在缺失时自动从模板铺设（fail-soft），
+   新机器/新 lca_home 首次读取即补齐。todo-41 关闭。
+2. **Tier-3 丢弃：改打 warning**。与 tier-2 对称：`assemble_standing` 的 projection 分支传入
+   `on_drop_section=_warn_projection_drop`，`logger.warning(name, heading)`（只记节名/文件名，不记内容）。
+   静默丢数据不是正规做法。
+3. **状态迁移**：本 ADR → Accepted；实现证据链（`5098195a0` + 测试 `0decbc2e8`/`1629e5728` +
+   2026-10-04 独立渲染验证）齐备 → 标 Implemented。
+4. **`platform_heading` 语言：保持中文**。理由：heading 与 PLATFORM.md 中文内容语言一致；
+   identity-disclosure 英文化是另一语境（英文 tool_usage 块），不强求统一。
+5. **预算 3000→36000：批准**。理由：实测 protected 四文件 30,705 chars + projection ~4,185 chars；
+   旧 3000 是静默截断宪法的 bug 预算（todo-40 实锤）。数字保留、可观测：
+   `layout.toml` 注释写明实测依据。
+
+## 6. Implementation Notes（本轮落地）
+
+- `lca/plugins/assistant/templates/PLATFORM.md`：新增种子模板（4 句铁律 + 同步规则注释头）。
+- `lca/infrastructure/memory/contextfiles/service/assembly.py`：`_seed_platform_file()`（缺失自动铺设，
+  fail-soft）+ `missing_platform_files()`（boot 检查用纯函数）。
+- `lca_kernel/boot/boot.py`：`_warn_missing_platform_files()`，在 `_emit_boot_events` 内调用；
+  缺失 → `boot.platform_file_missing` warning 事件，不 fatal。
+- `lca/infrastructure/memory/contextfiles/domain/standing.py`：`_warn_projection_drop()`；
+  tier-3 分支传入 `on_drop_section`，丢弃打 warning。
+- 测试：`tests/infrastructure/memory/test_shared_standing.py` 新增——tier-3 丢弃触发 warning；
+  缺 PLATFORM.md 时自动从模板铺设且内容一致；boot 检查函数缺失时返回缺名、存在时返回空。
+- 独立渲染验证（2026-10-04）：`persona_from_home(asst_29c963417967)` 输出 34,195 chars；
+  `## 平台共享规则` 块首位加载；URL 铁律 4 句完整；"came to genuinely understand" 不再断句。

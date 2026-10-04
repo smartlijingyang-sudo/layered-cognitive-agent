@@ -415,6 +415,30 @@ async def _boot_context(
     return ctx  # ↑ K3:返回 booted cordis.Context 给 K6
 
 
+def _warn_missing_platform_files() -> None:
+    """ADR-0284 decision 1: boot-time existence check for tier-1 files.
+
+    Warning only (fail-soft): a missing PLATFORM.md never blocks boot — the
+    loader skips it and the run continues. The warning makes the absence
+    observable instead of silent. Deferred imports: boot must not hard-depend
+    on the contextfiles service at module load.
+    """
+    try:
+        from lca.infrastructure.memory.contextfiles.domain.layout import (
+            packaged_layout,
+        )
+        from lca.infrastructure.memory.contextfiles.service.assembly import (
+            missing_platform_files,
+        )
+        from lca.infrastructure.path.locator import get_lca_home
+
+        home = get_lca_home()
+        for name in missing_platform_files(home, packaged_layout()):
+            _log.warning("boot.platform_file_missing", file=name, home=str(home))
+    except Exception:
+        return
+
+
 def _emit_boot_events(
     ctx: Context,
     *,
@@ -457,6 +481,7 @@ def _emit_boot_events(
         if getattr(bound, "evidence_store", None) is not None
         else "none",
     )
+    _warn_missing_platform_files()
     for event in pending_events:
         _log.info(
             "boot.pending_event",
