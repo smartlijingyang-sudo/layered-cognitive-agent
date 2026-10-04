@@ -13,7 +13,6 @@ once / scope / dispose).
 
 from __future__ import annotations
 
-import warnings
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, Protocol
@@ -47,14 +46,6 @@ class ScopeKind(Enum):
     TEAM = "team"
     AGENT = "agent"
     SESSION = "session"
-
-
-def _scope_kind_deprecation_warning() -> None:
-    warnings.warn(
-        "ScopeKind is deprecated; cordis.Context.scope(label) replaces",
-        DeprecationWarning,
-        stacklevel=3,
-    )
 
 
 class PluginKind(Enum):
