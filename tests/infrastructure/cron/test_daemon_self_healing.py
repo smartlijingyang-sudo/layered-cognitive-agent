@@ -15,6 +15,7 @@ from lca.contracts.models.cron.models import (
     OneShotSchedule,
 )
 from lca.domain.cron.store import CronStore
+from lca.domain.cron.worker_context import CronWorkerResult
 from lca.infrastructure.cron.daemon import CronDaemonService
 from lca.infrastructure.cron.worker_runner import CronWorkerRunner
 
@@ -56,6 +57,9 @@ def temp_env():
 async def test_worker_runner_delivers_task_card_to_session(temp_env):
     store, _lock_dir, _tmp = temp_env
     session_store = _FakeSessionStore()
+    # Sessions are keyed by run_id in production, so a live one must already
+    # exist for the target. The worker no longer creates one on a miss.
+    session_store.sessions["chat-123"] = _FakeSession("chat-123")
     runner = CronWorkerRunner(
         store=store,
         session_store=session_store,
@@ -126,6 +130,7 @@ async def test_daemon_lifecycle_and_tick(temp_env):
 async def test_daemon_tick_fires_due_job_and_delivers(temp_env):
     store, lock_dir, tmp = temp_env
     session_store = _FakeSessionStore()
+    session_store.sessions["chat-456"] = _FakeSession("chat-456")
 
     # Create job due at 21:00
     tz = ZoneInfo("Asia/Shanghai")
@@ -174,3 +179,116 @@ async def test_daemon_tick_fires_due_job_and_delivers(temp_env):
     runs = store.list_runs("job-tick-due-1")
     assert len(runs) == 1
     assert runs[0].outcome == "completed"
+
+
+@pytest.mark.asyncio
+async def test_unreachable_target_records_not_sent_and_creates_no_orphan(temp_env):
+    """A topic id with no live session must not be silently created.
+
+    run_56f67fbf52d9's sleep reminder fired on time, logged
+    cron.worker_delivered, and recorded outcome=completed with receipts=[].
+    The worker had called session_store.create(chat_id) on a miss, but
+    sessions are keyed by run_id (session/lifecycle/bind.py:178), so the
+    append landed in an orphan no gateway pump, flush listener or WebSocket
+    ever read. The user never saw the reminder.
+    """
+    store, _lock_dir, _tmp = temp_env
+    session_store = _FakeSessionStore()
+    runner = CronWorkerRunner(
+        store=store,
+        session_store=session_store,
+        clock=lambda: datetime(2026, 10, 4, 6, 33, 38, tzinfo=UTC),
+    )
+
+    job = CronJob(
+        id="sleep_reminder_20261004",
+        title="提醒睡觉",
+        body="提醒用户：该睡觉了！",
+        schedule=OneShotSchedule(
+            at=datetime(2026, 10, 4, 14, 33, 33, tzinfo=ZoneInfo("Asia/Shanghai"))
+        ),
+        timezone="Asia/Shanghai",
+        execution=AgentExecution(),
+        owner="asst_269aafa73e53",
+        created_chat_id="tpc_O1w50CiXxcQk",
+        delivery_targets=(ChatDelivery(chat_id="tpc_O1w50CiXxcQk"),),
+        anchor_at=datetime(2026, 10, 4, 6, 30, 52, tzinfo=UTC),
+    )
+    store.save_job(job)
+
+    result: CronWorkerResult = await runner(job)
+
+    assert result.outcome == "completed"
+    assert [(r.chat_id, r.state) for r in result.receipts] == [("tpc_O1w50CiXxcQk", "not_sent")]
+    assert session_store.sessions == {}, "the worker must not create an orphan session"
+
+
+@pytest.mark.asyncio
+async def test_reachable_target_records_delivered(temp_env):
+    store, _lock_dir, _tmp = temp_env
+    session_store = _FakeSessionStore()
+    session_store.sessions["tpc_live"] = _FakeSession("tpc_live")
+    runner = CronWorkerRunner(
+        store=store,
+        session_store=session_store,
+        clock=lambda: datetime(2026, 10, 4, 6, 33, 38, tzinfo=UTC),
+    )
+
+    job = CronJob(
+        id="job-live-1",
+        title="提醒",
+        body="正文",
+        schedule=OneShotSchedule(
+            at=datetime(2026, 10, 4, 14, 33, 33, tzinfo=ZoneInfo("Asia/Shanghai"))
+        ),
+        timezone="Asia/Shanghai",
+        execution=AgentExecution(),
+        owner="asst_1",
+        created_chat_id="tpc_live",
+        delivery_targets=(ChatDelivery(chat_id="tpc_live"),),
+        anchor_at=datetime(2026, 10, 4, 6, 30, 52, tzinfo=UTC),
+    )
+    store.save_job(job)
+
+    result: CronWorkerResult = await runner(job)
+
+    assert [(r.chat_id, r.state) for r in result.receipts] == [("tpc_live", "delivered")]
+    assert len(session_store.sessions["tpc_live"].events) == 1
+    assert session_store.sessions.keys() == {"tpc_live"}
+
+
+@pytest.mark.asyncio
+async def test_append_failure_records_failed_not_delivered(temp_env):
+    store, _lock_dir, _tmp = temp_env
+
+    class _BrokenSession(_FakeSession):
+        def append(self, event_type, data, **kwargs):
+            raise RuntimeError("session backend down")
+
+    session_store = _FakeSessionStore()
+    session_store.sessions["tpc_broken"] = _BrokenSession("tpc_broken")
+    runner = CronWorkerRunner(
+        store=store,
+        session_store=session_store,
+        clock=lambda: datetime(2026, 10, 4, 6, 33, 38, tzinfo=UTC),
+    )
+
+    job = CronJob(
+        id="job-broken-1",
+        title="提醒",
+        body="正文",
+        schedule=OneShotSchedule(
+            at=datetime(2026, 10, 4, 14, 33, 33, tzinfo=ZoneInfo("Asia/Shanghai"))
+        ),
+        timezone="Asia/Shanghai",
+        execution=AgentExecution(),
+        owner="asst_1",
+        created_chat_id="tpc_broken",
+        delivery_targets=(ChatDelivery(chat_id="tpc_broken"),),
+        anchor_at=datetime(2026, 10, 4, 6, 30, 52, tzinfo=UTC),
+    )
+    store.save_job(job)
+
+    result: CronWorkerResult = await runner(job)
+
+    assert [(r.chat_id, r.state) for r in result.receipts] == [("tpc_broken", "failed")]

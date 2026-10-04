@@ -28,6 +28,7 @@ from lca.contracts.models.cron.models import (
     TargetReceipt,
 )
 from lca.domain.cron.store import CronStore
+from lca.domain.cron.worker_context import CronWorkerResult
 from lca.infrastructure.cron.scheduler import CronScheduler
 
 _FIXED_CLOCK = datetime(2026, 10, 2, 9, 5, tzinfo=UTC)
@@ -78,7 +79,7 @@ async def test_worker_failure_retries_then_records_runtime_failure(tmp_path: Pat
     store.save_job(_job(max_retries=2))
     calls: list[str] = []
 
-    async def failing_runner(text: str) -> str:
+    async def failing_runner(text: str) -> CronWorkerResult:
         calls.append(text)
         raise RuntimeError("boom")
 
@@ -104,10 +105,10 @@ async def test_worker_timeout_records_timed_out(tmp_path: Path) -> None:
     store = CronStore(tmp_path)
     store.save_job(_job(max_retries=0, timeout_seconds=1))
 
-    async def slow_runner(text: str) -> str:
+    async def slow_runner(text: str) -> CronWorkerResult:
         del text
         await asyncio.sleep(60)
-        return "done"
+        return CronWorkerResult(outcome="completed")
 
     scheduler, _ = _make_scheduler(tmp_path, worker_runner=slow_runner, store=store)
     now = datetime(2026, 10, 2, 9, 0, tzinfo=UTC)
@@ -126,11 +127,11 @@ async def test_worker_retries_then_succeeds(tmp_path: Path) -> None:
     store.save_job(_job(max_retries=2))
     calls: list[str] = []
 
-    async def flaky_runner(text: str) -> str:
+    async def flaky_runner(text: str) -> CronWorkerResult:
         calls.append(text)
         if len(calls) < 3:
             raise RuntimeError("transient")
-        return "ok"
+        return CronWorkerResult(outcome="completed")
 
     scheduler, _ = _make_scheduler(tmp_path, worker_runner=flaky_runner, store=store)
     now = datetime(2026, 10, 2, 9, 0, tzinfo=UTC)
@@ -152,10 +153,10 @@ async def test_due_while_running_queues_and_does_not_kill(tmp_path: Path) -> Non
     release = asyncio.Event()
     finished: list[str] = []
 
-    async def blocking_runner(text: str) -> str:
+    async def blocking_runner(text: str) -> CronWorkerResult:
         await release.wait()
         finished.append(text)
-        return "ok"
+        return CronWorkerResult(outcome="completed")
 
     scheduler, _ = _make_scheduler(tmp_path, worker_runner=blocking_runner, store=store)
     await scheduler.tick(anchor + timedelta(seconds=60))  # worker 1 启动并阻塞
@@ -184,9 +185,9 @@ async def test_two_due_colliding_with_running_run_supersedes_older_pending(
     store.save_job(_job(schedule=IntervalSchedule(every_seconds=60), anchor_at=anchor))
     release = asyncio.Event()
 
-    async def blocking_runner(text: str) -> str:
+    async def blocking_runner(text: str) -> CronWorkerResult:
         await release.wait()
-        return "ok"
+        return CronWorkerResult(outcome="completed")
 
     scheduler, _ = _make_scheduler(tmp_path, worker_runner=blocking_runner, store=store)
     await scheduler.tick(anchor + timedelta(seconds=60))  # worker 1 启动
@@ -262,10 +263,10 @@ async def test_tick_reaps_stale_lock(tmp_path: Path) -> None:
     assert runs[0].outcome == "completed"
 
 
-async def _completed_runner(text: str) -> str:
+async def _completed_runner(text: str) -> CronWorkerResult:
     del text
-    return "ok"
+    return CronWorkerResult(outcome="completed")
 
 
-async def _never_called_runner(text: str) -> str:
+async def _never_called_runner(text: str) -> CronWorkerResult:
     raise AssertionError("worker 不应在锁未取得时启动")

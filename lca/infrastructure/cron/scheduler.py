@@ -23,7 +23,6 @@ from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any
 
 from lca.contracts.models.cron.models import (
     CronJob,
@@ -33,6 +32,7 @@ from lca.contracts.models.cron.models import (
 from lca.domain.cron.next_run import next_run
 from lca.domain.cron.store import CronStore
 from lca.domain.cron.worker_context import (
+    CronWorkerResult,
     WorkerProductContext,
     assemble_worker_context,
 )
@@ -45,7 +45,7 @@ STALE_ABSOLUTE_CAP_S = 90 * 60
 # ``agent`` 执行与 ``space_action`` 重试耗尽后的最长自然超时（ADR-0268 §7）。
 _MAX_TIMEOUT_S = 86400
 
-WorkerRunner = Callable[[str], Awaitable[Any]]
+WorkerRunner = Callable[[str], Awaitable[CronWorkerResult]]
 Clock = Callable[[], datetime]
 
 
@@ -179,11 +179,11 @@ class CronScheduler:
     async def _run_worker(self, job: CronJob, run_id: str) -> None:
         """执行带重试的 worker，写 run 记录，然后接手排队槽。"""
         try:
-            outcome = await self._execute_with_retries(job, run_id)
+            result = await self._execute_with_retries(job, run_id)
             self._store.append_run(
                 job.id,
-                outcome=outcome,
-                receipts=(),
+                outcome=result.outcome,
+                receipts=result.receipts,
                 finished_at=self._clock(),
                 run_id=run_id,
             )
@@ -204,36 +204,41 @@ class CronScheduler:
             if pending is not None:
                 self._start_worker(job, pending)
 
-    async def _execute_with_retries(self, job: CronJob, run_id: str) -> str:
+    async def _execute_with_retries(self, job: CronJob, run_id: str) -> CronWorkerResult:
         """按 ``max_retries`` 重试 ``runtime_failure`` / ``timed_out``。
 
         重试使用同一个 ``run_id``（ADR-0268 §7）；``completed`` 立即返回。
         """
         text = assemble_worker_context(job.body, self._product_context(job, run_id))
-        outcome = "runtime_failure"
+        result = CronWorkerResult(outcome="runtime_failure")
         for attempt in range(job.max_retries + 1):
-            outcome = await self._execute_once(job, run_id, text)
-            if outcome == "completed":
-                return outcome
+            result = await self._execute_once(job, run_id, text)
+            if result.outcome == "completed":
+                return result
             if attempt < job.max_retries:
                 _log.warning(
                     "cron.worker_retry job_id=%s run_id=%s attempt=%d outcome=%s",
                     job.id,
                     run_id,
                     attempt + 1,
-                    outcome,
+                    result.outcome,
                 )
-        return outcome
+        return result
 
-    async def _execute_once(self, job: CronJob, run_id: str, text: str) -> str:
-        """跑一次 worker；超时记 ``timed_out``，异常记 ``runtime_failure``。"""
+    async def _execute_once(self, job: CronJob, run_id: str, text: str) -> CronWorkerResult:
+        """跑一次 worker；超时记 ``timed_out``，异常记 ``runtime_failure``。
+
+        The worker's own result is authoritative on success. It carries one
+        receipt per delivery target, which is the only record of whether the
+        reminder reached anyone. Timing out or raising leaves no receipts, so
+        ``CronRun.receipts`` stays empty and reads as undecided per
+        ADR-0268 §6.
+        """
         timeout = self._effective_timeout(job)
         try:
             if timeout is None:
-                await self._worker_runner(text)
-            else:
-                await asyncio.wait_for(self._worker_runner(text), timeout=timeout)
-            return "completed"
+                return await self._worker_runner(text)
+            return await asyncio.wait_for(self._worker_runner(text), timeout=timeout)
         except TimeoutError:
             _log.warning(
                 "cron.worker_timed_out job_id=%s run_id=%s timeout=%s",
@@ -241,10 +246,10 @@ class CronScheduler:
                 run_id,
                 timeout,
             )
-            return "timed_out"
+            return CronWorkerResult(outcome="timed_out")
         except Exception:
             _log.exception("cron.worker_runtime_failure job_id=%s run_id=%s", job.id, run_id)
-            return "runtime_failure"
+            return CronWorkerResult(outcome="runtime_failure")
 
     def _effective_timeout(self, job: CronJob) -> int | None:
         """ADR-0268 §7 的实际超时秒数。
