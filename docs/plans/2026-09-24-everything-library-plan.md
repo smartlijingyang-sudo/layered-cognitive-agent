@@ -2,7 +2,7 @@
 
 > **For Antigravity:** REQUIRED WORKFLOW: Use `.agent/workflows/execute-plan.md` to execute this plan in single-flow mode.
 
-**Goal:** 构建一个长期可维护、高颜值、易用且对 Agent 极其友好的个人智库与资源枢纽（`~/everything-library`），支持局域网（`10.36.6.252:1889`）密码访问（`lichao12`）、分类管理、状态流转（待看/Todo/参考）、极速全文搜索与 Awesome 格式导出。
+**Goal:** 构建一个长期可维护、高颜值、易用且对 Agent 极其友好的个人智库与资源枢纽（`~/everything-library`），支持局域网（`10.36.6.252:1889`）密码访问（`<redacted-password>`）、分类管理、状态流转（待看/Todo/参考）、极速全文搜索与 Awesome 格式导出。
 
 **Architecture:** 采用 **Content as Code (GitOps)** 架构：Markdown + YAML Frontmatter 作为唯一真实数据源（SSOT），本地 SQLite FTS5 充当启动/保存时派生的只读全文检索与聚合索引（Projection）。通过 Python FastAPI 提供强类型 RESTful 接口与现代响应式 Web UI（TailwindCSS + 深浅色切换 + 卡片/列表双视图），完全兼顾人类沉浸交互与 Agent 终端直读/API 操作。
 
@@ -101,7 +101,7 @@
 - Create: `/home/lichao/everything-library/tests/test_auth.py`
 - Does NOT own: UI 页面布局
 - Invariants to test:
-  - `[INV-03]` 鉴权门禁不变量：未携带有效 Session Cookie 访问受保护接口必须返回 401 或重定向；正确密码 `lichao12` 颁发有效 Session；伪造/过期 Session 被坚决拦截。
+  - `[INV-03]` 鉴权门禁不变量：未携带有效 Session Cookie 访问受保护接口必须返回 401 或重定向；正确密码 `<redacted-password>` 颁发有效 Session；伪造/过期 Session 被坚决拦截。
 
 **Step 1: Write the failing test**
 - 编写 FastAPI TestClient 针对受保护端点的测试：未认证返回 401；登录成功获得 Cookie；持 Cookie 访问返回 200。
@@ -110,7 +110,7 @@
 - 运行 `pytest /home/lichao/everything-library/tests/test_auth.py`（预期失败）。
 
 **Step 3: Write minimal implementation**
-- `app/config.py`: 配置类，管理 `PORT=1889`, `HOST="0.0.0.0"`, `PASSWORD="lichao12"`, `SECRET_KEY`, `SESSION_COOKIE_NAME`。
+- `app/config.py`: 配置类，管理 `PORT=1889`, `HOST="0.0.0.0"`, `PASSWORD="<redacted-password>"`, `SECRET_KEY`, `SESSION_COOKIE_NAME`。
 - `app/auth.py`: 依赖项 `verify_session`、密码验证函数、Session 签名与验签工具。
 
 **Step 4: Run test to verify it passes**
@@ -163,7 +163,7 @@
   - 提供快速录入/编辑模态窗与即时搜索前端逻辑。
 
 **Step 1: Write Web routes and Templates**
-- `login.html`: 现代居中卡片式登录页，输入密码 `lichao12`。
+- `login.html`: 现代居中卡片式登录页，输入密码 `<redacted-password>`。
 - `base.html`: 引入 TailwindCSS (CDN) + Lucide Icons，内建全局深浅色模式切换脚本与全局顶部导航。
 - `index.html`:
   - 左侧边栏：状态过滤按钮（全部、待看、Todo、在读、参考、归档）+ 分类树带计数 + 标签过滤。
@@ -211,7 +211,7 @@
 
 **Files:**
 - Verify: 服务在 `10.36.6.252:1889` 稳定运行
-- Verify: 登录验证（密码 `lichao12`）
+- Verify: 登录验证（密码 `<redacted-password>`）
 - Verify: 状态流转（测试将条目在 Inbox / Todo / Reference 间流转）
 - Verify: 全文搜索（搜索 `awesome`、`agent` 等快速响应）
 - Verify: Agent 访问接口（`curl http://127.0.0.1:1889/api/items`）
