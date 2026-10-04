@@ -25,6 +25,11 @@ These four assertions cover the criteria from the alignment plan:
 
 from __future__ import annotations
 
+# This module boots a real kernel; the phase.think.reasoner.credentials
+# fail-loud gate requires the ambient dummy key (see tests/conftest.py
+# _ensure_no_env opt-out).
+__keep_llm_key__ = True
+
 import ast
 import re
 from pathlib import Path

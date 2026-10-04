@@ -8,6 +8,11 @@ a concrete human-answer adapter.
 
 from __future__ import annotations
 
+# This module boots a real kernel; the phase.think.reasoner.credentials
+# fail-loud gate requires the ambient dummy key (see tests/conftest.py
+# _ensure_no_env opt-out).
+__keep_llm_key__ = True
+
 import asyncio
 import inspect
 from pathlib import Path
@@ -46,7 +51,9 @@ from lca_kernel import run_kernel
 
 REPO = Path(__file__).resolve().parents[2]
 AGENT_ASSEMBLY_PATH = REPO / "lca" / "plugins" / "composer" / "composition" / "agent_assembly.py"
-RUNTIME_ASSEMBLY_PATH = REPO / "lca" / "plugins" / "composer" / "runtime" / "runtime" / "assembly.py"
+RUNTIME_ASSEMBLY_PATH = (
+    REPO / "lca" / "plugins" / "composer" / "runtime" / "runtime" / "assembly.py"
+)
 RUNTIME_CAPABILITIES_PATH = (
     REPO / "lca" / "plugins" / "composer" / "runtime" / "runtime" / "capabilities.py"
 )
