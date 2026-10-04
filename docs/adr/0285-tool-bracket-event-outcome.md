@@ -2,7 +2,7 @@
 
 ## 状态
 
-**Proposed — 2026-10-04**
+**Accepted / Implemented — 2026-10-04**
 
 本 ADR 从第一原理推导工具调用结局应如何落盘，裁决「节点级工具括号事件」的去留。第一次起草采用实证+候选表结构；2026-10-04 按第一原理重写：先定行为要求与不变量，再从零设计推导出目标，最后把现状差距和决策作为推导结论呈现。arch 轮裁决记录保留在 §决策记录。
 
@@ -49,7 +49,7 @@
 ## 5. 决策
 
 1. **立即（D）**：`emit_phase_tool_call_end_for_state` 与 `emit_body_tool_execute_end_for_state` 不再写 `outcome` 字段。括号事件回归纯生命周期标记（`state_id`），消除违反第一原理的假字段。这是过渡步骤，不是终态。
-2. **收口（E）**：从 `bundles/act/act_subgraph.yaml` 移除上述 5 条括号 emit 声明，关闭 ADR-0240 的 out-of-scope 风险，使 `body.tool.execute.*` / `phase.tool.call.*` 回归单一语义。移除后被拒路径仍有完整事实（ADR-0282 的 step 记录），成功/失败路径仍有决策级与调用级事件，无空白。
+2. **收口（E）**：从 `bundles/act/act_subgraph.yaml` 移除上述 4 条括号 emit 声明（`phase.tool.call.start` / `body.tool.execute.start` / `body.tool.execute.end` / `phase.tool.call.end`），关闭 ADR-0240 的 out-of-scope 风险，使 `body.tool.execute.*` / `phase.tool.call.*` 回归单一语义。移除后被拒路径仍有完整事实（ADR-0282 的 step 记录），成功/失败路径仍有决策级与调用级事件，无空白。
 3. **计数口径**：`lca-ops journal trace` 的「tool call」改读 `step.tool_call.record`（它统计每次尝试并带 status）；`status="wire_blocked"` 不计入执行数，被拒数以独立计数保持可见。
 4. **契约钉住区分键**：决策级 `body.tool.execute.*` 的 `wrapper="decision"` 写入 spine 事件目录，成为该 EP 的显式区分字段，防止 raw 消费者把两种语义读混。
 
@@ -86,3 +86,4 @@
 - 2026-10-04：ADR-0285 第一次起草（Proposed），实证基于 `run_56c3352cd22e` 与 main@2edc98c18。
 - 2026-10-04：arch 轮裁决（记录于第一次起草后）：① D 先行、E 另立一轮；② footer 计数改读 `step.tool_call.record`，`wire_blocked` 不计执行数；③ `wrapper="decision"` 显式契约采纳。裁决依据与 §5 一致。
 - 2026-10-04：按第一原理重写（本版本）：引入 §1-3 的推导链，把 D/E/计数/wrapper 作为推导结论而非候选偏好呈现。
+- 2026-10-04：执行落地：`emit_phase_tool_call_end_for_state` / `emit_body_tool_execute_end_for_state` 不再写 `outcome`（D）；`bundles/act/act_subgraph.yaml` 移除 4 条工具括号 emit 声明（E）；`lca-ops journal trace` footer 改读 `step.tool_call.record` 且 `wire_blocked` 独立计数；`wrapper` 字段写入 spine 事件目录。对应提交见 git log。
