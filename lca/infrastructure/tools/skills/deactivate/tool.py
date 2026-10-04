@@ -31,7 +31,7 @@ DEACTIVATE_SKILL_TOOL = "deactivate_skill"
         state=(
             COMMON["name"],
             FieldSpec("deactivated", "deactivated", "boolean", "observation", required=False),
-            FieldSpec("was_active", "was_active", "boolean", "observation", required=False),
+            FieldSpec("was_active", "wasActive", "boolean", "observation", required=False),
             COMMON["content"],
         ),
         content_field="content",
