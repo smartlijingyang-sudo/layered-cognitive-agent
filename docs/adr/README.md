@@ -200,7 +200,7 @@
 | [0260](0260-forced-retrieval-and-write-before-claim.md) | 强制检索与写盘铁律契约：写盘确认门（acknowledgement.py）升不变量、检索义务决策树升契约+补 home-bound 渲染盲区、当场写/先读后写/冲突原地修正/凭证红线四纪律；ADR-0255 §4.2/§4.3 的 LCA 落地提案 | Proposed |
 | [0261](0261-self-introspection-projection.md) | 自省投影契约：自省答案只许来自本 turn 注入块（禁用工作区文件搜寻）、点名配置文件必须真实注入（BackstorySection 守卫升不变量并推广）、新增只读自省工具与写工具配对；ADR-0255 §4.8 的 LCA 落地提案 | Proposed |
 | [0262](0262-skill-discovery-and-acquisition.md) | Skill 发现与沉淀契约：先查后动手（提示级义务）、先查后断言（检索失败≠检索无结果）、沉淀晋升三段门（candidate→批准→安装）、补 BM25/regex 双模式；ADR-0255 §4.9 的 LCA 落地提案 | Proposed |
-| [0263](0263-routine-scheduling-mutual-exclusion-and-self-healing.md) | 例程调度互斥与自愈契约：单实例互斥锁（owner+心跳）、锁超时自愈收割、busy→显式 SKIP 可观测、触发记录持久化、失败隔离；生产 Muse 调度模式的 LCA 落地提案 | Proposed |
+| [0263](0263-routine-scheduling-mutual-exclusion-and-self-healing.md) | 例程调度互斥与自愈契约：单实例互斥锁（owner+心跳）、锁超时自愈收割、busy→显式 SKIP 可观测、触发记录持久化、失败隔离；生产 Muse 调度模式的 LCA 落地提案 | Accepted |
 | [0264](0264-proactive-messaging-pipeline.md) | 主动消息三层管道契约：触发/裁决/投递三层分离、裁决纯函数四态（REJECTED/DELIVER_CHAT/DELIVER_QUIET/SILENT）、fail-closed 只用在精确可判定处、投递复用 surface 事件+turn=-1 哨兵+幂等键、落点默认回发起上下文；生产 Muse 主动行为机制的 LCA 落地提案 | Proposed |
 | [0265](0265-system-prompt-assembly-order.md) | 系统提示装配顺序契约：stable→volatile 带序约束（宪法层→时间锚点→用户 live 配置→能力面→运行上下文→行为规则）、profile 扩展只许带内增删、义务段不得可选；ADR-0255 §1.1 的 LCA 落地提案 | Proposed |
 | [0266](0266-standing-write-matrix-and-update-mechanics.md) | Standing 文件写权限矩阵与更新机制契约：谁可以改 standing 文件、在线写 read-before-write、离线写冲突消解（字段级合并/真冲突 fail-closed）、读取新鲜度语义（三层）；ADR-0255 §2.11/§2.12 的 LCA 落地提案 | Proposed |
