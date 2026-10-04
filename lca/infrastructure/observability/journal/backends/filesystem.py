@@ -32,6 +32,10 @@ from lca.infrastructure.observability.journal.schema_version import (
     SCHEMA_VERSION,
     check_schema_version,
 )
+from lca.infrastructure.observability.spine.sinks.naming import (
+    DEFAULT_SPINE_TEMPLATE,
+    resolve_filename,
+)
 from lca.infrastructure.persistence.jsonl_sink import JsonlFileSink
 from lca.infrastructure.persistence.write_behind import WriteBehindBuffer
 
@@ -39,7 +43,7 @@ from lca.infrastructure.persistence.write_behind import WriteBehindBuffer
 class FilesystemJournalStore(JournalStoreBackend):
     """Append-only 文件账本（write-behind 批量写入）。"""
 
-    DEFAULT_FILENAME = "$run_id.spine.jsonl"
+    DEFAULT_FILENAME = DEFAULT_SPINE_TEMPLATE
 
     def __init__(
         self,
@@ -50,9 +54,6 @@ class FilesystemJournalStore(JournalStoreBackend):
         fsync_each_append: bool = True,
         max_delay_ms: int = 200,
     ) -> None:
-        from lca.infrastructure.observability.spine.sinks.naming import (
-            resolve_filename,
-        )
         from lca.infrastructure.persistence.run_paths import ensure_run_dir
 
         self._root = Path(root)

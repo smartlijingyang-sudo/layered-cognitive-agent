@@ -23,6 +23,9 @@ from pathlib import Path
 from typing import Any, Protocol, runtime_checkable
 
 from lca.infrastructure.observability.spine.event.record import EventRecord
+from lca.infrastructure.observability.spine.sinks.naming import (
+    DEFAULT_SPINE_TEMPLATE,
+)
 
 
 @runtime_checkable
@@ -210,11 +213,10 @@ class RoutingFileStorage:
         self,
         run_dir: Path,
         *,
-        file_name: str = "$run_id.spine.jsonl",
+        file_name: str = DEFAULT_SPINE_TEMPLATE,
         spine_filename: bool = False,
     ) -> None:
         from lca.infrastructure.observability.spine.sinks.naming import (
-            DEFAULT_SPINE_TEMPLATE,
             RUN_ARTIFACT_MODE,
             resolve_filename,
             spine_filename_for_run,
