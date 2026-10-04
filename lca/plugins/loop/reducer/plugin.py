@@ -270,6 +270,13 @@ class DefaultReducer(Reducer):
         return state
 
     @_instrument_apply
+    def apply_deactivation(self, state: AgentState, skill_id: str) -> AgentState:
+        state.activated_skills[:] = [
+            s for s in state.activated_skills if s.skill_id != skill_id
+        ]
+        return state
+
+    @_instrument_apply
     def apply_memory(self, state: AgentState, writes: object) -> AgentState:
         """fold MemoryWriteSet 到 state(无副作用版本)。
 

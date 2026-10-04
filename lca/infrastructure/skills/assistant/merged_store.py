@@ -63,9 +63,7 @@ class AssistantMergedSkillStore(SkillPackageStore):
         """只查 Home 范围；未安装即抛 ``SkillNotFoundError``（无全局兜底）。"""
         assistant_store = self._assistant_disk_store()
         if assistant_store is None:
-            raise SkillNotFoundError(
-                f"assistant {self._assistant_id!r} 未安装任何技能"
-            )
+            raise SkillNotFoundError(f"assistant {self._assistant_id!r} 未安装任何技能")
         return fetch(assistant_store)
 
     def get(self, skill_id: str) -> SkillPackage:
@@ -76,6 +74,20 @@ class AssistantMergedSkillStore(SkillPackageStore):
 
     def resource_files(self, skill_id: str) -> dict[str, bytes]:
         return self._lookup(lambda store: store.resource_files(skill_id))
+
+    def update_package_meta(
+        self,
+        skill_id: str,
+        *,
+        retired: bool | None = None,
+        usage_count: int | None = None,
+    ) -> SkillPackage:
+        """写回装有该 skill 的 Home 磁盘 store（全局 store 只读，不兜底）。"""
+        return self._lookup(
+            lambda store: store.update_package_meta(
+                skill_id, retired=retired, usage_count=usage_count
+            )
+        )
 
 
 __all__ = ["AssistantMergedSkillStore"]

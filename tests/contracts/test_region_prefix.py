@@ -16,9 +16,11 @@ from lca.contracts.atoms.enums.region_prefix import (
     collect_region_prefixes,
 )
 
-# Region set observed at 2026-09-16, synced 2026-10-02 (effect region added) — the canonical value set is whatever
-# directories exist under ``lca/nodes/``. If you add a new region directory,
-# this test auto-picks it up because collect_region_prefixes walks the FS.
+# Region set observed at 2026-09-16, synced 2026-10-02 (effect region added),
+# synced 2026-10-04 (empty ``stop/`` directory removed by 55cba5659, intentional
+# deslop; ADR-0231 table already lists ``stop/`` as empty). The canonical value
+# set is whatever directories exist under ``lca/nodes/``. If you add a new region
+# directory, this test auto-picks it up because collect_region_prefixes walks the FS.
 _EXPECTED_REGIONS = frozenset(
     {
         "act",
@@ -31,7 +33,6 @@ _EXPECTED_REGIONS = frozenset(
         "plan",
         "reflect",
         "remember",
-        "stop",
         "think",
     }
 )

@@ -39,7 +39,7 @@ from lca.infrastructure.memory.contextfiles.domain.curated import (
     CuratedProjectionReceipt,
     contains_secret,
     may_acknowledge_projection,
-    plan_curated_projection,
+    plan_curated_memory_projection,
 )
 from lca.infrastructure.memory.contextfiles.domain.edit import StaleSnapshotOperationError
 from lca.infrastructure.memory.contextfiles.domain.explain import (
@@ -225,8 +225,8 @@ class AssistantMemory(MemorySystem):
         path = self.home_path / relative
         omitted: tuple[CuratedClaim, ...] = ()
         try:
-            text, omitted = plan_curated_projection(
-                _claims_from_records(self.query(MemoryLayer.SEMANTIC)),
+            text, omitted = plan_curated_memory_projection(
+                self.query(MemoryLayer.SEMANTIC),
                 source_note="记录在 `memory/semantic.json`。",
             )
             DiskFileStore(self.home_path).atomic_replace(relative, text)
@@ -738,29 +738,6 @@ def _explainable(entry: dict[str, Any]) -> ExplainableRecord:
         revision_of=str(revision) if isinstance(revision, str) and revision else None,
     )
 
-
-def _claims_from_records(records: list[MemoryRecord]) -> list[CuratedClaim]:
-    """Map host records into the portable projection input."""
-
-    claims: list[CuratedClaim] = []
-    for record in records:
-        if record.deleted:
-            continue
-        metadata = record.metadata if isinstance(record.metadata, dict) else {}
-        source = str(metadata.get("source") or "").strip()
-        trigger = str(metadata.get("trigger") or "").strip() or str(record.source_trace_id or "")
-        claims.append(
-            CuratedClaim(
-                claim_id=record.record_id,
-                kind=record.category.value,
-                body=record.content,
-                importance=record.importance,
-                source=source,
-                trigger=trigger.strip(),
-                recorded_on=_recorded_on(record.created_at_ms),
-            )
-        )
-    return claims
 
 
 def _recorded_on(created_at_ms: int | None) -> str:

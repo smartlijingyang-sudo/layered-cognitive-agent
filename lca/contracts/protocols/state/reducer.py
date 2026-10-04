@@ -54,6 +54,10 @@ class Reducer(Protocol):
         """同步 ``state.activated_skills``（PR5 helper 升格）。"""
         ...
 
+    def apply_deactivation(self, state: AgentState, skill_id: str) -> AgentState:
+        """从 ``state.activated_skills`` 移除 ``skill_id``（deactivateSkill）。"""
+        ...
+
     def apply_memory(
         self,
         state: AgentState,
