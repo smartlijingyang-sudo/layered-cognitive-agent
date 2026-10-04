@@ -33,6 +33,7 @@ from lca.infrastructure.observability import (
 )
 from lca.infrastructure.observability.adapters.policy import AttributePolicy, Verbosity
 from tests.support.observability_helpers import make_test_bound
+from tests.support.session_gate_helpers import bound_session
 
 
 class _Collector:
@@ -176,12 +177,14 @@ def test_failing_subscriber_does_not_break_store() -> None:
 
 
 def test_hub_lifecycle_flushes_and_closes_store() -> None:
+    # D3 裁决(todo-38):record() 需要 bound publish Session;无 Session 即抛。
     collector = _Collector()
     bound = make_test_bound(projections=[collector])
-    with bind_backends(bound):
-        record(TeamRunStarted(team_id="lifecycle"))
+    with bound_session("hub-lifecycle"), bind_backends(bound):
+        stamped = record(TeamRunStarted(team_id="lifecycle"))
     bound.journal.flush()  # type: ignore[union-attr]
     bound.journal.close()  # type: ignore[union-attr]
+    assert stamped is not None  # journal 派生镜像仍产出 stamped
     assert len(collector.received) == 1
     assert collector.flushed >= 1
     assert collector.closed
@@ -191,19 +194,28 @@ def test_hub_lifecycle_flushes_and_closes_store() -> None:
 
 
 def test_facade_record_routes_through_hub() -> None:
+    # D3 裁决(todo-38):真值=Session.append;journal.write 只是派生/镜像。
     bound = make_test_bound()
     try:
-        with bind_backends(bound), run_scope(RunScope(run_id="r-1")):
+        with (
+            bound_session("facade-hub") as session,
+            bind_backends(bound),
+            run_scope(RunScope(run_id="r-1")),
+        ):
             record(TeamRunStarted(team_id="via-facade"))
         events = bound.journal.store.events  # type: ignore[union-attr]
         assert len(events) == 1
         assert events[0].scope.run_id == "r-1"
+        truth = session.snapshot_events()
+        assert [e.type for e in truth] == ["TeamRunStarted"]
     finally:
         bound.journal.close()  # type: ignore[union-attr]
 
 
-def test_facade_record_noop_without_hub() -> None:
-    record(TeamRunStarted(team_id="no-hub"))  # 安全 no-op
+def test_facade_record_raises_without_session() -> None:
+    # D3 裁决(todo-38):无 Session 即抛 fail-loud;禁止"以为记下了实际没记"的旁路。
+    with pytest.raises(RuntimeError, match="requires a bound Session"):
+        record(TeamRunStarted(team_id="no-session"))
 
 
 # ── RunScope 跨 asyncio.create_task 传播 ─────────────────
