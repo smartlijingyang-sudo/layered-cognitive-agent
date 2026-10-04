@@ -2,6 +2,12 @@
 and can successfully invoke them.
 """
 
+# This module boots a real kernel ctx; the phase.think.reasoner.credentials
+# fail-loud gate requires the ambient dummy key (see tests/conftest.py
+# _ensure_no_env opt-out). All LLM traffic is scripted (mock_llm /
+# ScriptedLLMAdapter), no real network calls.
+__keep_llm_key__ = True
+
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -278,4 +284,3 @@ async def test_agent_run_loop_invokes_corp_mcp_tool():
         assert "200129" in result.output
     finally:
         reset_capability_bindings(token)
-
