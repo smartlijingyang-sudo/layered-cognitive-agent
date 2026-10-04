@@ -117,7 +117,7 @@ class ActObserveExecutor:
 
     semantic_name: str = "act.observe.normalize"
     region: str = "act"
-    declared_inputs: tuple[PortName, ...] = (PortName("receipt"), PortName("journal"))
+    declared_inputs: tuple[PortName, ...] = (PortName("receipt"),)
     declared_outputs: tuple[PortName, ...] = (PortName("receipt"),)
 
     async def node_execute(

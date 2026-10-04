@@ -45,7 +45,7 @@ class ThinkRouteExecutor:
     region: str = "think"
     # ADR-0219 §5.5: typed port contract declared on the plugin (graph
     # layer does not know port names; it only knows topology).
-    declared_inputs: tuple[PortName, ...] = (PortName("in_assembled_manifest"),)
+    declared_inputs: tuple[PortName, ...] = ()
     declared_outputs: tuple[PortName, ...] = (PortName("route_choice"), PortName("enforced_state"))
 
     async def node_execute(
@@ -55,7 +55,7 @@ class ThinkRouteExecutor:
     ) -> NodeOutput:
         """think 子图节点入口。
 
-        inputs 端口(yaml):in_assembled_manifest
+        inputs 端口(yaml):(无)
         outputs 端口(yaml):route_choice, enforced_state
         """
         import logging
