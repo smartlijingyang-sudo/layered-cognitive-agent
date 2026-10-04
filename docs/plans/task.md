@@ -585,9 +585,9 @@
 | BRAINSTORM-MUSE-MODAL-DESIGN-SECTIONS | 逐步呈现设计细节（Owns/Does NOT own、生产者改动清单、纯函数状态机、测试断言）并获取审批 | Completed | 全部 4 大小节（边界自治哲学、生产者改动清单与身份全链透传契约、纯函数状态机与 Muse 渲染、INV-01~08 测试矩阵）全部获用户审核批准 |
 | BRAINSTORM-MUSE-MODAL-DESIGN-DOC | 沉淀设计文档至 docs/plans/ 并提交 git | Completed | 成功落盘 docs/plans/2026-10-04-muse-activity-modal-dynamic-alignment-design.md 并完成设计归档 |
 | BRAINSTORM-MUSE-MODAL-TRANSITION | 转换至实施计划制定（writing-plans） | Completed | 成功落盘 docs/plans/2026-10-04-muse-activity-modal-dynamic-alignment-plan.md 并完成实施任务分解 |
-| ACT-TASK-1-PRODUCER | 生产者收敛与身份全链透传 (INV-01, INV-02) | Pending | 待执行 |
-| ACT-TASK-2-EXIT-CODE | 真值字段上移与退出码契约 (INV-03) | Pending | 待执行 |
-| ACT-TASK-3-PURGE-MOCK | 契约解析纯净化与魔法值清理 (INV-04, INV-06) | Pending | 待执行 |
-| ACT-TASK-4-COMPAT-SHIM | COMPAT 紧邻前驱单条合并 Shim (INV-08) | Pending | 待执行 |
-| ACT-TASK-5-UI-PATCH | 纯函数状态机与前端高保真双栏补丁 (INV-05, INV-07) | Pending | 待执行 |
+| ACT-TASK-1-PRODUCER | 生产者收敛与身份全链透传 (INV-01, INV-02) | Completed | 确立 step.tool_call.record 与 step.tool_result.record 为唯一真值源，llm.request.header.assistant 隔离为 PredictedIntent 且严禁写入 target.tool_calls，body.tool.execute.end 降级为生命周期括弧且阻断重复 tool_result，覆盖 INV-01/02 测试全绿 (commit 4f1ab96b5) |
+| ACT-TASK-2-EXIT-CODE | 真值字段上移与退出码契约 (INV-03) | Completed | record_step_tool_result 增加 exit_code 结构化整型字段与保底推导，SafeExecutor 权威解析 observation.payload/extra 真实退出码透传，单测全绿 (commit ccab2a47e) |
+| ACT-TASK-3-PURGE-MOCK | 契约解析纯净化与魔法值清理 (INV-04, INV-06) | Completed | 彻底移除 3841ms、ZZSTART、fake pytest 及 asst_3dacffc01a90 硬编码魔数，实现真值 exit_code 与 stderr 动态直出，失败流合成标准动态结论，单测全绿 (commit 34c2e7d36) |
+| ACT-TASK-4-COMPAT-SHIM | COMPAT 紧邻前驱单条合并 Shim (INV-08) | Completed | 加固紧邻前驱单条合并边界（window=1 且 not invocation_id），增加清晰 delete-when 标记，落地 test_journal_fold_compat_shim.py 3/3 单测全绿，连续相同调用绝不误吞并 |
+| ACT-TASK-5-UI-PATCH | 纯函数状态机与前端高保真双栏补丁 (INV-05, INV-07) | In Progress | 正在开发纯函数状态机单测与前端补丁更新（对齐 Muse 截图、移除固定标题与调试文本、真实退出码渲染） |
 | ACT-TASK-6-INTEGRATION-E2E | 全链路回归、Pre-push 门禁与真实端到端验收 | Pending | 待执行 |

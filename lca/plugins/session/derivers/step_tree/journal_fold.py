@@ -375,6 +375,13 @@ def _add_or_update_tool_call(target: _Frame, record: ToolCallRecord) -> None:
         if existing.invocation_id and existing.invocation_id == record.invocation_id:
             target.tool_calls[idx] = record
             return
+    # COMPAT: clean up after legacy run traces migration, owner: observability, delete-when: v1.0-release
+    # Only merge with the immediately preceding unlinked record if its invocation_id was empty and name matches (INV-08).
+    if target.tool_calls:
+        last = target.tool_calls[-1]
+        if not last.invocation_id and last.name == record.name:
+            target.tool_calls[-1] = record
+            return
     target.tool_calls.append(record)
 
 
@@ -382,6 +389,13 @@ def _add_or_update_tool_result(target: _Frame, result: ToolResult) -> None:
     for idx, existing in enumerate(target.tool_results):
         if existing.invocation_id and existing.invocation_id == result.invocation_id:
             target.tool_results[idx] = result
+            return
+    # COMPAT: clean up after legacy run traces migration, owner: observability, delete-when: v1.0-release
+    # Only merge with the immediately preceding unlinked result if invocation_id was empty (INV-08).
+    if target.tool_results:
+        last = target.tool_results[-1]
+        if not getattr(last, "invocation_id", "") and result.invocation_id:
+            target.tool_results[-1] = result
             return
     target.tool_results.append(result)
 
