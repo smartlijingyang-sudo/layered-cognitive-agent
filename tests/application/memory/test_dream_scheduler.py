@@ -2,6 +2,7 @@ import asyncio
 import json
 import logging
 import threading
+from collections.abc import Sequence
 from pathlib import Path
 
 import pytest
@@ -15,6 +16,7 @@ from lca.application.memory.dream_scheduler import (
 )
 from lca.application.routine.locks import RoutineFileLock
 from lca.contracts.atoms.ids.ids import utc_now_ms
+from lca.contracts.models.core.conversation.memory import MemoryRecord
 from lca.infrastructure.memory.contextfiles.domain.edit import StaleSnapshotOperationError
 from lca.infrastructure.memory.dream import DreamReport
 
@@ -80,6 +82,17 @@ def _scheduler(
 
 def _home_lock(lock_dir: Path, home: Path) -> RoutineFileLock:
     return RoutineFileLock(lock_dir, _dream_lock_id(home))
+
+
+def _write_lock_file(lock_dir: Path, home: Path, *, age_ms: int) -> Path:
+    """A lock file left behind by a holder that died ``age_ms`` ago."""
+    lock_dir.mkdir(parents=True, exist_ok=True)
+    path = lock_dir / f"{_dream_lock_id(home)}.lock"
+    path.write_text(
+        json.dumps({"owner": "pid:999999", "heartbeat_ms": utc_now_ms() - age_ms}),
+        encoding="utf-8",
+    )
+    return path
 
 
 def _colliding(
@@ -221,14 +234,8 @@ async def test_a_stale_lock_from_a_dead_pid_is_reclaimed(
     home = tmp_path / "a"
     calls: list[Path] = []
     scheduler = _scheduler(tmp_path, [home], clock, calls)
-    lock_dir = tmp_path / "locks"
-    lock_dir.mkdir()
-    # 660s old against a 600s threshold: min(2 * tick_seconds, STALE_AFTER_CAP_S).
-    stale = lock_dir / f"{_dream_lock_id(home)}.lock"
-    stale.write_text(
-        json.dumps({"owner": "pid:999999", "heartbeat_ms": utc_now_ms() - 660_000}),
-        encoding="utf-8",
-    )
+    # 960s old, past the 900s reclaim bound.
+    stale = _write_lock_file(tmp_path / "locks", home, age_ms=960_000)
 
     with caplog.at_level(logging.WARNING):
         reports = await scheduler.sweep_once()
@@ -236,10 +243,31 @@ async def test_a_stale_lock_from_a_dead_pid_is_reclaimed(
     assert calls == [home], "a dead holder's lock is reclaimed instead of skipping the home"
     assert reports == (_report(),)
     assert any(
-        "previous_owner=pid:999999" in record.message and "held_ms=" in record.message
+        "home=a" in record.message
+        and "previous_owner=pid:999999" in record.message
+        and "held_ms=" in record.message
         for record in caplog.records
-    ), "a reclaim leaves the trace ADR-0263 C2 requires"
+    ), "a reclaim names the home and leaves the trace ADR-0263 C2 requires"
     assert not stale.exists(), "the reclaimed lock is released when the pass ends"
+
+
+async def test_a_lock_younger_than_the_reclaim_bound_is_not_stolen(
+    tmp_path: Path, clock: list[int], caplog: pytest.LogCaptureFixture
+) -> None:
+    home = tmp_path / "a"
+    calls: list[Path] = []
+    scheduler = _scheduler(tmp_path, [home], clock, calls)
+    # 660s: older than 2 * tick_seconds (600s), younger than the 900s bound. A live
+    # holder in a second process keeps its lock, so the two never dream concurrently.
+    live = _write_lock_file(tmp_path / "locks", home, age_ms=660_000)
+
+    with caplog.at_level(logging.WARNING):
+        reports = await scheduler.sweep_once()
+
+    assert calls == [], "the reclaim bound is decoupled from the tick interval"
+    assert reports == (None,)
+    assert live.exists(), "a live holder's lock is left alone"
+    assert not any("reclaimed" in record.message for record in caplog.records)
 
 
 async def test_a_write_collision_is_contained_not_raised(
@@ -422,3 +450,115 @@ async def test_run_forever_survives_a_raising_homes_callable(
     await asyncio.wait_for(scheduler.run_forever(), timeout=5)
 
     assert ticks == 2, "a raising homes callable is contained, the loop keeps ticking"
+
+
+async def test_a_pass_that_overruns_a_tenth_of_the_bound_is_logged(
+    tmp_path: Path, clock: list[int], caplog: pytest.LogCaptureFixture
+) -> None:
+    home = tmp_path / "a"
+    calls: list[Path] = []
+
+    def slow(
+        seen: Path, *, now_ms: int, backfill: _Backfill | None, render: _Render | None
+    ) -> DreamReport:
+        del seen, now_ms, backfill, render
+        clock[0] += 91_000  # past the 90s observation bound, a tenth of the reclaim bound
+        return _report()
+
+    scheduler = _scheduler(tmp_path, [home], clock, calls, run_dream_fn=slow)
+
+    with caplog.at_level(logging.WARNING):
+        reports = await scheduler.sweep_once()
+
+    assert reports == (_report(),), "a slow pass still returns its report"
+    assert any(
+        "home=a" in record.message and "held_ms=91000" in record.message
+        for record in caplog.records
+    ), "the reclaim bound is observable rather than assumed"
+
+
+async def test_the_overrun_clock_starts_at_the_acquire(
+    tmp_path: Path,
+    clock: list[int],
+    caplog: pytest.LogCaptureFixture,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    home = tmp_path / "a"
+    calls: list[Path] = []
+    real_acquire = RoutineFileLock.acquire
+
+    def slow_acquire(self: RoutineFileLock) -> bool:
+        clock[0] += 91_000  # reaching the lock is not holding it
+        return real_acquire(self)
+
+    def plain(
+        seen: Path, *, now_ms: int, backfill: _Backfill | None, render: _Render | None
+    ) -> DreamReport:
+        del now_ms, backfill, render
+        calls.append(seen)
+        return _report()
+
+    monkeypatch.setattr(RoutineFileLock, "acquire", slow_acquire)
+    scheduler = _scheduler(tmp_path, [home], clock, calls, run_dream_fn=plain)
+
+    with caplog.at_level(logging.WARNING):
+        reports = await scheduler.sweep_once()
+
+    assert calls == [home]
+    assert reports == (_report(),)
+    assert not any("overran" in record.message for record in caplog.records), (
+        "the hold clock starts at the acquire, so a slow lock dir is not reported as a slow pass"
+    )
+
+
+async def test_the_callbacks_factory_runs_off_the_loop_and_reaches_run_dream(
+    tmp_path: Path, clock: list[int]
+) -> None:
+    home = tmp_path / "a"
+    loop_thread = threading.get_ident()
+    factory_calls: list[tuple[Path, bool]] = []
+    received: list[tuple[_Render | None, _Backfill | None]] = []
+
+    def render_profile(records: Sequence[MemoryRecord]) -> str:
+        del records
+        return "# profile"
+
+    def backfill_profile(assistant_id: str, records: list[MemoryRecord]) -> object:
+        del assistant_id, records
+        return None
+
+    def recording(
+        seen: Path, *, now_ms: int, backfill: _Backfill | None, render: _Render | None
+    ) -> DreamReport:
+        del seen, now_ms
+        received.append((render, backfill))
+        return _report()
+
+    def factory(seen: Path) -> tuple[_Render | None, _Backfill | None]:
+        factory_calls.append((seen, threading.get_ident() != loop_thread))
+        return render_profile, backfill_profile
+
+    scheduler = DreamScheduler(
+        homes=lambda: [home],
+        lock_dir=tmp_path / "locks",
+        tick_seconds=300,
+        now_ms=lambda: clock[0],
+        run_dream_fn=recording,
+        callbacks=factory,
+    )
+
+    await scheduler.sweep_once()
+
+    assert factory_calls == [(home, True)], "the factory runs off the event loop thread"
+    assert received == [(render_profile, backfill_profile)], (
+        "render reaches render= and backfill reaches backfill="
+    )
+
+
+def test_the_lock_id_is_a_stable_digest_across_processes() -> None:
+    # Golden. Builtin hash() is salted per process, so it would keep every other
+    # test here green while destroying cross-process mutual exclusion.
+    assert (
+        _dream_lock_id(Path("/home/lichao/.lca/assistants/asst_1"))
+        == "memory_dream:4f506839670286e0"
+    )

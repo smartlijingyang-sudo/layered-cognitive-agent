@@ -33,6 +33,19 @@ EvidenceWriter = Callable[[Path, DreamReport | None, int], object]
 
 _ROUTINE_ID = "memory_dream"
 
+#: Reclaim bound for one home's dream lock. Deliberately not derived from
+#: ``tick_seconds``: the interval says how often we sweep, this says how long one
+#: pass may hold the lock before another process may assume the holder died.
+#: A measured pass costs 11-30ms per home, so 900s is roughly 30,000x the worst
+#: measured case and still covers a pathological FTS index rebuild, while a
+#: genuinely dead lock costs one home at most three 300s ticks instead of never
+#: dreaming again, which is what the reclaim is for.
+_STALE_AFTER_S = 900.0
+
+#: A pass that holds the lock past a tenth of the reclaim bound gets a WARNING,
+#: so the bound stays observable instead of assumed.
+_SLOW_PASS_MS = _STALE_AFTER_S * 1000 / 10
+
 
 def _dream_lock_id(home: Path) -> str:
     """Lock id for one home. Keyed on the path, since two homes can share a basename."""
@@ -92,19 +105,9 @@ class DreamScheduler:
         return tuple(reports)
 
     async def _run_home(self, home: Path, now_ms: int) -> DreamReport | None:
-        render, backfill = self._callbacks(home) if self._callbacks is not None else (None, None)
-        return await asyncio.to_thread(
-            self._locked_pass, home, now_ms, render=render, backfill=backfill
-        )
+        return await asyncio.to_thread(self._locked_pass, home, now_ms)
 
-    def _locked_pass(
-        self,
-        home: Path,
-        now_ms: int,
-        *,
-        render: _Render | None,
-        backfill: _Backfill | None,
-    ) -> DreamReport | None:
+    def _locked_pass(self, home: Path, now_ms: int) -> DreamReport | None:
         """One dream pass under the home's lock, on an executor thread.
 
         The lock lives as long as this function rather than as long as the
@@ -117,7 +120,7 @@ class DreamScheduler:
         lock = RoutineFileLock(
             self._lock_dir,
             _dream_lock_id(home),
-            routine_interval_s=float(self._tick_seconds),
+            stale_after_s=_STALE_AFTER_S,
         )
         reclaimed = lock.reclaim_stale()
         if reclaimed is not None:
@@ -130,7 +133,11 @@ class DreamScheduler:
         if not lock.acquire():
             logger.info("dream skipped, home locked: %s", home.name)
             return None
+        held_from_ms = self._now_ms()
         try:
+            render, backfill = (
+                self._callbacks(home) if self._callbacks is not None else (None, None)
+            )
             report = self._run_dream(home, now_ms=now_ms, backfill=backfill, render=render)
             if self._evidence_writer is not None:
                 self._evidence_writer(home, report, now_ms)
@@ -146,3 +153,10 @@ class DreamScheduler:
         finally:
             if not lock.release():
                 logger.warning("dream lock release failed: %s", home.name)
+            held_ms = self._now_ms() - held_from_ms
+            if held_ms > _SLOW_PASS_MS:
+                logger.warning(
+                    "dream pass overran a tenth of the reclaim bound: home=%s held_ms=%d",
+                    home.name,
+                    held_ms,
+                )
