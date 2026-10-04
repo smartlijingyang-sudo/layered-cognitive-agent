@@ -12,20 +12,34 @@
 - T10 凭证红线：敏感 key/token 绝不写入记忆原文
 - T12 压缩不失忆：历史压缩时 9 大 Standing 文件完全豁免并重新全量注入
 
-名实说明（ADR-0276 C3）：本套件实际覆盖 T1/T2/T3/T4/T5/T6/T8/T9/T10/T12；
-T7（工具路由：走真机实查）与 T11（审批边界：等用户决定）全仓暂无用例，
-为合法缺席状态（待拍板补用例归属排期），此处显式标注以免“静默缺席”。
+名实说明（ADR-0276 C3 → §6 决策记录 2026-10-05）：本套件实际覆盖
+T1/T2/T3/T4/T5/T6/T8/T9/T10/T11/T12；T7（工具路由：走真机实查）全仓仍无用例，
+为合法缺席状态（真机实查需网络/沙箱 e2e，超出单元契约范围），此处显式标注
+以免“静默缺席”。T11 契约测试由 tests lane 按 ADR-0276 §6 落盘。
 """
 
 from __future__ import annotations
 
+import asyncio
 from pathlib import Path
 from types import SimpleNamespace
 
 from lca.cognition.memory.acknowledgement import guard_reply
-from lca.contracts.atoms.enums.enums import MemoryCategory, MemoryLayer
+from lca.contracts.atoms.enums.enums import ActionType, MemoryCategory, MemoryLayer
 from lca.contracts.models.core.conversation.memory import MemoryRecord
+from lca.contracts.models.core.execution.approval import ApprovalRequirement
+from lca.contracts.models.core.execution.decision import (
+    Decision,
+    ToolCall,
+    requires_human_input,
+)
 from lca.contracts.models.team.role.team import RoleProfile, ToolPermissionManifest
+from lca.contracts.protocols.declarative.declarative_1.node_executor import (
+    NodeContext,
+    NodeInput,
+)
+from lca.contracts.protocols.declarative.declarative_1.ports import PortName
+from lca.contracts.protocols.graph.command import Command
 from lca.infrastructure.memory.assistant_memory import AssistantMemory
 from lca.infrastructure.memory.contextfiles.domain.layout import (
     packaged_layout,
@@ -34,6 +48,10 @@ from lca.infrastructure.memory.contextfiles.domain.standing import (
     assemble_standing,
     rehydrate_after_compaction,
 )
+from lca.infrastructure.runtime_plane.access.approval_engine import (
+    build_default_approval_engine,
+)
+from lca.nodes.intervene.approve_gate import ApproveGateExecutor
 from lca.plugins.assistant.home._home_layout import (
     render_default_template,
     write_home_files,
@@ -294,6 +312,141 @@ def test_t12_compaction_exempts_standing_files_preserves_identity() -> None:
     for name in ("SOUL.md", "IDENTITY.md", "USER.md", "MEMORY.md"):
         assert f"<!-- INJECTED FILE: {name} -->" in rehydrated
         assert f"durable-content-{name}" in rehydrated
+
+
+# ── T11 审批边界 (ADR-0276 §6：tests lane 契约测试) ─────────────────────────
+#
+# 第一性原理：审批的本质是“等用户决定”的状态机语义——
+#   暂停 → 待审批（intervene.interrupt）→ 决定 → 恢复（act.envelope）/ 取消（terminal.commit）。
+# 状态流转可契约化，决定可模拟注入，无需真人交互即可断言。
+# 下方全部驱动真实实现（ApproveGateExecutor 纯函数 + ApprovalPolicyEngine）。
+
+
+def _t11_decision(*, needs_approval: bool, tool_calls: list[ToolCall] | None = None) -> Decision:
+    return Decision(
+        decision_id="d-t11",
+        action_type="tool_call",
+        rationale="t11 contract",
+        confidence=0.9,
+        tool_calls=list(tool_calls or []),
+        needs_approval=needs_approval,
+    )
+
+
+def _t11_route(
+    decision: Decision,
+    command: Command | None = None,
+    requirement: ApprovalRequirement | None = None,
+):
+    ports: dict[PortName, object] = {PortName("decision"): decision}
+    if command is not None:
+        ports[PortName("command")] = command
+    if requirement is not None:
+        ports[PortName("approval_requirement")] = requirement
+    ctx = NodeContext(runtime={}, budget={}, metadata={})
+    out = asyncio.run(
+        ApproveGateExecutor().node_execute(ctx, NodeInput(port_values=ports))
+    )
+    return out.port_values[PortName("approval_routing")]
+
+
+def _t11_command(kind: str) -> Command:
+    return Command(kind=kind, payload=None, issued_by="user", issued_at_seq=1)
+
+
+def test_t11_needs_approval_pauses_for_human_decision() -> None:
+    """T11: needs_approval=True 且无决定 → 暂停进 intervene.interrupt 等用户决定，不代点。"""
+    routing = _t11_route(_t11_decision(needs_approval=True))
+    assert routing.next_node == "intervene.interrupt"
+    assert routing.next_hint == "approve_interrupt"
+    assert routing.action_type == ActionType.ASK_HUMAN
+
+
+def test_t11_user_approve_resumes_to_envelope() -> None:
+    """T11: 用户批准（决定注入）→ 恢复进 act.envelope 继续执行。"""
+    routing = _t11_route(_t11_decision(needs_approval=True), _t11_command("approve"))
+    assert routing.next_node == "act.envelope"
+    assert routing.next_hint == "approve_approved"
+
+
+def test_t11_user_reject_aborts_to_terminal_commit() -> None:
+    """T11: 用户拒绝 → terminal.commit 干净中止，不再换路重试。"""
+    routing = _t11_route(_t11_decision(needs_approval=True), _t11_command("reject"))
+    assert routing.next_node == "terminal.commit"
+    assert routing.next_hint == "approve_rejected"
+    assert routing.next_node != "act.envelope"
+
+
+def test_t11_redirect_and_resume_also_abort_cleanly() -> None:
+    """T11: redirect/resume 决定同样收敛到 terminal.commit，绝不滑入 act.envelope。"""
+    for kind in ("redirect", "resume"):
+        routing = _t11_route(_t11_decision(needs_approval=True), _t11_command(kind))
+        assert routing.next_node == "terminal.commit", kind
+        assert routing.next_node != "act.envelope", kind
+
+
+def test_t11_no_approval_passes_through() -> None:
+    """T11 精确性：不需要审批的 Decision 直接放行，不暂停。"""
+    routing = _t11_route(_t11_decision(needs_approval=False))
+    assert routing.next_node == "act.envelope"
+    assert routing.next_hint == "approve_skipped"
+
+
+def test_t11_approval_requirement_overrides_decision_flag() -> None:
+    """T11 接线：ApprovalPolicyEngine 的 required 判定覆盖 Decision.needs_approval 标志。"""
+    req = ApprovalRequirement(required=True)
+    routing = _t11_route(_t11_decision(needs_approval=False), requirement=req)
+    assert routing.next_node == "intervene.interrupt"
+    assert routing.next_hint == "approve_interrupt"
+
+
+def test_t11_shell_tool_call_triggers_approval_requirement() -> None:
+    """T11 触发：shell 命名空间工具调用（bash）→ 审批需求 required=True。"""
+    engine = build_default_approval_engine()
+    req = engine.evaluate(
+        [ToolCall(call_id="c1", tool_name="bash", arguments={"command": "rm -rf /"})]
+    )
+    assert req.required is True
+    assert req.target_resource == "bash"
+
+
+def test_t11_hitl_tool_call_triggers_approval_requirement() -> None:
+    """T11 触发：HITL 交互工具（askUserQuestion）→ 审批需求 required=True。"""
+    engine = build_default_approval_engine()
+    req = engine.evaluate(
+        [ToolCall(call_id="c2", tool_name="askUserQuestion", arguments={})]
+    )
+    assert req.required is True
+
+
+def test_t11_cron_mutation_triggers_approval_requirement() -> None:
+    """T11 触发：模型路径 cron 写操作（cron.update）→ 挂起等审批回注（ADR-0268 §2.1）。"""
+    engine = build_default_approval_engine()
+    req = engine.evaluate(
+        [ToolCall(call_id="c3", tool_name="cron.update", arguments={})]
+    )
+    assert req.required is True
+
+
+def test_t11_benign_tool_call_needs_no_approval() -> None:
+    """T11 精确性：良性工具调用不触发审批需求（审批只覆盖精确动作）。"""
+    engine = build_default_approval_engine()
+    req = engine.evaluate(
+        [ToolCall(call_id="c4", tool_name="read_file", arguments={"path": "a.txt"})]
+    )
+    assert req.required is False
+
+
+def test_t11_requires_human_input_single_home() -> None:
+    """T11 归一：Decision.needs_approval 的 HITL 判定走 requires_human_input 单一归属。"""
+    hitl = [ToolCall(call_id="c5", tool_name="askUserQuestion", arguments={})]
+    shell = [ToolCall(call_id="c6", tool_name="bash", arguments={"command": "ls"})]
+    benign = [ToolCall(call_id="c7", tool_name="read_file", arguments={"path": "a"})]
+    assert requires_human_input(hitl) is True
+    # shell 工具走审批引擎命名空间策略，不归 HITL 交互谓词
+    assert requires_human_input(shell) is False
+    assert requires_human_input(benign) is False
+    assert requires_human_input(None) is False
 
 
 # ── 时间真值与 Runtime 辅助验证 (§1.3 / §1.4) ──────────────────────────────
