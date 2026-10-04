@@ -40,6 +40,14 @@ class RunRequest:
     legacy default agent (forward-compatible, I-A1)."""
     user_id: str = ""
     """Caller user identity (from x-lca-user-id header) for multi-tenant isolation."""
+    origin: str = "user"
+    """Which kind of turn this run is (ADR-0268 §4).
+
+    ``"handoff"`` is the only value that puts ``lca.nothing_to_do`` on the
+    wire. It is deliberately not decodable from the ``POST /runs`` body, so an
+    HTTP client cannot claim a handoff turn and end a user-visible round
+    silently. Only an in-process dispatcher sets it.
+    """
 
 
 @dataclass(frozen=True, slots=True)

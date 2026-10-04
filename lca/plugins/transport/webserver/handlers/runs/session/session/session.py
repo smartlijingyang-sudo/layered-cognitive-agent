@@ -117,6 +117,7 @@ class RunSession:
     assistant_id: str = ""  # ADR-0187 §3 D7：本 run 绑定的助理 id（空 = 遗留路径）
     topic_id: str = ""  # 缺陷1修复：run 所属话题 id（空 = 遗留路径）；跨 run 会话自愈日志按此归档
     user_id: str = ""  # ADR-0252：发起本 run 的租户 user_id（空 = 遗留/dev 路径）
+    origin: str = "user"  # ADR-0268 §4：handoff 轮才把 lca.nothing_to_do 放上 wire
     started_at: float = 0.0
     locator: RunLocator | None = None  # ADR-0065 PR-11: run 级 locator 引用
     thread_tree_writer: object | None = None  # ADR-0186 PR-3g: per-run StepTreeFoldDeriver

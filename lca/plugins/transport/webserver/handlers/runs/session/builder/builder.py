@@ -275,6 +275,7 @@ class RunSessionBuilder:
                 execution_target=request.execution_target.strip(),
                 assistant_id=(getattr(request, "assistant_id", "") or "").strip(),
                 user_id=(getattr(request, "user_id", "") or "").strip(),
+                origin=(getattr(request, "origin", "") or "user").strip() or "user",
                 started_at=started_at,
                 locator=locator,
                 event_session=event_session,

@@ -224,13 +224,13 @@ class CognitiveRuntime(Runtime):
             vocal_mode = None
             wake_source = "user_input"
             wake_context = None
-            origin = "user"
+            origin: str | None = None
             auto_review_mode = "off"
             if ctx:
                 vocal_mode = getattr(ctx, "vocal_mode", None) or (ctx.extra or {}).get("vocal_mode")
                 wake_source = (ctx.extra or {}).get("wake_source", "user_input")
                 wake_context = (ctx.extra or {}).get("wake_context")
-                origin = (ctx.extra or {}).get("origin", "user")
+                origin = (ctx.extra or {}).get("origin")
                 auto_review_mode = (ctx.extra or {}).get("auto_review_mode", "off")
 
             from lca.application.vocal.runtime_wiring import (
@@ -289,14 +289,20 @@ class CognitiveRuntime(Runtime):
                     auto_review_mode = "off"
                     auto_review_gate = None
 
-            runtime_bindings_token = with_runtime_bindings(
-                vocal_mode=vocal_ctx.mode.value,
-                vocal_gate=vocal_ctx.gate,
-                auto_review_mode=auto_review_mode,
-                auto_review_gate=auto_review_gate,
-                origin=origin,
-                box_accessor=BoxAccessor(),
-            )
+            runtime_overrides: dict[str, object] = {
+                "vocal_mode": vocal_ctx.mode.value,
+                "vocal_gate": vocal_ctx.gate,
+                "auto_review_mode": auto_review_mode,
+                "auto_review_gate": auto_review_gate,
+                "box_accessor": BoxAccessor(),
+            }
+            if origin is not None:
+                # ctx is shared across runs, so it only wins when it actually
+                # names an origin. Otherwise the per-run origin the carrier
+                # stamped on the session survives instead of being reset to
+                # "user", which would drop lca.nothing_to_do off a handoff turn.
+                runtime_overrides["origin"] = origin
+            runtime_bindings_token = with_runtime_bindings(**runtime_overrides)
             try:
                 await self._lifecycle.publish(RuntimeLifecycleEventType.STARTED, state)
                 return await self._run_driver(

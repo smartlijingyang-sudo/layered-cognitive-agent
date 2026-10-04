@@ -307,7 +307,7 @@ class RunExecutionEnvironment:
                     vocal_gate=vocal_gate,
                     auto_review_mode=auto_review_mode,
                     auto_review_gate=auto_review_gate,
-                    origin="user",
+                    origin=(getattr(session, "origin", "") or "user"),
                     box_accessor=box_accessor,
                 )
                 # Hot-resume cache (same class as session.ambit): the HIL

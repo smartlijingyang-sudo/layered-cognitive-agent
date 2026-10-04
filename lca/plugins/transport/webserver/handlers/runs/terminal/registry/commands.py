@@ -85,6 +85,7 @@ class RegistryRunCommands:
                 execution_target=request.execution_target,
                 assistant_id=request.assistant_id or "",
                 user_id=request.user_id or "",
+                origin=request.origin,
                 ctx=request.ctx,
             )
             schedule_run(
