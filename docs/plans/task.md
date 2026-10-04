@@ -579,3 +579,9 @@
 | MEM-TASK-2-EDIT-SYNC-SERVICE | Markdown 编辑事件解析器 (`MemoryEditSyncService`) | Completed | 解析提交的 Markdown，比对活跃记录计算 ADD/SUPERSEDE/DELETE 原子操作并驱动 AssistantMemory，单测 25/25 全绿，commit d7671e324 (INV-MEM-04~05) |
 | MEM-TASK-3-ROUTE-GATE | Webserver Standing File 写入窄门拦截 (`standing_files.py`) | Completed | 拦截 PUT MEMORY.md 严禁直接写盘，转由 MemoryEditSyncService 同步至 semantic.json 并重新投影，测试 25/25 全绿 (INV-MEM-06) |
 | MEM-TASK-4-INTEGRATION-E2E | 端到端集成与 Prompt 实时感知验收 (`test_memory_stateless_projection_e2e.py`) | Completed | 落地端到端集成测试，覆盖工具写入、编辑回写、全链路往返及 persona_from_home Prompt 实时感知，150/150 测试全绿 (INV-MEM-01~06) |
+| BRAINSTORM-MUSE-MODAL-CONTEXT | 深度梳理右侧动态弹窗硬编码、重复条目、执行失败标识与 Muse 截图信息流差异 | Completed | 已结合 Muse 生产截图、Spine 事件账本与 Journal Fold 机制完成溯源：定位了 invocation_id 空值导致的双写重复条目、3841ms/fake-pytest/固定任务标题等硬编码、以及缺乏真实错误沉淀的机械失败标识 |
+| BRAINSTORM-MUSE-MODAL-QUESTIONS | 澄清动态信息流机制演进与端到端真实事件映射方案（单步提问） | Completed | 用户明确确认选定全链路纯事件驱动治理（后端 Fold 修复双写与消重 + 真实状态机与错误流贯穿 + 语义动态解构） |
+| BRAINSTORM-MUSE-MODAL-APPROACHES | 提出 2-3 种信息流生成、去重与状态机制架构方案及权衡对比 | Completed | 用户明确确认选定方案 A+（三层闭环 + 生产者契约源头归一架构），由生产者上移真值并收敛双写，fold 退化为纯按 ID 归组，彻底消灭硬编码 |
+| BRAINSTORM-MUSE-MODAL-DESIGN-SECTIONS | 逐步呈现设计细节（Owns/Does NOT own、生产者改动清单、纯函数状态机、测试断言）并获取审批 | Completed | 全部 4 大小节（边界自治哲学、生产者改动清单与身份全链透传契约、纯函数状态机与 Muse 渲染、INV-01~08 测试矩阵）全部获用户审核批准 |
+| BRAINSTORM-MUSE-MODAL-DESIGN-DOC | 沉淀设计文档至 docs/plans/ 并提交 git | Completed | 成功落盘 docs/plans/2026-10-04-muse-activity-modal-dynamic-alignment-design.md 并完成设计归档 |
+| BRAINSTORM-MUSE-MODAL-TRANSITION | 转换至实施计划制定（writing-plans） | In Progress | 正在调用 writing-plans 技能规划落地步骤 |
