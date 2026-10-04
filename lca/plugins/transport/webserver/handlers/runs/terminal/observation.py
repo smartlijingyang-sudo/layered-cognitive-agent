@@ -78,6 +78,11 @@ def emit_carrier_run_failed(
     if journal_has_terminal_event(session):
         return None
     wire_status = status.strip() or RunLifecycleStatus.FAILED.value
+    from lca.infrastructure.session.bindings import active_publish_session
+
+    # 热路径 cheap 检查(todo-38,2026-10-05 裁决):无 Session 时跳过,不抛 RuntimeError。
+    if active_publish_session() is None:
+        return None
     return record(
         RuntimeObserved(
             kind=RuntimeKind.ERROR,

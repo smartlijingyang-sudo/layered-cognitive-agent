@@ -39,34 +39,40 @@ class CreatorRuntime:
 
     def inspect(self, *, target: str | None = None) -> dict[str, Any]:
         result = self._tool._composer.inspect(actor_role=self._tool._actor_role)
-        stamped = record(
-            PluginInspected(
-                actor_role=self._tool._actor_role,
-                mounted_count=result.mounted_count,
-                plugin_names=tuple(entry.name for entry in result.entries),
-                plugins_summary=tuple(
-                    {
-                        "name": entry.name,
-                        "context_key": entry.context_key,
-                        "implements": list(entry.implements),
-                        "capabilities": list(entry.capabilities),
-                        "policy_class": entry.policy_class,
-                        "side_effects": entry.side_effects,
-                    }
-                    for entry in result.entries
-                ),
+        from lca.infrastructure.session.bindings import active_publish_session
+
+        # 热路径 cheap 检查(todo-38,2026-10-05 裁决):无 Session 时跳过,不抛 RuntimeError。
+        stamped = None
+        if active_publish_session() is not None:
+            stamped = record(
+                PluginInspected(
+                    actor_role=self._tool._actor_role,
+                    mounted_count=result.mounted_count,
+                    plugin_names=tuple(entry.name for entry in result.entries),
+                    plugins_summary=tuple(
+                        {
+                            "name": entry.name,
+                            "context_key": entry.context_key,
+                            "implements": list(entry.implements),
+                            "capabilities": list(entry.capabilities),
+                            "policy_class": entry.policy_class,
+                            "side_effects": entry.side_effects,
+                        }
+                        for entry in result.entries
+                    ),
+                )
             )
-        )
-        record_runtime(
-            DiagnosticCategory.TOOL,
-            "creator.inspect",
-            plugin=self._tool.name,
-            attributes={
-                "actor_role": self._tool._actor_role,
-                "mounted_count": result.mounted_count,
-            },
-            status=DiagnosticStatus.SUCCEEDED,
-        )
+            # record_runtime 内部调 record(),同样跳过。
+            record_runtime(
+                DiagnosticCategory.TOOL,
+                "creator.inspect",
+                plugin=self._tool.name,
+                attributes={
+                    "actor_role": self._tool._actor_role,
+                    "mounted_count": result.mounted_count,
+                },
+                status=DiagnosticStatus.SUCCEEDED,
+            )
         artifacts: Iterable[AuthoredPlugin] = self._authored.values()
         if target:
             artifacts = (item for name, item in self._authored.items() if name == target)
@@ -109,22 +115,32 @@ class CreatorRuntime:
             factory=factory,
             metadata=dict(metadata),
         )
-        stamped = record(
-            PluginAuthored(
-                plugin_name=name,
-                path=path,
-                language=language,
-                size_bytes=size,
-                actor_role=self._tool._actor_role,
+        from lca.infrastructure.session.bindings import active_publish_session
+
+        # 热路径 cheap 检查(todo-38,2026-10-05 裁决):无 Session 时跳过,不抛 RuntimeError。
+        stamped = None
+        if active_publish_session() is not None:
+            stamped = record(
+                PluginAuthored(
+                    plugin_name=name,
+                    path=path,
+                    language=language,
+                    size_bytes=size,
+                    actor_role=self._tool._actor_role,
+                )
             )
-        )
-        record_runtime(
-            DiagnosticCategory.TOOL,
-            "creator.author",
-            plugin=name,
-            attributes={"actor_role": self._tool._actor_role, "path": path, "size_bytes": size},
-            status=DiagnosticStatus.SUCCEEDED,
-        )
+            # record_runtime 内部调 record(),同样跳过。
+            record_runtime(
+                DiagnosticCategory.TOOL,
+                "creator.author",
+                plugin=name,
+                attributes={
+                    "actor_role": self._tool._actor_role,
+                    "path": path,
+                    "size_bytes": size,
+                },
+                status=DiagnosticStatus.SUCCEEDED,
+            )
         return {
             "face": "author",
             "artifact": capability_artifact_to_dict(artifact),

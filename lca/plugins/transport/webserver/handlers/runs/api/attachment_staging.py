@@ -35,6 +35,8 @@ async def stage_machine_attachments(
     machine_resolver: MachineResolver | None,
 ) -> None:
     """Copy all run attachments to the selected machine or fail before execution."""
+    from lca.infrastructure.session.bindings import active_publish_session
+
     if session.bindings is None:
         return
     machine = ref_of(session.bindings, PlaneKind.MACHINE)
@@ -53,14 +55,16 @@ async def stage_machine_attachments(
             f"machine attachments missing in FileStore: {list(session.attachment_ids)}"
         )
     total_bytes = sum(len(value) for value in files.values())
-    record(
-        AttachmentStagingStarted(
-            plane_id=machine.id,
-            file_count=len(files),
-            total_bytes=total_bytes,
-            run_id=session.run_id,
+    # 热路径 cheap 检查(todo-38,2026-10-05 裁决):无 Session 时跳过,不抛 RuntimeError。
+    if active_publish_session() is not None:
+        record(
+            AttachmentStagingStarted(
+                plane_id=machine.id,
+                file_count=len(files),
+                total_bytes=total_bytes,
+                run_id=session.run_id,
+            )
         )
-    )
     started = time.monotonic()
     try:
         result = await transport.write_files(
@@ -73,35 +77,41 @@ async def stage_machine_attachments(
             run_id=session.run_id,
             plane_id=machine.id,
         )
-        record(
-            AttachmentStagingFailed(
-                plane_id=machine.id,
-                error=f"{type(exc).__name__}: {exc}",
-                failed_paths=tuple(files.keys()),
-                run_id=session.run_id,
+        # 热路径 cheap 检查(todo-38,2026-10-05 裁决):无 Session 时跳过,不抛 RuntimeError。
+        if active_publish_session() is not None:
+            record(
+                AttachmentStagingFailed(
+                    plane_id=machine.id,
+                    error=f"{type(exc).__name__}: {exc}",
+                    failed_paths=tuple(files.keys()),
+                    run_id=session.run_id,
+                )
             )
-        )
         raise
     duration_ms = (time.monotonic() - started) * 1000
     if getattr(result, "success", True) is False:
         error_msg = str(getattr(result, "error", result))
+        # 热路径 cheap 检查(todo-38,2026-10-05 裁决):无 Session 时跳过,不抛 RuntimeError。
+        if active_publish_session() is not None:
+            record(
+                AttachmentStagingFailed(
+                    plane_id=machine.id,
+                    error=error_msg,
+                    failed_paths=tuple(files.keys()),
+                    run_id=session.run_id,
+                )
+            )
+        raise RuntimeError(f"附件暂存失败（{len(files)} 个文件）: {error_msg}")
+    # 热路径 cheap 检查(todo-38,2026-10-05 裁决):无 Session 时跳过,不抛 RuntimeError。
+    if active_publish_session() is not None:
         record(
-            AttachmentStagingFailed(
+            AttachmentStagingCompleted(
                 plane_id=machine.id,
-                error=error_msg,
-                failed_paths=tuple(files.keys()),
-                run_id=session.run_id,
+                file_count=len(files),
+                total_bytes=total_bytes,
+                duration_ms=duration_ms,
             )
         )
-        raise RuntimeError(f"附件暂存失败（{len(files)} 个文件）: {error_msg}")
-    record(
-        AttachmentStagingCompleted(
-            plane_id=machine.id,
-            file_count=len(files),
-            total_bytes=total_bytes,
-            duration_ms=duration_ms,
-        )
-    )
 
 
 __all__ = ["stage_machine_attachments"]

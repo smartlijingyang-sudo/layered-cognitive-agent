@@ -143,15 +143,19 @@ async def send_and_wait(
     delegation_id = new_id("dlg")
     started = time.perf_counter()
     caller_scope = get_current_run_scope()
-    record(
-        DelegationIssued(
-            delegation_id=delegation_id,
-            caller_role=_caller_role(),
-            callee_role=callee,
-            subtask_preview=subtask,
-            mechanism=_mechanism(),
+    from lca.infrastructure.session.bindings import active_publish_session
+
+    # 热路径 cheap 检查(todo-38,2026-10-05 裁决):无 Session 时跳过,不抛 RuntimeError。
+    if active_publish_session() is not None:
+        record(
+            DelegationIssued(
+                delegation_id=delegation_id,
+                caller_role=_caller_role(),
+                callee_role=callee,
+                subtask_preview=subtask,
+                mechanism=_mechanism(),
+            )
         )
-    )
     # 成员 scope：parent_run_id=发起方 run_id，delegation_id=本次委派。
     # create_task 拷贝 contextvars，成员任务由此继承关联骨架；
     # 等待阶段恢复发起方自己的 scope（成员 scope 只在调度瞬间生效）。
@@ -195,15 +199,17 @@ async def send_and_wait(
                 observation = await transport.receive_result(task_id)
             handle.attributes[ATTR_OK] = observation.success
     status = _delegation_status(observation)
-    record(
-        DelegationCompleted(
-            delegation_id=delegation_id,
-            ok=observation.success,
-            status=status,
-            output_text=_payload_preview(observation.payload),
-            task_id=task_id,
+    # 热路径 cheap 检查(todo-38,2026-10-05 裁决):ContextVar 按上下文隔离,每次现查。
+    if active_publish_session() is not None:
+        record(
+            DelegationCompleted(
+                delegation_id=delegation_id,
+                ok=observation.success,
+                status=status,
+                output_text=_payload_preview(observation.payload),
+                task_id=task_id,
+            )
         )
-    )
     extra = dict(observation.extra or {})
     extra[OBS_TASK_ID] = task_id
     extra[OBS_DELEGATION_ID] = delegation_id
@@ -215,24 +221,26 @@ async def send_and_wait(
         else:
             extra[OBS_COMPLETION_QUALITY] = COMPLETION_EMPTY
     observation.extra = extra
-    record_runtime(
-        DiagnosticCategory.TRANSPORT,
-        "transport.receive",
-        plugin=type(transport).__name__,
-        attributes={
-            "callee_role": callee,
-            "protocol": protocol,
-            "task_id": task_id,
-            "delegation_id": delegation_id,
-            "context_ref_count": len(refs),
-        },
-        output={
-            "ok": observation.success,
-            "status": status,
-            "payload_preview": _payload_preview(observation.payload),
-            "latency_ms": int((time.perf_counter() - started) * 1000),
-        },
-    )
+    # 热路径 cheap 检查(todo-38,2026-10-05 裁决):record_runtime 内部调 record(),同样跳过。
+    if active_publish_session() is not None:
+        record_runtime(
+            DiagnosticCategory.TRANSPORT,
+            "transport.receive",
+            plugin=type(transport).__name__,
+            attributes={
+                "callee_role": callee,
+                "protocol": protocol,
+                "task_id": task_id,
+                "delegation_id": delegation_id,
+                "context_ref_count": len(refs),
+            },
+            output={
+                "ok": observation.success,
+                "status": status,
+                "payload_preview": _payload_preview(observation.payload),
+                "latency_ms": int((time.perf_counter() - started) * 1000),
+            },
+        )
     return observation
 
 
@@ -254,14 +262,18 @@ async def handoff_task_traced(
     """非阻塞控制权移交：record DelegationIssued(handoff)，发完即返回。"""
     callee = _describe_target(agent_card)
     delegation_id = new_id("dlg")
-    record(
-        DelegationIssued(
-            delegation_id=delegation_id,
-            caller_role=_caller_role(),
-            callee_role=callee,
-            subtask_preview=subtask,
-            mechanism=DelegationMechanism.HANDOFF,
+    from lca.infrastructure.session.bindings import active_publish_session
+
+    # 热路径 cheap 检查(todo-38,2026-10-05 裁决):无 Session 时跳过,不抛 RuntimeError。
+    if active_publish_session() is not None:
+        record(
+            DelegationIssued(
+                delegation_id=delegation_id,
+                caller_role=_caller_role(),
+                callee_role=callee,
+                subtask_preview=subtask,
+                mechanism=DelegationMechanism.HANDOFF,
+            )
         )
-    )
     with delegation_scope(_caller_role(), _current_run_id(), delegation_id):
         return await send_task_traced(transport, agent_card, subtask, context_refs)

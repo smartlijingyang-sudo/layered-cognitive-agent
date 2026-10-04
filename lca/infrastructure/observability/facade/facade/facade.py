@@ -176,8 +176,10 @@ def record(event: JournalEvent) -> StampedEvent | None:
     """向 Session 写入领域/运行时事实(SSOT only,无 fallback)。
 
     Session bound:经 raw ``Session.append`` 落 Session 日志 →
-    ``<run_id>.spine.jsonl``。无 Session 时抛 ``RuntimeError``(fail-loud);
-    SSOT 唯一真值,不允许旁路到 RunStore。
+    ``<run_id>.spine.jsonl``——这是唯一真值。``bound.journal.write``
+    只是派生/镜像投影(供 projection 订阅者消费),不参与真值判定。
+    无 Session 时抛 ``RuntimeError``(fail-loud);SSOT 唯一真值,
+    不允许旁路到 RunStore/journal。
     """
     from dataclasses import asdict
 
@@ -191,10 +193,11 @@ def record(event: JournalEvent) -> StampedEvent | None:
     # 上无 append），而运行时对象恒为 raw Session —— 直接解析 raw
     # session，与旧路径返回同一对象，零行为差。
     session = resolve_raw_session(active_publish_session())
-    bound = _bound.get()
     if session is None:
-        if bound is not None and bound.journal is not None:
-            return bound.journal.write(event)
+        # fail-loud:无 Session 即抛；journal 旁路分支已删除(todo-38,
+        # 2026-10-05 裁决)——“以为记下了实际没记”的 fail-open 与 docstring
+        # 宣称矛盾；test_facade_record_noop_without_hub 的“安全 no-op”
+        # 注释早已是谎言(该测试在干净 main 上本就是红的)。
         raise RuntimeError(
             f"record({type(event).__name__}) requires a bound Session "
             "(SSOT only; bind via bind_run_event_session or set_publish_session)"
@@ -202,8 +205,11 @@ def record(event: JournalEvent) -> StampedEvent | None:
     event_type = type(event).__name__
     payload = asdict(event)
     record_event = session.append(event_type, payload)
+    bound = _bound.get()
     stamped_from_journal = None
     if bound is not None and bound.journal is not None:
+        # 派生/镜像投影:真值已在上一行落 Session；journal.write 只供
+        # projection 订阅者消费,不参与真值判定。
         stamped_from_journal = bound.journal.write(event)
     return stamped_from_journal or StampedEvent(
         event=event,

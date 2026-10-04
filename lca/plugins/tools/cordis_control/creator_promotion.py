@@ -107,27 +107,34 @@ def promote(
                 safe_executor=safe_exec,
             )
 
-    stamped = record(
-        PluginMounted(
-            plugin_name=mounted.plugin_name,
-            plugin_id=mounted.plugin_id,
-            capabilities=mounted.capabilities,
-            capability_grant=mounted.capability_grant,
-            meta=mounted.meta_snapshot,
-            actor_role=tool._actor_role,
+    from lca.infrastructure.session.bindings import active_publish_session
+
+    # 热路径 cheap 检查(todo-38,2026-10-05 裁决):无 Session 时跳过,不抛 RuntimeError。
+    stamped = None
+    if active_publish_session() is not None:
+        stamped = record(
+            PluginMounted(
+                plugin_name=mounted.plugin_name,
+                plugin_id=mounted.plugin_id,
+                capabilities=mounted.capabilities,
+                capability_grant=mounted.capability_grant,
+                meta=mounted.meta_snapshot,
+                actor_role=tool._actor_role,
+            )
         )
-    )
     layout = _publish_release(tool, item, mounted.plugin_id, target_scope, preset_id)
-    record_runtime(
-        DiagnosticCategory.TOOL,
-        "creator.promote",
-        plugin=name,
-        attributes={
-            "actor_role": tool._actor_role,
-            "target_scope": resolved_scope.value,
-        },
-        status=DiagnosticStatus.SUCCEEDED,
-    )
+    # 热路径 cheap 检查(todo-38,2026-10-05 裁决):record_runtime 内部调 record(),同样跳过。
+    if active_publish_session() is not None:
+        record_runtime(
+            DiagnosticCategory.TOOL,
+            "creator.promote",
+            plugin=name,
+            attributes={
+                "actor_role": tool._actor_role,
+                "target_scope": resolved_scope.value,
+            },
+            status=DiagnosticStatus.SUCCEEDED,
+        )
     return {
         "face": "promote",
         "artifact": capability_artifact_to_dict(artifact),
@@ -214,20 +221,27 @@ def _retire(
             safe_executor=safe_exec,
         )
 
-    stamped = record(
-        PluginUnmounted(
-            plugin_name=unmounted.plugin_name,
-            plugin_id=unmounted.plugin_name,
-            actor_role=tool._actor_role,
+    from lca.infrastructure.session.bindings import active_publish_session
+
+    # 热路径 cheap 检查(todo-38,2026-10-05 裁决):无 Session 时跳过,不抛 RuntimeError。
+    stamped = None
+    if active_publish_session() is not None:
+        stamped = record(
+            PluginUnmounted(
+                plugin_name=unmounted.plugin_name,
+                plugin_id=unmounted.plugin_name,
+                actor_role=tool._actor_role,
+            )
         )
-    )
-    record_runtime(
-        DiagnosticCategory.TOOL,
-        "creator.promote",
-        plugin=artifact.logical_id,
-        attributes={"actor_role": tool._actor_role, "rollback": True},
-        status=DiagnosticStatus.SUCCEEDED,
-    )
+    # 热路径 cheap 检查(todo-38,2026-10-05 裁决):record_runtime 内部调 record(),同样跳过。
+    if active_publish_session() is not None:
+        record_runtime(
+            DiagnosticCategory.TOOL,
+            "creator.promote",
+            plugin=artifact.logical_id,
+            attributes={"actor_role": tool._actor_role, "rollback": True},
+            status=DiagnosticStatus.SUCCEEDED,
+        )
     return {
         "face": "promote",
         "artifact": capability_artifact_to_dict(artifact),
@@ -239,6 +253,11 @@ def _retire(
 def _record_rejected(
     tool: CordisControlTool, name: str, error: ComposerError, metadata: dict[str, Any]
 ) -> None:
+    from lca.infrastructure.session.bindings import active_publish_session
+
+    # 热路径 cheap 检查(todo-38,2026-10-05 裁决):无 Session 时跳过,不抛 RuntimeError。
+    if active_publish_session() is None:
+        return
     record_runtime(
         DiagnosticCategory.TOOL,
         "creator.promote_rejected",
