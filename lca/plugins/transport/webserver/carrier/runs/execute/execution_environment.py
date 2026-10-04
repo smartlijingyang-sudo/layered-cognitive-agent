@@ -159,7 +159,7 @@ class RunExecutionEnvironment:
             coordinator_token = bind_current_coordinator(coordinator)
 
         agent = session.agent
-        assistant_id = (getattr(session, "assistant_id", "") or "").strip()
+        assistant_id = ambit.assistant_id
         if assistant_id:
             # I-A2：带 assistant_id 的 run，agent 级载体值 = 该 id；
             # Spine EP 的 source / actor_role 以此为身份。

@@ -1,10 +1,6 @@
 """L0 tools —— Tool 协议的内置实现（manifest + executor 架构）。"""
 
 from lca.infrastructure.tools.default.set import build_default_tools
-from lca.infrastructure.tools.run.assistant_scope import (
-    get_current_assistant_id,
-    run_assistant_scope,
-)
 from lca.infrastructure.tools.run.attachment_scope import (
     get_current_run_attachment_ids,
     merge_attachment_ids,
@@ -23,9 +19,7 @@ __all__ = [
     "SandboxExecuteTool",
     "SandboxInspectTool",
     "build_default_tools",
-    "get_current_assistant_id",
     "get_current_run_attachment_ids",
     "merge_attachment_ids",
-    "run_assistant_scope",
     "run_attachment_scope",
 ]
