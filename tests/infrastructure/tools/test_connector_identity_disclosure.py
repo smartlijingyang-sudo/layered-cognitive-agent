@@ -16,13 +16,22 @@ from lca.plugins.prompts.template_provider import _builtin_section_refs
 
 def test_react_tool_usage_contains_dynamic_url_and_identity_iron_laws() -> None:
     """INV-CONN-05: System instructions must contain iron laws against fabricating dynamic URLs and requiring identity disclosure."""
+    from lca.plugins.transport.webserver.routes_1.routes_assistants.standing_files import (
+        DEFAULT_STANDING_FILE_TEMPLATES,
+    )
+
     section = build_react_tool_usage(Config())
     text = section.text
 
-    # Must contain prohibition of fabricating dynamic URLs
-    assert "动态授权" in text or "授权" in text
-    assert "严禁" in text or "必须调用" in text
+    # 身份披露铁律仍在 react_tool_usage_guidelines 段（fd53f1642 明确保留）
     assert "动身份先报身份" in text or "账号身份" in text or "凭证" in text
+
+    # 动态 URL 铁律已迁入 CONSTITUTION.md 模板（fd53f1642：prompt 规则不许硬编码在 py），
+    # section 不再承载；此处钉新家。注意：模板→backstory 组装预算截断问题另由
+    # test_url_iron_rule_survives_standing_assembly（xfail strict, todo-40）钉住。
+    constitution = DEFAULT_STANDING_FILE_TEMPLATES["CONSTITUTION.md"]
+    assert "动态授权" in constitution
+    assert "严禁" in constitution and "必须调用" in constitution
 
 
 def test_connected_services_renders_account_identity(tmp_path: Path) -> None:
