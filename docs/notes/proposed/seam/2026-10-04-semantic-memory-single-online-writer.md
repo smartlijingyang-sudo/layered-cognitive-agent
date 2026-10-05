@@ -56,6 +56,8 @@ ADR-0249（Accepted）§0.1 的问题陈述是「在主对话轮次（`reflect/r
 
 其二，目标 profile 的在线残差捕获真的能覆盖隐式偏好。判据是实测而非开关，一个含「还是简洁一点好」这类无记忆动词偏好句的 turn 之后，`{home}/memory/episodes/` 出现 `dedupe_key=preference:verbosity` 且 `explicit_user_authority=true` 的新增文件，或者每日流水补齐生产写入方并由 `is_preference_statement` 命中。这条来自 §产品决策待接受 的实测结论，当前 `govern()` 的模板覆盖不到这类句子。
 
+两条路线目前都覆盖不到判据句，因此本条件有两项交付物。`govern()` 的 verbosity 规则要求 `记住|以后` 合取（`govern.py:59`）。`is_preference_statement` 依赖的 `_PREFERENCE`（`contextfiles/domain/trail.py:18`）为 `偏好|以后|不要|必须|记住|严禁|回复要|请记`，实测「还是简洁一点好」「别那么啰嗦」「回复请简短」「我喜欢简洁的回复」全部不命中，只有「以后简洁一点」命中。第一项交付物是 `TrailWriter` 的在线调用方，归属见 §Open questions 第 5 项的裁决；第二项是拓宽 `_PREFERENCE` 与 `govern()` 之一的偏好判定。只做第一项，判据仍不达成。
+
 Phase 0 未达成时 extract 保持在线，本提案其余部分不启动。
 
 **Phase 1，extract 的 LLM 蒸馏移入离线轨。** 仅在 Phase 0 验收达成后启动。在线保留毫秒级残差门控。47 个 extract-only 维度的落盘时延从本 Phase 起才发生，因此调度必须在本 Phase 之前已经跑稳，退化窗口一天都不开。
@@ -70,7 +72,7 @@ Phase 0 未达成时 extract 保持在线，本提案其余部分不启动。
 
 机制事实决定时延的严重度，其中两条比提案初稿假设的更差。
 
-- 在线残差捕获的门不是开关而是模板。`phase.perceive.observe` 每轮无条件调 `record_task_episode`（`observe.py:62-67`，`913a967ae` 引入），`governor_enabled` 只控制 reflect 侧那一份与 perceive 近冗余的重复写入。真正的门是 `episode_home(runtime)` 能否解析（`daytime.py:17-31`），以及 `govern()` 的三个闭合模板能否命中（`govern.py:18-21`）。verbosity 规则要求 `记住|以后` 合取（`govern.py:55`），因此「别那么啰嗦」「还是简洁一点好」返回 `None`；命中时 `explicit_user_authority` 又被硬编码为 `False`（`govern.py:58-63`），走不到 `_lifecycle` 的首次即提升分支（`contracts/models/memory/episode.py:74-82`）。
+- 在线残差捕获的门不是开关而是模板。`phase.perceive.observe` 每轮无条件调 `record_task_episode`（`observe.py:62-67`，`913a967ae` 引入），`governor_enabled` 只控制 reflect 侧那一份与 perceive 近冗余的重复写入。真正的门是 `episode_home(runtime)` 能否解析（`daytime.py:17-31`），以及 `govern()` 的三个闭合模板能否命中（`govern.py:21-25`）。verbosity 规则要求 `记住|以后` 合取（`govern.py:59`），因此「别那么啰嗦」「还是简洁一点好」返回 `None`；命中时 `explicit_user_authority` 又被硬编码为 `False`（`govern.py:59-67`），走不到 `_lifecycle` 的首次即提升分支（`contracts/models/memory/episode.py:74-82`）。
 - 证据助理跑的就是 `profiles/web-assistant.yaml`，`governor_enabled` 为 true，`memory/episodes/` 仍为空，因为其三轮陈述「i am lee」「上海啊」「我有女儿 儿子 老婆 一家四口」不匹配任何模板。524 个助理 home 中 5 个有 `episodes/`、共 6 个文件，全部是 `residual: instruction` 的身份事实，`preference:verbosity`、`correction`、`error` 各为 0。
 - 每日流水 `memory/YYYY-MM-DD.md` 没有生产写入方。`TrailWriter`（`contextfiles/service/trail.py:16`）只被测试构造，24 个助理的 memory 目录下 `20*.md` 计数为 0。`run_dream` 经 `parse_trail` 读它，FTS 索引覆盖它，但没有任何在线路径产生它。
 - `AssistantMemory.retrieve` 只读 `semantic.json` 与 `episodic.json`，不读 `memory/episodes/`。捕获到的残差在提升为语义记录之前不进注入路径。
@@ -148,7 +150,7 @@ Phase 3 与守卫 remedy。
 2. ADR-0277 待拍板⑥（typed 对象是运行时投影还是新存储真值，与 ADR-0254 v2 决策 A 的关系）与待拍板⑦（`SemanticClaim` 与 ADR-0247 `MemoryRecord` 是替代、包装还是并行）决定对账闸的承载体，是 Phase 3 的硬前置。见 [ADR-0277 四问深审](../../audit-2026-10-03-adr0277-review.md) Q4。
 3. ADR-0277 待拍板③（sleep-time 载体）与 `run_dream` 的调度归属是同一件事的两面，需一并裁决，并给出 Phase 0 要求的周期上界。
 4. §产品决策待接受 的落盘时延尚未获得产品负责人明确接受，接受前 Phase 1 不启动。
-5. 每日流水的生产写入方由谁补。`TrailWriter` 已实现且被 `DiskFileStore` 的 append-only 窄门保护，但没有在线调用方。归 ADR-0254 落地还是本提案 Phase 0，需要裁决；在 governor 关闭的部署上，Phase 0 的第二个条件依赖这个答案。
+5. 已裁决（2026-10-05，李超）。每日流水的生产写入方归本提案 Phase 0，不归 ADR-0254 落地。`TrailWriter` 已实现且受 `DiskFileStore` 的 append-only 窄门保护，缺的是在线调用方，补它成为 Phase 0 条件二的交付物。裁决只解决归属，不解决覆盖面，见 §交付门禁 Phase 0 条件二。
 
 ## Related
 
