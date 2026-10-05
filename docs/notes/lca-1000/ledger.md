@@ -572,3 +572,97 @@
 - 验证结果: ruff check 1 文件首次即过（All checks passed!）；targeted pytest `tests/scenario/step/test_step_narrative_writer.py`：25 passed；行为等价 python 断言全绿（`StepNarrativeWriter("")` 早退仍返回 None；方法体内 `except ImportError` 字符串归零、`fold_model_visible(` 调用保留；local import 解析到 canonical 对象）。
 - commit: 见 git log --grep='第0498轮'（refactor(lca-1000): 第0498轮 删除 narrative writer 无依据的 ImportError 防御 guard（fold_source 为 in-repo 模块）；未 push）。
 - 备注: 只 add 本轮 2 个文件（代码 1 + ledger.md）；编辑前 git status --porcelain 干净（并发会话在本轮 explore 期间提交了 2 个 docs commit：0268 ADR + semantic-memory 笔记，98→100 commits；其改动均为 docs/，与本轮代码文件无交集）；备份 /tmp/bak_0498/writer.py（252，原文件完整备份）。本地 heredoc 嵌套引号翻车一次（文件未动），改用本地写脚本 + stdin 喂远程 python3，编辑与验证均一次成功。
+
+## 第0499轮 (2026-10-06 00:03-00:16 CST)
+- 改了什么: 删除 `lca/infrastructure/cli/services/kernel/restart_report.py` 中 `run_restart_report` 内对 in-repo 模块 `supervisor.types.ProgramState` 的无依据 `try/except ImportError` 防御 guard（1 file，9 insertions(+)/7 deletions(-)）：`except ImportError: # pragma: no cover — defensive` 分支（fallback 硬编码 `"running"` 字符串）删除；改写为裸的 local import（保持延迟导入位置不动）+ 4 行注释说明不可达依据。
+- 依据 skill 哪一节: deslop 清单 无依据的防御性 guard + LANGUAGE.md Interface（error mode 是 interface 的一部分：原接口隐含"supervisor.types 不可导入时静默用字面量 'running' 替代"幻影 error mode；删除后 comparison 值唯一真实来源是 `ProgramState.RUNNING.value`，调用方与测试不再被误导）+ SKILL.md Deletion test（删掉 guard 后复杂度直接消失：无调用方需要复刻 fallback，无 N 处复杂度回潮）。
+- 为什么这是实质改动(非凑数): 删除的是可执行的防御分支（含行为后果的兜底值），不是注释措辞。无依据证据链：(1) `types.py` 导入链仅 stdlib（shlex/dataclasses/enum），无可选第三方依赖；(2) restart_report 所在 kernel tree 的每个其他消费者（commands/kernel/supervisor.py、supervisor/results.py/decisions.py/state.py）都对 `ProgramState` 做模块级 import，全库按"恒可导入"对待；(3) tests/ 内无任何用例依赖该 ImportError 路径（`tests/infrastructure/cli/services/kernel/` 无 `except ImportError`，全库 grep 仅生产代码 1 处）；(4) fallback 值恰好是 enum 成员的重复字面量（`RUNNING = "running"`），属手抄 seam 的幻影冗余。
+- 关键设计决策（夜间跳过 grilling，记台账）: 保留 local import 位置（不提至模块级）：该函数文档头声明 restart_report 是"supervising read-only companion"，延迟导入的现有纪律不动；只删 guard，不碰 `supervisor_state != running_value` 比较逻辑。
+- 候选清单（本轮 explore，逐一验证后取舍）：
+  1. 上述 restart_report.py ImportError guard 删除 —— 选中（deslop 无依据 guard；单文件聚焦；deletion test 满分；targeted 测试现成）。
+  2. `lca/plugins/loop/graph/recovery/plugin.py` 整模块删除（delete-when: 2026-10-15）—— 驳回（日期未到；当前 2026-10-06）。
+  3. 全库其余 `except ImportError` 生产代码 —— 驳回：mcp/postgres/browser/fetch/llm_adapter/matplotlib/companion/telemetry_otel/otel_projection/langfuse_projection/composio/fact_scorer 全是真实可选第三方依赖的防御，justify 存在；computer.py:246 显式"kept for boot-time safety" boot 期防御；cli/commands/__init__.py:33,46 插件可选加载。
+  4. AgentState.history 迁移 / _DEFAULT_BOOT_PATH / tail.py:81 —— 驳回（沿用 498 结论：需 grilling 或规模超一轮）。
+- 验证结果: ruff check 1 文件首次即过（All checks passed!）；targeted pytest `tests/infrastructure/cli/test_kernel_restart_report.py`：8 passed；python 断言：文件内 `except ImportError` 归零、`ProgramState.RUNNING.value` 保留、模块导入无异常。
+- commit: refactor(lca-1000): 第0499轮 删除 restart_report 无依据的 ProgramState ImportError 防御 guard（hardcode "running" 兜底）；未 push。
+- 备注: 只 add 本轮 2 个文件（代码 1 + ledger.md）；编辑前 git status --porcelain 有并发会话（ralph/10-round-arch-deepening）未提交改动（docs/plans/task.md、memory/cognition/tools 等），与本轮文件无交集，未触碰；备份 /tmp/bak_0499/restart_report.py（252，原文件完整备份）。编辑经本地写脚本 + stdin 喂远程 python3（先断言 old 文本计数==1），一次成功。
+
+## 第0500轮 (2026-10-06 00:33-01:05 CST)
+- 改了什么: **本轮未发现新的实质机会，无代码改动**（诚实记账：deslop/加深扫描穷尽近期轮次的候选方向后，无一项通过实质性硬门槛）。
+- 依据 skill 哪一节: SKILL.md Process §1 Explore + §2 Present candidates（逐一列出、逐一用 deletion test / seam 纪律验证后取舍）+ LANGUAGE.md Interface/Seam（有意设计的 well-known-path 合同与 namespace 归属不碰）+ DEEPENING.md Seam discipline（single-adapter / 归属未定的 seam 不立新常量）。
+- 为什么这是实质结论(非凑数): 按规则 4，找不到实质机会就诚实记录，不硬凑 trivial commit。本轮 explore 覆盖 10 个候选方向，全部有明确驳回依据（见候选清单），没有一个是"改一句话/调标点/只改注释措辞"级别的凑数项——也没有可做的。
+- 关键设计决策（夜间跳过 grilling，记台账）: 三处"最新 kernel stderr 日志" helper（kernel.py:431 / restart_report.py:136 / driver_debug.py:145）看似重复，但 restart_report 版是 stdout-first + stderr-fallback（语义不同），kernel 版与 driver_debug 版在 is_file/prefix-filter 细节上有意不同；三者归属哪个 canonical 模块是 placement 决策，需 grilling，夜间轮不动。supervisor 日志路径三处拼写（config.py:152-153 / restart_report.py:61-63 / workflow.py:210）同理：两处注释明示"supervisor<->CLI well-known log paths"是有意合同，立新共享常量属 hypothetical seam，需 grilling。
+- 候选清单（本轮 explore，逐一验证后取舍）：
+  1. 过期 `delete-when` 标记 —— 驳回（全库日期均未到期：最早 2026-10-15；2026-12-31/2027-01-01/v1.0-release 均未到）。
+  2. in-repo `except ImportError` 无依据 guard —— 驳回（499 已全库扫完；本轮确认无新增）。
+  3. `contracts/models/session/epoch_header.py` / `event_ref.py` 纯 re-export（9-10 行）—— 驳回（docstring 明示有意设计："Re-exported here so the contracts/session namespace owns the import name"；按 498 ports.py 惯例，需 grilling）。
+  4. `contracts/protocols/graph/ports.py` —— 驳回（沿用 498：canonical import surface 是有意设计决策）。
+  5. companion `standalone.py` vs `client.py` 近乎逐字重复（pair/poll_pairing 流程）—— 驳回（standalone.py 是零依赖可下载 daemon，`GET /api/device/download/companion.py` 后脱离仓库运行；重复是 ADR-0246 M3 设计的必然代价）。
+  6. events `file_sink/__init__.py:47,73` `_LEGACY_SINGLE_FILE_LAYOUT` 兼容分支 —— 驳回（明文 PR-4 兼容理由：旧 profile 仍传 `path: events.jsonl` 时降级到 boot-spine.jsonl；495 已确认非死路径）。
+  7. `session/lifecycle/recovery.py:135` `legacy_terminal` 旧状态词映射 —— 驳回（真实 wire 迁移映射：旧 checkpoint 文件的 completed/failed/canceled → LiveAgentStatus，有明确语义，非死路径）。
+  8. supervisor 日志路径三处拼写（见上）—— 驳回（well-known-path 合同有意；seam 归属需 grilling）。
+  9. 三处 latest-kernel-stderr helper（见上）—— 驳回（语义差异真实存在；canonical 归属需 grilling）。
+  10. wire event 字符串 `"success"`/`"error"`/`"cancelled"` 等字面量比较 —— 驳回（均为 JSONL/event payload 的 wire 格式值，非 Python 常量/enum 的影子拼写）。
+  11. `format_capability_graph_from_legacy` / `legacy_result_shim` —— 驳回（均有真实调用方，非死代码）。
+- 验证结果: 无文件改动，验证门 N/A（无改动可验证；未运行 ruff/pytest——无目标文件）。
+- commit: 无（无代码改动；本条目为台账-only 记录）。
+- 备注: 编辑前 git status --porcelain 显示并发会话（ralph/10-round-arch-deepening）未提交改动（docs/plans/task.md、lca/infrastructure/tools/*/__init__.py、assistant_tools/plugin.py + 3 个 untracked），与台账文件无交集，未触碰；ledger.md 本轮追加前确认无人并发修改。
+
+## 第0501轮 (2026-10-06 01:03-01:13 CST)
+- 改了什么: debug-run 读侧 `kernel.log` 影子拼写收敛至 naming SSOT seam（1 file，2 insertions(+)，1 deletion(-)）：
+  - `lca/plugins/tools/diagnostics/debug/run.py:222`：`kernel_log_path = run_dir / "kernel.log"` → `run_dir / kernel_log_filename(run_id)`；
+  - 模块级 import 块补上 `from lca.infrastructure.observability.spine.sinks.naming import kernel_log_filename`（isort 顺序正确：contracts.* < infrastructure.*）。
+- 依据 skill 哪一节: DEEPENING.md Seam discipline（`naming.KERNEL_LOG_FILENAME` / `kernel_log_filename()` 是 kernel log 命名的真实 seam：已有两个 production adapter——唯一写者 `failure.py:54`（`record_run_failure`）与 contract reader `ssot.py:94`（`find_kernel_log`）——都经该 seam 派生；debug-run 读侧的字面量是全库唯一的绕开 seam 的 code site）+ SKILL.md Deletion test（若删掉常量/派生函数，写者与 contract 读者的命名会散开，复杂度回潮到 N 个调用方手拼；收敛后 seam 真实收口）+ LANGUAGE.md Locality（kernel log 文件名改一处——naming.py）/ Interface（error mode 未碰：`kernel_log_path` 缺失是常态（ssot docstring 明示），`_tail_lines` 容错行为原样保留）。
+- 为什么这是实质改动(非凑数): 读/写名不一的沉默 bug 类（同 494/495 弧）：常量若变更，写者按新名写、debug-run 读旧名 → 诊断报告 `[3/8] kernel.log` 节永远读空且无报错。非"改措辞"：收敛的是可执行路径构造。字节级等价已断言（`kernel_log_filename("run_abc") == "kernel.log" == KERNEL_LOG_FILENAME` 逐字节相等）；naming.py 是零 import 叶子模块，无循环风险（import 冒烟验证通过）。
+- 关键设计决策（夜间跳过 grilling，记台账）: 用派生函数 `kernel_log_filename(run_id)` 而非裸常量 `KERNEL_LOG_FILENAME`——与现有两个 adapter（writer `run_dir / kernel_log_filename(facts.run_id)` / ssot reader `run_dir / kernel_log_filename(run_id)`）调用惯例一致，"文件名固定、run 归属由目录表达"语义保持显性；不动 `[3/8] kernel.log` 展示标签（section label 非 code site，按 495 惯例）。
+- 候选清单（本轮 explore，逐一验证后取舍）：
+  1. 上述 kernel.log 读侧字面量收敛至 `kernel_log_filename` —— 选中（全库唯一 code site；seam 真实：两处现有 production adapter；命名收敛弧 494/495 的自然延续，kernel log 是 naming 家族最后一个未收口成员）。
+  2. `agent_gateway.py` 4 处 `except Exception: pass`（terminal streaming）—— 驳回：均为 best-effort teardown（websocket.close 已断开、pump 订阅异常由上层重连处理、cancel/resume_approval 尽力语义）；删除会改变异常传播行为，需 grilling，夜间轮不动。
+  3. 长注释块（cordis_event_table.py:38、journal.py:923 等）—— 驳回：承载 interface invariant（如"禁止业务/plugin 代码直接 `ctx.emit('agent.*')` 必须经 `EventDescriptor.derive()` 走本表"），是 interface 文档而非叙事 slop。
+  4. `append.py` `_read_max_snapshot_bytes`（`globals().get` + PEP 562 `__getattr__`）—— 驳回：0412 轮审定的有意设计（懒读 env 避 import 期崩溃），relitigate 风险，不动。
+  5. `delete-when` 标记 —— 驳回：全库无到期（最早 2026-10-15）；`adapters/__init__.py:9` 的"delete-when met"是早轮已删除的 TelemetryMemoryAdapter 的记述，非待办。
+  6. `writable_matrix/storage/s3.py` PR-10 TODO 占位 —— 驳回：ADR-0167 声明的占位实现，有意设计。
+  7. 轮500 驳回项（三处 latest-kernel-stderr helper / supervisor 日志路径三处拼写 / AgentState.history 迁移 / `_DEFAULT_BOOT_PATH` / tail.py:81）—— 驳回（沿用 500 结论：语义差异真实存在或需 grilling/规模超一轮）。
+- 验证结果: ruff check 1 文件首次即过（All checks passed!）；import 冒烟无循环（naming 叶子模块上移安全）；行为等价 python 断言全绿（派生值与旧字面量逐字节相等；文件内裸 `"kernel.log"` 路径构造归零；派生调用恰 1 处）；targeted pytest `tests/scenario/debug/test_debug_run_tool.py`：4 passed。
+- commit: 见 git log --grep='第0501轮'（refactor(lca-1000): 第0501轮 debug-run 读侧 kernel.log 影子拼写收敛至 naming kernel_log_filename(Seam)；未 push）。
+- 备注: 只 add 本轮 2 个文件（代码 1 + ledger.md）；编辑前 git status --porcelain 显示并发会话（ralph/10-round-arch-deepening）未提交改动（5 modified + 3 untracked），与本轮文件无交集，未触碰；备份 /tmp/bak_0501/run.py（252，原文件完整备份）。本地写脚本 + stdin 喂远程 python3（heredoc 嵌套引号翻车一次，改 stdin 文件模式后一次成功；subprocess 传 `~/.local/bin/ruff` 需 expanduser，修后一次成功）。
+
+## 第0502轮 (2026-10-06 01:33-01:41 CST)
+- 改了什么: 删除 `web_to_contracts_report` 内对 `HopVerdict.ok` 三态判断链中不可达的防御 `else` 分支（1 file，4 insertions(+)/7 deletions(-)）：
+  - `lca/plugins/transport/webserver/doctor/contracts_adapter.py:79-84`：`elif hop_value.ok is True:` + `else: # pragma: no cover (defensive) → "unknown state"` 收敛为单 `else:  # ok 恒为 True` 分支（保持 info/`detail or 'ok'` 行为）。
+- 依据 skill 哪一节: deslop 清单 无依据的防御性 guard（guard 声称的失败模式——`ok` 为 True/False/None 之外的第四态——在该模块的 interface 下不可达）+ LANGUAGE.md Interface（error mode 是 interface 的一部分：原 `else` 给 interface 塞入了一个幻影 error mode（"unknown state"），删除后 tri-state 映射穷尽于类型契约，调用方不再被误导）+ SKILL.md Deletion test（删掉分支后复杂度直接消失：该分支 `# pragma: no cover` 永不可达，无调用方/测试复刻）。
+- 为什么这是实质改动(非凑数): 删除的是可执行的防御分支（非注释措辞/空行调整），且有接口语义后果：`DoctorReport` 的 severity/message 映射此后完全由 `bool | None` 三态决定，幻影第四态从 interface 上移除。无依据证据链：(1) `HopVerdict.ok: bool | None`（frozen dataclass，models.py:26）；(2) if 链的前两分支已覆盖 `hop_value is None / ok is None` 与 `ok is False`，剩余只能是 `ok is True`；(3) lca/ 内全部 `HopVerdict(...)` 构造（doctor.py / session_check.py）均为字面量 True/False/None；(4) `HopVerdict` 只有 `as_dict` 序列化、无线反序列化入口，非 bool 值无途径流入；(5) tests/ 内无任何用例构造非 bool `ok`。
+- 关键设计决策（夜间跳过 grilling，记台账）: 用 `else` 而非保留 `elif hop_value.ok is True:` 结尾——三态穷尽在类型层面可证，`else` 使穷尽性在代码上自明，同时避免删分支后静态检查报 possibly-unbound；可达域（True/False/None）行为逐分支等价，已由 14 个既有映射测试锁定。
+- 候选清单（本轮 explore，逐一验证后取舍）：
+  1. 上述 contracts_adapter.py 防御 else 删除 —— 选中（deslop 无依据 guard；单文件聚焦；deletion test 满分；targeted 测试现成 14 个）。
+  2. supervisor.py:278 `_waiter_loop` 的 `except Exception` 防御 —— 驳回：supervisor waiter 线程职责是"进程死亡必须发 died 事件"，`proc.wait()` 在复用/异常 fd 等真实场景可抛，失败模式有据；删除会改变 supervising 模块的尽力语义，需 grilling，夜间轮不动。
+  3. accessors.py:63,82 `_resolve_spine` / `_resolve_pipeline` 的 `except Exception` 防御 —— 驳回：getter 是外部注册的任意 callable（`set_active_*_accessor`），raise 是真实可达的失败模式；删除会把异常传播进 instrumentation 包裹层，改变 error mode，需 grilling。
+  4. naming 家族 code site 复查 —— 驳回：501 结论已验证（exceptions `.exceptions.jsonl` 全库仅剩 docstring 提及，无可执行拼接；`run_paths.py` 的 `spine_path_for_run`/`exceptions_path_for_run` 已走 naming 派生函数；`boot-spine.jsonl` 唯一可执行字面是 `_DEFAULT_BOOT_PATH`，沿用 494 结论：hypothetical seam，需 grilling）。
+  5. `delete-when` 到期扫描 —— 驳回：全库无到期（最早 2026-10-15 的 recovery/plugin.py；其余 2026-12-31/2027-01-01/条件型均未达成）。
+  6. `_LEGACY_SINGLE_FILE_LAYOUT` / `legacy_terminal` 映射等 —— 驳回（沿用 500 结论：PR-4 真实 wire 兼容，非死路径）。
+  7. 轮 500/501 驳回项（三处 latest-kernel-stderr helper / supervisor 日志路径三处拼写 / AgentState.history 迁移 / `_DEFAULT_BOOT_PATH` / tail.py:81 / agent_gateway 4 处 except / 长注释块 / append.py PEP562 / s3.py PR-10）—— 驳回（沿用 500/501 结论：语义差异真实存在或需 grilling/规模超一轮）。
+- 验证结果: ruff check 1 文件首次即过（All checks passed!）；targeted pytest `tests/lca_plugins/transport/webserver/doctor/test_contracts_adapter.py`：14 passed（覆盖 ok=False/None/True → severity/message 映射全路径，删除前后行为等价）。
+- commit: 见 git log --grep='第0502轮'（refactor(lca-1000): 第0502轮 删除 contracts_adapter 不可达的 HopVerdict.ok 防御 else 分支（"unknown state" 幻影 error mode）；未 push）。
+- 备注: 只 add 本轮 2 个文件（代码 1 + ledger.md）；编辑前 git status --porcelain 显示并发会话（ralph/10-round-arch-deepening）未提交改动（6 modified + 3 untracked），与本轮文件无交集，未触碰；备份 /tmp/bak_0502/contracts_adapter.py（252，原文件完整备份）。本地写脚本 + stdin 喂远程 python3（先断言 old 文本计数==1），一次成功。
+
+
+## 第0503轮 (2026-10-06 02:03-02:25 CST)
+- 改了什么: 删除 legacy `RunPort` seam 上已退休的 `stream_run_fold` 入口及其整条实现链（4 files，27 deletions(-)，纯删除）：
+  - `lca/plugins/transport/webserver/read/runs/live.py`：删除 `async def stream_run_fold` 桩（docstring 自标 "Retired — P1 uses LcaAgentGateway WebSocket instead of Journal SSE"；本体 `del session, after` + `if False: # pragma: no cover: yield b""`，零行为）；`__all__` 去条目；
+  - `lca/plugins/transport/webserver/read/runs/terminal.py`：删除类上的 `stream_run_fold` 透传方法 + `stream_run_fold as _stream_run_fold` 导入（该导入块被抽空后整体删除）；
+  - `lca/plugins/transport/webserver/read/runs/__init__.py`：去 live-import 条目 + `__all__` 条目；
+  - `lca/plugins/transport/webserver/handlers/runs/terminal/port/port.py`：legacy `RunPort` Protocol 删除 `stream_run_fold` 入口点。
+- 依据 skill 哪一节: deslop 清单 死兼容路径（"Retired" 自标 + 全库零调用方 + tests/ 零引用，路径已死）+ DEEPENING.md Seam discipline（seam interface 收敛：迁移已在 P1 的新 `RunPort` Protocol（agent_gateway.py:53）上完成——新协议只有 `cancel`/`resume_approval`，根本未声明 `stream_run_fold`；旧 seam 上的退休入口是幻影 capability）+ SKILL.md Deletion test（删后复杂度消失：旧函数本体是 `if False` no-op，无 N 个调用方会重造）+ LANGUAGE.md Interface（interface 包含 error modes：退休 stub 曾向调用方承诺一个永远产空流的 entry point，从 interface 上移除后 surface 收敛）。
+- 为什么这是实质改动(非凑数): 删除的是真实的 interface surface（Protocol 入口点 + 唯一 adapter 实现 + 包 re-export），非注释措辞/空行调整。证据链：(1) lca/ 内零 `.stream_run_fold(` 调用（grep）；(2) tests/ 内零 `stream_run_fold` 引用；(3) 唯一 adapter 是 terminal.py 的透传（class method → `_stream_run_fold`），删协议入口只需删这一处实现；(4) 函数本体逐字是 `if False` no-op，删后行为零变化；(5) 新 P1 `RunPort`（agent_gateway.py）早已不声明该入口，迁移事实完成，旧 seam 入口纯属遗留接线。
+- 关键设计决策（夜间跳过 grilling，记台账）: 整条链（函数 + 透传 + re-export + protocol 入口）一次性删除而非仅删本体——旧 seam 的 protocol 入口是幻影 capability，留着会误导未来 explorer 认为"Journal SSE 折叠流仍是 RunPort 的能力"；仅剩 port.py 的 docstring（"创建、控制、查询、诊断和健康投影均由同一 owner 提供"）与能力列表一致，无需改动。未动 `routes.py:34` 的 `_ws_placeholder`（不同死桩，需 grilling，留给下轮）。
+- 候选清单（本轮 explore，逐一验证后取舍）：
+  1. 上述 stream_run_fold 退休链删除 —— 选中（deslop 死兼容路径；证据链完整：零调用/零测试/新协议已收敛；4 文件 27 deletions，纯删除）。
+  2. `predicate_evaluator.py:72,103` 两处 `raise ValueError(unhandled ...)` —— 驳回：`kind` 是否 closed Literal 未在类型层面确证；删除 raise 会把非法 kind 的行为从显式 ValueError 变为隐式 return None，属 error mode 变更，需 grilling，夜间轮不动。
+  3. `failover.py` 4 处 `raise RuntimeError("... exhausted without a ... result")` —— 驳回：虽标 `pragma: no cover`，但失败模式真实可达（全部 adapter 失败），是 interface 的真实 error mode，删除等于删 error mode，需 grilling。
+  4. `supervisor.py:278` `_waiter_loop` 的 `except Exception` —— 驳回（沿用 502 结论：尽力语义有据）。
+  5. `accessors.py:63,82` 的 `except Exception` —— 驳回（沿用 502 结论：外部注册 getter 可达异常）。
+  6. `delete-when` 到期扫描 —— 驳回：全库无到期（最早 2026-10-15）。
+  7. 轮 500/501/502 驳回项（agent_gateway 4 处 except / 长注释块 / append.py PEP562 / s3.py PR-10 / naming 家族 / `_DEFAULT_BOOT_PATH` / tail.py:81 / 三处 latest-kernel-stderr / supervisor 日志路径 / AgentState.history / contracts_adapter 已做）—— 驳回（沿用结论：语义真实或需 grilling/规模超一轮）。
+- 验证结果: ruff check 4 文件首次修复后即过（中间插曲：terminal.py 出现空 `from ... import ()`，补删后 All checks passed!）；残余引用 `grep -rn stream_run_fold lca/ --include=*.py` = 0 行；import 冒烟（read.runs / terminal / port.port 三模块导入 + `__all__` 断言）OK；targeted pytest 3 文件（test_read_runs_unified.py / test_runs_sessions_facade_path.py / test_run_isolation.py）：14 passed。
+- commit: 见 git log --grep='第0503轮'（refactor(lca-1000): 第0503轮 删除 legacy RunPort 上退休的 stream_run_fold 入口及其实现链（死兼容路径）；未 push）。
+- 备注: 只 add 本轮 5 个文件（代码 4 + ledger.md）；编辑前 git status --porcelain 显示并发会话（ralph/10-round-arch-deepening）未提交改动（6 modified + 3 untracked），与本轮文件无交集，未触碰；备份 /tmp/bak_0503/（252，4 文件原文件完整备份）。本地写脚本 + stdin 喂远程 python3（断言计数==1），主脚本一次成功；修复空导入块追加一次。

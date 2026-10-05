@@ -76,12 +76,9 @@ def web_to_contracts_report(
         elif hop_value.ok is False:
             severity = "error"
             message = f"{hop_name}: {hop_value.detail or 'failed'}"
-        elif hop_value.ok is True:
+        else:  # ok 恒为 True: bool | None 三态已被上两分支穷尽
             severity = "info"
             message = f"{hop_name}: {hop_value.detail or 'ok'}"
-        else:  # pragma: no cover (defensive)
-            severity = "info"
-            message = f"{hop_name}: unknown state"
 
         remediation = (
             hop_value.detail

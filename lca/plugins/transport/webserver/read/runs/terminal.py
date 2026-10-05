@@ -58,9 +58,6 @@ from lca.plugins.transport.webserver.read.runs.live import (
 from lca.plugins.transport.webserver.read.runs.live import (
     stream_process_journal_live as _stream_process_journal_live,
 )
-from lca.plugins.transport.webserver.read.runs.live import (
-    stream_run_fold as _stream_run_fold,
-)
 
 _log = structlog.get_logger(__name__)
 
@@ -340,14 +337,6 @@ class RegistryRunQueries:
             return
         async for item in _iter_stamped_events(session, after_seq=after_seq):
             yield item
-
-    async def stream_run_fold(self, run_id: str, after: int = 0) -> AsyncIterator[bytes]:
-        """Stream a run live as four UI SSE events (reasoning|text|tool|done)."""
-        session = self._registry.get(run_id)
-        if session is None:
-            return
-        async for line in _stream_run_fold(session, after=after):
-            yield line
 
     async def doctor(self, run_id: str) -> DoctorReport | None:
         session = self._registry.get(run_id)

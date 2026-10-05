@@ -186,17 +186,6 @@ async def iter_stamped_events(
             return
 
 
-async def stream_run_fold(
-    session: RunSession,
-    *,
-    after: int = 0,
-) -> AsyncIterator[bytes]:
-    """Retired — P1 uses LcaAgentGateway WebSocket instead of Journal SSE."""
-    del session, after
-    if False:  # pragma: no cover
-        yield b""
-
-
 def stream_process_journal_live(tail: Any, *, last_seq: int = 0) -> AsyncIterator[bytes]:
     """Provide the process-level Journal stream for operations endpoints."""
     return iter_live_sse(
@@ -213,5 +202,4 @@ __all__ = [
     "journal_outcome_from_session",
     "stream_chat_completion",
     "stream_process_journal_live",
-    "stream_run_fold",
 ]

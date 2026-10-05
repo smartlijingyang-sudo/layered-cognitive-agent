@@ -21,7 +21,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from lca.application.runtime.coordinator.session_gateway_pump import (
+from lca.application.runtime.coordinator import (
     schedule_gateway_session_pump,
 )
 

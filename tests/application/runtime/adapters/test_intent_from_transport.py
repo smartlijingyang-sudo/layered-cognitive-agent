@@ -1,7 +1,7 @@
 """Behavioral tests for the HTTP ``RunRequest`` → ``RunIntent`` adapter.
 
 The adapter under test
-(``lca.application.runtime.adapters.intent_from_transport``) only reads
+(``lca.application.runtime.adapters``) only reads
 fields off its argument via attribute access, so tests use a tiny stub
 dataclass with the same shape as the real ``RunRequest`` instead of
 importing the live class (which pulls in the full transport wiring).
@@ -20,7 +20,7 @@ from typing import Any
 
 import pytest
 
-from lca.application.runtime.adapters.intent_from_transport import (
+from lca.application.runtime.adapters import (
     run_request_to_intent,
 )
 from lca.contracts.models.core.conversation.conversation import ConversationTurn

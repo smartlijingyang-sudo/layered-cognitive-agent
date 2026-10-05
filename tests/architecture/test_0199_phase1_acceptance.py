@@ -60,11 +60,9 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from lca.application.runtime.adapters.intent_from_cli import (
+from lca.application.runtime.adapters import (
     CliRunArgs,
     cli_args_to_intent,
-)
-from lca.application.runtime.adapters.intent_from_transport import (
     run_request_to_intent,
 )
 from lca.application.runtime.default_facade import DefaultRuntimeFacade
@@ -441,7 +439,7 @@ class TestCrossSurfacePlanRefParity:
         """
         service = MagicMock(spec=PlanResolutionService)
 
-        def _resolve(profile_path, *, session_id):  # type: ignore[no-untyped-def]
+        def _resolve(profile_path, *, session_id, **extra):  # type: ignore[no-untyped-def]
             return PlanResolutionResult(
                 plan_ref=f"plan::{profile_path}",
                 graph_ref=f"graph::{profile_path}",
@@ -585,8 +583,8 @@ class TestHPCL2Compliance:
                 continue
             rel = path.relative_to(REPO)
             # Adapters + facade + contracts are the authorized sites.
-            if rel.parts[:3] == ("lca", "application", "runtime") and (
-                "adapters" in rel.parts or "default_facade" in rel.parts
+            if rel.parts[:3] == ("lca", "application", "runtime") and any(
+                part.startswith("adapters") or part.startswith("default_facade") for part in rel.parts
             ):
                 continue
             # tests/ subfolder may mirror pattern; skip.

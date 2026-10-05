@@ -32,16 +32,7 @@ from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import
     OwnershipDeclaration,
 )
 from lca.harness.plugin_api import EffectClass, PluginContext, PluginKind, plugin
-from lca.infrastructure.tools.assistant.create_skill_tool import (
-    assistant_create_skill_tool_from_run,
-)
-from lca.infrastructure.tools.assistant.create_tool import AssistantCreateTool
-from lca.infrastructure.tools.assistant.memory_tools import assistant_memory_tools_from_run
-from lca.infrastructure.tools.assistant.role_card_resolver import FileRoleCardResolver
-from lca.infrastructure.tools.assistant.role_card_tool import RoleCardListTool
-from lca.infrastructure.tools.assistant.self_manage_tools import (
-    assistant_self_manage_tools_from_run,
-)
+from lca.infrastructure.tools.assistant import FileRoleCardResolver, build_assistant_tools
 
 
 def _default_tool_names_provider(
@@ -135,40 +126,17 @@ async def setup(ctx: PluginContext, config: Any) -> None:
         return tools_service.names()
 
     def _assistant_tools_factory(bindings: object) -> list[Any] | None:
-        tools: list[Any] = [
-            AssistantCreateTool(
-                catalog=catalog,
-                bridge=bridge,
-                default_tool_names=_default_tool_names_provider(tools_service, bindings),
-            )
-        ]
-        tools.append(RoleCardListTool(resolver=role_resolver))
-        # ``assistant_id`` comes from the run bindings when the caller has
-        # them, else from the ambient ``current_assistant_id()``;
-        # ``assistant_create_skill_tool_from_run`` owns that precedence, so the
-        # bindings value is forwarded unchanged instead of re-wrapped here.
-        create_skill = assistant_create_skill_tool_from_run(bindings, overlay=overlay)
-        if create_skill is not None:
-            tools.append(create_skill)
-        # 自我管理工具族（ADR-0242 D6 + ADR-0243 D6）：只在 run 绑定 assistant_id 时出现。
-        tools.extend(
-            assistant_self_manage_tools_from_run(
-                bindings,
-                catalog=catalog,
-                overlay=overlay,
-                tool_overlay=tool_overlay,
-                catalog_names=_catalog_names,
-            )
+        return build_assistant_tools(
+            bindings,
+            catalog=catalog,
+            bridge=bridge,
+            overlay=overlay,
+            tool_overlay=tool_overlay,
+            role_resolver=role_resolver,
+            default_tool_names=_default_tool_names_provider(tools_service, bindings),
+            catalog_names=_catalog_names,
+            profile_backfill=_profile_backfill,
         )
-        # 受治理记忆工具族（ADR-0246 PR-6）：search/add/update/remove 结构化记忆。
-        tools.extend(
-            assistant_memory_tools_from_run(
-                bindings,
-                catalog=catalog,
-                profile_backfill=_profile_backfill,
-            )
-        )
-        return tools
 
     ctx.require("tools").register_factory("assistant", _assistant_tools_factory)
 
