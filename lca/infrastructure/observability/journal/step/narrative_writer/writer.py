@@ -203,12 +203,12 @@ class StepNarrativeWriter:
         """
         if self._path == Path() or self._path.parent == Path("."):
             return None
-        try:
-            from lca.infrastructure.observability.replay.fold_source import (
-                fold_model_visible,
-            )
-        except ImportError:
-            return None
+        # fold_source 是 in-repo 模块(仅 stdlib + lca/lca_kernel,无可选第三方
+        # 依赖);本模块已从同一 infrastructure 树做模块级 import —— 此处
+        # ImportError 不可达,不吞异常,让真实导入失败直接暴露。
+        from lca.infrastructure.observability.replay.fold_source import (
+            fold_model_visible,
+        )
         return fold_model_visible(
             run_dir=self._path.parent,
             run_id=run_id,

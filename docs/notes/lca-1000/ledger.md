@@ -555,3 +555,20 @@
 - 验证结果: ruff check 1 文件首次即过（All checks passed!）；targeted pytest `tests/infrastructure/tools/dynamic/test_dynamic_tool_bridge.py`：5 passed（覆盖 register/unregister 主路径行为，删除死分支后行为等价）；python 断言：`COMPAT`/`safe_executor_compat` 字符串在文件内归零、`add_permitted`/`revoke_permitted` 调用各保留 1 处。
 - commit: 见 git log --grep='第0497轮'（refactor(lca-1000): 第0497轮 删除 bridge.py 两处死 COMPAT elif 分支（旧 ToolPermissionManifest 实例防御）；未 push）。
 - 备注: 只 add 本轮 2 个文件（代码 1 + ledger.md）；编辑前 git status --porcelain 干净（无并发会话未提交改动）；备份 /tmp/bak_0497/bridge.py（252，原文件完整备份）。base64+stdin 喂远程 python 编辑路径稳定（先本地断言 old 文本计数再替换，一次成功）。
+
+## 第0498轮 (2026-10-05 08:33-08:55 CST)
+- 改了什么: 删除 `StepNarrativeWriter._default_fold_provider` 内对 in-repo 模块 `fold_source` 的无依据 `except ImportError` 防御 guard（1 file，6 insertions(+)/6 deletions(-)，净删 3 行可执行防御代码 + 3 行中文 rationale 注释）：
+  - `lca/infrastructure/observability/journal/step/narrative_writer/writer.py:203-214`：`try: from ...fold_source import fold_model_visible / except ImportError: return None` → 裸 local import（保持延迟导入位置不动）+ 3 行注释说明不可达依据。
+- 依据 skill 哪一节: deslop 清单 无依据的防御性 guard（guard 声称的失败模式在该模块的依赖结构下不可达）+ LANGUAGE.md Interface（error mode 是 interface 的一部分：原接口隐含"fold_source 不可导入时静默返回 None"的幻影 error mode，删除后 None 的语义收敛为唯一真实条件——无 run_dir / 无 fold 数据；调用方与测试不再被误导）+ SKILL.md Deletion test（删掉 guard 后复杂度直接消失：无调用方需要复刻该分支，N/A 降级的真实路径——空路径早退 + fold_model_visible 自身 fail-soft——原样保留）。
+- 为什么这是实质改动(非凑数): 删除的是可执行的防御代码分支（非注释措辞/空行调整），且有行为后果：真实导入失败从此直接暴露而非被吞成静默 N/A。无依据的证据链：(1) `fold_source.py` 导入链仅 stdlib + `lca.contracts.*` + `lca_kernel.*`，无可选第三方依赖；(2) writer.py 模块级已从同一 infrastructure 树 import（`lca.infrastructure.atomic.write`、`...spine.sinks.naming`），树不可导入时本模块自身先加载失败；(3) `replay/__init__.py` 与 `doctor/steps/hops.py` 均对 `fold_source` 做模块级 import，全库按"恒可导入"对待；(4) tests/ 内无任何用例依赖该 ImportError 路径（grep 确认）。
+- 关键设计决策（夜间跳过 grilling，记台账）: 只删 `try/except`，local import 保持原位不提升到模块级（`fold_source.py:46` 注释提示双模块 import 时序敏感，延迟导入的现有纪律不动）；不动早退 guard（`StepNarrativeWriter("")` → None 是文档化行为，`__init__` docstring 有载）；不碰 `fold_model_visible` 自身的 fail-soft（缺 spine 时返回 None 的真实降级保留）。
+- 候选清单（本轮 explore，逐一验证后取舍）：
+  1. 上述 writer.py ImportError guard 删除 —— 选中（deslop 无依据 guard；单文件聚焦；deletion test 满分）。
+  2. 全库 COMPAT delete-when 条件逐条验证 —— 全部驳回：manifest EXECUTION_POINTS（3 importer ≠ 0）、spine.enrich（refs 仍在）、emit_pipeline enrich_spine_payload（4 hits ≠ import-only）、spine_anomaly（`self._anomaly.on_event` 仍有 1 hit）、session __init__（bundle 仍引用 `lca.plugins.session.runtime`）、RunStatus alias（tests/ 仍有非 alias 命中）、reasoner.py（条件 4 未达成）、evidence.py（pipeline_safe_executor 仍存在）、privilege_projection（迁移状态未落地）、`SHARED_LOADER_EXEMPT` 剩余项（delete-when: PR-6 未做）、codecs/handlers/evolve 的 2026-12-31（日期未到）、naming.py:15（沿用 496：纯注释删除属凑数）、resume.py:39（e2e 迁移状态夜间无法验证）。
+  3. journal.json / manifest.json 字面量收敛至命名 seam —— 驳回（跨多个命名空间：run dir journal vs skill catalog manifest；单一 seam 会是 hypothetical，需 grilling）。
+  4. `ports.py` re-export shim 删除 —— 驳回（docstring 明确声明为 canonical import surface，是有意的设计决策，需 grilling；且 declarative_1/graph 两套 import 惯例并存，收敛超一轮聚焦）。
+  5. cors.py 影子拼写扫描 —— 无动作（SSOT seam 健康，零影子拼写，deletion test 反向通过）。
+  6. `AgentState.history` 迁移 / `_DEFAULT_BOOT_PATH` / `tail.py:81` —— 驳回（沿用 497：规模超一轮或需 grilling）。
+- 验证结果: ruff check 1 文件首次即过（All checks passed!）；targeted pytest `tests/scenario/step/test_step_narrative_writer.py`：25 passed；行为等价 python 断言全绿（`StepNarrativeWriter("")` 早退仍返回 None；方法体内 `except ImportError` 字符串归零、`fold_model_visible(` 调用保留；local import 解析到 canonical 对象）。
+- commit: 见 git log --grep='第0498轮'（refactor(lca-1000): 第0498轮 删除 narrative writer 无依据的 ImportError 防御 guard（fold_source 为 in-repo 模块）；未 push）。
+- 备注: 只 add 本轮 2 个文件（代码 1 + ledger.md）；编辑前 git status --porcelain 干净（并发会话在本轮 explore 期间提交了 2 个 docs commit：0268 ADR + semantic-memory 笔记，98→100 commits；其改动均为 docs/，与本轮代码文件无交集）；备份 /tmp/bak_0498/writer.py（252，原文件完整备份）。本地 heredoc 嵌套引号翻车一次（文件未动），改用本地写脚本 + stdin 喂远程 python3，编辑与验证均一次成功。
