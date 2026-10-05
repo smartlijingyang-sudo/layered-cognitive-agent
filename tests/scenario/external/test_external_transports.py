@@ -2,12 +2,8 @@
 
 from __future__ import annotations
 
-import os
-import sys
 import unittest
 from unittest.mock import AsyncMock, MagicMock, patch
-
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from lca.contracts.protocols import AgentTransport
 from lca.infrastructure.transport.a2a_transport import A2ATransport
@@ -49,12 +45,12 @@ class TestA2ATransportEndpointResolution(unittest.TestCase):
 
     def test_default_endpoint_fallback(self) -> None:
         transport = A2ATransport(default_endpoint="http://default:8080")
-        card = MagicMock(spec=[])
+        card = MagicMock(url=None, endpoint=None)
         self.assertEqual(transport._resolve_endpoint(card), "http://default:8080")
 
     def test_no_endpoint_raises(self) -> None:
         transport = A2ATransport()
-        card = MagicMock(spec=[])
+        card = MagicMock(url=None, endpoint=None)
         with self.assertRaises(ValueError):
             transport._resolve_endpoint(card)
 
