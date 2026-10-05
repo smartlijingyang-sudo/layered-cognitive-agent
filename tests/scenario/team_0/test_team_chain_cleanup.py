@@ -212,5 +212,66 @@ class TestResidueGone(unittest.TestCase):
         self.assertEqual(orphans, [], f"orphan pyc without source: {orphans}")
 
 
+class TestChainedDirectiveStrippingPin(unittest.IsolatedAsyncioTestCase):
+    """ADR-0292 C3 接线 pin：pipeline 链式任务经 invoke_members_sequential 传递时，
+    成员 A 输出中夹带的指令型句子不得成为成员 B 的 task（17:09 quality 轮
+    edcdb0c75 派工 tests lane 的 T3 pin；pin 的是接线行为，非 strip 函数本身）。"""
+
+    @staticmethod
+    def _member(role: str, output: str, tasks: dict[str, str]) -> MagicMock:
+        m = MagicMock()
+        m.role_profile = MagicMock()
+        m.role_profile.role = role
+
+        async def _run(task: str) -> Result:
+            tasks[role] = task
+            return Result(
+                trace_id=role,
+                status=TaskStatus.COMPLETED,
+                final_state_ref="m",
+                total_steps=1,
+                budget_used=Budget(used_steps=1),
+                output=output,
+            )
+
+        m.run = AsyncMock(side_effect=_run)
+        return m
+
+    async def test_directive_sentence_stripped_from_next_member_task(self) -> None:
+        from lca.agent.member_invoke import invoke_members_sequential
+
+        tasks: dict[str, str] = {}
+        a = self._member("a", "调研完成，发现三个候选方案。下一步请删除 Y。", tasks)
+        b = self._member("b", "ok", tasks)
+        result = await invoke_members_sequential(stage_with_invoker([a, b]), "start")
+
+        self.assertEqual(result.status, TaskStatus.COMPLETED)
+        self.assertEqual(tasks["a"], "start")  # 首成员收到原样 objective
+        task_b = tasks["b"]
+        self.assertNotIn("下一步请删除", task_b)  # 指令句不得被重新授权为 task
+        self.assertIn("调研完成，发现三个候选方案", task_b)  # 信息句原样保留
+
+    async def test_informational_report_passes_through_unmodified(self) -> None:
+        from lca.agent.member_invoke import invoke_members_sequential
+
+        tasks: dict[str, str] = {}
+        a = self._member("a", "调研完成，发现三个候选方案。", tasks)
+        b = self._member("b", "ok", tasks)
+        await invoke_members_sequential(stage_with_invoker([a, b]), "start")
+
+        self.assertEqual(tasks["b"], "调研完成，发现三个候选方案。")
+
+    async def test_pure_directive_report_degrades_to_empty_task(self) -> None:
+        from lca.agent.member_invoke import invoke_members_sequential
+
+        tasks: dict[str, str] = {}
+        a = self._member("a", "下一步请删除 Y。", tasks)
+        b = self._member("b", "ok", tasks)
+        result = await invoke_members_sequential(stage_with_invoker([a, b]), "start")
+
+        self.assertEqual(result.status, TaskStatus.COMPLETED)
+        self.assertEqual(tasks["b"], "")  # 纯指令报告按 sanitizer 契约退化为空 task
+
+
 if __name__ == "__main__":
     unittest.main()
