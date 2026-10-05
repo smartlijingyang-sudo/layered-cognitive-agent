@@ -23,13 +23,13 @@ from lca.contracts.models.core.policy.budget import DEFAULT_TOOL_TIMEOUT_S
 from lca.contracts.protocols import Tool
 from lca.infrastructure.memory.assistant_memory import AssistantMemory
 from lca.infrastructure.memory.contextfiles.adapters.disk import DiskFileStore
-from lca.infrastructure.memory.contextfiles.domain.edit import StaleSnapshotOperationError
 from lca.infrastructure.memory.contextfiles.domain.layout import layout_for_home
 from lca.infrastructure.memory.contextfiles.domain.privacy import is_private_personal
 from lca.infrastructure.memory.contextfiles.service.groups import GroupsDirectory
 from lca.infrastructure.memory.contextfiles.service.indexing import search_memory_index
 from lca.infrastructure.memory.contextfiles.service.people import PeopleDirectory
 from lca.infrastructure.memory.contextfiles.service.sidechat import SideChatDirectory
+from lca.infrastructure.memory.contextfiles.sync import StaleSnapshotOperationError
 
 _MEMORY_SEARCH_TOOL = "memory_search"
 _MEMORY_ADD_TOOL = "memory_add"
@@ -54,6 +54,25 @@ class _BaseMemoryTool(Tool):
 
     def __init__(self, *, memory: AssistantMemory) -> None:
         self._memory = memory
+
+    @property
+    def _file_store(self) -> DiskFileStore:
+        return DiskFileStore(self._memory.home_path)
+
+    @property
+    def _sidechat_dir(self) -> SideChatDirectory:
+        layout = layout_for_home(self._memory.home_path)
+        return SideChatDirectory(self._file_store, layout=layout)
+
+    @property
+    def _people_dir(self) -> PeopleDirectory:
+        layout = layout_for_home(self._memory.home_path)
+        return PeopleDirectory(self._file_store, layout=layout)
+
+    @property
+    def _groups_dir(self) -> GroupsDirectory:
+        layout = layout_for_home(self._memory.home_path)
+        return GroupsDirectory(self._file_store, layout=layout)
 
     def _ok(self, start: float, payload: dict[str, Any] | None, text: str = "") -> Observation:
         return Observation(
@@ -213,10 +232,8 @@ class MemorySearchTool(_BaseMemoryTool):
         ]
 
     def _search_branch(self, query: str, branch: str, *, limit: int) -> list[dict[str, Any]]:
-        layout = layout_for_home(self._memory.home_path)
-        directory = SideChatDirectory(DiskFileStore(self._memory.home_path), layout=layout)
         try:
-            hits = directory.search(query, branch, limit=limit)
+            hits = self._sidechat_dir.search(query, branch, limit=limit)
         except ValueError:
             return []
         return [
@@ -319,9 +336,8 @@ class MemoryAddTool(_BaseMemoryTool):
         """Write a branch-specific fact to the side chat's MEMORY.md."""
 
         layout = layout_for_home(self._memory.home_path)
-        directory = SideChatDirectory(DiskFileStore(self._memory.home_path), layout=layout)
         try:
-            record = directory.write(branch, content, source="user", trigger="side chat")
+            record = self._sidechat_dir.write(branch, content, source="user", trigger="side chat")
         except ValueError as exc:
             return self._fail(start, str(exc))
         except OSError as exc:
@@ -481,10 +497,7 @@ class PersonNoteTool(_BaseMemoryTool):
             return self._fail(start, "name 和 note 都必须为非空字符串")
         layout = layout_for_home(self._memory.home_path)
         try:
-            page = PeopleDirectory(
-                DiskFileStore(self._memory.home_path),
-                layout=layout,
-            ).upsert(name, note)
+            page = self._people_dir.upsert(name, note)
         except ValueError as exc:
             return self._fail(start, str(exc))
         except OSError as exc:
@@ -522,10 +535,7 @@ class GroupNoteTool(_BaseMemoryTool):
             return self._fail(start, "name 和 note 都必须为非空字符串")
         layout = layout_for_home(self._memory.home_path)
         try:
-            page = GroupsDirectory(
-                DiskFileStore(self._memory.home_path),
-                layout=layout,
-            ).upsert(name, note)
+            page = self._groups_dir.upsert(name, note)
         except ValueError as exc:
             return self._fail(start, str(exc))
         except OSError as exc:

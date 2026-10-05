@@ -10,7 +10,7 @@ from pathlib import Path
 from lca.contracts.atoms.enums.enums import MemoryCategory, MemoryLayer
 from lca.contracts.models.core.conversation.memory import MemoryRecord
 from lca.infrastructure.memory.assistant_memory import AssistantMemory
-from lca.infrastructure.memory.contextfiles.service.memory_edit_sync import (
+from lca.infrastructure.memory.contextfiles.sync import (
     MemoryEditSyncService,
 )
 

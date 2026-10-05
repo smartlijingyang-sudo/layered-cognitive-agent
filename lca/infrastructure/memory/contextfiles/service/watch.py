@@ -10,14 +10,14 @@ from __future__ import annotations
 import logging
 from collections.abc import Sequence
 
-from lca.infrastructure.memory.contextfiles.domain.diff import (
-    render_standing_diff,
-    unified_diff,
-)
 from lca.infrastructure.memory.contextfiles.domain.layout import packaged_layout
 from lca.infrastructure.memory.contextfiles.events.publisher import StandingChanged
 from lca.infrastructure.memory.contextfiles.ports.events import DomainEventPublisher
 from lca.infrastructure.memory.contextfiles.ports.file_store import FileStore
+from lca.infrastructure.memory.contextfiles.sync import (
+    render_standing_diff,
+    unified_diff,
+)
 
 logger = logging.getLogger(__name__)
 

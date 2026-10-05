@@ -41,7 +41,6 @@ from lca.infrastructure.memory.contextfiles.domain.curated import (
     may_acknowledge_projection,
     plan_curated_memory_projection,
 )
-from lca.infrastructure.memory.contextfiles.domain.edit import StaleSnapshotOperationError
 from lca.infrastructure.memory.contextfiles.domain.explain import (
     ClaimExplanation,
     ExplainableRecord,
@@ -53,6 +52,7 @@ from lca.infrastructure.memory.contextfiles.events.publisher import (
     ProjectionWritten,
 )
 from lca.infrastructure.memory.contextfiles.ports.events import DomainEventPublisher
+from lca.infrastructure.memory.contextfiles.sync import StaleSnapshotOperationError
 from lca.infrastructure.memory.fingerprint import content_fingerprint
 from lca.infrastructure.memory.retrieval.scoring import (
     apply_token_budget,

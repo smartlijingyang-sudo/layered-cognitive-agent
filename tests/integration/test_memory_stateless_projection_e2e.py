@@ -20,7 +20,7 @@ from lca.contracts.atoms.ids.ids import new_id
 from lca.contracts.models.core.conversation.memory import MemoryRecord
 from lca.infrastructure.memory.assistant_memory import AssistantMemory
 from lca.infrastructure.memory.contextfiles.service.assembly import refresh_standing_backstory
-from lca.infrastructure.memory.contextfiles.service.memory_edit_sync import MemoryEditSyncService
+from lca.infrastructure.memory.contextfiles.sync import MemoryEditSyncService
 from lca.plugins.assistant.persona.persona import persona_from_home
 
 
