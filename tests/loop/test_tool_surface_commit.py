@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from lca.contracts.atoms.ids.ids import new_id
 from lca.contracts.models.core.execution.decision import Observation
+from lca.contracts.models.core.execution.external_content import fence_external_content
 from lca.infrastructure.session.context.model_context_assembler import DefaultModelContextAssembler
 from lca.loop.commit.tool_journal import commit_body_tool_execute_end
 from lca.plugins.session.projection_registry.projection_registry import ProjectionRegistry
@@ -35,4 +36,6 @@ def test_commit_body_tool_execute_end_appends_tool_role_message() -> None:
     assert len(tool_msgs) == 1
     assert tool_msgs[0]["tool_call_id"] == "toolu_abc"
     # Production convention (observation_content): dict payloads JSON-encode.
-    assert tool_msgs[0]["content"] == '{"stdout": "page one"}'
+    # ADR-0292 C1: external observations are fenced in the tool message
+    # (one source, two renderings — the envelope's content_origin mark).
+    assert tool_msgs[0]["content"] == fence_external_content('{"stdout": "page one"}')
