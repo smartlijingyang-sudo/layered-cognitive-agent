@@ -11,6 +11,8 @@ from __future__ import annotations
 import time
 from typing import Any
 
+from lca.cognition.convergence.payload import _file_names
+
 _PERF_COUNTER_SCALE = 1000
 
 
@@ -25,36 +27,11 @@ def _elapsed_ms(started: float) -> int:
 # folded into safe_executor (single owner of the contract).
 _STDOUT_KEYS = ("output", "stdout", "content", "text")
 
-# Body-layer SSOT for harvested-file keys and entry shape, kept in sync with
-# the convergence layer's ``_FILE_KEYS`` / ``_file_names`` for the same reason
-# and under the same delete-when as ``_STDOUT_KEYS`` above.
+# Body-layer SSOT for harvested-file keys, kept in sync with the convergence
+# layer's ``_FILE_KEYS`` for the same reason and under the same delete-when
+# as ``_STDOUT_KEYS`` above. Entry normalization (``_file_names``) is canonical
+# in ``lca/cognition/convergence/payload.py`` (imported above) — no local copy.
 _FILE_KEYS = ("files_created", "files")
-
-
-def _file_names(value: Any) -> tuple[str, ...]:
-    """Normalize harvested file entries to names.
-
-    The sandbox harvest carries A2A file metadata dicts (``name`` / ``url`` /
-    ``mimeType``; see ``infrastructure/tools/sandbox/observation.py``), while
-    writeFile-shaped producers carry plain name strings. Stringifying a dict
-    entry would surface its repr as a filename.
-
-    Listing-shaped tools (``listFiles`` / ``searchFiles``) also carry a
-    ``files`` key whose entries have ``isDirectory``. Those are directory
-    listings, not files created by this call, so entries with an
-    ``isDirectory`` key are skipped (see tests/cognition/body/
-    test_listfiles_not_files_created.py).
-    """
-    if not isinstance(value, (list, tuple)):
-        return ()
-    names: list[str] = []
-    for item in value:
-        if isinstance(item, dict) and "isDirectory" in item:
-            continue
-        name = str(item.get("name") or "") if isinstance(item, dict) else str(item or "")
-        if name:
-            names.append(name)
-    return tuple(names)
 
 
 def _extract_stdout_head(observation: Any, *, limit: int = 2000) -> str:

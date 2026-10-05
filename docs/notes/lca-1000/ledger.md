@@ -825,5 +825,25 @@
   11. validate ×2（avatar/tools.py:129/206）—— 驳回（本轮）：已被 06:03 窗口的第 511 轮收敛（commit 6f932f1fd），本轮启动时曾误判为并发修改，实为 511 轮未提交的工作区残留，现已提交，工作区干净。
   12. idempotency/store.py 的 BEGIN IMMEDIATE 内联惯用法 —— 留作后续候选（async + with closing(...) 形状不同，收敛需确认语义等价，超一轮范围）。
 - 验证结果: ~/.local/bin/ruff check 3 文件 All checks passed；ruff format --check already formatted；git grep 确认两旧文件 BEGIN IMMEDIATE 残余 0（新模块独有）；import 冒烟 + 行为验证（commit/rollback 双路径：两类各插 1 行提交可见、异常回滚不可见）SMOKE OK；targeted pytest 3 文件（tests/harness/test_continuous_control_plane.py、tests/architecture/test_learning_review_ticket_store.py、test_learning_review_lifecycle.py）：16 passed；import-linter lint exit 0（全契约通过，新增 harness→infrastructure 边合规）。
-- commit: PLACEHOLDER_HASH refactor(lca-1000): 第0512轮 收敛 _transaction 事务纪律到 infrastructure/sqlite（未 push）。
+- commit: 7f518a5d3 refactor(lca-1000): 第0512轮 收敛 _transaction 事务纪律到 infrastructure/sqlite（未 push）。
 - 备注: 只 add/commit 本轮 4 个文件（新模块 1 + 代码 2 + ledger.md），git add + git commit -- <paths> 显式路径；并发会话已 staged 的 2 个测试文件改动及 untracked（docs/notes/audit-2026-10-05.md、ralph/）全程未触碰。备份 /tmp/bak_0511/（252，改动前 queue.py/review_ticket_sqlite_database.py；目录名沿用轮次扫描编号，实际为 512 轮备份）。scan0511.py/patch0511_tx.py/smoke0511_tx.sh 留 /tmp（252，非仓库文件）。教训：经 ssh 双引号 heredoc 写台账时，条目内反引号会被本地 bash 执行替换——以后写文件内容一律走 stdin 通道，不走命令行内嵌 heredoc。
+
+
+## 第0513轮 (2026-10-06 07:03-07:25 CST)
+- 改了什么: 收敛两处逐字相同的 `_file_names` harvested-file 归一化实现（改动 1 文件：+7/-30）：删除 `lca/cognition/body/executor/safe_executor/evidence.py:34` 的 24 行本地副本（含逐字相同的 docstring），改为 `from lca.cognition.convergence.payload import _file_names` 导入 convergence 层的 canonical 实现；同步更新 evidence.py 内已过时的 "kept in sync with ... `_file_names`" 注释，指向 canonical 位置。`convergence/payload.py` 零改动（canonical 本就以它为参照——evidence.py 注释原文即视 convergence 层为 reference）。
+- 依据 skill 哪一节: SKILL.md Deletion test（删掉 evidence.py 的副本后复杂度直接消失：另一副本即共享 canonical；docstring 逐字相同证明是同一知识而非巧合）+ DEEPENING.md 依赖分类 In-process（纯函数、无 I/O，Always deepenable）与 Seam discipline（`_file_names` 保持下划线私有、不进 `__all__`，internal seam 不外泄；cognition 层内 import，import-linter 分层契约 1 允许）+ LANGUAGE.md Locality/Leverage（`isDirectory` 跳过这种"看起来会错"的细节正是 drift 最高危点；evidence.py 注释自己承认了 sync 负担）。
+- 为什么这是实质改动(非凑数): 收敛的是真实的非平凡语义重复（24 行：A2A metadata dict / 纯字符串 / 目录 listing 三种 producer 形状的归一化 + isDirectory 跳过；两处 docstring 逐字相同）。证据链：(1) AST dump 去 docstring 后逐字相同（本轮 scan0513b.py 断言）；(2) 全库同体 `_file_names` 仅此两处（AST 扫描 27 组中唯一跨子系统的实质组）；(3) 代码自证 drift 风险：evidence.py:29-31 注释明写 "kept in sync with the convergence layer's `_FILE_KEYS` / `_file_names`" + delete-when；(4) 参数注解差异（`Any` vs `object | None`）仅为注解风格，行为等价经 15 用例冒烟验证；(5) `safe_executor/__init__.py` 与 `executor.py` 从 evidence 导入的 6 个名字不含 `_file_names`，无下游断裂。
+- 关键设计决策（夜间跳过 grilling，记台账）: canonical 留在 `convergence/payload.py` 而非新建 `_shared.py`——evidence.py 的注释原文即把 convergence 层视为 reference，且 payload.py 整个模块就是 observation payload reader（`payload_files_created`/`observation_files_created`/`merge_files_created` 皆其公共面），归一化知识天然属于它。跨子包导入私有名：沿用 509 模式（`_snapshot_from_state` 同为跨模块私有导入），区别于 508 驳回的"私有校验惯例"（那两处语义未确证同；此处 docstring+body 逐字相同且代码自证 sync 关系）。`_STDOUT_KEYS`/`_FILE_KEYS` 常量仍两处重复（各 1 行），属 trivial 边界，留作后续候选，不在本轮凑数。
+- 候选清单（本轮 explore：AST 同体扫描 27 组，逐一取舍）:
+  1. `_file_names` ×2（evidence.py vs convergence/payload.py，24 行同体，docstring 逐字相同）—— 选中。
+  2. `commit_act_journal_receipt` vs `commit_memory_journal_receipt`（lca/loop/commit/，14 行同体）—— 驳回（本轮新判）：两处各绑定自己模块的 `_catalog_from_journal`（事件类型映射不同），真正共享的只是 `append_catalog_bound(...)` 尾巴 5 行；抽 helper 即 1 行体 indirection，deletion test 未过。
+  3. `parse_auth_config_ids` vs `_parse_auth_config_ids`（composio/env/settings.py vs settings/settings.py，8 行同体）—— 驳回（本轮新判）：一公一私、8 行近凑数边界；env 版调用方未确证，收敛方向需 grilling。留作后续候选。
+  4. `setup` ×2（genai/llm_provider.py vs tool_provider.py，9 行同体）—— 驳回（本轮新判）：plugin 框架的 interface 本身（每个 plugin 文件需自有 `setup` 入口供 bundles/base.yaml 解析），deletion test 未过。
+  5. companion client.py vs standalone.py 14 组 —— 驳回：沿用 508/509/512（sync/async 桥接刻意镜像，deletion test 未过）。
+  6. `_fail` ×8 / `_emit` ×5 / `_ok` ×4 —— 驳回：沿用 508/509/512（跨包命名家族，需 grilling）。
+  7. `_get_role_library` / `_format_duration` / `_catalog_digest` —— 驳回：沿用 507/508/509/512（需 grilling / 跨子系统语义未确证）。
+  8. `parameters` ×2 / `target` ×2 / `__init__` ×2（phase_observation vs runtime_event_publisher）—— 驳回：沿用 510/512（interface 契约本身 / fake 刻意镜像 / 构造器对称）。
+  9. contracts/ 下 Protocol `...` stub 大组 —— 非实质（trivial stub），扫描已排除。
+- 验证结果: `~/.local/bin/ruff check` 2 文件 All checks passed；`ruff format --check` already formatted；import identity 冒烟（`evidence._file_names is convergence.payload._file_names`）OK；新旧行为等价冒烟 15 用例（None/非 list/空/A2A dict/纯字符串/isDirectory 跳过/空名过滤等）全等；targeted pytest 4 文件（tests/cognition/body/test_listfiles_not_files_created.py、tests/cognition/test_delivery_synth.py、tests/infrastructure/test_turn_control_files_created.py、tests/infrastructure/test_turn_control_reader.py）：14 passed；`lint-imports` exit 0（全契约通过，新增 cognition 层内边合规）。
+- commit: <待回填> refactor(lca-1000): 第0513轮 收敛 _file_names 重复实现到 convergence/payload（未 push）。
+- 备注: 只 add/commit 本轮 2 文件（代码 1 + ledger.md），`git commit -- <paths>` 显式路径；并发会话已 staged 的 2 个测试文件改动及 untracked（docs/notes/audit-2026-10-05.md、ralph/）全程未触碰；512 轮 hash 回填行（7f518a5d3）属本 campaign 自有 bookkeeping，随本次一并提交（沿用 505/510/511 做法）。备份 /tmp/bak_0513/（252，改动前 evidence.py/payload.py）。scan0513.py/scan0513b.py/patch0513.py/smoke0513.py 留 /tmp（252，非仓库文件）。
