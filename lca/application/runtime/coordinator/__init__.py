@@ -11,6 +11,10 @@ from lca.application.runtime.coordinator.runtime_coordinator import (
     MetadataWriter,
     ToolStateWriter,
 )
+from lca.application.runtime.coordinator.session_gateway_pump import (
+    schedule_gateway_session_pump,
+    session_event_to_stamped,
+)
 from lca.application.runtime.coordinator.terminal_hints import (
     TerminalHint,
     is_stream_terminal_status,
@@ -25,4 +29,6 @@ __all__ = (
     "ToolStateWriter",
     "is_stream_terminal_status",
     "resolve_live_terminal_hint",
+    "schedule_gateway_session_pump",
+    "session_event_to_stamped",
 )

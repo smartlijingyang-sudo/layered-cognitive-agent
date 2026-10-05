@@ -397,7 +397,7 @@ def _create_via_facade(
     # Lazy imports — facade lives in ``lca.application.runtime``; keep
     # them out of module import time so we don't pull application /
     # harness into ``lca.infrastructure`` modules that import this one.
-    from lca.application.runtime.adapters.intent_from_cli import (
+    from lca.application.runtime.adapters import (
         CliRunArgs,
         cli_args_to_intent,
     )

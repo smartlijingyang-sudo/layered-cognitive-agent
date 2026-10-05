@@ -1,7 +1,7 @@
 """Behavioral tests for the CLI ``CliRunArgs`` → ``RunIntent`` adapter.
 
 The adapter under test
-(``lca.application.runtime.adapters.intent_from_cli``) translates the
+(``lca.application.runtime.adapters``) translates the
 parser-produced ``CliRunArgs`` carrier into the wire-agnostic
 ``RunIntent``. CLI runs always start fresh — there is no carrier of
 conversation history at the CLI layer — so ``prior_turns`` is always
@@ -16,7 +16,7 @@ from typing import Any
 
 import pytest
 
-from lca.application.runtime.adapters.intent_from_cli import (
+from lca.application.runtime.adapters import (
     CliRunArgs,
     cli_args_to_intent,
 )
