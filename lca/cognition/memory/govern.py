@@ -15,8 +15,12 @@ from lca.contracts.models.memory.episode import (
     canonical_dedupe_key,
 )
 
-_ROLE = re.compile(r"我是(.+)")
-_NAME = re.compile(r"我叫(.+)|叫我(.+)")
+# 身份模板捕获的是单个名词短语，句子余下的子句是别的事实。贪婪捕获会把它们折进
+# 同一条记录并连同 explicit_user_authority 一起提升，违反本模块「至多一条事实」。
+# 顿号是名词短语内的列举（架构师、技术负责人），不作子句边界。
+_CLAUSE_END = ",，。;；!！?？\n"
+_ROLE = re.compile(rf"我是([^{_CLAUSE_END}]+)")
+_NAME = re.compile(rf"我叫([^{_CLAUSE_END}]+)|叫我([^{_CLAUSE_END}]+)")
 _QUOTES = "\"'「」"
 _VERBOSITY = ("简洁", "啰嗦", "详细")
 _TOKEN = re.compile(r"[A-Za-z0-9_]+")
