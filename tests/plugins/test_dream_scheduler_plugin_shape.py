@@ -272,8 +272,10 @@ async def test_setup_injects_the_production_seams(
             return None
 
     monkeypatch.setattr(plugin_module, "DreamScheduler", _Recorder)
-    home = _home_with_memory(isolated_lca_home / "assistants", "asst_1")
-    catalog = _StubCatalog([_summary(home)])
+    assistants = isolated_lca_home / "assistants"
+    home = _home_with_memory(assistants, "asst_1")
+    other = _home_with_memory(assistants, "asst_0")
+    catalog = _StubCatalog([_summary(home), _summary(other)])
     ctx = _StubCtx(catalog)
 
     await plugin_module.setup.setup(ctx, plugin_module.Config(tick_seconds=42))
@@ -298,7 +300,9 @@ async def test_setup_injects_the_production_seams(
         "the injected backfill writes through the catalog this plugin resolved"
     )
 
-    assert captured["homes"]() == [home]
+    assert captured["homes"]() == [home, other], (
+        "catalogued late-first by name, so neither a reversal nor a sort can pass"
+    )
 
 
 async def test_the_registered_dispose_stops_the_background_sweep(

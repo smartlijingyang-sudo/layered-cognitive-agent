@@ -360,7 +360,9 @@ async def test_a_release_that_returns_false_is_logged(
     assert any("dream lock release failed" in record.message for record in caplog.records)
 
 
-async def test_one_raising_home_does_not_stop_the_sweep(tmp_path: Path, clock: list[int]) -> None:
+async def test_one_raising_home_does_not_stop_the_sweep(
+    tmp_path: Path, clock: list[int], caplog: pytest.LogCaptureFixture
+) -> None:
     bad = tmp_path / "a"
     good = tmp_path / "b"
     calls: list[Path] = []
@@ -375,10 +377,15 @@ async def test_one_raising_home_does_not_stop_the_sweep(tmp_path: Path, clock: l
 
     scheduler = _scheduler(tmp_path, [bad, good], clock, calls, run_dream_fn=flaky)
 
-    reports = await scheduler.sweep_once()
+    with caplog.at_level(logging.WARNING):
+        reports = await scheduler.sweep_once()
 
     assert calls == [good], "a raising home yields None and the sweep still visits the next one"
     assert reports == (None, _report())
+    assert any(record.getMessage() == "dream pass raised: a" for record in caplog.records), (
+        "containment makes this log the only trace that a home failed, since Phase 0 has "
+        "no execution point for it"
+    )
     after = _home_lock(tmp_path / "locks", bad)
     assert after.acquire() is True, "a raising pass must not strand its lock"
     after.release()
@@ -460,6 +467,76 @@ async def test_home_discovery_runs_off_the_event_loop_thread(
         "discovery lists the catalog and stats every home, which on the live fleet "
         "costs 120ms warm and 4s cold; the loop it would block serves HTTP"
     )
+
+
+async def test_the_sweep_timestamp_is_sampled_once_before_discovery(
+    tmp_path: Path, clock: list[int]
+) -> None:
+    home = tmp_path / "a"
+    at_discovery: list[int] = []
+    consolidated_at: list[int] = []
+
+    def homes() -> list[Path]:
+        at_discovery.append(clock[0])
+        clock[0] += 3_900  # what a cold catalog listing of the live fleet costs
+        return [home]
+
+    def recording(
+        seen: Path, *, now_ms: int, backfill: _Backfill | None, render: _Render | None
+    ) -> DreamReport:
+        del seen, backfill, render
+        consolidated_at.append(now_ms)
+        return _report()
+
+    scheduler = DreamScheduler(
+        homes=homes,
+        lock_dir=tmp_path / "locks",
+        tick_seconds=300,
+        now_ms=lambda: clock[0],
+        run_dream_fn=recording,
+    )
+
+    await scheduler.sweep_once()
+
+    assert consolidated_at == at_discovery, (
+        "one clock read per sweep, taken before discovery, so every home in a tick "
+        "consolidates under one timestamp and the artifact's now_ms means the tick"
+    )
+
+
+async def test_a_failed_discovery_still_consumes_the_interval(
+    tmp_path: Path, clock: list[int]
+) -> None:
+    start = clock[0]
+    attempts: list[int] = []
+
+    def homes() -> list[Path]:
+        attempts.append(clock[0])
+        raise OSError("assistant catalog listing failed")
+
+    scheduler = DreamScheduler(
+        homes=homes,
+        lock_dir=tmp_path / "locks",
+        tick_seconds=300,
+        now_ms=lambda: clock[0],
+    )
+
+    with pytest.raises(OSError):
+        await scheduler.sweep_once()
+
+    clock[0] += 100_000  # still inside the 300s interval
+    assert await scheduler.sweep_once() == ()
+    assert attempts == [start], (
+        "discovery is the expensive call, 3.9s cold against the live fleet, so an attempt "
+        "that failed still owns the interval and a caller polling sweep_once cannot use it "
+        "to hammer the catalog"
+    )
+
+    clock[0] += 300_000  # past the interval, so the retry is due
+    with pytest.raises(OSError):
+        await scheduler.sweep_once()
+
+    assert attempts == [start, start + 400_000]
 
 
 async def test_run_forever_survives_a_raising_homes_callable(
