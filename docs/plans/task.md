@@ -596,3 +596,9 @@
 | MODAL-TASK-3-HERO-VIEWPORT | 顶部 Hero 结论卡前置与长思考/长代码视口防护 (INV-MODAL-02, INV-MODAL-03) | Completed | 结论卡前置（heroVerdictCard），叙述段 120 字渐隐 + 展开按钮，命令块行数统计栏 + maxHeight:240 视口锁定，热补丁已同步 |
 | MODAL-TASK-4-INSPECTION-ZONE | 按需深查区（模型指标/结构化JSON/原始终端IO/思考链） (INV-MODAL-01) | Completed | 落地 inspectionZone 折叠区含四张遥测卡（Card A 模型指标/Card B 结构化JSON/Card C 原始终端IO/Card D 完整思考链），严格零Mock条件渲染；14/14 测试全通，热补丁 APPLIED |
 | MODAL-TASK-5-VERIFY-REGRESSION | 全链路回归测试、补丁一致性核验与门禁体检 (INV-MODAL-05) | Completed | 14/14 测试全通；Playwright 真实浏览器实测（asst_f0e833e176be 真实 run_721c7ae6fc0c）全屏弹窗无 React 报错；三屏完整截图已留存（verified_top_view.png, verified_card_a_and_b.png, verified_cards_view.png）；四张卡片真实渲染且零 Mock 呈现真实 qwen3.7-plus、701/112 tokens 与 3301ms 耗时；ruff / git diff --check 全通 |
+| ARCH-IMPROVE-CONTEXT | 深度梳理 4 大架构重构候选上下文与约束 | Completed | 已深度梳理 4 大候选（Transport终态生命周期、ContextFiles虚设Seam、Cron多租户遍历、SelfManage权限拦截）的现状与负向边界 |
+| ARCH-IMPROVE-QUESTIONS | 澄清全量 4 大候选演进排期与执行策略（单步提问） | Completed | 用户选定「分阶段单流推进」策略（Phase 1: Transport → Phase 2: Tools → Phase 3: Cron → Phase 4: ContextFiles） |
+| ARCH-IMPROVE-APPROACHES | 提炼分阶段架构重构执行方案与权衡对比 | Completed | 用户明确确认选定方案 A（严格就地加深与干净收敛，零跨PR兼容垫片残留） |
+| ARCH-IMPROVE-DESIGN-SECTIONS | 逐步呈现设计细节（Owns/Does NOT own/不变量测试）并获取审批 | In Progress | 正在逐步呈现 §1 边界自治与等级、§2 四阶段深度架构设计、§3 测试不变量矩阵 |
+| ARCH-IMPROVE-DESIGN-DOC | 沉淀设计文档至 docs/plans/ 并提交 git | Pending | |
+| ARCH-IMPROVE-TRANSITION | 转换至实施计划制定（writing-plans） | Pending | |
