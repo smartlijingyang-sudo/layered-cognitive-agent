@@ -71,6 +71,8 @@ def create_run_session(
     user_id: str = "",
     topic_id: str = "",
     origin: str = "user",
+    developer_seed: str = "",
+    developer_seed_job_id: str = "",
     ctx: Any | None = None,
 ) -> RunSession:
     """Build a RunSession through the unified factory.
@@ -107,6 +109,8 @@ def create_run_session(
             user_id=user_id.strip(),
             topic_id=topic_id.strip(),
             origin=origin,
+            developer_seed=developer_seed,
+            developer_seed_job_id=developer_seed_job_id,
         )
     )
 

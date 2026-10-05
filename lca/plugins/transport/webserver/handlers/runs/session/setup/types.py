@@ -32,6 +32,10 @@ class RunSessionRequest:
     """本 run 所属会话。在 dispatch 之前落到 session，见 ``RunRequest.topic_id``。"""
     origin: str = "user"
     """ADR-0268 §4：``handoff`` 轮才把 ``lca.nothing_to_do`` 放上 wire。"""
+    developer_seed: str = ""
+    """ADR-0268 §6：run 启动时注入的 developer 消息，承载 cron handoff。"""
+    developer_seed_job_id: str = ""
+    """``developer_seed`` 的来源 job，落进 journal 供重放溯源。"""
 
 
 __all__ = ["RunSessionRequest"]

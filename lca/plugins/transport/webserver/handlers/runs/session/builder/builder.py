@@ -277,6 +277,8 @@ class RunSessionBuilder:
                 user_id=(getattr(request, "user_id", "") or "").strip(),
                 topic_id=(getattr(request, "topic_id", "") or "").strip(),
                 origin=(getattr(request, "origin", "") or "user").strip() or "user",
+                developer_seed=getattr(request, "developer_seed", "") or "",
+                developer_seed_job_id=getattr(request, "developer_seed_job_id", "") or "",
                 started_at=started_at,
                 locator=locator,
                 event_session=event_session,

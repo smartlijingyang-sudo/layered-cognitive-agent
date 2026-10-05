@@ -56,6 +56,16 @@ def test_the_carrier_decode_target_has_no_origin_field() -> None:
     """No field means no body key can reach it, so no client can claim a handoff."""
     names = {f.name for f in dataclasses.fields(CreateRunRequest)}
     assert "origin" not in names
+    assert "developer_seed" not in names
+    assert "developer_seed_job_id" not in names
+
+
+def test_the_developer_seed_defaults_to_empty() -> None:
+    """A run that is not a handoff injects no developer message."""
+    request = RunRequest(**_run_request_kwargs())
+    assert request.developer_seed == ""
+    assert request.developer_seed_job_id == ""
+    assert RunSessionRequest(question="hi", user_text="hi").developer_seed == ""
 
 
 def test_to_run_request_never_carries_an_origin() -> None:
@@ -130,6 +140,25 @@ async def test_the_camel_case_body_topic_reaches_the_run_request() -> None:
 
     assert isinstance(decoded, CreateRunRequest)
     assert _to_run_request(decoded).topic_id == "tpc_camel"
+
+
+@pytest.mark.asyncio
+async def test_a_body_carrying_a_developer_seed_is_ignored() -> None:
+    body = {
+        "messages": [{"role": "user", "content": "hi"}],
+        "developer_seed": "injected by a client",
+    }
+
+    decoded = await decode_create_run(
+        body,
+        ctx=None,
+        file_store=None,
+        resolve_mode=lambda _ctx, mode: mode or "solo",
+        user_id="",
+    )
+
+    assert isinstance(decoded, CreateRunRequest)
+    assert _to_run_request(decoded).developer_seed == ""
 
 
 def test_run_request_topic_defaults_to_empty() -> None:

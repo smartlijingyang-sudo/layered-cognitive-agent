@@ -118,6 +118,8 @@ class RunSession:
     topic_id: str = ""  # 缺陷1修复：run 所属话题 id（空 = 遗留路径）；跨 run 会话自愈日志按此归档
     user_id: str = ""  # ADR-0252：发起本 run 的租户 user_id（空 = 遗留/dev 路径）
     origin: str = "user"  # ADR-0268 §4：handoff 轮才把 lca.nothing_to_do 放上 wire
+    developer_seed: str = ""  # ADR-0268 §6：run 启动时注入的 developer 消息
+    developer_seed_job_id: str = ""  # 该 developer 消息的来源 cron job
     started_at: float = 0.0
     locator: RunLocator | None = None  # ADR-0065 PR-11: run 级 locator 引用
     thread_tree_writer: object | None = None  # ADR-0186 PR-3g: per-run StepTreeFoldDeriver

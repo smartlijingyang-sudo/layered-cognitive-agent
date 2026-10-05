@@ -38,6 +38,12 @@ def run_context_for_session(
         for key in _ADR0248_PROFILE_KEYS:
             if key in profile_runtime:
                 extra[key] = profile_runtime[key]
+    seed = getattr(session, "developer_seed", "") or ""
+    if seed:
+        # ADR-0268 §6：cron handoff 作为 developer 消息进父轮。RunContext 是
+        # 每 run 的，extra 是它既有的按 run 传值通道（origin 同源）。
+        extra["developer_seed"] = seed
+        extra["developer_seed_job_id"] = getattr(session, "developer_seed_job_id", "") or ""
     return RunContext(
         session_id=session.agent.agent_id,
         prior_turns=tuple(session.prior_turns) if session.prior_turns else (),

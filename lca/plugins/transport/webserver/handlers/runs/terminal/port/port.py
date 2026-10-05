@@ -57,6 +57,16 @@ class RunRequest:
     HTTP client cannot claim a handoff turn and end a user-visible round
     silently. Only an in-process dispatcher sets it.
     """
+    developer_seed: str = ""
+    """Developer message appended at run start, before the first model call.
+
+    Carries a cron ``ScheduledHandoff`` into its parent turn (ADR-0268 §6).
+    Seeded at construction rather than appended after dispatch, so it cannot
+    lose a race with the run task. Not body-decodable, for the same reason as
+    ``origin``.
+    """
+    developer_seed_job_id: str = ""
+    """Provenance for ``developer_seed``, recorded in the journal."""
 
 
 @dataclass(frozen=True, slots=True)

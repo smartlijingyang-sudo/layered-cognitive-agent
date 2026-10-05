@@ -220,6 +220,15 @@ class CognitiveRuntime(Runtime):
                     role="user",
                     content=task,
                 )
+                seed = (ctx.extra or {}).get("developer_seed") if ctx else None
+                if isinstance(seed, str) and seed:
+                    # ADR-0268 §6：handoff 在用户轮之后、第一次模型调用之前落盘。
+                    run_writer.append_developer_message(
+                        message_id=f"handoff:{trace_id}",
+                        content=seed,
+                        job_id=(ctx.extra or {}).get("developer_seed_job_id") or None,
+                        run_id=trace_id,
+                    )
             # ADR-0248: 运行态声带与硬闸解析
             vocal_mode = None
             wake_source = "user_input"

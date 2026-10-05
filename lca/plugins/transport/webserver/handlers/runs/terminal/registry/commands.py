@@ -87,6 +87,8 @@ class RegistryRunCommands:
                 user_id=request.user_id or "",
                 topic_id=request.topic_id,
                 origin=request.origin,
+                developer_seed=request.developer_seed,
+                developer_seed_job_id=request.developer_seed_job_id,
                 ctx=request.ctx,
             )
             schedule_run(
