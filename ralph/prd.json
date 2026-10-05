@@ -1,0 +1,65 @@
+{
+  "project": "LCA Round 2 Codebase Architecture Deepening",
+  "branchName": "ralph/r2-arch-deepening",
+  "description": "Deep architecture refactor of the LCA cognitive-agent codebase (Round 2): remove residual ContextFiles forwarding shims and unify the MemoryTools directory seam, consolidate the Transport Read Runs micro-packages into deep modules, then run full regression verification and close the tracker. Tasks 1-2 (DecisionGates flattening, Ingest consolidation) are already done on this branch.",
+  "userStories": [
+    {
+      "id": "US-001",
+      "title": "Remove residual ContextFiles shims and unify MemoryTools directory seam",
+      "description": "As an LCA maintainer, I want the stale ContextFiles forwarding shims physically deleted and the assistant memory tools to share a single file-store/directory seam, so the memory subsystem has one import path and no per-call ad-hoc construction.",
+      "acceptanceCriteria": [
+        "Update lca/infrastructure/memory/contextfiles/service/watch.py to import directly from contextfiles/sync.py (no imports from contextfiles.domain.diff, contextfiles.domain.edit, or contextfiles.service.memory_edit_sync)",
+        "In lca/infrastructure/tools/assistant/memory_tools.py, add read-only properties _file_store, _sidechat_dir, _people_dir, _groups_dir to _BaseMemoryTool providing the correct DiskFileStore / SideChatDirectory / PeopleDirectory / GroupsDirectory instances",
+        "All derived memory tools use the _BaseMemoryTool properties instead of constructing their own DiskFileStore and directory instances per call",
+        "Physically delete lca/infrastructure/memory/contextfiles/domain/diff.py, lca/infrastructure/memory/contextfiles/domain/edit.py, and lca/infrastructure/memory/contextfiles/service/memory_edit_sync.py",
+        "A repo-wide grep finds zero non-doc imports of contextfiles.domain.diff, contextfiles.domain.edit, or contextfiles.service.memory_edit_sync",
+        "Add tests/infrastructure/memory/test_contextfiles_shims_removed.py asserting the three shim files are gone and no old-path import remains",
+        "Add tests/infrastructure/tools/test_memory_tools_unified_context_seam.py asserting the _BaseMemoryTool seam provides correct working-directory context to derived tools and leaks no state across sessions",
+        "uv run pytest tests/infrastructure/memory/test_contextfiles_shims_removed.py tests/infrastructure/tools/test_memory_tools_unified_context_seam.py --no-cov -v passes",
+        "uv run pytest tests/infrastructure/memory/ tests/infrastructure/tools/ --no-cov -v passes",
+        "uv run ruff check passes on all touched files",
+        "Do NOT change AssistantMemory semantics and do NOT touch lca/cognition/memory/"
+      ],
+      "priority": 1,
+      "passes": true,
+      "notes": "Plan source: docs/plans/2026-10-05-codebase-architecture-round2-plan.md Task 3. Invariants INV-ARCH-12 and INV-ARCH-13."
+    },
+    {
+      "id": "US-002",
+      "title": "Consolidate Transport Read Runs micro-packages into deep modules",
+      "description": "As an LCA maintainer, I want the read-side run projections currently scattered across 9 micro-directories consolidated into 4 deep flat modules, so run queries are easy to find and maintain.",
+      "acceptanceCriteria": [
+        "Create lca/plugins/transport/webserver/read/runs/terminal.py covering terminal-state materialization and terminal lifecycle queries",
+        "Create lca/plugins/transport/webserver/read/runs/live.py covering active run streams, step-tree refresh, and journal projection binding",
+        "Create lca/plugins/transport/webserver/read/runs/evidence.py covering evidence extraction, failure diagnostics, and formatted presentation",
+        "Create lca/plugins/transport/webserver/read/runs/identity.py covering session identity retrieval and metadata",
+        "Update lca/plugins/transport/webserver/read/runs/__init__.py to re-export the common read operations",
+        "Update lca/plugins/transport/webserver/handlers/runs/api/query_endpoints.py and lca/plugins/transport/webserver/handlers/runs/session/builder/builder.py to import from the flat modules",
+        "Delete micro-directories: read/runs/artifact/, read/runs/error/, read/runs/evidence/, read/runs/failure/, read/runs/identity/, read/runs/journal/, read/runs/live/, read/runs/step/, read/runs/terminal/",
+        "A repo-wide grep finds zero non-doc imports referencing the deleted read/runs micro-directory paths",
+        "Add tests/lca_plugins/transport/webserver/test_read_runs_unified.py covering terminal-state materialization, live tree refresh, evidence formatting, and asserting the micro-directories no longer exist",
+        "uv run pytest tests/lca_plugins/transport/webserver/test_read_runs_unified.py --no-cov -v passes",
+        "uv run pytest tests/lca_plugins/transport/webserver/ --no-cov -v passes",
+        "Do NOT change HTTP route contracts or response JSON formats in query_endpoints.py"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": "Plan source: docs/plans/2026-10-05-codebase-architecture-round2-plan.md Task 4. Invariant INV-ARCH-14."
+    },
+    {
+      "id": "US-003",
+      "title": "Full regression verification, gate checks, and tracker closure",
+      "description": "As an LCA maintainer, I want all Round 2 phase tests green, linters clean, and the live task tracker marked complete, so the refactor is verified end to end.",
+      "acceptanceCriteria": [
+        "uv run pytest tests/cognition/brain/test_decision_gates_flattened_chain.py tests/lca_plugins/transport/webserver/test_ingest_pipeline_unified.py tests/infrastructure/memory/test_contextfiles_shims_removed.py tests/infrastructure/tools/test_memory_tools_unified_context_seam.py tests/lca_plugins/transport/webserver/test_read_runs_unified.py --no-cov -v passes",
+        "uv run ruff check reports 0 errors",
+        "git diff --check is clean",
+        "Update docs/plans/task.md marking all 5 ARCH-R2 tasks as Completed",
+        "Commit the tracker update"
+      ],
+      "priority": 3,
+      "passes": false,
+      "notes": "Plan source: docs/plans/2026-10-05-codebase-architecture-round2-plan.md Task 5. Invariant INV-ARCH-15."
+    }
+  ]
+}

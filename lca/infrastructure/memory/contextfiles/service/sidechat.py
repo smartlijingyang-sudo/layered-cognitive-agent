@@ -12,10 +12,6 @@ import logging
 
 from lca.contracts.mechanisms.content.addressable import sha256_hex
 from lca.infrastructure.memory.contextfiles.domain.curated import contains_secret
-from lca.infrastructure.memory.contextfiles.domain.edit import (
-    FileVersion,
-    require_fresh,
-)
 from lca.infrastructure.memory.contextfiles.domain.layout import ContextLayout, packaged_layout
 from lca.infrastructure.memory.contextfiles.domain.search import best_documents
 from lca.infrastructure.memory.contextfiles.domain.sidechat import (
@@ -30,6 +26,7 @@ from lca.infrastructure.memory.contextfiles.ports.file_store import (
     FileSnapshot,
     FileStore,
 )
+from lca.infrastructure.memory.contextfiles.sync import FileVersion, require_fresh
 
 logger = logging.getLogger(__name__)
 

@@ -23,13 +23,13 @@ from lca.contracts.models.core.policy.budget import DEFAULT_TOOL_TIMEOUT_S
 from lca.contracts.protocols import Tool
 from lca.infrastructure.memory.assistant_memory import AssistantMemory
 from lca.infrastructure.memory.contextfiles.adapters.disk import DiskFileStore
-from lca.infrastructure.memory.contextfiles.domain.edit import StaleSnapshotOperationError
-from lca.infrastructure.memory.contextfiles.domain.layout import layout_for_home
+from lca.infrastructure.memory.contextfiles.domain.layout import ContextLayout, layout_for_home
 from lca.infrastructure.memory.contextfiles.domain.privacy import is_private_personal
 from lca.infrastructure.memory.contextfiles.service.groups import GroupsDirectory
 from lca.infrastructure.memory.contextfiles.service.indexing import search_memory_index
 from lca.infrastructure.memory.contextfiles.service.people import PeopleDirectory
 from lca.infrastructure.memory.contextfiles.service.sidechat import SideChatDirectory
+from lca.infrastructure.memory.contextfiles.sync import StaleSnapshotOperationError
 
 _MEMORY_SEARCH_TOOL = "memory_search"
 _MEMORY_ADD_TOOL = "memory_add"
@@ -54,6 +54,31 @@ class _BaseMemoryTool(Tool):
 
     def __init__(self, *, memory: AssistantMemory) -> None:
         self._memory = memory
+
+    @property
+    def _file_store(self) -> DiskFileStore:
+        """DiskFileStore rooted at this tool's assistant home."""
+        return DiskFileStore(self._memory.home_path)
+
+    @property
+    def _layout(self) -> ContextLayout:
+        """Context-file layout overlaid with this assistant home's override."""
+        return layout_for_home(self._memory.home_path)
+
+    @property
+    def _sidechat_dir(self) -> SideChatDirectory:
+        """Side-chat branch memory directory for this assistant home."""
+        return SideChatDirectory(self._file_store, layout=self._layout)
+
+    @property
+    def _people_dir(self) -> PeopleDirectory:
+        """Person page directory for this assistant home."""
+        return PeopleDirectory(self._file_store, layout=self._layout)
+
+    @property
+    def _groups_dir(self) -> GroupsDirectory:
+        """Group page directory for this assistant home."""
+        return GroupsDirectory(self._file_store, layout=self._layout)
 
     def _ok(self, start: float, payload: dict[str, Any] | None, text: str = "") -> Observation:
         return Observation(
@@ -158,12 +183,11 @@ class MemorySearchTool(_BaseMemoryTool):
     def _search_indexed(self, query: str, *, limit: int) -> list[dict[str, Any]] | None:
         """Query the built FTS index. Returns None when no index exists."""
 
-        layout = layout_for_home(self._memory.home_path)
         hits = search_memory_index(
             self._memory.home_path,
             query,
             limit=limit,
-            layout=layout,
+            layout=self._layout,
         )
         if hits is None:
             return None
@@ -213,8 +237,7 @@ class MemorySearchTool(_BaseMemoryTool):
         ]
 
     def _search_branch(self, query: str, branch: str, *, limit: int) -> list[dict[str, Any]]:
-        layout = layout_for_home(self._memory.home_path)
-        directory = SideChatDirectory(DiskFileStore(self._memory.home_path), layout=layout)
+        directory = self._sidechat_dir
         try:
             hits = directory.search(query, branch, limit=limit)
         except ValueError:
@@ -318,8 +341,8 @@ class MemoryAddTool(_BaseMemoryTool):
     def _write_branch(self, start: float, content: str, branch: str) -> Observation:
         """Write a branch-specific fact to the side chat's MEMORY.md."""
 
-        layout = layout_for_home(self._memory.home_path)
-        directory = SideChatDirectory(DiskFileStore(self._memory.home_path), layout=layout)
+        layout = self._layout
+        directory = self._sidechat_dir
         try:
             record = directory.write(branch, content, source="user", trigger="side chat")
         except ValueError as exc:
@@ -479,12 +502,9 @@ class PersonNoteTool(_BaseMemoryTool):
         note = str(args.get("note") or "").strip()
         if not name or not note:
             return self._fail(start, "name 和 note 都必须为非空字符串")
-        layout = layout_for_home(self._memory.home_path)
+        layout = self._layout
         try:
-            page = PeopleDirectory(
-                DiskFileStore(self._memory.home_path),
-                layout=layout,
-            ).upsert(name, note)
+            page = self._people_dir.upsert(name, note)
         except ValueError as exc:
             return self._fail(start, str(exc))
         except OSError as exc:
@@ -520,12 +540,9 @@ class GroupNoteTool(_BaseMemoryTool):
         note = str(args.get("note") or "").strip()
         if not name or not note:
             return self._fail(start, "name 和 note 都必须为非空字符串")
-        layout = layout_for_home(self._memory.home_path)
+        layout = self._layout
         try:
-            page = GroupsDirectory(
-                DiskFileStore(self._memory.home_path),
-                layout=layout,
-            ).upsert(name, note)
+            page = self._groups_dir.upsert(name, note)
         except ValueError as exc:
             return self._fail(start, str(exc))
         except OSError as exc:

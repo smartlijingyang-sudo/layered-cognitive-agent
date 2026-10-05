@@ -368,9 +368,7 @@ async def update_standing_file(request: Request) -> JSONResponse:
             # MEMORY.md 为纯函数投影，编辑操作必须经由 MemoryEditSyncService 同步回写至
             # memory/semantic.json 唯一真理，并重新生成规范 Markdown 投影，严禁直接写盘破坏不变量 (INV-MEM-06)
             from lca.infrastructure.memory.assistant_memory import AssistantMemory
-            from lca.infrastructure.memory.contextfiles.service.memory_edit_sync import (
-                MemoryEditSyncService,
-            )
+            from lca.infrastructure.memory.contextfiles.sync import MemoryEditSyncService
 
             assistant_memory = AssistantMemory(home)
             sync_service = MemoryEditSyncService(assistant_memory)

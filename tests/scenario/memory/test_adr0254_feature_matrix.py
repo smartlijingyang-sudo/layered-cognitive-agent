@@ -25,16 +25,16 @@ from lca.contracts.protocols.declarative.declarative_1.node_executor import (
 from lca.infrastructure.memory.assistant_memory import AssistantMemory
 from lca.infrastructure.memory.contextfiles.adapters.disk import DiskFileStore
 from lca.infrastructure.memory.contextfiles.adapters.realtime import FaultInjectingWatcher
-from lca.infrastructure.memory.contextfiles.domain.edit import (
-    FileVersion,
-    StaleSnapshotOperationError,
-    require_fresh,
-)
 from lca.infrastructure.memory.contextfiles.domain.layout import validate_root_entries
 from lca.infrastructure.memory.contextfiles.domain.standing import assemble_standing
 from lca.infrastructure.memory.contextfiles.service.trail import (
     NarrowGateViolationError,
     TrailWriter,
+)
+from lca.infrastructure.memory.contextfiles.sync import (
+    FileVersion,
+    StaleSnapshotOperationError,
+    require_fresh,
 )
 from lca.infrastructure.tools.assistant.memory_tools import MemoryAddTool, MemoryExplainTool
 from lca.nodes.think.history.assemble import HistoryDeriveExecutor

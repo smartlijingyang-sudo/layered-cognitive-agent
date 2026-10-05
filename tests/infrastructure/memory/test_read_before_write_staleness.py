@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from lca.infrastructure.memory.contextfiles.domain.edit import (
+from lca.infrastructure.memory.contextfiles.sync import (
     FileVersion,
     StaleSnapshotOperationError,
     require_fresh,
