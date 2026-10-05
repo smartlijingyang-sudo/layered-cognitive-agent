@@ -1,18 +1,47 @@
 ---
 name: airtap-automation
-description: Automates Airtap cloud Android phone operations for Meta Muse onboarding, email verification, birthday wheel picker (>20 yrs), credit-card boundary handshake, referral code redemption (X2B33X), and multi-API-key lifecycle quota management.
+description: Automates Meta Muse onboarding, registration, email verification, anti-risk birthday selection, card verification, referral code redemption, using either Chrome CDP Playwright runner (100% hands-free) or Airtap cloud Android phones.
 ---
 
-# Airtap Automation Skill
+# Muse & Airtap Automation Skill
 
-Use this skill when orchestrating or troubleshooting automated operations on Airtap cloud Android phones running the Meta Muse application.
+Use this skill when orchestrating or troubleshooting automated operations on Meta Muse (`muse.ai` / `com.facebook.aura`), including Chrome CDP automated batch runs and Airtap cloud Android phones.
 
 ## Core Capabilities & Tools
 
-- **CLI Tool:** `airtap-runner` (`/home/lichao/tools/airtap-runner/runner.py`)
-- **Knowledge Base & SOP:** `el-find airtap` → `/home/lichao/everything-library/data/items/accounts-sop/airtap-muse-automation-sop.md`
-- **Target Referral Code:** **`X2B33X`** (Redeems 1B Tokens per account — SSOT, never change)
+- **Engine 1 (Primary - 100% Hands-Free):** `chrome_playwright_runner.py` (`/home/lichao/tools/airtap-runner/chrome_playwright_runner.py`)
+  - Runs against real Chrome via CDP (`127.0.0.1:9222` over SSH reverse tunnel).
+  - Auto-fills cards (Inline/Popup), randomizes adult birthdays (ages 21-38) with anti-risk pacing, extracts invite codes, redeems referral code, and cleanly logs out.
+  - SOP: [`muse-chrome-automation-sop.md`](file:///home/lichao/everything-library/data/items/accounts-sop/muse-chrome-automation-sop.md)
+- **Engine 2 (Cloud Android):** `airtap-runner` (`/home/lichao/tools/airtap-runner/runner.py`)
+  - Multi-API key management on Airtap cloud phones.
+  - SOP: [`airtap-muse-automation-sop.md`](file:///home/lichao/everything-library/data/items/accounts-sop/airtap-muse-automation-sop.md)
+- **Default Target Referral Code:** Check `/home/lichao/tools/airtap-runner/config.json` (e.g. `WNN758` / `X2B33X` - 1B Tokens per account)
 - **Email Infrastructure:** `https://muse.smartlijingyangs.top/api/mailbox`
+
+---
+
+## 0. Chrome CDP Runner (100% Hands-Free Batch Pipeline)
+
+```bash
+# 1. Ensure Chrome is running with CDP and SSH tunnel is active
+# Remote Windows/Mac: chrome.exe --remote-debugging-port=9222
+# Tunnel: ssh -N -R 9222:localhost:9222 lichao@10.36.6.252
+
+# 2. Run batch on host (e.g. 5 accounts for target code WNN758)
+python3 /home/lichao/tools/airtap-runner/chrome_playwright_runner.py --count 5 --code WNN758
+```
+
+### Key Chrome CDP Selectors & Anti-Risk Invariants:
+1. **Landing / Account Switch:** If `button:has-text('使用手机号或邮箱')` or `button:has-text('使用其他账户')` is visible, click it first to reveal email input.
+2. **Hidden OTP Input:** Input is `.sr-only` (`input[autocomplete='one-time-code']`); use `fill(otp, force=True)`.
+3. **Name & Random Birthday (Anti-Risk Pacing):**
+   - If name inputs exist (`名`/`姓`), fill random names first (or "确认" button stays disabled).
+   - Birthday selects: Wait until `locator("select").count() >= 3`.
+   - Age 21–38 (`1988`–`2003`), month `1`–`12`, day `1`–`28`.
+   - Jittered sequential delays: `0.6`–`1.2s` between selects, `1.0`–`2.0s` after finishing before clicking "确认". NEVER click "确认" before selects are chosen.
+4. **Dual-Mode Card Fill:** Auto-handles both Inline (`muse.ai/access/verification`) and Popup Checkout (`auth.meta.com/payments/checkout`). If directly in chat, skips card.
+5. **Redeem & Logout:** Settings -> "兑现邀请码" -> fill target code -> "确认" -> Esc -> Settings -> `button:has-text('退出')`.
 
 ---
 
