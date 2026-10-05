@@ -25,7 +25,7 @@ _BANNED_CLASS_PATTERN = re.compile(
     r"|(Data|Info)$",
 )
 
-# 显式豁免清单（参照 docs/specs/glossary.md "命名约定" 章节）
+# 显式豁免清单（参照 docs/design/naming-constitution.md，命名宪法 ADR-0106）
 _NAME_EXEMPT: dict[str, str] = {
     # Action 策略类：Operation 后缀表达策略模式插槽，非禁用词 Manager/Helper
     "RespondOperation": "Action 策略实现（contracts.protocols.action.Action）",
@@ -34,6 +34,9 @@ _NAME_EXEMPT: dict[str, str] = {
     "HandoffOperation": "Action 策略实现（contracts.protocols.action.Action）",
     # Observability 命名：SpanContextInfo 是 OTel SDK 兼容的 dataclass（非 Info/Helper 类）
     "SpanContextInfo": "OTel span context 信息封装（兼容 OTel SDK 命名约定）",
+    # ADR-0290 豁免：SpineHandler 为每 EP 单请求处理，Handler 系命名宪法 §4.1 合法后缀
+    # （健身函数误杀；本 ADR 即 §13 Phase E 要求的豁免归档）
+    "SpineHandler": "ADR-0290 豁免：每 EP 单请求处理的 reflector 句柄（命名宪法 §4.1）",
 }
 
 _SCAN_PACKAGES = [
@@ -323,7 +326,7 @@ class TestNoBannedClassNames(unittest.TestCase):
                 continue
             if _BANNED_CLASS_PATTERN.search(cls_name):
                 offenders.append(
-                    f"  - {cls_name}（如需豁免，请在 docs/specs/glossary.md 登记并在 "
+                    f"  - {cls_name}（如需豁免，请在 docs/design/naming-constitution.md 登记并在 "
                     f"_NAME_EXEMPT 中注明理由）"
                 )
         self.assertFalse(
