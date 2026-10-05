@@ -299,6 +299,26 @@ worker 结束时先追加 run，`outcome` 已定。`receipts` 在投递决定写
 
 卡片用最近一条 run。`silent` 必须带着 `finished_at`。只有 `outcome`、没有回执的最近一条，卡片显示未决，不显示成功。
 
+### 6.1 回执的关闭
+
+§6 要求 handoff 轮结束时 `receipts` 非空，§12 写着 run 记录只追加。两句同时成立的读法只有一种：一次到点追加一条记录，那条记录上有一个字段从未决变成已决，恰好一次。这是补完一条事实，不是修订一条事实。
+
+**所有者。** 追加发生在 worker 结束时，写 `run_id`、`outcome`、`finished_at`，`receipts` 为空。关闭发生在 handoff 轮结束时，只写 `receipts`。`run_id`、`outcome`、`finished_at` 一经追加不再改变。除这两次写入之外没有第三种写。
+
+**关闭之前先落 dispatch 身份。** `CronRun` 增加 `handoff_run_ids: tuple[str, ...]`，一个投递目标一个 id，在起 handoff run 之前写入。顺序是先写盘再起 run。反过来不成立：先起 run 再写盘，进程在两步之间死掉，重启后读到一条既未决又没派过 run 的记录，重新推导会再派一次，用户收到两条同样的提醒。写在前面的那个身份让重复投递在结构上不可能，而不是靠重试逻辑小心。
+
+`handoff_run_ids` 缺省为空，读作「还没派」。既有记录全部落在这个读法上，不需要迁移脚本。
+
+**恢复。** 未决且 `handoff_run_ids` 非空，含义是派过了还没关，恢复路径读那些 run 的结果补写 `receipts`，不再派新 run。未决且 `handoff_run_ids` 为空才是待派。§8.1 的等待位按这两个条件区分，不按时间。
+
+**关闭幂等，但不随意。** 用同一组 `receipts` 再关一次是无操作，返回已有值。用不同的一组关第二次是拒绝，一次到点有两个投递决定是矛盾，不是更新。
+
+**存储接口。** `CronStore` 增加一个方法：读记录、判空、原子替换写回。不新增记录类型，不新增文件，不新增第二份 run 事实。
+
+**为什么不追加第二条记录来承载回执。** §6 的「卡片用最近一条 run」会出现两个候选，`last_delivery` 的投影要跨两条记录合并，`cron.view` 的只追加语义会让同一次到点出现两行。一个字段的单次补完比两条记录的合并规则便宜。
+
+**为什么不在 worker 结束时就写回执。** 那时投递还没发生，写下的任何值都是猜的。§6 已经把空 `receipts` 定义为未决，猜一个值等于把未决伪装成已决。
+
 ---
 
 ## 7. 超时与重试
@@ -425,7 +445,7 @@ class CronListItem(BaseModel):  # extra="forbid"
 | `CronJob` 定义 | cron 存储 | `cron.view` 与 worker 的 `body`。列表只有 §10 的投影 |
 | `NextFire` | `next_run` 纯函数 | `upcoming` 变成 `next_run_local`。`due` 变成列表上的到点标记 |
 | `schedule_label` | cron 存储在读时生成 | 卡片上的人话。不参与客户端计时 |
-| run 记录与回执 | cron 存储，只追加 | 卡片上的最近一次。更早的仍可 `cron.view`。压缩父对话不删除 |
+| run 记录与回执 | cron 存储。一次到点追加一条；`handoff_run_ids` 与 `receipts` 在该条上各补写一次，见 §6.1 | 卡片上的最近一次。更早的仍可 `cron.view`。压缩父对话不删除 |
 | handoff 文本 | runtime 注入父的下一轮 | 父能决定说或不说 |
 | 可见气泡 | 父的回复 | 出现在 `delivery_targets` 的 chat。回执 `delivered` 或 `failed` |
 | 无气泡 | `lca.nothing_to_do`，或 `not_sent` | 该 chat 没有新气泡。`silent` 仍有完成时间 |
@@ -471,11 +491,15 @@ class CronListItem(BaseModel):  # extra="forbid"
    - 春令时缺口日不返回不存在的本地时刻。日任务与周任务取下一周期里真实存在的同一墙钟。秋令时歧义取 `fold=0`。
    - 一次性且 `at > now` 时，`upcoming` 等于 `at`。一次性且 `at <= now`、没跑过时，`due` 为真且 `upcoming` 为空，`kind` 仍是 `oneshot`。已有 `last_run` 则不在即将到来里。间隔在 `last_run` 为空且 `anchor_at == now` 时，`upcoming == anchor_at + every_seconds`。
    - `ScheduledHandoff` 缺任一字段，契约测试失败。
+   - `CronRun` 缺 `handoff_run_ids`，或它不是字符串元组，契约测试失败。缺省是空元组，既有记录不迁移也能读。
+   - 关闭回执用同一组值重复调用，返回已有值，记录字节不变。用不同的一组调用，拒绝，记录字节不变。
    - `CronListItem` 缺字段、多字段，或出现 `schedule`、`timezone`、`anchor_at`、`every_seconds`、`at`，契约测试失败。`next_run_local` 与 `upcoming` 的墙钟一致。停用的周期任务仍带 `next_run_local`，列表上的 `due` 为假，并标停用。
    - 用户轮发出 `lca.nothing_to_do`，回注是错误。
    - `CronJob` 拒绝双 schedule、侧聊跨 chat、`space_action` 带投递目标。
 3. 故障注入。每增加一种重试或审批语义，就增加对应的注入。
    - worker 跑到一半被杀。按 `max_retries` 重试。耗尽后 handoff 的 `outcome = timed_out`。父结束该轮时 `receipts` 非空。
+   - handoff run 已起，进程在关闭回执之前死掉。重启后该记录未决且 `handoff_run_ids` 非空，恢复读那些 run 的结果补写回执，不派新 run，目标 chat 只收到一条。
+   - `handoff_run_ids` 写盘失败。不起 run。记录停在未决且身份为空，下一次 tick 重新派。
    - worker 交出「没做完」。不重试。`outcome = completed`。
    - 审批卡片 10 分钟没有点选。定义文件的字节不变。再次 `cron.view` 仍是旧定义。
    - 两个到点同时撞上运行中的 run。旧排队项 `outcome = superseded` 且回执 `not_sent`。无 handoff。运行中的 worker 不被杀。
