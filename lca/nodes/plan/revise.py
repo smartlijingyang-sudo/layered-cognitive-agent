@@ -63,6 +63,7 @@ from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import
     OwnershipDeclaration,
 )
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
+from lca.nodes.plan._shared import _extract_task_list
 
 
 def _revise_entries(
@@ -155,22 +156,6 @@ class PlanReviseExecutor:
                 ),
             },
         )
-
-
-def _extract_task_list(state: object) -> TaskList:
-    """Resolve the current ``TaskList`` from the state port value.
-
-    Accepts a bare ``TaskList`` (typed shortcut projection) or an
-    ``AgentState`` carrying the ``task_list`` field added by ADR-0228.
-    Missing / unset → empty list so the node always produces a valid
-    typed artifact (C6 minimization).
-    """
-    if isinstance(state, TaskList):
-        return state
-    candidate: object = getattr(state, "task_list", None)
-    if isinstance(candidate, TaskList):
-        return candidate
-    return TaskList()
 
 
 @plugin(

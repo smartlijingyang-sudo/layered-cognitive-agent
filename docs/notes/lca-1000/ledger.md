@@ -723,3 +723,21 @@
 - 验证结果: ruff check 改动文件 All checks passed；import 冒烟（`m._elapsed_ms is` canonical + 文件内零残余 `_PERF_COUNTER_SCALE`）OK；targeted pytest 2 文件（tests/cognition/body/test_pipeline_safe_executor_projection.py、test_safe_executor_tool_result_latency.py）：5 passed。
 - commit: refactor(lca-1000): 第0506轮 收敛 _elapsed_ms 重复定义到 safe_executor.evidence（未 push）。
 - 备注: 只 add/commit 本轮 2 个文件（代码 1 + ledger.md），用 `git commit -- <paths>` 指定路径提交，避免带入并发会话（ralph）已 staged 的 2 个测试文件改动；其 staged/untracked（docs/notes/audit-2026-10-05.md、ralph/）全程未触碰。本轮中段曾遇 252 SSH 隧道短暂挂起约 20 秒（一条查询命令 backgrounded 后自动恢复），挂起期间未执行写操作。备份 /tmp/bak_0506/（252，改动前原文件）。教训：heredoc 经 ssh252 双层 shell 会丢格式致锚点匹配失败，改用本地写脚本 + stdin 喂远程 python3，一次成功。
+
+
+## 第0507轮 (2026-10-06 04:13 CST)
+- 改了什么: 收敛 `_extract_task_list` 重复定义（改动 2 文件 +1/-32，新文件 1）：删除 `lca/nodes/plan/compose.py:133` 与 `lca/nodes/plan/revise.py:160` 两处逐字相同的 def（含 docstring，各 -16 行），canonical 放到新建 `lca/nodes/plan/_shared.py`；两模块各加 1 行 `from lca.nodes.plan._shared import _extract_task_list`；调用点（compose:187 / revise:138）零改动，语义逐字相同。
+- 依据 skill 哪一节: SKILL.md Deletion test（删一处副本后复杂度直接消失：另一处副本不是靠 N 个调用方重造，而是同一包内共享的 canonical 定义）+ DEEPENING.md Seam discipline / Locality（同包两处定义 = ADR-0228 D3 task_list 提取逻辑的漂移风险；收敛到包内 internal seam `_shared.py`，只改一处）+ LANGUAGE.md Module/Interface/Leverage（helper 的 leverage 来自其 interface，重复定义不增加 leverage，是 shallow 拷贝）。
+- 为什么这是实质改动(非凑数): 消除的是真实的代码重复（两处逐字相同的 14 行实现 + docstring），不是注释措辞/空行。证据链：(1) AST dump 本体逐字相同；(2) 两文件各仅 1 处调用点，行为语义不变（import smoke 断言 `compose._extract_task_list is _shared._extract_task_list` 且三种输入形态行为等价）；(3) `_shared.py` 是代码库既定惯例（openai_compat/shared/_shared.py、cli/commands/kernel/_shared.py）；(4) 无外部/测试直接引用该私有名（git grep 全库仅两处 def + 两处调用）。
+- 关键设计决策（夜间跳过 grilling，记台账）: 新建中立的包内 `_shared.py` 而非让 revise 引用 compose（或反向）——compose 与 revise 是同级节点模块，互相 import 会制造怪异的同级依赖 seam；包内 internal seam 是 DEEPENING.md 鼓励的形状。`__init__.py` 保持为空（不引入 re-export，避免把 internal seam 变成包 interface）。compose.py:142 的 ruff format 长行告警是预先存在的（/tmp/bak_0507 备份确认），本轮未动。
+- 候选清单（本轮 explore，逐一验证后取舍）:
+  1. 上述 `_extract_task_list` 同包去重 —— 选中（506 轮同模式；同一包、同体、有跨模块共享 helper 的设计意图）。
+  2. `run_manifest.py` 三个 `@deprecated` 字段（delete-when: 2027-01-01）—— 驳回：未到期，AGENTS.md §5 要求旧 reader 继续解析，提前删违 discipline。
+  3. `_catalog_digest`（harness/skills/service.py vs cognition/sensors/skill_catalog.py）—— 驳回：跨子系统，两个 seam 的 digest 语义是否相同未确证，需 grilling。
+  4. `_is_use_tool`（convergence/evidence.py vs material.py）—— 驳回：2 行单表达式函数，搬家接近凑数边界，需 grilling。
+  5. `_require_non_empty` / `_require_unit_interval`（memory/sensors.py vs memory/types.py）—— 驳回：私有校验惯例，删除任一需跨模块导入私有名，需 grilling。
+  6. `_format_duration` / `_find_blueprint` / `_turn_of` / `release_lock` 等 AST 同体对 —— 驳回：多为跨层/跨包或协议实现，收敛语义需 grilling；单轮只取最干净的一对。
+  7. 504/505/506 驳回项沿用（_ws_placeholder、failover 4 raises、supervisor waiter、accessors excepts、predicate_evaluator raises、serve.py stubs、plugin.py fail-soft、s3.py PR-10 TODO、delete-when 到期、双 SearchProvider/FileStore Protocol、terminal.py 另 4 个 @deprecated、命名家族、append.py PEP562 等）—— 驳回（语义真实或需 grilling/规模超一轮）。
+- 验证结果: ruff check 3 文件 All checks passed（首次即过）；import 冒烟（identity + 三种输入形态行为等价）OK；targeted pytest 2 文件（tests/plan/test_plan_compose_phase_plugin.py、test_plan_revise_phase_plugin.py）：18 passed。
+- commit: refactor(lca-1000): 第0507轮 收敛 _extract_task_list 重复定义到 nodes/plan/_shared（未 push）。
+- 备注: 只 add/commit 本轮 4 个文件（代码 3 + ledger.md），用 `git commit -- <paths>` 指定路径提交，避免带入并发会话已 staged 的 2 个测试文件改动；其 staged/untracked（docs/notes/audit-2026-10-05.md、ralph/）全程未触碰。备份 /tmp/bak_0507/（252，改动前 compose.py/revise.py 原文件）。本地写脚本 + stdin 喂远程 python3（断言 anchor 计数==1），一次成功。
