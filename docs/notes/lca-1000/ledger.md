@@ -758,3 +758,20 @@
 - 验证结果: ruff check 3 文件首次报 F401（run_replay PlanBlueprint 闲置，删掉后）All checks passed；ruff format --check 无需改；AST 等价（新旧 def AST dump 逐字相同）+ import identity 冒烟 OK；targeted pytest 1 文件（tests/infrastructure/cli/test_run_replay_graph_timeline.py）：2 passed。
 - commit: refactor(lca-1000): 第0508轮 收敛 _find_blueprint 重复定义到 observation/_shared（未 push）。
 - 备注: 只 add 本轮 4 个文件（代码 3 + ledger.md），用 `git commit -- <paths>` 指定路径提交，避免带入并发会话（ralph）已 staged 的 2 个测试文件改动；其 staged/untracked（docs/notes/audit-2026-10-05.md、ralph/）全程未触碰。备份 /tmp/bak_0508/（252，改动前 run_explain.py/run_replay.py 原文件）。教训：ssh 管道 exit code 取的是 grep 的（run 1 的真实失败被 2>/dev/null 吃掉且 exit 码不可信），以后关键步骤 stderr 不得丢弃、用显式状态文件或 grep 断言输出。
+
+## 第0509轮 (2026-10-06 05:03-05:25 CST)
+- 改了什么: 收敛 `snapshot` 属性重复实现（改动 3 文件 +20/-28，无新文件）：`lca/infrastructure/observability/loop_cursor/in/memory.py:44` 与 `lca/infrastructure/observability/loop_cursor/std/std.py:65` 两处逐字相同的 13 行 `snapshot` property（`_CursorState` → 9 字段 frozen `CursorSnapshot` 投影，含 `incarnation=incarnation.incarnation_seq` 映射），canonical 放到两文件已共同 import 的 `state/state.py` 私有函数 `_snapshot_from_state`；两处 property 各变为 1 行委托 `return _snapshot_from_state(self._state)`；state.py 的 `__all__` 保持 `["_CursorState"]`（internal seam 不外泄）；两文件仍保留 `CursorSnapshot` import（property 返回类型注解用）。调用点零改动（`advance` 尾部 `return self.snapshot` 等）。
+- 依据 skill 哪一节: SKILL.md Deletion test（删一处副本后复杂度直接消失：另一处副本被共享的 canonical 投影替代；若无 helper，两处 adapter 各需保留 9 字段映射 → helper 赚到了 keep）+ DEEPENING.md Seam discipline / Locality（`_CursorState` 的拥有者是 `state/state.py`，投影逻辑收敛到状态拥有者模块，新增字段时改一处；`__all__` 不变 = internal seam 纪律，不把实现细节变成 interface）+ LANGUAGE.md Module/Interface/Leverage（`snapshot` 的 interface 不变——两个 adapter 的公共面与 `LoopCursor` Protocol 对齐关系不受影响，纯 implementation 收敛）。
+- 为什么这是实质改动(非凑数): 消除的是真实的代码重复（两处逐字相同的 13 行非平凡映射：`incarnation` 取 `incarnation_seq` 而非对象本身这种"看起来会错"的映射，恰恰是 drift 最高危点——任一改动一处漏改另一处就会静默分叉）。证据链：(1) AST dump 本体逐字相同（stdin-python 扫描断言）；(2) 全库仅此两处 `CursorSnapshot(` 构造（grep 非测试代码仅 memory.py:46 / std.py:67）；(3) `CursorSnapshot` 与 `_CursorState` 本就来自同一 contracts 模块，state.py 加 import 不引入新依赖 seam；(4) `_static_protocol_check`（memory.py）继续编译期校验 `LoopCursor` Protocol 对齐。
+- 关键设计决策（夜间跳过 grilling，记台账）: canonical 放 `state/state.py` 而非新建 `_shared.py`（506-508 模式）——因为 `_CursorState` 的拥有者就是 `state/state.py`，两文件本来就 import 它；helper 是状态模块的私有导出（下划线 + 不进 `__all__`），比包内中立 `_shared.py` 更符合 Locality（知识集中在状态拥有者）。未把 helper 挂到 `_CursorState` 上作方法（dataclass 保持纯数据形状；ADR-0169 D1/D6 只谈状态与快照分离，投影函数独立更干净）。
+- 候选清单（本轮 explore：AST 同体扫描 37 组，逐一取舍）:
+  1. `snapshot`（in/memory.py vs std/std.py，同子系统 13 行同体）—— 选中。
+  2. `apply`（projections/defaults.py `_StepTreeProjection` vs `_NarrativeProjection`，9 行同体）—— 驳回：step_tree/narrative 未来语义可能分化（projection 的 apply 是各投影的演化点），收敛需 grilling 确认二者"永远同计数语义"；留作后续候选。
+  3. `_run` 闭包（box/tool.py vs plugins/tools/bash.py，11 行同体）—— 驳回：闭包绑定不同的外层变量与不同的 gating 注释语义（员工机 Shell 管道 vs Creator 流程），deletion test 未过（删一处另一处仍需自己的闭包），跨包语义需 grilling。
+  4. `_fail` 方法 ×2（delegate_tool.py 两 tool 类同文件）—— 驳回：是 ×8 跨包命名家族的一部分（508 已判家族级需 grilling），单文件收敛会制造不一致的 seam。
+  5. companion client.py vs standalone.py 16 对（connect_and_run 92 行起）—— 驳回：沿用 508（疑似 sync/async 桥接刻意镜像，deletion test 未过，需确证）。
+  6. `_get_role_library`（fold.py vs triage.py）—— 驳回：沿用 508（绑定 self._role_library，需 grilling）。
+  7. `_format_duration` / `_catalog_digest` / `_turn_of` / `parameters` / `target` / `_transaction` / `read_file` / `_ok` / `_emit` / `_fail` 家族—— 驳回：沿用 507/508（跨子系统语义未确证 / 刻意对称双 adapter / 命名家族需 grilling / adapter interface 本身）。
+- 验证结果: `~/.local/bin/ruff check` 3 文件 All checks passed（首次即过）；`ruff format --check` 3 文件 already formatted；import 冒烟（两模块 helper identity + property 委托 + 9 字段映射逐一断言 + `__all__` 未泄露）OK；targeted pytest 2 文件（tests/observability/loop_cursor/test_in_memory.py、test_protocol.py）：10 passed。
+- commit: refactor(lca-1000): 第0509轮 收敛 snapshot 投影重复到 state/_snapshot_from_state（未 push）。
+- 备注: 只 add 本轮 4 个文件（代码 3 + ledger.md），用 `git commit -- <paths>` 指定路径提交；并发会话已 staged 的 2 个测试文件改动及 untracked（docs/notes/audit-2026-10-05.md、ralph/）全程未触碰。备份 /tmp/bak_0509/（252，改动前 3 文件）。scan0509.py/patch0509.py/smoke0509.py 留本地 hidden_files/scratch（非仓库文件）。

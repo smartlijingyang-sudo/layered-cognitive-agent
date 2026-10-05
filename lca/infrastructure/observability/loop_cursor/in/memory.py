@@ -18,7 +18,10 @@ from lca.contracts.observability.cursor.loop_cursor import (
     LoopCursor,
     PhaseName,
 )
-from lca.infrastructure.observability.loop_cursor.state.state import _CursorState
+from lca.infrastructure.observability.loop_cursor.state.state import (
+    _CursorState,
+    _snapshot_from_state,
+)
 
 
 class InMemoryLoopCursor:
@@ -42,18 +45,7 @@ class InMemoryLoopCursor:
 
     @property
     def snapshot(self) -> CursorSnapshot:
-        s = self._state
-        return CursorSnapshot(
-            run_id=s.run_id,
-            trace_id=s.trace_id,
-            incarnation=s.incarnation.incarnation_seq,
-            iteration=s.iteration,
-            attempt_in_step=s.attempt_in_step,
-            phase=s.phase,
-            iteration_reason=s.iteration_reason,
-            stop_signal=s.stop_signal,
-            seq=s.seq,
-        )
+        return _snapshot_from_state(self._state)
 
     @property
     def incarnation(self) -> Incarnation:
