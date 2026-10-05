@@ -199,6 +199,7 @@ class MultiAssistantCronStore:
             self._dir = get_lca_home() / "assistants"
         else:
             self._dir = Path(assistants_dir)
+        self._job_to_assistant: dict[str, str] = {}
 
     def _stores(self) -> dict[str, CronStore]:
         if not self._dir.is_dir():
@@ -209,18 +210,47 @@ class MultiAssistantCronStore:
                 stores[p.name] = CronStore(p)
         return stores
 
+    def _resolve_store_for_job(self, job_id: str) -> CronStore | None:
+        """根据内部索引 O(1) 路由至目标 assistant 的 CronStore，未命中时回退扫描并填充索引。"""
+        stores = self._stores()
+        asst_id = self._job_to_assistant.get(job_id)
+        if asst_id is not None and asst_id in stores:
+            store = stores[asst_id]
+            if store.get_job(job_id) is not None:
+                return store
+            # 索引陈旧（文件已在底层被移动或删除）
+            self._job_to_assistant.pop(job_id, None)
+
+        # 回退扫描全部助理目录并建立索引
+        for aid, store in stores.items():
+            if store.get_job(job_id) is not None:
+                self._job_to_assistant[job_id] = aid
+                return store
+        return None
+
     def list_jobs(self) -> list[CronJob]:
         all_jobs: list[CronJob] = []
-        for s in self._stores().values():
-            all_jobs.extend(s.list_jobs())
+        for asst_id, s in self._stores().items():
+            for job in s.list_jobs():
+                self._job_to_assistant[job.id] = asst_id
+                all_jobs.append(job)
         return all_jobs
 
     def get_job(self, job_id: str) -> CronJob | None:
-        for s in self._stores().values():
-            j = s.get_job(job_id)
-            if j is not None:
-                return j
+        store = self._resolve_store_for_job(job_id)
+        if store is not None:
+            return store.get_job(job_id)
         return None
+
+    def delete_job(self, job_id: str) -> bool:
+        """删除指定 job_id，成功后从内部索引中清除。"""
+        store = self._resolve_store_for_job(job_id)
+        if store is not None:
+            deleted = store.delete_job(job_id)
+            if deleted:
+                self._job_to_assistant.pop(job_id, None)
+            return deleted
+        return False
 
     def append_run(
         self,
@@ -231,36 +261,41 @@ class MultiAssistantCronStore:
         receipts: tuple[TargetReceipt, ...] = (),
         run_id: str | None = None,
     ) -> str:
-        for s in self._stores().values():
-            if s.get_job(job_id) is not None:
-                return s.append_run(
-                    job_id,
-                    outcome=outcome,
-                    finished_at=finished_at,
-                    receipts=receipts,
-                    run_id=run_id,
-                )
+        store = self._resolve_store_for_job(job_id)
+        if store is not None:
+            return store.append_run(
+                job_id,
+                outcome=outcome,
+                finished_at=finished_at,
+                receipts=receipts,
+                run_id=run_id,
+            )
         return f"{job_id}-{uuid.uuid4().hex}"
 
     def record_handoff_runs(
         self, job_id: str, run_id: str, handoff_run_ids: tuple[str, ...]
     ) -> CronRun | None:
-        for s in self._stores().values():
-            if s.get_job(job_id) is not None:
-                return s.record_handoff_runs(job_id, run_id, handoff_run_ids)
+        store = self._resolve_store_for_job(job_id)
+        if store is not None:
+            return store.record_handoff_runs(job_id, run_id, handoff_run_ids)
         return None
 
     def close_run_receipts(
         self, job_id: str, run_id: str, receipts: tuple[TargetReceipt, ...]
     ) -> CronRun | None:
-        for s in self._stores().values():
-            if s.get_job(job_id) is not None:
-                return s.close_run_receipts(job_id, run_id, receipts)
+        store = self._resolve_store_for_job(job_id)
+        if store is not None:
+            return store.close_run_receipts(job_id, run_id, receipts)
         return None
 
     def list_runs(self, job_id: str) -> list[CronRun]:
-        for s in self._stores().values():
-            runs = s.list_runs(job_id)
-            if runs:
-                return runs
+        store = self._resolve_store_for_job(job_id)
+        if store is not None:
+            return store.list_runs(job_id)
         return []
+
+    def get_run(self, job_id: str, run_id: str) -> CronRun | None:
+        store = self._resolve_store_for_job(job_id)
+        if store is not None:
+            return store.get_run(job_id, run_id)
+        return None
