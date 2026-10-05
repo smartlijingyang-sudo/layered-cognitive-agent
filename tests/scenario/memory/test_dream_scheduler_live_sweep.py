@@ -218,3 +218,46 @@ async def test_a_second_sweep_promotes_nothing_and_keeps_the_evidence_stable(
     assert (home / "USER.md").stat().st_mtime_ns == user_md_stamp
     assert len(catalog.revised) == 1, "the convergence is one-time, not one per tick"
     assert len(list((home / "revisions").glob("user-md-preimage-*.md"))) == 1
+
+
+async def test_a_tick_that_only_reprojects_the_profile_still_updates_the_evidence(
+    tmp_path: Path,
+) -> None:
+    """A pass that moves no fact but re-renders USER.md is a change.
+
+    This is the R54 convergence shape on a home that has already dreamed once,
+    and the reason ``user_md_written`` is half of ``_changed`` rather than a
+    passenger in the payload. Drop it from the predicate and a home whose
+    profile the sweep repaired reports the previous promotion forever.
+    """
+    home, catalog, clock, scheduler = _seeded_home(tmp_path)
+    await scheduler.sweep_once()
+    stale_profile = "# 用户画像\n"
+    (home / "USER.md").write_text(stale_profile, encoding="utf-8")
+
+    clock[0] += TICK_MS
+    (third,) = await scheduler.sweep_once()
+
+    assert third is not None
+    assert third.upserted == 0, "the episode is already active, so nothing promotes"
+    assert third.user_md_written is True
+
+    assert _evidence(home) == {
+        "now_ms": FIRST_TICK_MS + TICK_MS,
+        "upserted": 0,
+        "user_md_written": True,
+        "trail_facts": 0,
+        "index_documents": 1,
+    }, "the artifact follows the pass that re-projected the profile, not the last promotion"
+    assert (home / "USER.md").read_text(encoding="utf-8") == USER_MD
+
+    preimages = sorted((home / "revisions").glob("user-md-preimage-*.md"))
+    assert [preimage.name for preimage in preimages] == [
+        f"user-md-preimage-{FIRST_TICK_MS}.md",
+        f"user-md-preimage-{FIRST_TICK_MS + TICK_MS}.md",
+    ]
+    assert preimages[1].read_text(encoding="utf-8") == stale_profile, (
+        "the bytes the sweep replaced are recoverable, which is what makes a "
+        "fleet-wide first tick reversible"
+    )
+    assert len(catalog.revised) == 2
