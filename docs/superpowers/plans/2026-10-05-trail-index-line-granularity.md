@@ -10,6 +10,17 @@
 
 实测的当前形状：一句偏好提升之后 `memory_search("简洁")` 返回 3 行，1 行 curated 语义记录加 2 行流水文档，每个流水文档的 `content` 是整天文件原文。`limit=10` 时最坏情况是 10 个整日原文进模型上下文。
 
+生产上已经可观测。运行中的内核（pid 2696579，22:34:23 启动，`--profile profiles/web-assistant.yaml`）加载了条件二的 Task 3（`17496c65f`，22:02）与 Task 4（`4f2a295d1`，22:23），两者都在启动之前提交。`asst_ce7fecd65188` 的索引里目前只有一个文档。
+
+```
+search_memory_index(home, "cron")     -> [('trail-2026-10-05.md', 'trail', 623)]
+search_memory_index(home, "handoff")  -> [('trail-2026-10-05.md', 'trail', 623)]
+search_memory_index(home, "Lee")      -> [('trail-2026-10-05.md', 'trail', 623)]
+search_memory_index(home, "简洁")      -> []
+```
+
+三个互不相关的查询返回同一个 623 字符的整日原文，因为它是一个文档。查用户姓名 Lee 命中，是因为 cron 文本里有「提醒 Lee：」。623 字符会随当天 cron 探针次数增长。这就是本计划要消灭的形状，且它不是假设。
+
 ## 先决发现：流水里已经有第二类内容
 
 写这份计划前查了生产状态，`TrailWriter` 只有一个调用方 `record_turn_trail`，但生产助理 `asst_ce7fecd65188` 的 `memory/2026-10-05.md` 里全部条目都是 cron handoff 文本，没有一条是用户话轮。初次查看时 576 字节两条，第二条在 200 字符处被截断在「决定规则（ADR-0268 §」，即 Task 3 的单行上界生效。
@@ -139,6 +150,7 @@ canonical owner：行抽取归 `domain/trail.py`，文档形状归 `service/inde
 - **content 去重会吃掉合法的多条结果。** 两条不同记录恰好内容相同时只剩一条。语义记录与流水行相同是本计划要去的那个重，其余情况罕见，但去重键选 `content` 而不是 `(content, category)` 是有意的，选后者就抓不到这个重。
 - **旧索引 db 的中间态。** 若 Task 4 的重建步骤被跳过，生产那个 db 会同时含整日文档与行文档，噪音比改之前更大。这一步不能省。
 - **机器文本仍在流水里。** 行粒度不改变这一点，只是改变它被返回的形状。授权漏洞那一档仍然存在，等 run origin 载体。
+- **运行中的内核早于授权收窄。** pid 2696579 于 22:34:23 启动，Task 3（22:02）与 Task 4（22:23）在启动前提交因而已加载，Task 5（`9f6a89c66`，22:58）与 Task 6（`abd7b5780`，23:24）在启动后提交，未加载。所以该内核跑的是收窄前的 `_trail_episode`，任何 `is_preference_statement` 命中都给 `authority=True`。目前不发作，因为 `run_dream` 在生产从未运行。但条件一的调度一旦在这个内核上落地，就会拿旧授权规则去处理一个装满 cron 文本的流水。条件一上线前必须重启内核，或确认调度进程加载的是 Task 5 之后的代码。这一条对[条件一计划](2026-10-04-dream-scheduler-phase0.md)是硬约束。
 - **撤回条件。** 若 run origin 裁决先落地并决定 cron handoff 不进流水，本计划的 Task 5 实测数字需要重跑，Task 1 至 4 不受影响。
 
 ## Retirement
