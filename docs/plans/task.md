@@ -602,8 +602,8 @@
 | ARCH-IMPROVE-DESIGN-SECTIONS | 逐步呈现设计细节（Owns/Does NOT own/不变量测试）并获取审批 | Completed | 全部 3 大小节（§1 边界自治与等级、§2 四阶段深度架构设计、§3 测试不变量矩阵）均获用户审批通过 |
 | ARCH-IMPROVE-DESIGN-DOC | 沉淀设计文档至 docs/plans/ 并提交 git | Completed | 成功落盘 docs/plans/2026-10-05-codebase-architecture-deepening-design.md 并提交 git (commit d47f6f1e8) |
 | ARCH-IMPROVE-TRANSITION | 转换至实施计划制定（writing-plans） | Completed | 成功落盘 docs/plans/2026-10-05-codebase-architecture-deepening-plan.md 并完成 5 大单流任务分解 |
-| ARCH-TASK-1-TRANSPORT | Phase 1 - Transport Run 终态生命周期加深 (INV-ARCH-01, INV-ARCH-02) | Pending | |
-| ARCH-TASK-2-TOOLS | Phase 2 - Assistant Tools 基类统一拦截 Seam (INV-ARCH-03, INV-ARCH-04) | Pending | |
-| ARCH-TASK-3-CRON | Phase 3 - Cron 存储多租户索引与 Seam 封装 (INV-ARCH-05) | Pending | |
-| ARCH-TASK-4-CONTEXTFILES | Phase 4 - ContextFiles 虚设 Seam 与微分层收敛 (INV-ARCH-06) | Pending | |
-| ARCH-TASK-5-VERIFY-REGRESSION | Phase 5 - 全链路回归、契约门禁与 Pre-push 验收 (INV-ARCH-07) | Pending | |
+| ARCH-TASK-1-TRANSPORT | Phase 1 - Transport Run 终态生命周期加深 (INV-ARCH-01, INV-ARCH-02) | Completed | 成功收敛 outcome/status/failure/terminalizer 4大浅目录为 RunTerminalCoordinator (terminal/lifecycle.py)，45 项回归及不变量单测全绿，commit 1997d84ef |
+| ARCH-TASK-2-TOOLS | Phase 2 - Assistant Tools 基类统一拦截 Seam (INV-ARCH-03, INV-ARCH-04) | Completed | 重构 _BaseAssistantTool 模板方法统一拦截 mutating 变更，彻底切除 9 处手写检查，22 项不变量单测 + 41 项自管理回归全绿，commit dd4821350 |
+| ARCH-TASK-3-CRON | Phase 3 - Cron 存储多租户索引与 Seam 封装 (INV-ARCH-05) | Completed | MultiAssistantCronStore 增加 _job_to_assistant O(1) 内存索引与自愈扫描，冲突与删除一致性闭环，76 项测试全绿，commit 47b2255ff |
+| ARCH-TASK-4-CONTEXTFILES | Phase 4 - ContextFiles 虚设 Seam 与微分层收敛 (INV-ARCH-06) | Completed | 收敛 diff/edit/memory_edit_sync 微分层为 contextfiles/sync.py，切除虚设 ports.file_store 依赖，16 项回归测试全绿，commit 71ea80e83 |
+| ARCH-TASK-5-VERIFY-REGRESSION | Phase 5 - 全链路回归、契约门禁与 Pre-push 验收 (INV-ARCH-07) | Completed | ruff check 0 报错、git diff --check 干净，全量 128 项跨阶段回归测试 100% 通过（耗时 5.52s），负边界 100% 遵守 |
