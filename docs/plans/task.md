@@ -610,5 +610,5 @@
 | ARCH-R2-TASK-1-GATES | Phase 1 - Cognition DecisionGates 微目录扁平化与策略聚合 (INV-ARCH-08, INV-ARCH-09) | Completed | 成功收敛 10 个微目录为 flat 深度模块，切除全部空 __init__.py，90 项测试全绿 (INV-ARCH-08, INV-ARCH-09)，commit ef7704a81 |
 | ARCH-R2-TASK-2-INGEST | Phase 2 - Transport Ingest 文件摄取流水线深度收拢 (INV-ARCH-10, INV-ARCH-11) | Completed | 成功收敛 8 个套娃微目录为 flat 深度模块，切除冗余门面，73 项测试全绿 (INV-ARCH-10, INV-ARCH-11) |
 | ARCH-R2-TASK-3-SHIMS-TOOLS | Phase 3 - ContextFiles 滞留垫片清零与 MemoryTools 接缝 (INV-ARCH-12, INV-ARCH-13) | Completed | 3 处滞留 forwarding shims 彻底删除，全仓 import 洁净，_BaseMemoryTool 上下文接缝闭环，419 项回归单测全绿 (INV-ARCH-12, INV-ARCH-13) |
-| ARCH-R2-TASK-4-READ-RUNS | Phase 4 - Transport Read Runs 读侧微目录收拢 (INV-ARCH-14) | In_Progress | 编写 TDD 失败测试中 |
-| ARCH-R2-TASK-5-VERIFY-REGRESSION | Phase 5 - 全链路回归验证、门禁体检与追踪看板闭环 (INV-ARCH-15) | Pending | 待执行 |
+| ARCH-R2-TASK-4-READ-RUNS | Phase 4 - Transport Read Runs 读侧微目录收拢 (INV-ARCH-14) | Completed | 8 个微目录物理删除，平铺为 identity/evidence/live/terminal 4 大深度模块，全量 334 项相关测试全绿 (INV-ARCH-14)，commit 162596bde |
+| ARCH-R2-TASK-5-VERIFY-REGRESSION | Phase 5 - 全链路回归验证、门禁体检与追踪看板闭环 (INV-ARCH-15) | Completed | 全量 49 项跨阶段架构不变量测试 (INV-ARCH-01~14) 100% 通过；ruff check 0 报错；git diff --check 干净；负向边界 100% 遵守 |
