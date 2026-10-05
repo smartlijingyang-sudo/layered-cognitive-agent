@@ -6,7 +6,7 @@ import ast
 from dataclasses import FrozenInstanceError
 from pathlib import Path
 
-from lca.plugins.transport.webserver.handlers.runs.terminal.failure.failure import RunFailureFacts
+from lca.plugins.transport.webserver.handlers.runs.terminal.failure import RunFailureFacts
 
 ROOT = Path(__file__).parents[2]
 FAILURE_RECORDING = (

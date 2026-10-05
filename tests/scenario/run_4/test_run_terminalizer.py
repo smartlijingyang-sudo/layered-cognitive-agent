@@ -9,7 +9,7 @@ from unittest.mock import MagicMock
 import pytest
 
 from lca.plugins.transport.webserver.handlers.runs.session.session.session import RunStatus
-from lca.plugins.transport.webserver.handlers.runs.terminal.terminalizer.terminalizer import (
+from lca.plugins.transport.webserver.handlers.runs.terminal.lifecycle import (
     RunTerminalizer,
 )
 

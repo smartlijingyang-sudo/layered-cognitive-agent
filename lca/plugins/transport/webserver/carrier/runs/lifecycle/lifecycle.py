@@ -28,16 +28,14 @@ from lca.plugins.transport.webserver.handlers.runs.session.session.session impor
     RunRegistry,
     RunSession,
 )
-from lca.plugins.transport.webserver.handlers.runs.terminal.failure.failure import (
+from lca.plugins.transport.webserver.handlers.runs.terminal.lifecycle import (
     RunFailureFacts,
+    RunOutcomeApplier,
+    RunTerminalizer,
     record_run_failure,
 )
 from lca.plugins.transport.webserver.handlers.runs.terminal.observation import (
     emit_carrier_run_failed,
-)
-from lca.plugins.transport.webserver.handlers.runs.terminal.outcome.outcome import RunOutcomeApplier
-from lca.plugins.transport.webserver.handlers.runs.terminal.terminalizer.terminalizer import (
-    RunTerminalizer,
 )
 from lca.plugins.transport.webserver.read.runs.step.tree_flush import (
     flush_step_tree_artifacts,

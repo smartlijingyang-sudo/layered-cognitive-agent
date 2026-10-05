@@ -27,7 +27,7 @@ from lca.plugins.transport.webserver.handlers.runs.session.message.conversation_
 from lca.plugins.transport.webserver.handlers.runs.session.message.history import (
     extract_prior_turns,
 )
-from lca.plugins.transport.webserver.handlers.runs.terminal.terminalizer.terminalizer import (
+from lca.plugins.transport.webserver.handlers.runs.terminal.lifecycle import (
     RunTerminalizer,
 )
 

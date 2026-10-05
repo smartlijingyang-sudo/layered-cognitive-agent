@@ -1,16 +1,7 @@
 """Best-effort logging of run failure (no Journal emission).
 
-This module is a pure observation-safety net: when the normal lifecycle
-finishing path itself fails, log the failure fact so operators can see it,
-but do NOT emit ``AgentRunFinished`` into the Journal. The
-``AgentRunStarted`` / ``AgentRunFinished`` facts are owned by
-``lca.agent.cognitive_agent`` (catalog single-emitter constraint); this
-handler is not allowed to bypass that ownership. If the agent's own
-termination path failed, the prior ``AgentRunFinished`` event is still in
-the Journal store and UI终止卡 can fall back to it.
-
-Accepting a small immutable fact value (rather than the mutable
-``RunSession`` carrier) keeps lifecycle and observability ownership separate.
+Defensive observation safety net: logs the failure fact and writes kernel.log,
+strictly decoupled from the mutable RunSession lifecycle carrier.
 """
 
 from __future__ import annotations
@@ -39,16 +30,7 @@ class RunFailureFacts:
 
 
 def record_run_failure(facts: RunFailureFacts) -> None:
-    """Log the failure fact; never emit a Journal event.
-
-    Lifecycle and Journal emission are owned by ``lca.agent.cognitive_agent``.
-    This function is a defensive log so the failure is visible when the
-    primary emission path itself failed.
-
-    Also appends a durable line to ``traces/runs/<run_id>/kernel.log`` so
-    ``lca-ops debug-run`` can surface the message when Journal is empty
-    (ADR-0122 kernel.log intent / ADR-0165.1 carrier gap).
-    """
+    """Log the failure fact and append to kernel.log without Journal emission."""
     _log.warning(
         "run_failure_observed",
         trace_id=facts.trace_id,

@@ -101,15 +101,11 @@ def test_temporal_memory_store_delegates_schema_and_record_codec() -> None:
 
 
 def test_terminalizer_only_coordinates_terminal_transition_order() -> None:
-    """Terminal status, artifact closure, manifest, and exporter cleanup have owners."""
-    source = _source("lca/plugins/transport/webserver/handlers/runs/terminal/terminalizer/terminalizer.py")
+    """Retired: terminalizer/status/outcome 浅目录收敛为 terminal/lifecycle.py (INV-ARCH-01/02)。
 
-    assert "lca.plugins.transport.webserver.handlers.runs.terminal.status.status" in source
-    assert "lca.infrastructure.tools.run.finalizer" in source
-    assert "lca.plugins.transport.webserver.read.runs.terminal.materialization" in source
-    assert "lca.plugins.transport.webserver.carrier.runs.lifecycle.export_disposal" in source
-    assert "def _derive_terminal_status" not in source
-    assert "def _record_terminal_materialization" not in source
+    新形态由 tests/lca_plugins/transport/webserver/test_run_terminal_coordinator.py 守护。
+    """
+    pytest.skip("retired: terminalizer.py consolidated into terminal/lifecycle.py; guarded by test_run_terminal_coordinator.py")
 
 
 def test_openai_shim_is_a_facade_over_protocol_service_and_http_adapters() -> None:

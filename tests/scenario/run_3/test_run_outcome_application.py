@@ -6,7 +6,7 @@ from lca.plugins.transport.webserver.handlers.runs.session.session.session impor
     RunSession,
     RunStatus,
 )
-from lca.plugins.transport.webserver.handlers.runs.terminal.outcome.outcome import RunOutcomeApplier
+from lca.plugins.transport.webserver.handlers.runs.terminal.lifecycle import RunOutcomeApplier
 
 
 def _session() -> RunSession:

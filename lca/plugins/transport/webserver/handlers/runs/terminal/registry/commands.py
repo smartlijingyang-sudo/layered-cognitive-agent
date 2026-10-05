@@ -23,13 +23,13 @@ from lca.plugins.transport.webserver.carrier.runs.execute.scheduling import (
     schedule_run,
 )
 from lca.plugins.transport.webserver.handlers.runs.session.session.session import RunRegistry
+from lca.plugins.transport.webserver.handlers.runs.terminal.lifecycle import (
+    RunTerminalizer,
+)
 from lca.plugins.transport.webserver.handlers.runs.terminal.port.port import (
     RunCommandReceipt,
     RunReceipt,
     RunRequest,
-)
-from lca.plugins.transport.webserver.handlers.runs.terminal.terminalizer.terminalizer import (
-    RunTerminalizer,
 )
 
 _log = structlog.get_logger(__name__)

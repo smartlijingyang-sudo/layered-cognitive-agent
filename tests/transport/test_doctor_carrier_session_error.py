@@ -24,7 +24,7 @@ def test_debug_run_extract_failure_reads_session_error() -> None:
 
 
 def test_record_run_failure_writes_kernel_log(tmp_path: Path, monkeypatch) -> None:
-    from lca.plugins.transport.webserver.handlers.runs.terminal.failure.failure import (
+    from lca.plugins.transport.webserver.handlers.runs.terminal.lifecycle import (
         RunFailureFacts,
         record_run_failure,
     )
