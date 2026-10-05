@@ -180,11 +180,25 @@ canonical owner 判定：风格偏好词表归 `contracts/models/memory/episode.
 
 ### Task 6：Phase 0 条件二端到端验收
 
-一条场景测试走完链路。构造一个 `task` 为判据句的 turn，跑 `phase.perceive.observe`，断言 `{home}/memory/<date>.md` 出现该行；断言 `memory_search` 当轮能命中它（Task 4 的前提）；跑 `run_dream`，断言 `semantic.json` 出现 `dedupe_key=preference:verbosity` 的活跃记录；再跑一次 `run_dream`，断言行数与退役行数都不增长，即 `_already_active` 的 NOOP 生效。
+状态：已完成。
 
-这条测试就是 Phase 0 条件二的判据本身，也是 ADR-0287 §4 里「trail 追加后 `memory_search` 当轮能命中该偏好句」那一条的落点。
+`tests/scenario/memory/test_phase0_condition2_trail_capture.py` 走 `phase.perceive.observe` 真实节点，不手写流水。断言分五段：判据句落进当天流水且 `episodes/` 为空（`govern()` 对它返回 `None`，路线 b 成立）、`is_preference_statement` 命中、当轮 `memory_search` 能命中（D6 前提）、单次提及经 `run_dream` 不提升、跨天复现后提升为唯一一条 `preference:verbosity` 且第三次 dream 的行数与退役行数不变。
 
-验证：新增 `tests/scenario/memory/test_phase0_condition2_trail_capture.py`。
+计划初稿写的是「跑 `run_dream` 就断言出现 `preference:verbosity`」，那是 Task 5 收窄授权之前的语义。收窄之后单次提及停在 `ephemeral_fast`，验收必须走两天，否则测试会与授权矩阵自相矛盾。
+
+日期不写死。`observe` 调 `record_turn_trail` 不传 `now_ms`，流水文件名取自墙钟，所以当天文件按 glob 找，第二天用一个保证不同的固定日期，跨午夜不会让本测试变红。已连跑 5 次随机顺序并与整目录同跑，均稳定。
+
+#### 检索噪音，需另行裁决
+
+端到端跑出来的实测形状：一句偏好提升之后 `memory_search("简洁")` 返回 3 行，1 行 curated 语义记录加 2 行流水文档，而每个流水文档的 `content` 是**整天**的文件原文。原因是 `_documents` 按整个流水文件产一个文档，`doc_id=trail-<文件名>`。
+
+Task 3 之前流水不存在，这个形状不可达；Task 3 加 Task 4 之后它成为常态，并随天数与当天话轮数增长。`limit=10` 时最坏情况是 10 个整日文件进模型上下文。
+
+`test_trail_documents_are_whole_day_files` 把当前形状钉住，粒度或排序要改时该测试变红，改动必须显式。
+
+三条候选，都不在本计划范围。一是接受，流水本来就是证据，ADR-0254 设计索引覆盖它。二是合并结果里把 curated 记录排在流水之前并给流水行数设上限，保证投影不会把记录挤出 `limit`。三是流水索引改按行粒度，`doc_id` 变为 `trail-<文件名>-<行摘要>`，一次命中只返回一行，代价是 `build_memory_index` 与 `index_trail_file` 的文档形状都要改，Task 4 建立的一致性约束要重新对齐。
+
+倾向三。它同时解决噪音与上下文膨胀，且与 Task 2 的稳定维度键同一思路，粒度对齐语义单元。但它改的是 `_documents` 的既有形状，属新的独立任务。
 
 ## Verification
 
@@ -199,11 +213,12 @@ canonical owner 判定：风格偏好词表归 `contracts/models/memory/episode.
 
 ## Risks
 
-- **语料太小，误报率测不准。** 76 行对话不足以给出统计意义上的误报率。缓解是 Task 2 的稳定维度键把误报代价降到 ephemeral，而不是靠探测器精度兜底。若上线后发现 `preference:verbosity` 被误提升，回退点是 Task 5 的词表，不是 Task 2 的键形状。
-- **流水体积。** 每个话轮一行，长期无上限。`run_dream` 把每行都映射成 EpisodeFact，非偏好行落 `trail:<摘要>` 且 `authority=False`、`recurrence` 恒为 1，因此停在 `ephemeral_fast`，不进 `semantic.json`，但会持续增大 episode 集合与索引。本计划只做单行长度上界，不做保留期。保留期属 ADR-0249 Night Consolidation 的 decay 职责，不在条件二范围，需要时另立。
-- **隐私过滤是新增的读侧行为。** Task 3 给 `_search_indexed` 加过滤会让某些既有查询少返回结果。这是修正而不是回归，但要在 PR 描述里写明，避免被当成检索能力下降。
-- **`MemoryIndex` 只有一个实现。** 给它加方法符合 §5 的闭环要求，但也说明这个 Protocol 目前是单实现抽象。本计划不借机扩实现，也不删这个 seam，删除属 `lca-find-simplifications` 的范围。
-- **撤回条件。** Task 2 的稳定维度键若与 ADR-0277 待拍板⑦（`SemanticClaim` 与 `MemoryRecord` 的关系）的裁决冲突，Task 2 与 Task 5 需按裁决重做，Task 1/3/4 不受影响，因为它们的归属与键形状无关。
+- **语料太小，误报率测不准。** 实测语料 213 行（24 个含 `semantic.json` 的 home 共 136 条记录，加 19 个对话日志的用户话轮），不足以给出统计意义上的误报率，Task 5 记录的是不存在性证明。缓解不是探测器精度，而是授权收窄到「显式指令且命中维度」，加上 Task 2 的稳定维度键让误报会被下一条同维度 upsert 退役。若上线后发现 `preference:verbosity` 被误提升，回退点是 Task 5 的词表与授权交集，不是 Task 2 的键形状。
+- **检索噪音与上下文膨胀。** `_documents` 按整天产一个流水文档，所以一次命中会把当天全部话轮原文带进模型上下文，且同一事实会同时以 curated 记录与多个流水文档出现。实测形状与三条候选见 Task 6 的「检索噪音，需另行裁决」。这是 Task 3 加 Task 4 之后才可达的，此前流水无生产方。
+- **流水体积。** 每个话轮一行，长期无上限。`run_dream` 把每行都映射成 EpisodeFact，非偏好行落 `trail:<摘要>` 且 `authority=False`、`recurrence` 恒为 1，因此停在 `ephemeral_fast`，不进 `semantic.json`，但会持续增大 episode 集合与索引。本计划只做单行长度上界（200 字符），不做保留期。保留期属 ADR-0249 Night Consolidation 的 decay 职责，不在条件二范围，需要时另立。
+- **隐私过滤已落地为读侧行为。** Task 3 把过滤统一成所有检索路径之后的一次，`_search_branch` 的结果也开始被过滤，某些既有查询会少返回结果。这是修正而不是回归，但会让检索结果数量下降，需要与「检索能力下降」区分。
+- **`MemoryIndex` 只有一个实现。** Task 4 给它加了 `add`，符合 §5 的闭环要求，但也说明这个 Protocol 目前是单实现抽象。本计划不借机扩实现，也不删这个 seam，删除属 `lca-find-simplifications` 的范围。
+- **撤回条件。** Task 2 的稳定维度键若与 ADR-0277 待拍板⑦（`SemanticClaim` 与 `MemoryRecord` 的关系）的裁决冲突，Task 2 与 Task 5 需按裁决重做，Task 1/3/4/6 不受影响，因为它们的归属与键形状无关。
 
 ## Retirement
 
