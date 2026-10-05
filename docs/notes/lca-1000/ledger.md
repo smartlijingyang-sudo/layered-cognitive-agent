@@ -845,5 +845,29 @@
   8. `parameters` ×2 / `target` ×2 / `__init__` ×2（phase_observation vs runtime_event_publisher）—— 驳回：沿用 510/512（interface 契约本身 / fake 刻意镜像 / 构造器对称）。
   9. contracts/ 下 Protocol `...` stub 大组 —— 非实质（trivial stub），扫描已排除。
 - 验证结果: `~/.local/bin/ruff check` 2 文件 All checks passed；`ruff format --check` already formatted；import identity 冒烟（`evidence._file_names is convergence.payload._file_names`）OK；新旧行为等价冒烟 15 用例（None/非 list/空/A2A dict/纯字符串/isDirectory 跳过/空名过滤等）全等；targeted pytest 4 文件（tests/cognition/body/test_listfiles_not_files_created.py、tests/cognition/test_delivery_synth.py、tests/infrastructure/test_turn_control_files_created.py、tests/infrastructure/test_turn_control_reader.py）：14 passed；`lint-imports` exit 0（全契约通过，新增 cognition 层内边合规）。
-- commit: <待回填> refactor(lca-1000): 第0513轮 收敛 _file_names 重复实现到 convergence/payload（未 push）。
+- commit: 94bc3757d refactor(lca-1000): 第0513轮 收敛 _file_names 重复实现到 convergence/payload（未 push）。
 - 备注: 只 add/commit 本轮 2 文件（代码 1 + ledger.md），`git commit -- <paths>` 显式路径；并发会话已 staged 的 2 个测试文件改动及 untracked（docs/notes/audit-2026-10-05.md、ralph/）全程未触碰；512 轮 hash 回填行（7f518a5d3）属本 campaign 自有 bookkeeping，随本次一并提交（沿用 505/510/511 做法）。备份 /tmp/bak_0513/（252，改动前 evidence.py/payload.py）。scan0513.py/scan0513b.py/patch0513.py/smoke0513.py 留 /tmp（252，非仓库文件）。
+
+- 更正（513 轮 commit 后补查，迟到的后台 grep 结果证实）：本轮"为什么这是实质改动"证据链第 (5) 点有误——`safe_executor/__init__.py:23` 实际从 evidence 导入了 `_file_names` 并在 `:55` 的 `__all__` 中 re-export（此前只看了该文件 14–20 行，漏看了 23 行）。结论不变、无下游断裂：re-export 经由 evidence.py 的跨模块 import 绑定继续解析，已显式验证 `safe_executor._file_names is convergence.payload._file_names` 且 `'_file_names' in safe_executor.__all__`；本轮冒烟与 pytest 即经由 package import 路径执行，已覆盖。教训：断言"某名字未被导入"时必须 grep 全仓库而非只看局部行段；迟到的后台任务结果仍需核对已提交的台账断言。
+
+
+## 第0514轮 (2026-10-06 07:33-07:50 CST)
+- 改了什么: 收敛 `lca/infrastructure/cli/commands/observation/debug_graph.py` 中与 `_shared/projection.py` 同构的本地 `_truncate`（6 行）与 `_safe_repr`（28 行）为跨模块导入：删除两处本地定义，4 处 `_truncate(` 调用点改调共享 `truncate`，import 行扩展为 `(_safe_repr, spine_filename_for_run_cwd, truncate)`；同步删除因此闲置的 `from datetime import datetime` 与 `from lca.infrastructure.text.truncate import ASCII_ELLIPSIS, truncate_text`。改动 1 文件：+9/-43。
+- 依据 skill 哪一节: SKILL.md Deletion test（删掉 debug_graph 本地两份副本后复杂度直接消失：全部 9 个调用点被 `_shared/projection` 的 canonical 实现吸收；旧注释自证曾有"同型修法"的并行维护负担）+ DEEPENING.md Seam discipline（`_safe_repr`/`truncate` 保持原名与下划线私有，不进 `__all__`，internal seam 不外泄；`_shared/projection` 本就是 CLI 命令共享渲染知识的 seam，debug_graph 原已从它 import——未新增模块边）+ LANGUAGE.md Locality/Leverage（datetime 字面量/对象双识别、`object at 0x` 抑制这类"看起来会错"的细节从此单点；11 个调用点共享同一实现）。
+- 为什么这是实质改动(非凑数): 收敛的是真实的已分叉语义重复——两处 `_safe_repr` 逻辑逐字相同（仅注释/docstring 与所调 truncate 别名不同），而两处 truncate 经源码级证明行为全等：`truncate_text(s, n-3, suffix="...")` ≡ `s[:n-3]+"..."`（truncate.py:29-33 源码即此，无词边界逻辑）。证据链：(1) 新旧实现 817 组对比 0 差异（_safe_repr 29 用例×19 种截断长度 + truncate 14 字符串用例×19 种长度；用例含 59/60/61/119/120/121 边界长度、换行、unicode、datetime 对象/字面量/tzinfo、object 地址 repr、自定义类、容器）；(2) 模块级 identity 断言 `dg._safe_repr is projection._safe_repr`；(3) 两函数全库调用点仅限两文件内部（git grep，无外部用户）；(4) 旧注释"（0225 projection.py 同型修法）"自证 drift 方向：projection 为 canonical。
+- 关键设计决策（夜间跳过 grilling，记台账）: canonical 定在 projection 而非 debug_graph——修法源头在 projection（0225）、且 `_shared/` 包的职责就是跨命令共享。跨模块导入私有名沿用 509/513 模式（internal seam 纪律，不加 `__all__`）。`_summarize_outputs` 与 projection 的 `summarize_outputs` 也是镜像对，但属另一知识单元，不在本轮凑数。
+- 候选清单（本轮 explore：名称+字面量归一化 AST 扫描 55 组，逐一取舍）:
+  1. `_safe_repr`/`_truncate` ×2（debug_graph.py vs _shared/projection.py）—— 选中。
+  2. `emit_*_for_state` ×16（cognitive_emit）—— 驳回：每个命名 emitter 是调用方的公开 interface（调用点按名绑定），事件名字符串必须落在某处；deletion test 未过。
+  3. `parse_*` ×6（contracts/atoms）—— 驳回：各 atom 的字面量键不同（归一化隐藏了字面量差异），每个 parse 是其 atom 类型的 interface。
+  4. `node_execute` 组（lca/nodes）—— 驳回：节点插件入口 interface，形状即框架契约（同 513 setup×2 判例）。
+  5. `search` ×3（tavily/searxng/exa）—— 驳回：同一 seam 的三个 adapter（三个 adapter 即真实 seam），结构相似是 adapter 本性；跨 adapter 共享实现会耦合 seam。
+  6. `install_ps1`/`install_sh`、`download_runner_bat`/`download_runner_command`（routes_http）—— 驳回：281 行体是安装脚本字面量 payload（归一化隐藏了字面量），差异未确证，收敛有损坏 payload 风险；defer。
+  7. companion client.py vs standalone.py 8 组 —— 驳回：沿用 508/509/512（sync/async 桥接刻意镜像）。
+  8. `evaluate` ×2（reflect/remember derivers）、`_current_exception` ×2（exception classifiers）、`_emit`/`_fail`/`_ok` 家族 —— 驳回：插件家族刻意镜像，需 grilling（沿用 508/509/512）。
+  9. `append`/`append_via_session`（spine.py 同文件）、`_load_*_payload` ×2（fold_source.py 同文件）、`dispatch_run`/`dispatch_resume`（facade.py 同文件）、`refuse_*` ×2（external_content.py 同文件）—— 驳回：同文件刻意包装对 / interface 表面，deletion test 未过或需 grilling。
+  10. `_section_output_dicts` ×2（prompt_render/compile.py vs brain/reasoner/reasoner.py，14 行全等）—— defer：真实全等但跨层（nodes↔cognition），canonical 归属与 import 方向需 import-linter 契约核对 + 白天 grilling；下轮候选。
+  11. `_decode_json_string_content` vs `_decode_json_string_prefix`、`_ownership_error` ×2、`build_bash_tool`/`build_file_write_tool`、`render_curated_*` ×2、`generate_gmail_skill_content`/`market_auth_setup_hint` —— defer：语义差异未确证，留作后续候选。
+- 验证结果: `~/.local/bin/ruff check` 2 文件 All checks passed；新旧行为等价冒烟 817 组对比 0 差异 + 模块 identity 断言 OK；targeted pytest 3 文件（tests/infrastructure/cli/test_debug_graph.py、test_runs_debug.py、tests/scenario/code/test_code_conventions.py）：22 passed；`lint-imports` exit 1 系**预先存在、与本轮无关**：在未改动的 pristine 树上（git stash 验证）同样 exit 1，卡在 "No matches for ignored import ... lca_kernel" 配置解析、未进入契约分析；本轮未新增模块边（debug_graph→projection 边此前已存在）。`ruff format --check` 本轮新增行干净；文件其余 format diff 为 pre-existing（备份文件同样不通过），未动。
+- commit: <待回填> refactor(lca-1000): 第0514轮 收敛 debug_graph _safe_repr/_truncate 到 _shared/projection（未 push）。
+- 备注: 只 add/commit 本轮 2 文件（代码 1 + ledger.md），`git commit -- <paths>` 显式路径；并发会话已 staged 的 2 个测试文件改动及 untracked（docs/notes/audit-2026-10-05.md、ralph/）全程未触碰；513 轮 hash 回填行（94bc3757d）与"- 更正"附录属本 campaign 自有 bookkeeping，随本次一并提交（沿用 505/510/511/512/513 做法）。备份 /tmp/bak_0514/debug_graph.py（252，改动前原文件）。scan0514.py/patch0514.py/smoke0514.py 留本地 hidden_files/scratch（非仓库文件）。教训：patch 脚本的"检查后替换"顺序 bug（先断言残留后替换导致误报 LEFTOVER 中断）——以后先替换再断言；写文件内容走 stdin/base64 通道，不走命令行内嵌（沿用 512 教训）。

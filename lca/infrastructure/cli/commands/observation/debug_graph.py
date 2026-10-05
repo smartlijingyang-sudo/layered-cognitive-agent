@@ -16,13 +16,15 @@ llm 响应、tool_calls、gate verdict,并按可靠性自动标注每一步状�
 from __future__ import annotations
 
 import json
-from datetime import datetime
 from typing import Any
 
 import typer
 
-from lca.infrastructure.cli.commands._shared.projection import spine_filename_for_run_cwd
-from lca.infrastructure.text.truncate import ASCII_ELLIPSIS, truncate_text
+from lca.infrastructure.cli.commands._shared.projection import (
+    _safe_repr,
+    spine_filename_for_run_cwd,
+    truncate,
+)
 
 _LOG_DEBUG_GRAPH_TAG = "debug-graph"
 
@@ -64,42 +66,6 @@ def _classify_node(end_event: dict[str, Any]) -> tuple[str, str]:
     if outcome in _FAIL_OUTCOMES or error:
         return "✗", error or outcome
     return "✓", ""
-
-
-def _truncate(s: str, n: int = 120) -> str:
-    s = s.replace("\n", " ").strip()
-    # Canonical truncation; the hard-coded 3 was len(ASCII_ELLIPSIS).
-    return s if len(s) <= n else truncate_text(s, n - len(ASCII_ELLIPSIS), suffix=ASCII_ELLIPSIS)
-
-
-def _safe_repr(v: Any, n: int = 60) -> str:
-    """repr 但抑制 object 地址(`<...object at 0x...>`)和 datetime repr。
-
-    spine.jsonl 里 datetime 是字符串字面量 ``"datetime.datetime(...)"``,
-    Python 对象是 ``datetime.datetime(...)``。两种都要识别。
-    """
-    is_string_dt = isinstance(v, str) and v.startswith("datetime.datetime(")
-    r = repr(v)
-    # object 地址类: '<abc.Tool_search object at 0x7f...>'
-    if "object at 0x" in r:
-        return f"<{type(v).__name__}>"
-    # datetime repr (对象或字符串字面量)
-    if is_string_dt or r.startswith("datetime.datetime("):
-        # 字符串字面量: 'datetime.datetime(2026, 9, 14, 12, ...)'  → 抽出 ISO 段
-        if is_string_dt:
-            # 截到 'tzinfo=...' 之前作为可读摘要
-            inner = v[len("datetime.datetime(") : -1]
-            return _truncate(inner, n)
-        # str 的 repr 以引号开头, 走不到这里;
-        # 能到这里的只有 datetime 对象
-        # （0225 projection.py 同型修法）。
-        if isinstance(v, datetime):
-            try:
-                return v.isoformat()
-            except Exception:
-                return f"<{type(v).__name__}>"
-        return f"<{type(v).__name__}>"
-    return _truncate(r, n)
 
 
 def _summarize_outputs(outputs: dict[str, Any]) -> list[str]:
@@ -145,12 +111,12 @@ def _summarize_response(response: dict[str, Any]) -> list[str]:
             name = tc.get("name") or tc.get("tool_name") or "?"
             args = tc.get("arguments") or {}
             if isinstance(args, dict):
-                args_str = ", ".join(f"{k}={_truncate(repr(v), 50)}" for k, v in args.items())
+                args_str = ", ".join(f"{k}={truncate(repr(v), 50)}" for k, v in args.items())
             else:
-                args_str = _truncate(repr(args), 80)
+                args_str = truncate(repr(args), 80)
             lines.append(f"    tool_call: {name}({args_str})")
     elif response.get("text"):
-        lines.append(f"    text: {_truncate(response['text'], 160)}")
+        lines.append(f"    text: {truncate(response['text'], 160)}")
     if response.get("finish_reason"):
         lines.append(f"    finish_reason: {response['finish_reason']}")
     usage = response.get("usage") or {}
@@ -318,7 +284,7 @@ def render_human(report: dict[str, Any], run_id: str) -> str:
             if isinstance(args, dict):
                 args_str = ", ".join(f"{k}={_safe_repr(v, 60)}" for k, v in args.items())
             else:
-                args_str = _truncate(repr(args), 100)
+                args_str = truncate(repr(args), 100)
             out.append(f"    tool_call: {name}({args_str})")
     out.append("")
 
