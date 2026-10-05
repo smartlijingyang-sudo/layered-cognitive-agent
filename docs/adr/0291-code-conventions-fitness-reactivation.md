@@ -1,8 +1,8 @@
 # ADR-0291：代码规范健身函数空心化修复与激活策略
 
-> **Status: Proposed**（2026-10-05 iter-arch 10:09 轮起草；**待李超拍板**）
+> **Status: Accepted**（2026-10-05 iter-arch 10:09 轮起草；2026-10-05 Athena 按李超授权裁决通过）
 > 本提案处理 todo-56：`tests/scenario/code/test_code_conventions.py` 四个空心测试的修复与激活策略。
-> **未改动任何代码与文档现状**；四测试现状依旧空心，tests lane 在 §5 拍板前不动。
+> **未改动任何代码与文档现状**；四测试现状依旧空心，tests lane 在 §5 拍板（已裁决）前不动。
 
 ## 1. Context（发现）
 
@@ -72,7 +72,7 @@
 - **C4 glossary 现役定义 SSOT**：正反覆盖的"现役区"以 `docs/specs/glossary.md`
   的「已废弃主名」章节为唯一分界，测试只读不自定义。
 
-## 5. 待拍板（李超）
+## 5. 决策记录（2026-10-05，Athena 按李超授权裁决）
 
 ① **Phase C 三选一**：(i) 分批豁免登记 / (ii) 阈值重设 / (iii) 大文件拆分。
 推荐 (i) 分批豁免登记：拆分 149 个文件是数月工程；阈值重设是数字游戏掩盖问题；
@@ -87,7 +87,20 @@
 
 ## 6. 诚实边界
 
-- 本 ADR 为 **Proposed**；四测试现状依旧空心，tests lane 在 §5 拍板前不动（todo-56 约束延续）。
+- 本 ADR 为 **Proposed**；四测试现状依旧空心，tests lane 在 §5 拍板（已裁决）前不动（todo-56 约束延续）。
 - 149 / 69 等数字引自 tests 09:09 轮干跑报告（`hidden_files/red-20261005-0909.txt` 同级证据），
   本轮 arch 未重测；Phase 落实前以实测为准。
 - 本 ADR 未改动任何代码与文档现状；message 与 diff 相符（docs only）。
+
+**裁决**：四项全部批准，按 §3/§4 实施。
+
+- ① Phase C 选 **(i) 分批豁免登记**。第一性原理：健身函数的意义是让大文件自我辩护，不是强制小文件——
+  逐文件写一句真实理由的过程本身就是一次全仓大文件合理性审计，审计完自然知道哪些真该拆。
+  (ii) 阈值重设是数字游戏，掩盖问题；(iii) 拆分 149 个文件是数月工程、回归风险高，不值得为治理信号付出。
+  豁免审计中被判定"真该拆"的文件，另立 P1 后续项，不在本 ADR 承诺拆分工程。
+  注：149 个豁免超 C3 的"10+ 须 ADR 仲裁"门，本 ADR 即该仲裁，合规。
+- ② Phase B 节奏批准：arch lane 按认知域分 3–4 批、每批独立 commit。
+- ③ C1 基数门批准：类扫描 ≥800、文件扫描 ≥400（fail-closed 防空心），最终值由 Phase A 落实时实测并钉住。
+- ④ todo-56 定级 **P1**：治理债，不阻塞生产行为。
+- 派工：tests lane Phase A（一次重写，预期红是真实债务信号）；arch lane Phase B；quality lane 主导 Phase C；
+  tests lane Phase D 按 reverse → forward → line-count → layer-docstring 顺序点亮，每点亮独立 commit，真绿才合。
