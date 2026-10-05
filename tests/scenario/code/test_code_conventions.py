@@ -265,6 +265,10 @@ def _read_glossary_terms() -> set[str]:
 # 反向校验的扫描范围：术语表覆盖 contracts 与 L0-L4 全部层的类名。
 # ADR-0291 Phase A：去掉已不存在的 lca.plugins.loop.phase，
 # 换为现行 lca.plugins.loop 下的 control/driver/graph/reducer 四包。
+# ADR-0291 Phase D 前置动作①（2026-10-05 tests lane）：纳入 lca.plugins.strategies
+# （7 策略类 DebateStrategy…SwarmStrategy）与 lca.plugins.tools.diagnostics
+# （3 诊断工具类 FailureExplainer/MinimalReproduction/OptimizationFinder）——
+# 三类均实证真实存在，先前因扫描范围外致 reverse 设计意图红，勿当 deleted 清理。
 _REVERSE_SCAN_PACKAGES = (
     "lca.contracts",
     "lca.infrastructure",
@@ -276,6 +280,8 @@ _REVERSE_SCAN_PACKAGES = (
     "lca.plugins.loop.driver",
     "lca.plugins.loop.graph",
     "lca.plugins.loop.reducer",
+    "lca.plugins.strategies",
+    "lca.plugins.tools.diagnostics",
 )
 _CAMEL_CASE_TERM = re.compile(r"^[A-Z][A-Za-z0-9]*$")
 _DEPRECATED_SECTION_MARKERS = ("已废弃主名", "禁止复活")
@@ -480,18 +486,17 @@ class TestGlossaryReverseCoverage(unittest.TestCase):
             f"现役术语为空：{_GLOSSARY_PATH} 不存在、无词条或「已废弃主名」章节位置漂移",
         )
 
-        # Terms from deleted modules that haven't been moved to the deprecated section yet.
-        # Phase B（arch lane）负责将其移入「已废弃主名」表后从此处删除。
-        known_deleted_terms = {
-            "CandidateEvaluationPipeline",
-            "DecisionParser",
-            "DegradationPolicy",
-            "GracefulDegradation",
-            "SimpleDecisionParser",
-            "FailureExplainer",
-            "MinimalReproduction",
-            "OptimizationFinder",
-        }
+        # ADR-0291 Phase D 前置动作②（2026-10-05 tests lane）：8 条目全部清账——
+        # ① 5 个已删除术语（CandidateEvaluationPipeline/DecisionParser/
+        #    DegradationPolicy/GracefulDegradation/SimpleDecisionParser）已由
+        #    Phase B（arch lane）移入 docs/specs/glossary.md「已废弃主名」表
+        #    （实证：glossary.md 366–371 行；现役区 88 行的 DecisionParser 非
+        #    bold 行内提及，reverse 只抓 bold 术语，不受影响）；
+        # ② 3 个（FailureExplainer/MinimalReproduction/OptimizationFinder）为
+        #    真实存在的诊断工具类（lca.plugins.tools.diagnostics/*），先前因
+        #    扫描范围外被误登记，随动作①纳入扫描后可直接命中。
+        # 保留空集合作为历史记录位（后续 deleted terms 未进废弃表时可再登记）。
+        known_deleted_terms: set[str] = set()
 
         class_names = _collect_class_names(_REVERSE_SCAN_PACKAGES)
         # C1 基数门：扫描基数异常时直接红，不许恒绿。
