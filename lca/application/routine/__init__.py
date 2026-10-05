@@ -1,4 +1,4 @@
-from lca.application.routine.locks import ReclaimInfo, RoutineFileLock
+from lca.application.routine.locks import ReclaimTrace, RoutineFileLock
 from lca.application.routine.scheduler import RoutineSchedulerService
 from lca.application.routine.spend_guard import SpendGuard
 from lca.application.routine.tick import (
@@ -20,7 +20,7 @@ __all__ = [
     "RETRY_BACKOFFS_S",
     "DeadLetter",
     "FailureState",
-    "ReclaimInfo",
+    "ReclaimTrace",
     "RoutineFileLock",
     "RoutineSchedulerService",
     "RoutineTickDriver",

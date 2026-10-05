@@ -8,7 +8,7 @@ get_run_params），无互斥锁、无 SKIP verdict、无持久化下沉、无 t
 
 tests lane 定义的契约 seam（quality lane 实现时遵循；开放设计点已标注）：
 - lca.application.routine.locks.RoutineFileLock(lock_dir, routine_id, stale_after_s=None)
-  acquire() -> bool / release() / reclaim_stale() -> ReclaimInfo | None。
+  acquire() -> bool / release() / reclaim_stale() -> ReclaimTrace | None。
   锁文件 <lock_dir>/<routine_id>.lock，JSON {"owner": str, "heartbeat_ms": int}
   （锁文件格式是本契约的一部分：T2 的"写过期锁文件模拟"依赖它）。
   stale 默认 2×interval、绝对上限 90min（§9 裁决①②）。

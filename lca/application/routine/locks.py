@@ -10,9 +10,9 @@ Lock file: ``<lock_dir>/<routine_id>.lock``, JSON
 contract (ADR-0263 T2 simulates kill -9 by writing a stale lock file directly).
 
 Intended tick-driver flow (T5, ADR-0263 §10 — not this module's job):
-``reclaim_stale()`` -> journal the ReclaimInfo if any -> ``acquire()`` ->
+``reclaim_stale()`` -> journal the ReclaimTrace if any -> ``acquire()`` ->
 run -> ``release()``. ``acquire()`` deliberately does NOT auto-reclaim:
-a silent reclaim would drop the ReclaimInfo trace, and ADR-0263 C2 requires
+a silent reclaim would drop the ReclaimTrace trace, and ADR-0263 C2 requires
 reclaim to leave a trace, never be silent.
 """
 
@@ -37,7 +37,7 @@ DEFAULT_STALE_AFTER_S = 5_400
 
 
 @dataclass(frozen=True)
-class ReclaimInfo:
+class ReclaimTrace:
     """Trace left by a stale-lock reclaim (ADR-0263 C2: never silent)."""
 
     previous_owner: str
@@ -132,7 +132,7 @@ class RoutineFileLock:
             return False
         return utc_now_ms() - heartbeat_ms < self._stale_after_s * 1000
 
-    def reclaim_stale(self) -> ReclaimInfo | None:
+    def reclaim_stale(self) -> ReclaimTrace | None:
         """Remove a dead holder's lock file and return the trace.
 
         ``None`` when there is no lock file or the lock is still fresh.
@@ -157,7 +157,7 @@ class RoutineFileLock:
             self._path.unlink()
         except OSError:
             return None  # someone else reclaimed it first
-        return ReclaimInfo(
+        return ReclaimTrace(
             previous_owner=owner,
             held_ms=now_ms - heartbeat_ms,
             reclaimed_at_ms=now_ms,
@@ -187,6 +187,6 @@ class RoutineFileLock:
 __all__ = [
     "DEFAULT_STALE_AFTER_S",
     "STALE_AFTER_CAP_S",
-    "ReclaimInfo",
+    "ReclaimTrace",
     "RoutineFileLock",
 ]
