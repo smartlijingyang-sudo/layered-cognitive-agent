@@ -789,5 +789,17 @@
   5. `_fail` ×8 / `_emit` ×5 / `_ok` ×2 家族 —— 驳回：沿用 508/509（跨包命名家族，统一错误语义需 grilling）。
   6. `_get_role_library` / `_format_duration` / `_catalog_digest` / `_turn_of` / `parameters` / `target` / `_transaction` / `read_file` / `apply` / `_run` —— 驳回：沿用 507/508/509（跨子系统语义未确证 / 需 grilling / 闭包绑定差异）。
 - 验证结果: `~/.local/bin/ruff check`（live 对应文件 `lca/plugins/composer/composition/prompt_catalog.py`）All checks passed；残余引用 `git grep -rn 'plugins.composition.composer'` = 0 行；import 冒烟（live prompt_catalog）OK；targeted pytest `tests/composer/test_prompt_catalog.py`：3 passed。相邻 `tests/architecture/test_brain_prompt_catalog_capability.py` 1 failed 系**预先存在、与本轮无关**：`lca/plugins/composer/think/brain.py:144` 的 `PROMPT_TEMPLATE_PROVIDER` require 由他人提交 a19f0ef22（ADR-0220 P10）引入，测试 mock 未同步更新；brain.py 与测试文件工作区均 clean，本轮未触碰；失败调用路径全在 live 树内。
-- commit: PLACEHOLDER_HASH refactor(lca-1000): 第0510轮 删除 plugins/composition 死迁移子树（未 push）。
+- commit: 34c71e577 refactor(lca-1000): 第0510轮 删除 plugins/composition 死迁移子树（未 push）。
 - 备注: 只 add/commit 本轮 8 个文件（删除 7 + ledger.md），`git commit -- <paths>` 显式路径；并发会话已 staged 的 2 个测试文件改动及 untracked（docs/notes/audit-2026-10-05.md、ralph/）全程未触碰；ledger.md 未提交的一行（509 补 hash）属本 campaign 自有 bookkeeping，随本次一并提交（沿用 505 做法）。备份 /tmp/bak_0510/composition/（252，删除前整树）。
+
+## 第0511轮 (2026-10-06 06:03 窗口，worker 超时中断，主流程补齐提交)
+- 改了什么: 收敛 `lca/plugins/avatar/tools.py` 中 `AvatarCreateTool.validate` 与 `AvatarEditTool.validate` 两处逐字相同的 8 行参数校验（`user_request` 必填非空 strip、`visual_prompt` 可选字符串），提取为模块级 helper `_validate_request_args`；两处 `validate` 各变为 1 行委托 `return _validate_request_args(args)`。改动 +13/-14（另含 1 行 docstring 编码修正，见下）。
+- 依据 skill 哪一节: SKILL.md Deletion test（删一处副本后复杂度直接消失：另一处副本被同一模块的 canonical helper 替代；两段 def 体逐字相同，非"看起来像"）+ DEEPENING.md Seam discipline / Locality（校验规则是 avatar tools 模块的内部知识，收敛到模块级私有 helper；确证两类校验语义相同且无子类 override 差异——这是 510 轮 deferred 的确证项，本轮 explore 完成确证：两类均直接继承 Tool、无子类复写 validate）+ LANGUAGE.md Leverage（重复定义不增加 leverage）。
+- 为什么这是实质改动(非凑数): 消除的是真实代码重复（两处逐字相同的 8 行非平凡校验：strip() 空串拒绝、`visual_prompt` 的 None/类型双分支——任一改动一处漏改另一处就会静默分叉，create 与 edit 的参数门从此单点）。证据链：(1) 两段 def 体逐字相同（worker AST 扫描断言）；(2) 调用点零改动（`validate` 签名与返回语义不变）。
+- 关键设计决策（夜间跳过 grilling，记台账）: 本轮 worker 在 06:03 窗口执行到验证通过后超时中断，未完成台账追加与单独提交；主流程补齐：(a) 发现 worker 补丁引入的新 helper docstring 中文被双重编码成乱码（UTF-8 当 latin-1 重编，`c3 a5 c2 85…`，ruff 不报），已修正为正确中文——属本轮同一文件的缺陷修复，非新轮次；(b) 台账追加与单独提交按本轮名义完成。helper 命名 `_validate_request_args` 下划线私有，不进 `__all__`（internal seam 纪律）。
+- 候选清单（本轮 explore：沿用 510 候选清单）:
+  1. `validate` ×2（avatar/tools.py，同文件 8 行同体）—— 选中（510 轮驳回项，本轮确证语义相同后收敛）。
+  2. 510 轮其余驳回项（`__init__` ×2、dispatch_rpc/poll_pairing/_edit_file、`_fail`/`_emit`/`_ok` 家族等）—— 驳回：沿用 510（需 grilling / 跨包家族 / 规模超一轮）。
+- 验证结果: worker：`~/.local/bin/ruff check` 全过；targeted pytest 38 passed；行为烟测 6 案例 OK。主流程：docstring 修正后 `ruff check` 重过、`py_compile` OK；`git diff` 确认仅本轮 2 文件变更（代码 1 + ledger.md）。
+- commit: PLACEHOLDER_HASH refactor(lca-1000): 第0511轮 收敛 avatar tools validate 重复定义为模块 helper（未 push）。
+- 备注: 只 add/commit 本轮 2 文件（代码 1 + ledger.md），显式路径提交，避免带入并发会话（ralph）已 staged 的 2 个测试文件；其 staged/untracked（docs/notes/audit-2026-10-05.md、ralph/）全程未触碰；510 轮 hash 回填行（34c71e577）随本次一并提交（沿用 505/510 做法）；备份 /tmp/bak_0511/tools.py（252，改动前原文件）。

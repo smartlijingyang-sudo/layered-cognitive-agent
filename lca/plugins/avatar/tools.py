@@ -97,6 +97,17 @@ def _decode_reference_image(value: Any) -> bytes | None:
     return data
 
 
+def _validate_request_args(args: dict[str, Any]) -> str | None:
+    """Avatar create/edit 共用的参数校验：user_request 必填非空，visual_prompt 可选字符串。"""
+    user_request = args.get("user_request")
+    if not isinstance(user_request, str) or not user_request.strip():
+        return "user_request must be a non-empty string"
+    visual_prompt = args.get("visual_prompt")
+    if visual_prompt is not None and not isinstance(visual_prompt, str):
+        return "visual_prompt must be a string if provided"
+    return None
+
+
 class AvatarCreateTool(Tool):
     """从用户请求生成新头像候选，绝不自动激活（两轮分离，ADR-0269 §4）。"""
 
@@ -127,13 +138,7 @@ class AvatarCreateTool(Tool):
     default_timeout_s = 120
 
     def validate(self, args: dict[str, Any]) -> str | None:
-        user_request = args.get("user_request")
-        if not isinstance(user_request, str) or not user_request.strip():
-            return "user_request must be a non-empty string"
-        visual_prompt = args.get("visual_prompt")
-        if visual_prompt is not None and not isinstance(visual_prompt, str):
-            return "visual_prompt must be a string if provided"
-        return None
+        return _validate_request_args(args)
 
     async def execute(self, args: dict[str, Any]) -> Observation:
         started = time.monotonic()
@@ -204,13 +209,7 @@ class AvatarEditTool(Tool):
     default_timeout_s = 120
 
     def validate(self, args: dict[str, Any]) -> str | None:
-        user_request = args.get("user_request")
-        if not isinstance(user_request, str) or not user_request.strip():
-            return "user_request must be a non-empty string"
-        visual_prompt = args.get("visual_prompt")
-        if visual_prompt is not None and not isinstance(visual_prompt, str):
-            return "visual_prompt must be a string if provided"
-        return None
+        return _validate_request_args(args)
 
     async def execute(self, args: dict[str, Any]) -> Observation:
         started = time.monotonic()
