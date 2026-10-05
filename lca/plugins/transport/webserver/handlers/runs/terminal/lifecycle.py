@@ -31,7 +31,7 @@ from lca.plugins.transport.webserver.handlers.runs.terminal.failure import (
     RunFailureFacts,
     record_run_failure,
 )
-from lca.plugins.transport.webserver.read.runs.terminal.materialization import (
+from lca.plugins.transport.webserver.read.runs.terminal import (
     record_terminal_materialization as _record_terminal_materialization,
 )
 

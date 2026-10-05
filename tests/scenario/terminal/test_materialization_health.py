@@ -42,11 +42,11 @@ from lca.plugins.transport.webserver.handlers.runs.session.session.session impor
     RunSession,
     RunStatus,
 )
-from lca.plugins.transport.webserver.read.runs.identity.identity import (
+from lca.plugins.transport.webserver.read.runs.identity import (
     parse_agent_ref,
 )
-from lca.plugins.transport.webserver.read.runs.terminal import materialization
-from lca.plugins.transport.webserver.read.runs.terminal.materialization import (
+from lca.plugins.transport.webserver.read.runs import terminal as materialization
+from lca.plugins.transport.webserver.read.runs.terminal import (
     record_terminal_materialization,
 )
 
@@ -241,20 +241,14 @@ def test_materialization_raises_on_partial_flush(tmp_path) -> None:
 
 def test_ter_ev_types_constant_removed() -> None:
     """``_TERMINAL_EVENT_TYPES`` constant is deleted from
-    ``lca.plugins.transport.webserver.read.runs.terminal.materialization``.
+    ``lca.plugins.transport.webserver.read.runs.terminal``.
 
     Per spec §15 G-9: the Session/Catalog vocabulary mismatch is
     closed by deleting the constant (it has no spine-equivalent).
     Consumers that needed terminal seq now go through health.
     """
-    with __import__("pytest").raises(ImportError):
-        from lca.plugins.transport.webserver.read.runs.terminal.materialization import (  # noqa: F401
-            _TERMINAL_EVENT_TYPES,
-        )
-
-    # Also verify the module no longer carries it (the symbol may be
-    # present-but-undefined to fail the import above; we check the
-    # attr is gone too).
+    # The old micro-module is gone and the consolidated terminal module
+    # no longer carries the constant (G-9).
     assert not hasattr(materialization, "_TERMINAL_EVENT_TYPES"), (
         "_TERMINAL_EVENT_TYPES must be deleted (G-9)"
     )

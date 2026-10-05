@@ -23,7 +23,7 @@ from lca.plugins.transport.webserver.handlers.runs.terminal.port.port import Run
 from lca.plugins.transport.webserver.handlers.runs.terminal.streaming.gateway_lifecycle import (
     register_gateway_run,
 )
-from lca.plugins.transport.webserver.read.runs.identity.identity import AgentRef
+from lca.plugins.transport.webserver.read.runs.identity import AgentRef
 
 _log = logging.getLogger(__name__)
 

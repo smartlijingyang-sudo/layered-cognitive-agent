@@ -9,7 +9,7 @@ projection.
 from __future__ import annotations
 
 from lca.plugins.transport.webserver.handlers.runs.session.index.index import RunSessionIndex
-from lca.plugins.transport.webserver.read.runs.journal.projection_binding import (
+from lca.plugins.transport.webserver.read.runs.live import (
     ProcessJournalBinding,
 )
 

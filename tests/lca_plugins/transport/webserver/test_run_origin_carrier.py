@@ -27,7 +27,7 @@ from lca.plugins.transport.webserver.handlers.runs.session.setup.types import (
     RunSessionRequest,
 )
 from lca.plugins.transport.webserver.handlers.runs.terminal.port.port import RunRequest
-from lca.plugins.transport.webserver.read.runs.identity.identity import AgentRef
+from lca.plugins.transport.webserver.read.runs.identity import AgentRef
 
 
 def _carrier_request() -> CreateRunRequest:

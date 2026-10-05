@@ -1,26 +1,10 @@
-"""Materialize a terminal run manifest from Journal-owned facts.
+"""Terminal-state materialization and terminal lifecycle queries.
 
-PR-1 / Task 1.7 close-path contract (spec §2.6, §15 G-6..G-9, G-12, G-13):
-
-- **G-6 / G-7 / G-8**: ``RunManifest.terminal_event_seq``,
-  ``ledger_high_watermark``, ``ledger_summary`` are marked
-  ``@deprecated`` (delete-when: 2027-01-01). The new
-  ``health_summary`` + ``health_hash`` fields replace them as the
-  integrity source.
-- **G-9**: the ``_TERMINAL_EVENT_TYPES`` constant is deleted (the
-  Session/Catalog vocabulary mismatch is closed; ``health_hash``
-  subsumes its integrity role).
-- **G-12** (C9 idempotency): ``_materialization_lock`` uses
-  ``fcntl.flock`` for per-run-id mutual exclusion across processes,
-  and ``record_terminal_materialization`` skips re-writing when
-  ``manifest.json`` already carries the same ``health_hash``.
-- **G-13** (C7 / C9 fail-loud): if ``flush_step_tree_artifacts``
-  returns errors, ``ManifestFlushIncompleteError`` is raised and the
-  manifest is NOT written. Catches the "broken journal.json + clean
-  manifest.json" silent-failure class.
-
-# ADR-0203 §3.3: streaming file-bytes hash; canonical_digest requires
-# full payload in memory.
+Consolidated flat module (INV-ARCH-14, ADR-0195 §2.4 observe plane):
+- terminal run manifest materialization (fold-only close-path, PR-1 /
+  Task 1.7 G-6..G-13);
+- registry run read projections and process-level observability streams
+  (P3-07/P3-09).
 """
 
 from __future__ import annotations
@@ -31,9 +15,9 @@ import hashlib
 import json
 import time
 import traceback
-from collections.abc import Iterator
+from collections.abc import AsyncIterator, Iterator
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import structlog
 
@@ -50,13 +34,20 @@ from lca.infrastructure.observability.journal.engine.journal_io import (
 )
 from lca.infrastructure.workspace.artifact_ledger import artifact_closure_text
 from lca.plugins.observability.health.run_health_fold import fold_run_health
-from lca.plugins.transport.webserver.doctor import diagnose
-from lca.plugins.transport.webserver.handlers.runs.session.session.session import (
-    RunSession,
-)
-from lca.plugins.transport.webserver.read.runs.step.tree_flush import (
+from lca.plugins.transport.webserver.doctor import DoctorReport, diagnose
+from lca.plugins.transport.webserver.read.runs.live import (
     flush_step_tree_artifacts,
+    iter_stamped_events,
+    stream_chat_completion,
+    stream_process_journal_live,
+    stream_run_fold,
 )
+
+if TYPE_CHECKING:
+    from lca.plugins.transport.webserver.handlers.runs.session.session.session import (
+        RunRegistry,
+        RunSession,
+    )
 
 
 class ManifestFlushIncompleteError(RuntimeError):
@@ -396,9 +387,87 @@ def _artifact_closure_manifest(session: RunSession) -> dict[str, Any] | None:
     }
 
 
+class RegistryRunQueries:
+    """Own read-only run projections and process-level observability streams."""
+
+    def __init__(self, registry: RunRegistry) -> None:
+        self._registry = registry
+
+    async def summary(self, run_id: str) -> dict[str, Any] | None:
+        self._registry.prune()
+        return self._registry.summary(run_id)
+
+    async def stream_chat_completion(self, run_id: str, last_seq: int = 0) -> AsyncIterator[bytes]:
+        """Stream a run's journal events encoded as OpenAI ChatCompletion chunks."""
+        session = self._registry.get(run_id)
+        if session is None:
+            return
+        async for line in stream_chat_completion(session, last_seq=last_seq):
+            yield line
+
+    async def iter_stamped_events(self, run_id: str, after_seq: int = 0) -> AsyncIterator[Any]:
+        """Yield the raw ``StampedEvent`` stream for one run."""
+        session = self._registry.get(run_id)
+        if session is None:
+            return
+        async for item in iter_stamped_events(session, after_seq=after_seq):
+            yield item
+
+    async def stream_run_fold(self, run_id: str, after: int = 0) -> AsyncIterator[bytes]:
+        """Stream a run live as four UI SSE events (reasoning|text|tool|done)."""
+        session = self._registry.get(run_id)
+        if session is None:
+            return
+        async for line in stream_run_fold(session, after=after):
+            yield line
+
+    async def doctor(self, run_id: str) -> DoctorReport | None:
+        session = self._registry.get(run_id)
+        spine_path = (
+            session.spine_path if session is not None else self._registry.spine_path_for(run_id)
+        )
+        if session is None and not spine_path.is_file():
+            return None
+        target_path = spine_path
+        locator = getattr(session, "locator", None) if session is not None else None
+        if locator is not None:
+            step_path = locator.journal_step_path(run_id)
+            if step_path.exists():
+                target_path = step_path
+        else:
+            step_path = spine_path.parent / "journal.json"
+            if step_path.exists():
+                target_path = step_path
+        return diagnose(session, target_path)
+
+    def journal_path(self, run_id: str) -> Path | None:
+        """Return only the current run's spine path; never fall back across sessions."""
+        path = self._registry.spine_path_for(run_id)
+        return path if path.is_file() else None
+
+    def latest_bindings(self) -> object | None:
+        """Expose the context projection without exposing the Registry itself."""
+        return self._registry.latest_bindings()
+
+    def status_counts(self) -> dict[str, int]:
+        return self._registry.status_counts()
+
+    def live_totals(self) -> dict[str, int]:
+        return self._registry.live_totals()
+
+    def stream_process_journal_live(self, last_seq: int = 0) -> AsyncIterator[bytes]:
+        """Provide the process-level Journal stream for operations endpoints."""
+        return stream_process_journal_live(
+            self._registry.journal.tail,
+            last_seq=last_seq,
+        )
+
+
 __all__ = [
     "ManifestFlushIncompleteError",
+    "RegistryRunQueries",
     "_materialization_lock",
+    "flush_step_artifacts_with_log",
     "ledger_high_watermark_for",
     "ledger_summary_for",
     "record_terminal_materialization",

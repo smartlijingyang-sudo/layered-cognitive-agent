@@ -1,8 +1,8 @@
-"""Who is acting. Isolation key for a Run.
+"""Session identity retrieval and metadata. Isolation key for a Run.
 
-A Run is one invocation of one AgentRef. Journal, sandbox, memory, and
-inflight dedup are per identity. Two LobeHub agents that say the same
-words are still two principals.
+Consolidated flat module (INV-ARCH-14): a Run is one invocation of one
+AgentRef. Journal, sandbox, memory, and inflight dedup are per identity.
+Two LobeHub agents that say the same words are still two principals.
 
 Housekeeper calls on /v1 are not agents and do not get an AgentRef.
 """
@@ -42,3 +42,6 @@ def parse_agent_ref(raw: Any) -> AgentRef:
     if not name:
         name = SOLO_ROLE if agent_id == DEFAULT_AGENT_ID else agent_id
     return AgentRef(agent_id=agent_id, name=name)
+
+
+__all__ = ["DEFAULT_AGENT_ID", "AgentRef", "default_agent_ref", "parse_agent_ref"]

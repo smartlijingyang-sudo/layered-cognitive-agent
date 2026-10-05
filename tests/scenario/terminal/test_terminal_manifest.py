@@ -24,8 +24,8 @@ from lca.plugins.transport.webserver.handlers.runs.session.session.session impor
     RunSession,
     RunStatus,
 )
-from lca.plugins.transport.webserver.read.runs.identity.identity import parse_agent_ref
-from lca.plugins.transport.webserver.read.runs.terminal.materialization import (
+from lca.plugins.transport.webserver.read.runs.identity import parse_agent_ref
+from lca.plugins.transport.webserver.read.runs.terminal import (
     record_terminal_materialization,
 )
 

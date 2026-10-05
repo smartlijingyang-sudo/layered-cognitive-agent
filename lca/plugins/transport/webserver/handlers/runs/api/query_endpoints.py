@@ -26,7 +26,7 @@ from lca.infrastructure.persistence.run_paths import default_runs_root
 from lca.plugins.transport.webserver.handlers.cors.cors import cors_headers
 from lca.plugins.transport.webserver.handlers.runs.api.command_endpoints import _run_port_of
 from lca.plugins.transport.webserver.handlers.runs.terminal.port.port import RunPort
-from lca.plugins.transport.webserver.read.runs.evidence.evidence import (
+from lca.plugins.transport.webserver.read.runs.evidence import (
     EvidencePayloadDecodeError,
     InvalidEvidenceDigestError,
     RunEvidenceNotFoundError,
@@ -348,7 +348,7 @@ async def get_run_failure(request: Request) -> JSONResponse:
     summary = await _run_port_of(request).summary(run_id)
     if summary is None:
         return JSONResponse({"error": "run not found"}, status_code=404, headers=cors_headers())
-    from lca.plugins.transport.webserver.read.runs.failure.failure_reader import (
+    from lca.plugins.transport.webserver.read.runs.evidence import (
         failure_summary_for_run,
     )
 
@@ -365,7 +365,7 @@ async def get_run_exceptions(request: Request) -> JSONResponse:
     summary = await _run_port_of(request).summary(run_id)
     if summary is None:
         return JSONResponse({"error": "run not found"}, status_code=404, headers=cors_headers())
-    from lca.plugins.transport.webserver.read.runs.failure.failure_reader import (
+    from lca.plugins.transport.webserver.read.runs.evidence import (
         load_exception_records,
     )
 

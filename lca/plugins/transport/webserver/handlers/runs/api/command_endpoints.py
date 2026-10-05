@@ -47,7 +47,7 @@ from lca.plugins.transport.webserver.handlers.runs.terminal.port.port import (
 from lca.plugins.transport.webserver.handlers.runs.terminal.streaming.gateway_lifecycle import (
     topic_id_from_body,
 )
-from lca.plugins.transport.webserver.read.runs.identity.identity import (
+from lca.plugins.transport.webserver.read.runs.identity import (
     AgentRef,
     parse_agent_ref,
 )
