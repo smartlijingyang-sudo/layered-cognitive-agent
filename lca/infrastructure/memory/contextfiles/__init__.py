@@ -13,6 +13,24 @@ does not leak into this package, so another agent can reuse the package
 without the LCA graph.
 """
 
-from __future__ import annotations
+from lca.infrastructure.memory.contextfiles.sync import (
+    FileVersion,
+    MemoryEditSyncService,
+    StaleSnapshotOperationError,
+    parse_memory_markdown_claims,
+    render_standing_diff,
+    require_fresh,
+    sync_memory_markdown,
+    unified_diff,
+)
 
-__all__: list[str] = []
+__all__: list[str] = [
+    "FileVersion",
+    "MemoryEditSyncService",
+    "StaleSnapshotOperationError",
+    "parse_memory_markdown_claims",
+    "render_standing_diff",
+    "require_fresh",
+    "sync_memory_markdown",
+    "unified_diff",
+]
