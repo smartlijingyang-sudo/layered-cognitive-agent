@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING, Any
 
 from lca.contracts.atoms.enums.enums import ContentType, DelegationProtocol, ReflectionVerdict
 from lca.contracts.atoms.ids.ids import utc_now
+from lca.contracts.models.core.execution.external_content import ContentOrigin
 from lca.contracts.models.core.execution.task_progress import TaskProgress
 from lca.contracts.models.core.state.lifecycle import AgentCard
 
@@ -17,6 +18,7 @@ if TYPE_CHECKING:
 __all__ = [
     "HITL_TOOL_NAMES",
     "AgentCard",
+    "ContentOrigin",
     "Decision",
     "DelegationSpec",
     "Observation",
@@ -145,6 +147,13 @@ class Observation:
     success: bool
     payload: Any
     content_type: ContentType = ContentType.TEXT
+    content_origin: ContentOrigin = ContentOrigin.EXTERNAL
+    """ADR-0292 C1: origin mark on the event envelope (source of truth).
+
+    Fail-closed default: tool / delegate / transport outcomes are external
+    content and carry no instruction authority. Producers of genuinely
+    internal observations must set ``ContentOrigin.INTERNAL`` explicitly.
+    """
     tool_call_id: str | None = None
     error: str | None = None
     retries_used: int = 0
