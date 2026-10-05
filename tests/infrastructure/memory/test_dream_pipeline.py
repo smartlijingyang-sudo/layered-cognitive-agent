@@ -104,6 +104,35 @@ def test_dream_second_run_is_idempotent(tmp_path: Path) -> None:
     _assert_synthesis(home)
 
 
+def test_a_render_without_a_backfill_leaves_user_md_alone(tmp_path: Path) -> None:
+    """The half pair ``DreamCallbacks`` legally allows must neither write nor claim.
+
+    ``_sync_user_md`` compares the rendering against disk first, so a home with
+    identity or preference records and no ``USER.md`` always reaches the second
+    half of that guard. Without ``backfill is None`` in it, the pass emits a
+    preimage for a write that never happens and then raises on the ``None`` call.
+
+    Reachable rather than theoretical. ``DreamCallbacks`` types the pair as
+    ``tuple[_Render | None, _Backfill | None]``, and ``DreamFn``'s docstring
+    already records a transposed pair that type-checked clean and degraded at
+    runtime into a contained per-home failure. Nothing else drove it: the
+    scheduler tests fake the pass, the plugin shape test replaces the scheduler,
+    and the end-to-end scenario uses ``make_dream_callbacks``, which returns
+    both callbacks or neither.
+    """
+    home = _seed_home(tmp_path)
+    now_ms = 1_759_200_000_000
+    render, _ = _dream_callbacks(home)
+
+    report = run_dream(home, now_ms=now_ms, backfill=None, render=render)
+
+    assert report.upserted >= 1, "promotion does not depend on the profile callbacks"
+    assert report.user_md_written is False
+    assert report.preimage is None
+    assert not (home / "USER.md").exists()
+    assert not (home / "revisions").exists(), "no preimage for a write that never happened"
+
+
 def test_people_index_orders_by_intimacy(tmp_path: Path) -> None:
     home = _seed_home(tmp_path)
     now_ms = 1_759_200_000_000

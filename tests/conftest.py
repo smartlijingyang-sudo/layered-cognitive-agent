@@ -43,3 +43,27 @@ def _isolate_runs_root(
     if getattr(request.module, "__keep_runs_root__", False):
         return
     monkeypatch.setenv("LCA_RUNS_ROOT", str(tmp_path / "traces" / "runs"))
+
+
+@pytest.fixture
+def isolated_lca_home(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
+    """Point ``LCA_HOME`` at a temporary directory and return it.
+
+    Load-bearing for a test that runs a plugin ``setup()``, because that is
+    where ``get_lca_home()`` resolves the host routine lock directory. Belt and
+    braces for a test that builds a scheduler directly and passes its own
+    ``lock_dir``: ``get_lca_home`` appears in none of ``dream.py``,
+    ``dream_scheduler.py``, ``episode_buffer.py``,
+    ``contextfiles/domain/layout.py`` or ``contextfiles/service/indexing.py``,
+    and the FTS index is ``Path(home) / chosen.index_db_path``. What keeps such
+    a test inside ``tmp_path`` is home-relative resolution all the way through
+    ``run_dream``, not this variable.
+
+    Requested by name rather than autouse, unlike the two fixtures above.
+    Flipping ``LCA_HOME`` for the whole suite would change behaviour for every
+    test that resolves a real assistant home, and the two autouse fixtures here
+    each carry a module-level opt-out for exactly that reason.
+    """
+    lca_home = (tmp_path / "lca-home").resolve()
+    monkeypatch.setenv("LCA_HOME", str(lca_home))
+    return lca_home

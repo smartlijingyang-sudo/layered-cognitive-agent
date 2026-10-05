@@ -108,3 +108,8 @@ entries:
     name: lca_plugins_avatar_tools
     $module: lca.plugins.avatar.tools
     config: {}
+
+  - id: lca-memory-dream-scheduler
+    name: lca_plugins_memory_dream_scheduler
+    $module: lca.plugins.memory.dream_scheduler
+    config: {}

@@ -97,6 +97,17 @@ patch:
   - id: phase.reflect.memory.extract
     config:
       governor_enabled: true
+  # 离线 consolidation 的周期上界属于配置面而不是文档（ADR-0287 §4）：
+  # 改这里就改了上界，不需要动代码。tick_seconds 必须 > 0，否则 sweep
+  # 在 kernel 提供 HTTP 的那个 loop 上变成热循环。
+  - id: lca-memory-dream-scheduler
+    config:
+      tick_seconds: 300
+      # Disabled until the ADR-0254 v3 USER.md ownership conflict is resolved.
+      # The first enabled tick rewrites USER.md in 8 of 578 live homes, one of
+      # which loses a payment/account-modification safety constraint that exists
+      # in no semantic record. See the Config docstring in the plugin.
+      enabled: false
   - id: lca-composio-provider
     config:
       api_key:

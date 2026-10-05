@@ -14,6 +14,11 @@
 
 ## Why the carrier is a plugin loop and not cron or routines
 
+**Phase 0 ships disabled (R54, R61).** `Config.enabled` defaults to `False` and `profiles/web-assistant.yaml` sets `enabled: false` explicitly. A read-only scan of all 578 live assistant homes found that the first enabled tick would rewrite `USER.md` in 8 of them, and one, `asst_8849841f4f9a`, carries a hard safety constraint about payment and account-modification operations that exists in no semantic record, so rendering the profile from records would drop it. ADR-0254 v3 rules user-domain Markdown an SSOT the system must not rebuild from JSON and names a full `USER.md` rebuild a bug, which conflicts with the ADR-0249 and ADR-0287 dream track treating `USER.md` as a projection. Enable-when is recorded at the `Config.enabled` field.
+
+Consequence for Task 5: its Step 3 live-kernel restart is cancelled by R60 rather than merely deferred. With the plugin disabled, `setup()` returns before constructing anything, so a restart would prove only that the bundle entry resolves, which `scripts/check_plan_lift.py` at exit 0 and the shape test's real `resolve_profile` call already prove. ADR-0287 §4 Phase 0's live trigger evidence is therefore NOT satisfied: Phase 0 is complete as an implementation and incomplete as an acceptance, and the gap belongs to the ADR-0254 v3 conflict. Do not report Phase 0 as accepted on the strength of a disabled-plugin boot.
+
+
 ADR-0287 §4 Phase 0 names two carriers: "`{home}/routines/` 或 0268 CronJob 有 `run_dream` 条目". Neither can work. This section is the evidence, and it is the reason this plan exists in this shape. **ADR-0287 §4 Phase 0 must be amended to name the plugin loop before Task 4 lands.**
 
 | Blocker | Evidence | Consequence |
@@ -51,23 +56,23 @@ Every task's deliverable implicitly satisfies these. Values are copied from the 
 
 | File | Responsibility |
 |---|---|
-| `lca/infrastructure/memory/dream_scheduler.py` (create) | The sweep loop: interval bookkeeping, home fan-out, per-home lock, off-loop `run_dream`, evidence write. No plugin imports, no Cordis dependency |
+| `lca/application/memory/dream_scheduler.py` (create) | The sweep loop: interval bookkeeping, home fan-out, per-home lock, off-loop `run_dream`, evidence write. No plugin imports, no Cordis dependency |
 | `lca/plugins/memory/dream_scheduler/plugin.py` (create) | The `@plugin` entry: config parse, catalog resolution, callback construction, `asyncio.create_task`, LIFO dispose |
 | `bundles/assistant-runtime.yaml` (modify) | Declare the plugin id so the profile that binds assistant homes loads it |
 | `profiles/web-assistant.yaml` (modify) | Set `tick_seconds`, putting the cadence upper bound in configuration |
-| `tests/infrastructure/memory/test_dream_scheduler.py` (create) | Loop, fan-out, lock, collision, evidence, change detection |
+| `tests/application/memory/test_dream_scheduler.py` (create) | Loop, fan-out, lock, collision, evidence, change detection |
 | `tests/plugins/test_dream_scheduler_plugin_shape.py` (create) | Plugin shape and dispose registration |
-| `tests/scenario/memory/test_dream_scheduler_live_sweep.py` (create) | End-to-end Phase 0 evidence against real homes |
+| `tests/scenario/memory/test_dream_scheduler_sweep_e2e.py` (create) | End-to-end Phase 0 evidence against real homes |
 
-`dream_scheduler.py` lives in infrastructure next to `dream.py` because it owns no cognition and no contract. The plugin file is the only place that touches the harness.
+`dream_scheduler.py` lives in `lca/application/memory/` because it needs `RoutineFileLock` from `lca/application/routine/locks`, and `pyproject.toml:82-92` contract 2 forbids `lca.infrastructure` from importing `lca.application`. `application` is the composition root, so it may import its own layer and downward into `lca.infrastructure.memory.dream`. The package needs an `__init__.py`: without one grimp treats the directory as a namespace package and skips it, which would leave the module outside layering enforcement entirely. The plugin file is the only place that touches the harness.
 
 ---
 
 ### Task 1: The sweep loop with an injected clock
 
 **Files:**
-- Create: `lca/infrastructure/memory/dream_scheduler.py`
-- Test: `tests/infrastructure/memory/test_dream_scheduler.py`
+- Create: `lca/application/memory/dream_scheduler.py`
+- Test: `tests/application/memory/test_dream_scheduler.py`
 
 **Interfaces:**
 - Consumes: `run_dream` from `lca.infrastructure.memory.dream`; `RoutineFileLock` from `lca.application.routine.locks`.
@@ -76,12 +81,12 @@ Every task's deliverable implicitly satisfies these. Values are copied from the 
 - [ ] **Step 1: Write the failing test**
 
 ```python
-# tests/infrastructure/memory/test_dream_scheduler.py
+# tests/application/memory/test_dream_scheduler.py
 from pathlib import Path
 
 import pytest
 
-from lca.infrastructure.memory.dream_scheduler import DreamScheduler
+from lca.application.memory.dream_scheduler import DreamScheduler
 
 
 @pytest.fixture
@@ -104,7 +109,6 @@ def _scheduler(tmp_path: Path, homes: list[Path], clock: list[int], calls: list[
     )
 
 
-@pytest.mark.anyio
 async def test_sweep_once_visits_every_home(tmp_path: Path, clock: list[int]) -> None:
     homes = [tmp_path / "a", tmp_path / "b"]
     calls: list[Path] = []
@@ -115,7 +119,6 @@ async def test_sweep_once_visits_every_home(tmp_path: Path, clock: list[int]) ->
     assert calls == homes
 
 
-@pytest.mark.anyio
 async def test_interval_skips_a_sweep_that_is_not_due_yet(
     tmp_path: Path, clock: list[int]
 ) -> None:
@@ -135,13 +138,13 @@ async def test_interval_skips_a_sweep_that_is_not_due_yet(
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `uv run pytest tests/infrastructure/memory/test_dream_scheduler.py -v`
-Expected: FAIL with `ModuleNotFoundError: No module named 'lca.infrastructure.memory.dream_scheduler'`
+Run: `uv run pytest tests/application/memory/test_dream_scheduler.py -v`
+Expected: FAIL with `ModuleNotFoundError: No module named 'lca.application.memory.dream_scheduler'`
 
 - [ ] **Step 3: Write minimal implementation**
 
 ```python
-# lca/infrastructure/memory/dream_scheduler.py
+# lca/application/memory/dream_scheduler.py
 """Periodic sweep that runs the offline memory consolidation per assistant home.
 
 The loop keeps its own interval bookkeeping. It does not route through
@@ -156,19 +159,21 @@ the event loop. The kernel process serves HTTP on the same loop.
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import logging
 from collections.abc import Callable, Sequence
 from pathlib import Path
 
 from lca.application.routine.locks import RoutineFileLock
+from lca.contracts.models.core.conversation.memory import MemoryRecord
 from lca.infrastructure.memory.dream import DreamReport, run_dream
 
 logger = logging.getLogger(__name__)
 
-_Backfill = Callable[[str, list], object]
-_Render = Callable[[Sequence], str]
+_Backfill = Callable[[str, list[MemoryRecord]], object]
+_Render = Callable[[Sequence[MemoryRecord]], str]
 DreamFn = Callable[..., DreamReport]
-EvidenceWriter = Callable[[Path, DreamReport | None, int], None]
+EvidenceWriter = Callable[[Path, DreamReport | None, int], object]
 
 _ROUTINE_ID = "memory_dream"
 
@@ -207,12 +212,10 @@ class DreamScheduler:
                 await self.sweep_once()
             except Exception:
                 logger.exception("dream sweep failed")
-            try:
+            with contextlib.suppress(TimeoutError):
                 await asyncio.wait_for(
                     self._stop.wait(), timeout=float(self._tick_seconds)
                 )
-            except TimeoutError:
-                continue
 
     async def sweep_once(self) -> tuple[DreamReport | None, ...]:
         """Run one pass over every home. Returns one report per home, None when skipped."""
@@ -222,7 +225,7 @@ class DreamScheduler:
         self._next_due_ms = now + self._tick_seconds * 1000
         reports: list[DreamReport | None] = []
         for home in self._homes():
-            reports.append(await self._run_home(Path(home), now))
+            reports.append(await self._run_home(home, now))
         return tuple(reports)
 
     async def _run_home(self, home: Path, now_ms: int) -> DreamReport | None:
@@ -254,13 +257,13 @@ class DreamScheduler:
 
 - [ ] **Step 4: Run test to verify it passes**
 
-Run: `uv run pytest tests/infrastructure/memory/test_dream_scheduler.py -v`
+Run: `uv run pytest tests/application/memory/test_dream_scheduler.py -v`
 Expected: PASS, 2 tests
 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add lca/infrastructure/memory/dream_scheduler.py tests/infrastructure/memory/test_dream_scheduler.py
+git add lca/application/memory/dream_scheduler.py tests/application/memory/test_dream_scheduler.py
 git commit -m "feat(memory): add the dream sweep loop with an injected clock"
 ```
 
@@ -268,11 +271,23 @@ git commit -m "feat(memory): add the dream sweep loop with an injected clock"
 
 ### Task 2: Lock contention and write collision
 
+**Shipped code is authoritative.** Task 2 landed as `5434ad6f1` and the `_run_home` and `sweep_once` code blocks below, plus the Interfaces paragraph's `DreamFn` line and the three original test bodies, no longer match it. Read `lca/application/memory/dream_scheduler.py` and `tests/application/memory/test_dream_scheduler.py` rather than copying from this section. The plan's prose and rulings still bind; only its code listings for this task are stale.
+
+**Superseding ruling (R16, R17).** The `_run_home` body specified below is replaced, not merely extended. Task 1's review found that `RoutineFileLock.acquire()` returns `False` whenever the lock file exists, stale or not (`lca/application/routine/locks.py:93-95`), and that nothing calls `reclaim_stale()`. After a `kill -9`, an OOM, or a `kernel-restart` escalating to SIGKILL mid-dream, the lock file survives with the dead pid in its owner string, so a restarted kernel cannot release it and that assistant home never dreams again until a human deletes the file. The failure is permanent and logged only at INFO. The review also found that `asyncio.to_thread` does not make executor threads interruptible, so a `CancelledError` at the await runs the `finally`, releases the lock, and leaves `run_dream` executing unlocked.
+
+The replacement structure hands one synchronous function to `asyncio.to_thread` that performs, in order: `reclaim_stale()` and log a WARNING carrying `previous_owner` and `held_ms` when it returns non-`None`; `acquire()`; `run_dream`; the evidence write; `release()`, logging when it returns `False`. This binds the lock's lifetime to the work rather than to the await, puts every file operation including `mkdir` and `os.open` off the event loop, and places the evidence write inside the mutual exclusion guarding the run that produced it. It resolves the reclaim gap, the discarded `release()` result, the cancellation window, and the evidence placement in one change.
+
+`sweep_once` also gains per-home containment around the whole `_run_home` call. Today one home raising aborts the rest of the sweep, so a single corrupt home silently starves every home after it in catalog order. A failing home yields `None` and logs; the sweep continues.
+
+The three tests below stay as the required behaviour, and gain three more. A fourth asserts that a stale lock from a dead pid is reclaimed rather than skipped. A fifth asserts that one home raising does not prevent the next home from being visited. A sixth asserts that `run_forever` survives a raising `homes` callable and keeps ticking.
+
+That sixth test corrects a ruling the controller got wrong. Per-home containment wraps only the `_run_home` call, so `self._now_ms()` and `self._homes()` in `sweep_once` stay outside it, and Task 4's `homes` callable does catalog listing plus a `(home / "memory").is_dir()` stat that raises `OSError`. `run_forever`'s `except Exception` handler therefore stays reachable after this task and must not be deleted as redundant. It is the only supervisor the plugin's background task has: without it, one raising `homes()` kills the loop for the process lifetime. Note that `except Exception` does not catch `asyncio.CancelledError`, which derives from `BaseException`, so Task 4's dispose-by-cancel path is unaffected by keeping the handler.
+
 A minutes-level timer makes collision with a live user turn routine rather than theoretical. Both the online memory tools and `run_dream` rewrite `{home}/memory/semantic.json` with a non-atomic `write_text` (`lca/infrastructure/memory/assistant_memory.py:215`), and the only guard is `StaleSnapshotOperationError` at `:213`, which aborts rather than waits. `run_dream` does not catch it, so a collision today leaves a half-promoted pass with no receipt.
 
 **Files:**
-- Modify: `lca/infrastructure/memory/dream_scheduler.py` (`_run_home`)
-- Test: `tests/infrastructure/memory/test_dream_scheduler.py`
+- Modify: `lca/application/memory/dream_scheduler.py` (`_run_home`)
+- Test: `tests/application/memory/test_dream_scheduler.py`
 
 **Interfaces:**
 - Consumes: `DreamScheduler._run_home` from Task 1; `StaleSnapshotOperationError` from `lca.infrastructure.memory.contextfiles.domain.edit`.
@@ -281,12 +296,11 @@ A minutes-level timer makes collision with a live user turn routine rather than 
 - [ ] **Step 1: Write the failing test**
 
 ```python
-# appended to tests/infrastructure/memory/test_dream_scheduler.py
+# appended to tests/application/memory/test_dream_scheduler.py
 from lca.application.routine.locks import RoutineFileLock
 from lca.infrastructure.memory.contextfiles.domain.edit import StaleSnapshotOperationError
 
 
-@pytest.mark.anyio
 async def test_a_held_lock_skips_the_home(tmp_path: Path, clock: list[int]) -> None:
     home = tmp_path / "a"
     calls: list[Path] = []
@@ -300,7 +314,6 @@ async def test_a_held_lock_skips_the_home(tmp_path: Path, clock: list[int]) -> N
     holder.release()
 
 
-@pytest.mark.anyio
 async def test_a_write_collision_is_contained_not_raised(
     tmp_path: Path, clock: list[int]
 ) -> None:
@@ -320,7 +333,6 @@ async def test_a_write_collision_is_contained_not_raised(
     assert reports == (None,)
 
 
-@pytest.mark.anyio
 async def test_the_lock_is_released_after_a_collision(tmp_path: Path, clock: list[int]) -> None:
     def colliding(home, *, now_ms, backfill, render):
         raise StaleSnapshotOperationError("semantic.json changed during edit")
@@ -341,12 +353,12 @@ async def test_the_lock_is_released_after_a_collision(tmp_path: Path, clock: lis
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `uv run pytest tests/infrastructure/memory/test_dream_scheduler.py -v -k "collision or held_lock"`
+Run: `uv run pytest tests/application/memory/test_dream_scheduler.py -v -k "collision or held_lock"`
 Expected: `test_a_held_lock_skips_the_home` PASSES (Task 1 already locks), `test_a_write_collision_is_contained_not_raised` FAILS with `StaleSnapshotOperationError` propagating out of `sweep_once`
 
 - [ ] **Step 3: Contain the collision in `_run_home`**
 
-Replace the `try:` / `finally:` body of `_run_home` in `lca/infrastructure/memory/dream_scheduler.py` with:
+Replace the `try:` / `finally:` body of `_run_home` in `lca/application/memory/dream_scheduler.py` with:
 
 ```python
         try:
@@ -380,13 +392,13 @@ from lca.infrastructure.memory.contextfiles.domain.edit import StaleSnapshotOper
 
 - [ ] **Step 4: Run test to verify it passes**
 
-Run: `uv run pytest tests/infrastructure/memory/test_dream_scheduler.py -v`
+Run: `uv run pytest tests/application/memory/test_dream_scheduler.py -v`
 Expected: PASS, 5 tests
 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add lca/infrastructure/memory/dream_scheduler.py tests/infrastructure/memory/test_dream_scheduler.py
+git add lca/application/memory/dream_scheduler.py tests/application/memory/test_dream_scheduler.py
 git commit -m "fix(memory): contain dream write collisions instead of stranding the pass"
 ```
 
@@ -394,26 +406,32 @@ git commit -m "fix(memory): contain dream write collisions instead of stranding 
 
 ### Task 3: File-based run evidence and change detection
 
+**Shipped code is authoritative.** Task 3 landed as `96aa44998` and was amended by `a67ee8259` under ruling R40, which dropped `synthesis_written` and `promoted` from the payload. The `_report` helper, the `_changed` predicate and the payload shape in the listings below no longer match the shipped code. Read `lca/application/memory/dream_scheduler.py` and `tests/application/memory/test_dream_scheduler.py` rather than copying from this section. The plan's prose and rulings still bind.
+
+**Hazard carried from Task 2 (ruling R20).** Task 2 put the evidence write inside the same synchronous function as `run_dream`, under one `except OSError` that logs the failure as a dream pass failure. So an I/O error writing `{home}/dreams/last_run.json` is currently indistinguishable from `run_dream` itself failing, and the promotion that already succeeded is reported as lost. Task 3 must separate the two: the evidence write gets its own containment, so a failed artifact write logs as an evidence failure and still returns the report that says what was promoted. Evidence is a rebuildable projection and must not be able to mask a successful consolidation.
+
 ADR-0287 §4 Phase 0 requires "真实触发证据". A new execution point would need a whitelist entry, a SpineHandler, a test, and an ADR (C11), so the evidence is a file. `run_dream` emits nothing today, and its `backfill` reaches `revise_profile`, whose `assistant.profile.revised` EP is already dropped without an emitter.
 
 Change detection matters because every pass unconditionally rewrites `ALIGNMENT_SYNTHESIS.md` (`dream.py:266`), the people and groups indexes (`:265`), and the FTS index (`:269`). At a 5-minute cadence across 528 homes that is roughly 150k file rewrites per day for passes that promote nothing.
 
 **Files:**
-- Modify: `lca/infrastructure/memory/dream_scheduler.py`
-- Test: `tests/infrastructure/memory/test_dream_scheduler.py`
+- Modify: `lca/application/memory/dream_scheduler.py`
+- Test: `tests/application/memory/test_dream_scheduler.py`
 
 **Interfaces:**
 - Consumes: `DreamReport` from `lca.infrastructure.memory.dream` (fields `promoted: tuple[str, ...]`, `upserted: int`, `trail_facts: int`, `synthesis_written: bool`, `index_documents: int`).
 - Produces: `write_dream_evidence(home: Path, report: DreamReport | None, now_ms: int) -> Path | None`, writing `{home}/dreams/last_run.json`. Returns `None` when the report shows no change and a previous evidence file already exists. Task 4 passes this as `evidence_writer`.
 
+Do not add the `_report(**overrides)` helper below. Task 1's fix round already put that helper in `tests/application/memory/test_dream_scheduler.py` verbatim, because annotating the test double honestly needed a minimal `DreamReport`. Redefining it here shadows the existing one. Use the helper that is already in the file; its call sites work unchanged.
+
 - [ ] **Step 1: Write the failing test**
 
 ```python
-# appended to tests/infrastructure/memory/test_dream_scheduler.py
+# appended to tests/application/memory/test_dream_scheduler.py
 import json
 
 from lca.infrastructure.memory.dream import DreamReport
-from lca.infrastructure.memory.dream_scheduler import write_dream_evidence
+from lca.application.memory.dream_scheduler import write_dream_evidence
 
 
 def _report(**overrides) -> DreamReport:
@@ -458,12 +476,12 @@ def test_a_no_change_pass_does_not_rewrite_existing_evidence(tmp_path: Path) -> 
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `uv run pytest tests/infrastructure/memory/test_dream_scheduler.py -v -k evidence`
+Run: `uv run pytest tests/application/memory/test_dream_scheduler.py -v -k evidence`
 Expected: FAIL with `ImportError: cannot import name 'write_dream_evidence'`
 
 - [ ] **Step 3: Write the implementation**
 
-Append to `lca/infrastructure/memory/dream_scheduler.py`:
+Append to `lca/application/memory/dream_scheduler.py`:
 
 ```python
 _EVIDENCE_RELATIVE = ("dreams", "last_run.json")
@@ -510,13 +528,13 @@ Add `import json` to the module imports.
 
 - [ ] **Step 4: Run test to verify it passes**
 
-Run: `uv run pytest tests/infrastructure/memory/test_dream_scheduler.py -v`
+Run: `uv run pytest tests/application/memory/test_dream_scheduler.py -v`
 Expected: PASS, 7 tests
 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add lca/infrastructure/memory/dream_scheduler.py tests/infrastructure/memory/test_dream_scheduler.py
+git add lca/application/memory/dream_scheduler.py tests/application/memory/test_dream_scheduler.py
 git commit -m "feat(memory): record dream run evidence as a file artifact"
 ```
 
@@ -615,7 +633,7 @@ from pydantic import BaseModel, ConfigDict
 from lca.contracts.capabilities import ASSISTANT_CATALOG
 from lca.contracts.models.core.conversation.memory import MemoryRecord
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
-from lca.infrastructure.memory.dream_scheduler import DreamScheduler, write_dream_evidence
+from lca.application.memory.dream_scheduler import DreamScheduler, write_dream_evidence
 from lca.plugins.assistant.profile.profile import ProfileBackfillService, render_user_profile
 
 logger = logging.getLogger(__name__)
@@ -731,8 +749,8 @@ Append to the plugin patch list in `profiles/web-assistant.yaml`, next to the ex
 
 - [ ] **Step 5: Run tests and the plugin shape gate**
 
-Run: `uv run pytest tests/plugins/test_dream_scheduler_plugin_shape.py -v && ./scripts/lca-ops audit-plugin-shape`
-Expected: PASS, 4 tests; audit exits 0 for the new plugin id
+Run: `uv run pytest tests/plugins/test_dream_scheduler_plugin_shape.py -v && ./scripts/lca-ops audit-plugin-shape && uv run python scripts/check_plan_lift.py`
+Expected: PASS, 4 tests; audit exits 0 for the new plugin id; `check_plan_lift.py` exits 0. The lift check is mandatory because this task edits a bundle: it runs the same two calls `boot_check` uses (`resolve_profile_with_deployment_env` then `validate_profile_plans`), and skipping it before a bundle change has taken the shared kernel down.
 
 - [ ] **Step 6: Verify the profile still resolves**
 
@@ -751,7 +769,7 @@ git commit -m "feat(memory): schedule the dream pass from a plugin-hosted loop"
 ### Task 5: End-to-end Phase 0 evidence
 
 **Files:**
-- Test: `tests/scenario/memory/test_dream_scheduler_live_sweep.py`
+- Test: `tests/scenario/memory/test_dream_scheduler_sweep_e2e.py`
 
 **Interfaces:**
 - Consumes: everything from Tasks 1-4.
@@ -760,15 +778,15 @@ git commit -m "feat(memory): schedule the dream pass from a plugin-hosted loop"
 - [ ] **Step 1: Write the failing test**
 
 ```python
-# tests/scenario/memory/test_dream_scheduler_live_sweep.py
+# tests/scenario/memory/test_dream_scheduler_sweep_e2e.py
 import json
 from pathlib import Path
 
 import pytest
 
-from lca.contracts.atoms.enums.enums import MemoryCategory, ResidualClass
-from lca.contracts.models.memory.episode import EpisodeFact
-from lca.infrastructure.memory.dream_scheduler import DreamScheduler, write_dream_evidence
+from lca.contracts.atoms.enums.enums import MemoryCategory
+from lca.contracts.models.memory.episode import EpisodeFact, ResidualClass
+from lca.application.memory.dream_scheduler import DreamScheduler, write_dream_evidence
 from lca.infrastructure.memory.episode_buffer import EpisodeBuffer
 
 
@@ -785,7 +803,6 @@ def _identity_fact(trace_id: str) -> EpisodeFact:
     )
 
 
-@pytest.mark.anyio
 async def test_a_sweep_promotes_a_captured_episode_and_leaves_evidence(
     tmp_path: Path,
 ) -> None:
@@ -809,10 +826,10 @@ async def test_a_sweep_promotes_a_captured_episode_and_leaves_evidence(
 
     evidence = json.loads((home / "dreams" / "last_run.json").read_text(encoding="utf-8"))
     assert evidence["upserted"] == 1
-    assert evidence["promoted"] == ["identity:role"]
+    assert evidence["upserted"] == 1
+    assert evidence["now_ms"] == 1_791_121_000_000
 
 
-@pytest.mark.anyio
 async def test_a_second_sweep_promotes_nothing_and_keeps_the_evidence_stable(
     tmp_path: Path,
 ) -> None:
@@ -841,18 +858,23 @@ async def test_a_second_sweep_promotes_nothing_and_keeps_the_evidence_stable(
 
 - [ ] **Step 2: Run test to verify it fails, then passes**
 
-Run: `uv run pytest tests/scenario/memory/test_dream_scheduler_live_sweep.py -v`
+Run: `uv run pytest tests/scenario/memory/test_dream_scheduler_sweep_e2e.py -v`
 Expected: FAIL first if `ResidualClass` is imported from the wrong module. It lives in `lca.contracts.models.memory.episode` (`episode.py:17-20`). After fixing the import, PASS, 2 tests. The second test is the regression lock on the 17/89 duplicate-dimension defect: it proves the dream path is idempotent on a fact already active, via `_already_active` at `dream.py:242`.
 
 - [ ] **Step 3: Confirm the real kernel picks it up**
 
-Run: `./scripts/lca-ops kernel-restart && sleep 320 && cat /home/lichao/.lca/assistants/asst_ce7fecd65188/dreams/last_run.json`
-Expected: a JSON document with a `now_ms` inside the last 6 minutes. This is the "真实触发证据" ADR-0287 §4 Phase 0 requires. If the file is absent, check `./scripts/lca-ops status --json` and the kernel log for `dream sweep failed`.
+Run: `uv run python scripts/check_plan_lift.py` first and require exit 0, then `./scripts/lca-ops kernel-restart`, then wait one tick plus margin and read the kernel log for the sweep.
+
+Expected: the lift check exits 0, and the log shows the sweep running on the cadence set in `profiles/web-assistant.yaml`. That log line is the "真实触发证据" ADR-0287 §4 Phase 0 requires.
+
+Do NOT take liveness from `{home}/dreams/last_run.json`. Per ruling R34 that artifact records the last pass that moved memory, not the last pass that ran, so an idle home legitimately shows a days-old stamp and asserting a recent `now_ms` fails against a healthy scheduler. It would pass on a first run only because the file does not exist yet, and fail on every re-run. The two questions, "did the loop run" and "did memory move", were conflated into one file; the log answers the first and the artifact answers the second. The artifact is still worth catting, as evidence that a promotion landed, with `upserted` and `now_ms` as the keys to read.
+
+The restart is authorized for this step only, and the lift check is not optional: the workspace rule records that skipping it before a bundle change has taken this shared kernel down twice, and Task 4 edits both a bundle and a profile.
 
 - [ ] **Step 4: Commit**
 
 ```bash
-git add tests/scenario/memory/test_dream_scheduler_live_sweep.py
+git add tests/scenario/memory/test_dream_scheduler_sweep_e2e.py
 git commit -m "test(memory): pin end-to-end dream sweep promotion and idempotency"
 ```
 
