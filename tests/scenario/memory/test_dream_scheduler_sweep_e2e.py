@@ -12,7 +12,11 @@ prove that instead.
 No test here reaches a real assistant home. ``run_dream`` rewrites
 ``MEMORY.md``, ``USER.md``, the people and groups indexes and the FTS index,
 and ``_sync_user_md`` emits a preimage under ``{home}/revisions/``, so every
-home is built under ``tmp_path`` and ``LCA_HOME`` is isolated per test.
+home is built under ``tmp_path``. What contains that is home-relative
+resolution all the way through ``run_dream``. The shared ``isolated_lca_home``
+fixture each test requests is belt and braces, because nothing on this path
+reads ``LCA_HOME``: only the plugin's ``setup()`` does, to resolve the host
+lock directory, and these tests build the scheduler directly.
 """
 
 from __future__ import annotations
@@ -21,8 +25,6 @@ import json
 from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
-
-import pytest
 
 from lca.application.memory.dream_scheduler import (
     DreamScheduler,
@@ -38,12 +40,6 @@ CONTENT = "用户身份：架构师"
 USER_MD = "# 用户画像\n\n## 身份\n- 用户身份：架构师\n"
 FIRST_TICK_MS = 1_791_121_000_000
 TICK_MS = 300_000
-
-
-@pytest.fixture(autouse=True)
-def isolated_lca_home(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """Keep every path the sweep can reach inside ``tmp_path``."""
-    monkeypatch.setenv("LCA_HOME", str((tmp_path / "lca-home").resolve()))
 
 
 class _PersistingCatalog:
@@ -135,7 +131,10 @@ def _seeded_home(tmp_path: Path) -> tuple[Path, _PersistingCatalog, list[int], D
     return home, catalog, clock, _production_sweep(tmp_path, home, catalog, clock)
 
 
-async def test_a_sweep_promotes_a_captured_episode_and_leaves_evidence(tmp_path: Path) -> None:
+async def test_a_sweep_promotes_a_captured_episode_and_leaves_evidence(
+    tmp_path: Path, isolated_lca_home: Path
+) -> None:
+    del isolated_lca_home
     home, catalog, _, scheduler = _seeded_home(tmp_path)
 
     (report,) = await scheduler.sweep_once()
@@ -180,8 +179,9 @@ async def test_a_sweep_promotes_a_captured_episode_and_leaves_evidence(tmp_path:
 
 
 async def test_a_second_sweep_promotes_nothing_and_keeps_the_evidence_stable(
-    tmp_path: Path,
+    tmp_path: Path, isolated_lca_home: Path
 ) -> None:
+    del isolated_lca_home
     home, catalog, clock, scheduler = _seeded_home(tmp_path)
     await scheduler.sweep_once()
     artifact = home / "dreams" / "last_run.json"
@@ -220,7 +220,7 @@ async def test_a_second_sweep_promotes_nothing_and_keeps_the_evidence_stable(
 
 
 async def test_a_tick_that_only_reprojects_the_profile_still_updates_the_evidence(
-    tmp_path: Path,
+    tmp_path: Path, isolated_lca_home: Path
 ) -> None:
     """A pass that moves no fact but re-renders USER.md is a change.
 
@@ -229,6 +229,7 @@ async def test_a_tick_that_only_reprojects_the_profile_still_updates_the_evidenc
     passenger in the payload. Drop it from the predicate and a home whose
     profile the sweep repaired reports the previous promotion forever.
     """
+    del isolated_lca_home
     home, catalog, clock, scheduler = _seeded_home(tmp_path)
     await scheduler.sweep_once()
     stale_profile = "# 用户画像\n"

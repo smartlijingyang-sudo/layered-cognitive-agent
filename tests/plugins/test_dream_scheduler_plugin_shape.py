@@ -129,14 +129,6 @@ def _home_with_memory(tmp_path: Path, name: str) -> Path:
     return home
 
 
-@pytest.fixture
-def isolated_lca_home(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
-    """Keep the sweep's lock directory off the operator's real ``~/.lca``."""
-    lca_home = (tmp_path / "lca-home").resolve()
-    monkeypatch.setenv("LCA_HOME", str(lca_home))
-    return lca_home
-
-
 # ── Config ────────────────────────────────────────────────────────
 
 
