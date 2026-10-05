@@ -105,6 +105,7 @@ class TestSoulReachesSystemPrompt:
         assert "领域驱动设计" in output.text
         assert "最小改动原则" in output.text
         assert output.text.startswith("BACKSTORY:")
+        assert output.text.count("<!-- INJECTED FILE: SOUL.md -->") == 1
 
     def test_role_section_contains_name(self, catalog: AssistantCatalogImpl) -> None:
         """The RoleSection must render the assistant name."""

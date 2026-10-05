@@ -96,7 +96,20 @@ def test_t1_self_cognition_grounded_in_real_physical_files(tmp_path: Path) -> No
     assert persona.role == "Athena-noqadanum"
     assert "Athena-noqadanum" in persona.backstory
 
-    # 3. 避免指称幻觉反例：未绑定 Home (backstory 为空) 时不输出 SOUL.md 声明
+    # 3. 绑定 Home 时，standing 文本自带注入标记，BackstorySection 只发射一次
+    bound_profile = RoleProfile(
+        role=persona.role,
+        goal=persona.goal,
+        backstory=persona.backstory,
+        tool_permission_manifest=ToolPermissionManifest(allowed_tools=[]),
+    )
+    bound_out = BackstorySection().render(role_profile=bound_profile, tools=())
+    assert bound_out.text.startswith("BACKSTORY:")
+    assert bound_out.text.count("<!-- INJECTED FILE: SOUL.md -->") == 1
+    assert "Athena-noqadanum" in bound_out.text
+    assert bound_out.text.index("SOUL.md 是人格配置") > bound_out.text.index("BACKSTORY:")
+
+    # 4. 避免指称幻觉反例：未绑定 Home (backstory 为空) 时不输出 SOUL.md 声明
     unbound_profile = RoleProfile(
         role="solo",
         goal="g",
@@ -344,9 +357,7 @@ def _t11_route(
     if requirement is not None:
         ports[PortName("approval_requirement")] = requirement
     ctx = NodeContext(runtime={}, budget={}, metadata={})
-    out = asyncio.run(
-        ApproveGateExecutor().node_execute(ctx, NodeInput(port_values=ports))
-    )
+    out = asyncio.run(ApproveGateExecutor().node_execute(ctx, NodeInput(port_values=ports)))
     return out.port_values[PortName("approval_routing")]
 
 
@@ -413,18 +424,14 @@ def test_t11_shell_tool_call_triggers_approval_requirement() -> None:
 def test_t11_hitl_tool_call_triggers_approval_requirement() -> None:
     """T11 触发：HITL 交互工具（askUserQuestion）→ 审批需求 required=True。"""
     engine = build_default_approval_engine()
-    req = engine.evaluate(
-        [ToolCall(call_id="c2", tool_name="askUserQuestion", arguments={})]
-    )
+    req = engine.evaluate([ToolCall(call_id="c2", tool_name="askUserQuestion", arguments={})])
     assert req.required is True
 
 
 def test_t11_cron_mutation_triggers_approval_requirement() -> None:
     """T11 触发：模型路径 cron 写操作（cron.update）→ 挂起等审批回注（ADR-0268 §2.1）。"""
     engine = build_default_approval_engine()
-    req = engine.evaluate(
-        [ToolCall(call_id="c3", tool_name="cron.update", arguments={})]
-    )
+    req = engine.evaluate([ToolCall(call_id="c3", tool_name="cron.update", arguments={})])
     assert req.required is True
 
 

@@ -85,12 +85,11 @@ def test_refresh_injected_collapses_a_repeated_file_to_one_block() -> None:
 
 
 def test_refresh_injected_closes_a_block_on_its_own_end_marker() -> None:
-    """A nested block does not close its parent and leak the rest as prose.
+    """A nested bundle must close on its own END marker.
 
-    ``BackstorySection`` wraps an already-marked-up bundle in SOUL.md markers,
-    so the incoming text nests. Matching any END marker let the inner block
-    terminate the outer one early, and everything after it was copied through
-    verbatim, which is how one bundle became two.
+    An outer block wrapping inner blocks nests the text. Matching any END
+    marker would let the inner block terminate the outer one early and copy
+    everything after it through verbatim, which turns one bundle into two.
     """
     inner = "\n\n".join(
         [render_injected("SOUL.md", "内层人设"), render_injected("USER.md", "内层用户")]

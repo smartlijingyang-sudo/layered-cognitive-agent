@@ -198,12 +198,11 @@ def refresh_injected(
     A standing file that was not in the text is appended, in layout order.
 
     One block per name survives, so the result is a fixed point of this
-    function. An upstream producer that wraps an already-marked-up bundle in
-    another block used to multiply every standing file on each turn: the walk
-    replaced each occurrence it found and ``seen`` only gated the append tail,
-    so a prompt carrying two copies kept carrying two copies refreshed from
-    disk. The END marker is matched by name for the same reason. Matching any
-    END let a nested block close its parent early and leak the rest of the
+    function. Nested or repeated blocks converge to one block per name: the
+    walk skips every occurrence after the first and ``seen`` gates the append
+    tail, so a prompt carrying two copies of a file keeps only the first.
+    The END marker is matched by name for the same reason. Matching any END
+    would let a nested block close its parent early and leak the rest of the
     bundle through as free text. An END with no matching BEGIN is dropped
     instead of being copied as prose.
     """
