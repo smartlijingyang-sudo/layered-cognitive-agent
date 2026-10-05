@@ -23,6 +23,7 @@ from lca.harness.continuous.serialization import (
     work_item_from_payload,
     work_item_payload,
 )
+from lca.infrastructure.sqlite import transaction
 
 
 class LeaseNotOwnedError(RuntimeError):
@@ -251,15 +252,8 @@ class SqliteWorkQueue(WorkQueue):
 
     @contextmanager
     def _transaction(self) -> Iterator[sqlite3.Connection]:
-        with self._connection() as connection:
-            connection.execute("BEGIN IMMEDIATE")
-            try:
-                yield connection
-            except BaseException:
-                connection.rollback()
-                raise
-            else:
-                connection.commit()
+        with transaction(self._connection) as connection:
+            yield connection
 
 
 __all__ = ["LeaseNotOwnedError", "SqliteWorkQueue"]

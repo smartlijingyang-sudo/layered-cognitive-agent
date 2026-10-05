@@ -801,5 +801,29 @@
   1. `validate` ×2（avatar/tools.py，同文件 8 行同体）—— 选中（510 轮驳回项，本轮确证语义相同后收敛）。
   2. 510 轮其余驳回项（`__init__` ×2、dispatch_rpc/poll_pairing/_edit_file、`_fail`/`_emit`/`_ok` 家族等）—— 驳回：沿用 510（需 grilling / 跨包家族 / 规模超一轮）。
 - 验证结果: worker：`~/.local/bin/ruff check` 全过；targeted pytest 38 passed；行为烟测 6 案例 OK。主流程：docstring 修正后 `ruff check` 重过、`py_compile` OK；`git diff` 确认仅本轮 2 文件变更（代码 1 + ledger.md）。
-- commit: PLACEHOLDER_HASH refactor(lca-1000): 第0511轮 收敛 avatar tools validate 重复定义为模块 helper（未 push）。
+- commit: 6f932f1fd refactor(lca-1000): 第0511轮 收敛 avatar tools validate 重复定义为模块 helper（未 push）。
 - 备注: 只 add/commit 本轮 2 文件（代码 1 + ledger.md），显式路径提交，避免带入并发会话（ralph）已 staged 的 2 个测试文件；其 staged/untracked（docs/notes/audit-2026-10-05.md、ralph/）全程未触碰；510 轮 hash 回填行（34c71e577）随本次一并提交（沿用 505/510 做法）；备份 /tmp/bak_0511/tools.py（252，改动前原文件）。
+
+
+## 第0512轮 (2026-10-06 06:33-06:52 CST)
+- 编号说明: 本轮是 06:33 窗口的 cron 轮次，按顺序应为第 512 轮。启动时台账最新为 510（06:03 窗口的 511 轮 worker 超时中断、主流程在 06:38:57 才补交 commit 6f932f1fd 并回填台账），故初稿误标 511，现纠正为 512；与 6f932f1fd 无冲突。
+- 改了什么: 收敛两处逐字相同的 _transaction 事务纪律实现（改动 3 文件：+22/-16）：新建 lca/infrastructure/sqlite.py（canonical transaction(connection_factory) contextmanager：BEGIN IMMEDIATE / except BaseException rollback+raise / else commit，__all__=["transaction"]）；lca/harness/continuous/queue.py:253（SqliteWorkQueue._transaction，5 个调用点）与 lca/infrastructure/learning/review_ticket_sqlite_database.py:34（SqliteLearningReviewTicketDatabase._transaction，4 个调用点在 review_ticket_sqlite.py）各从 10 行本体收敛为 3 行委托 with transaction(self._connection) as connection: yield connection；9 个调用点零改动。
+- 依据 skill 哪一节: SKILL.md Deletion test（删掉任一副本后复杂度直接消失：另一副本被共享 canonical 替代；若无 helper，两处各需保留 BEGIN IMMEDIATE/BaseException 回滚语义，helper 赚到了 keep）+ DEEPENING.md 依赖分类 In-process（纯本地、无 I/O，Always deepenable，merge the modules and test through the new interface directly，No adapter needed）与 Seam discipline（两处 production 调用方即真实 seam；_transaction 保持下划线私有，internal seam 不外泄到 interface；各 store 的 _connection 配置差异保留在各自类内，helper 只收敛事务纪律不收敛连接配置）+ LANGUAGE.md Locality/Leverage（9 个调用点共享同一事务语义；except BaseException 这种"看起来会错"的细节正是 drift 最高危点）。
+- 为什么这是实质改动(非凑数): 收敛的是真实的非平凡语义重复（BEGIN IMMEDIATE 抢占式加锁 + BaseException 全捕获回滚，10 行；两处 AST dump 去 docstring 后逐字相同，本轮 scan0511.py 断言）。证据链：(1) 全库 def _transaction 仅此两处（git grep）；(2) idempotency/store.py 的 BEGIN IMMEDIATE 是另一惯用法（async 内联 with closing(...) as connection, connection），未纳入（形状不同，见候选清单）；(3) 架构测试 test_legacy_loop_transaction_module_is_retired 禁的是已退役 lca/loop/transaction.py 路径引用，本轮新建 lca/infrastructure/sqlite.py 不触该断言（名称/路径均不同），且 import-linter lint exit 0 全契约通过。
+- 关键设计决策（夜间跳过 grilling，记台账）: canonical 放新模块 lca/infrastructure/sqlite.py 而非并入任一现有类，因为事务纪律是通用 sqlite plumbing，不属于 queue（harness）也不属于 learning；harness→infrastructure 方向合规（importlinter 契约 4 只禁 harness→cognition/runtime/agent/application，且 lca/harness/diagnostics/audit/direct_commands.py:78 已有同方向先例）。helper 取 connection_factory 而非 connection：两类的 _connection() 配置不同（queue 注册 max_attempts_from_payload SQL 函数；review_ticket 设 WAL/FULL pragmas + Row factory），只共享事务纪律。保留各类的 _transaction 私有委托（9 调用点不动，internal seam 纪律）。
+- 候选清单（本轮 explore：AST 同体扫描 32 组，逐一取舍）:
+  1. _transaction ×2（queue.py vs review_ticket_sqlite_database.py，10 行同体，9 调用点）—— 选中。
+  2. companion client.py vs standalone.py 14 组（connect_and_run 92 行等）—— 驳回：沿用 508/509（疑似 sync/async 桥接刻意镜像，deletion test 未过）。
+  3. _run（box/tool.py vs plugins/tools/bash.py，11 行）—— 驳回：沿用 509（闭包绑定不同外层变量，deletion test 未过）。
+  4. _emit ×5 / _fail ×8+×2 / _ok ×2 —— 驳回：沿用 508/509（跨包命名家族，统一错误语义需 grilling）。
+  5. _get_role_library（fold.py vs triage.py）—— 驳回：沿用 508（绑定 self._role_library，需 grilling）。
+  6. apply ×2（defaults.py 同文件）—— 驳回：沿用 509（step_tree/narrative 语义可能分化，需 grilling）。
+  7. _format_duration / _catalog_digest / _turn_of / __init__ ×2（runtime_tools.py）—— 驳回：沿用 507/508/510（跨子系统语义未确证 / 刻意对称）。
+  8. parameters ×2（lca_computer get/command_output.py vs kill/command.py）—— 驳回（本轮新判）：parameters() 是 tool registry 按模块导入的 interface 契约本身，deletion test 未过（删一处另一处仍需自己的 schema；收敛只是 indirection，无 locality 收益）。
+  9. read_file ×2（ops.py vs runtime/exec.py）—— 驳回（本轮新判）：两处都是 Protocol 方法签名（... 本体），trivial 同体，非实质。
+  10. target ×2（fake/companion.py vs machine/adapter.py，7 行同体）—— 驳回（本轮新判）：fake adapter 刻意镜像 real adapter；fake 若共享 production 实现则测试替身耦合生产代码，deletion test 未过（复杂度变成耦合）。
+  11. validate ×2（avatar/tools.py:129/206）—— 驳回（本轮）：已被 06:03 窗口的第 511 轮收敛（commit 6f932f1fd），本轮启动时曾误判为并发修改，实为 511 轮未提交的工作区残留，现已提交，工作区干净。
+  12. idempotency/store.py 的 BEGIN IMMEDIATE 内联惯用法 —— 留作后续候选（async + with closing(...) 形状不同，收敛需确认语义等价，超一轮范围）。
+- 验证结果: ~/.local/bin/ruff check 3 文件 All checks passed；ruff format --check already formatted；git grep 确认两旧文件 BEGIN IMMEDIATE 残余 0（新模块独有）；import 冒烟 + 行为验证（commit/rollback 双路径：两类各插 1 行提交可见、异常回滚不可见）SMOKE OK；targeted pytest 3 文件（tests/harness/test_continuous_control_plane.py、tests/architecture/test_learning_review_ticket_store.py、test_learning_review_lifecycle.py）：16 passed；import-linter lint exit 0（全契约通过，新增 harness→infrastructure 边合规）。
+- commit: PLACEHOLDER_HASH refactor(lca-1000): 第0512轮 收敛 _transaction 事务纪律到 infrastructure/sqlite（未 push）。
+- 备注: 只 add/commit 本轮 4 个文件（新模块 1 + 代码 2 + ledger.md），git add + git commit -- <paths> 显式路径；并发会话已 staged 的 2 个测试文件改动及 untracked（docs/notes/audit-2026-10-05.md、ralph/）全程未触碰。备份 /tmp/bak_0511/（252，改动前 queue.py/review_ticket_sqlite_database.py；目录名沿用轮次扫描编号，实际为 512 轮备份）。scan0511.py/patch0511_tx.py/smoke0511_tx.sh 留 /tmp（252，非仓库文件）。教训：经 ssh 双引号 heredoc 写台账时，条目内反引号会被本地 bash 执行替换——以后写文件内容一律走 stdin 通道，不走命令行内嵌 heredoc。

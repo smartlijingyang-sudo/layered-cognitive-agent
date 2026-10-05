@@ -7,6 +7,8 @@ from collections.abc import Iterator
 from contextlib import contextmanager
 from pathlib import Path
 
+from lca.infrastructure.sqlite import transaction
+
 
 class SqliteLearningReviewTicketDatabase:
     """Own the durable database boundary shared by review-ticket operations."""
@@ -32,15 +34,8 @@ class SqliteLearningReviewTicketDatabase:
 
     @contextmanager
     def _transaction(self) -> Iterator[sqlite3.Connection]:
-        with self._connection() as connection:
-            connection.execute("BEGIN IMMEDIATE")
-            try:
-                yield connection
-            except BaseException:
-                connection.rollback()
-                raise
-            else:
-                connection.commit()
+        with transaction(self._connection) as connection:
+            yield connection
 
     @staticmethod
     def _ensure_schema(connection: sqlite3.Connection) -> None:
