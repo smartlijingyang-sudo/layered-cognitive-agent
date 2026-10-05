@@ -50,7 +50,6 @@ from lca.plugins.transport.webserver.read.runs.terminal import (
     record_terminal_materialization,
     session_locator,
     terminal_event_seq_for,
-    terminal_event_seq_from_file,
     watermark_from_file,
 )
 
@@ -89,6 +88,5 @@ __all__ = [
     "stream_chat_completion",
     "stream_process_journal_live",
     "terminal_event_seq_for",
-    "terminal_event_seq_from_file",
     "watermark_from_file",
 ]

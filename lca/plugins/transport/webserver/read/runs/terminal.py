@@ -274,11 +274,6 @@ def watermark_from_file(path: Path) -> int:
     return last
 
 
-def terminal_event_seq_from_file(path: Path) -> int:
-    """Scan JSONL in reverse for last terminal event seq. @deprecated."""
-    return 0
-
-
 def ledger_summary_for(session: RunSession) -> str:
     """Hash the terminal one megabyte of Journal for integrity navigation. @deprecated."""
     path = session.spine_path
@@ -397,6 +392,5 @@ __all__ = [
     "record_terminal_materialization",
     "session_locator",
     "terminal_event_seq_for",
-    "terminal_event_seq_from_file",
     "watermark_from_file",
 ]

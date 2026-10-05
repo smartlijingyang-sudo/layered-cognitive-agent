@@ -666,3 +666,44 @@
 - 验证结果: ruff check 4 文件首次修复后即过（中间插曲：terminal.py 出现空 `from ... import ()`，补删后 All checks passed!）；残余引用 `grep -rn stream_run_fold lca/ --include=*.py` = 0 行；import 冒烟（read.runs / terminal / port.port 三模块导入 + `__all__` 断言）OK；targeted pytest 3 文件（test_read_runs_unified.py / test_runs_sessions_facade_path.py / test_run_isolation.py）：14 passed。
 - commit: 见 git log --grep='第0503轮'（refactor(lca-1000): 第0503轮 删除 legacy RunPort 上退休的 stream_run_fold 入口及其实现链（死兼容路径）；未 push）。
 - 备注: 只 add 本轮 5 个文件（代码 4 + ledger.md）；编辑前 git status --porcelain 显示并发会话（ralph/10-round-arch-deepening）未提交改动（6 modified + 3 untracked），与本轮文件无交集，未触碰；备份 /tmp/bak_0503/（252，4 文件原文件完整备份）。本地写脚本 + stdin 喂远程 python3（断言计数==1），主脚本一次成功；修复空导入块追加一次。
+## 第0504轮 (2026-10-06 02:33-02:47 CST)
+- 改了什么: 无代码改动（本轮未发现新的实质机会）。
+- 依据 skill 哪一节: SKILL.md 三步走（explore → 候选清单 → 逐一验证取舍；夜间跳过 grilling，理由记台账）+ 实质性硬门槛（禁止凑数：`RunRequest | Any` 一字注解清理这类改动明确不算一轮）。
+- explore 范围: 503 留下的 `wire/routes.py:34` `_ws_placeholder`（深度验证）；今晨 ralph/10-round-arch-deepening 合并带来的新代码（`lca/application/runtime/adapters.py` 148 行、`lca/infrastructure/tools/assistant/family.py` 70 行、`assistant_tools/plugin.py` 抽取后 54 行删减）；全库 `pragma: no cover` 清单；`if False` 死桩扫描；TODO/FIXME；`delete-when` 到期扫描；`adapters/` 包→模块折叠的残余引用扫描。
+- 候选清单（逐一验证后取舍）:
+  1. `_ws_placeholder` 哨兵删除 —— 驳回（沿用 503"需 grilling"结论，本轮独立验证确认）：该哨兵承载 ROUTE_SPECS 发现契约——wire 包 docstring 声明 WS 路由"与 ROUTE_SPECS 同元组以供文档/发现"（spec §3.2 + ADR-0200 §4.3）；`test_ws_path_is_in_route_specs` 与 `test_lca_p1_node_07b_running_op` 均断言 `WS_PATH in ROUTE_SPECS`；`RouteSpec.handler` 是必填 `Callable`，任何替代写法只是把哨兵换名；删 `WS_ROUTE_SPEC` 则改动被测试锁定的发现接口。三种删法都不满足"无 grilling 安全删除"——真正的解法是重设计发现契约（DEEPENING.md seam 纪律：当前"handler 抛错即跳过"的注册语义是"currently it does not"实现的 hypothetical seam），夜间轮不动。
+  2. `run_request_to_intent(request: RunRequest | Any, …)` 中 `| Any` 塌缩为 `Any` —— 驳回：单 token 注解清理，无行为/复杂度变化，属硬门槛明确禁止的凑数（改一句话不算一轮）。
+  3. `failover.py` 4 处 `raise RuntimeError("… exhausted …")` —— 驳回（沿用 503：全部 adapter 失败是真实可达的 error mode，删 raise = 删 interface 的 error mode）。
+  4. `supervisor.py:278` `_waiter_loop` 的 `except Exception` —— 驳回（沿用 502：进程死亡必须发 died 事件的尽力语义有据）。
+  5. `accessors.py:63,82` `_resolve_*` 的 `except Exception` —— 驳回（沿用 502：getter 是外部注册的任意 callable，raise 真实可达）。
+  6. `predicate_evaluator.py:72,103` 两处 `raise ValueError(unhandled …)` —— 驳回（沿用 503：`kind` 的 closed 性未在类型层面确证，删 raise 改变 error mode，需 grilling）。
+  7. `serve.py` 5 个 `# pragma: no cover - intentional stub` —— 驳回：ServiceState 接口实现，删除改变类接口。
+  8. `plugin.py` `_default_tool_names_provider` 内 `except Exception: return ()` fail-soft —— 驳回：docstring 记录的设计决策（物化失败保持模板 `allow: []` 行为），删除需 grilling。
+  9. `s3.py` PR-10 TODO 占位 —— 驳回：里程碑占位，非死代码。
+  10. `delete-when` 到期扫描 —— 驳回：全库无到期（最早 2026-10-15；多条为 `delete-when: never`）。
+  11. 新 `adapters.py` / `family.py` / 抽取后 `plugin.py` —— 无 slop（ralph 轮 3-4 刚做完 deepening；包→模块折叠无残余引用）。
+- 验证结果: explore-only 轮，无代码改动，不触发验证门（ruff/pytest 均不适用）。
+- 备注: 只 add ledger.md 本文件。并发会话的未提交改动（`lca/application/memory/dream_scheduler.py` + 对应测试）全程未触碰；`docs/notes/audit-2026-10-05.md`、`ralph/` untracked 保持原样。本轮中段曾遇 252 SSH 隧道中断约 3 分钟（egress proxy 3130 CONNECT 被拒，3128 正常），重试后恢复；中断期间未执行任何写操作。
+---
+
+
+## 第0505轮 (2026-10-06 03:03-03:32 CST)
+- 改了什么: 删除 terminal_event_seq_from_file 退休 stub 及其 re-export 接线（2 files，8 deletions(-)，纯删除）：
+  - lca/plugins/transport/webserver/read/runs/terminal.py:277-279：删除 def terminal_event_seq_from_file(path)（docstring 自标 "@deprecated"，本体恒 return 0）；__all__ 去条目；
+  - lca/plugins/transport/webserver/read/runs/__init__.py：去 from .terminal import 条目 + __all__ 条目。
+- 依据 skill 哪一节: deslop 清单 死兼容路径（@deprecated 自标 + 恒返 0 零行为 + 全库零调用方，路径已死）+ DEEPENING.md Seam discipline（seam interface 收敛：该 stub 曾在 read.runs 包 interface 上占一个 entry point，承诺"按 path 扫出 terminal event seq"能力，实际恒返 0，是幻影 capability；ADR-0233 已记录完整性源迁移至 health_hash (G-8)，该入口的保留动机已不存在）+ SKILL.md Deletion test（删后复杂度直接消失：本体无行为，零调用方会重造；唯一文档引用是 ADR-0233 的历史记录，不可改）+ LANGUAGE.md Interface（interface 包含 error modes 与能力承诺：幻影 entry point 从 interface 移除后 surface 收敛）。
+- 为什么这是实质改动(非凑数): 删除的是真实的 interface surface（包 __all__ + 模块 __all__ + 唯一实现），非注释措辞/空行调整。证据链：(1) docstring 自标 @deprecated；(2) 本体逐字 return 0，零行为；(3) git grep 全库（docs/、ralph/ 除外）仅剩 def + __all__×2 + import，零代码调用方；(4) tests/ 零引用（test_migrate_traces_flat_to_v2_layout.py 引用的是 scripts/ 下同名不同体的 _terminal_event_seq_for，无关）；(5) ADR-0233 (G-9/Task 1.6+1.7) 明确记录该函数已降级为 deprecated stub，完整性源改用 health_hash；(6) 同包的 terminal_event_seq_for / ledger_high_watermark_for / ledger_summary_for 仍有 terminal.py:173-175 内部调用方存活——本轮只删零调用的 _from_file 变体，未碰它们。
+- 关键设计决策（夜间跳过 grilling，记台账）: docs/ 下的 ADR-0233 与 2026-09-16 plan/spec 对该函数的历史记载原样保留——ADR 是决策历史记录，不重写历史；只删代码 surface。terminal_event_seq_for（恒返 0 但有内部调用方）与 ledger_high_watermark_for / ledger_summary_for（有行为 + 内部调用方）不动，删除需重设计 manifest 组装契约，留给 grilling。
+- 候选清单（本轮 explore，逐一验证后取舍）：
+  1. 上述 terminal_event_seq_from_file 退休 stub 删除 —— 选中（deslop 死兼容路径；503 同模式；2 文件 8 deletions 纯删除）。
+  2. terminal.py 另 4 个 @deprecated（ledger_high_watermark_for / terminal_event_seq_for / watermark_from_file / ledger_summary_for）—— 驳回：terminal.py:173-175 有内部调用方存活（RunManifest 组装），删等于改 manifest 行为，需 grilling。
+  3. 双 SearchProvider Protocol（search/providers/protocol.py async 版 vs web_search/providers/base.py sync 版）—— 驳回：两 seam 皆活（A 有 exa/searxng/tavily + registry；B 有 duckduckgo + verticals/stubs），按 LANGUAGE.md 都是 real seam，收敛需跨子系统 grilling。
+  4. 双 FileStore Protocol（infrastructure/file/store.py vs memory/contextfiles/ports/file_store.py）—— 驳回：同名不同概念（附件 blob store vs home-root 文本文件 store），非重复。
+  5. cordis_event_table.py:38 18 行注释块 —— 驳回：是 interface 不变量声明（命名规则 + 范围 + 禁止直接 emit 的纪律），属 LANGUAGE.md Interface 的一部分，非叙事 slop。
+  6. lca_kernel/boot/plan_validation/core.py:128 注释掉的 check 列表 —— 驳回：每项带 false-positive 分析与 re-enable 条件，是设计事实；取舍需 grilling。
+  7. session.py:129 loop_cursor_token —— 驳回：仍活（:174-178 CursorRecord.bind + builder.py:264 赋值），非 no-op。
+  8. legacy_blacklist.txt —— 驳回：活的治理机制（季度 review 流程 + scripts 消费），非 slop。
+  9. 轮 500/501/502/503/504 驳回项（_ws_placeholder / failover 4 raises / supervisor waiter / accessors except / predicate_evaluator raises / serve.py stubs / plugin.py fail-soft / s3.py PR-10 / delete-when / adapters.py-family.py-plugin.py 新代码 / _DEFAULT_BOOT_PATH / tail.py:81 / agent_gateway excepts / 长注释块 / append.py PEP562 / naming 家族）—— 驳回（沿用结论：语义真实或需 grilling/规模超一轮）。
+- 验证结果: ruff check 2 文件首次即过（All checks passed!）；残余引用 git grep terminal_event_seq_from_file -- lca/ tests/ scripts/ = 0 行；import 冒烟（read.runs.__all__ + terminal 模块属性断言符号完全消失）OK；targeted pytest 3 文件（test_read_runs_unified.py / test_runs_sessions_facade_path.py / test_run_isolation.py）：14 passed。
+- commit: 见 git log --grep='第0505轮'（refactor(lca-1000): 第0505轮 删除 terminal_event_seq_from_file 退休 stub（死兼容路径）；未 push）。
+- 备注: 只 add 本轮 3 个文件（代码 2 + ledger.md）；504 轮的台账条目此前未提交，随本次一并提交（均为本 campaign 自有 bookkeeping）；编辑前/后 git status --porcelain 显示并发会话（ralph）未提交改动（docs/notes/audit-2026-10-05.md + ralph/，untracked）与本轮文件无交集，未触碰；ralph 在本轮期间新增了 2 个 commit（ahead 由 64→66），未动；备份 /tmp/bak_0505/（252，2 文件原文件完整备份）。本地写脚本 + stdin 喂远程 python3（断言 old 文本计数==1），一次成功。台账曾因 heredoc 反引号被远程 shell 吃掉导致标识符缺失，已用 stdin-python 模式重写 689-708 行修复。
