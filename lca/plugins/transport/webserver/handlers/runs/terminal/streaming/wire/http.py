@@ -14,6 +14,7 @@ Two endpoints (ADR-0200 §3.2):
   is not alive. The token TTL is the standard 5 minutes
   (auth.DEFAULT_TTL_SECONDS).
 """
+
 from __future__ import annotations
 
 import time
@@ -24,6 +25,7 @@ from starlette.applications import Starlette
 from starlette.requests import Request
 from starlette.responses import JSONResponse
 
+from lca.contracts.observability.registry.status import RunLifecycleStatus
 from lca.infrastructure.observability.stream import (
     LcaStreamEventLog,
     get_agent_runtime_redis_client,
@@ -77,13 +79,22 @@ async def get_running_operation(request: Request) -> JSONResponse:
 
     from lca.plugins.transport.webserver.handlers.auth.user import auth_config_of
 
+    run_id = row.get("run_id") if isinstance(row, dict) else None
+    registry = getattr(request.app.state, "registry", None)
+    session = registry.get(run_id) if (run_id and registry and hasattr(registry, "get")) else None
+
+    # lca_running_operations has no status column and its rows are never deleted,
+    # so the latest row for a topic is usually a run that ended long ago. Liveness
+    # lives only in the registry. Answering with a dead run makes every caller
+    # attach to a stream that will never emit, which is worse than answering null.
+    # An empty registry after a restart reads as "nothing live", which is true.
+    if RunLifecycleStatus.is_terminal(getattr(session, "status", None)):
+        return JSONResponse({"running_operation": None})
+
     _, dev_mode = auth_config_of(request)
     if not dev_mode:
         caller_user_id = request.headers.get("x-lca-user-id", "").strip()
-        run_id = row.get("run_id") if isinstance(row, dict) else None
         if run_id:
-            registry = getattr(request.app.state, "registry", None)
-            session = registry.get(run_id) if (registry and hasattr(registry, "get")) else None
             owner_user_id = getattr(session, "user_id", "") if session is not None else ""
             if not owner_user_id:
                 mgr = _stream_manager()

@@ -269,6 +269,9 @@ async def test_record_feedback_rejects_cross_tenant_user() -> None:
 @pytest.mark.asyncio
 async def test_get_running_operation_concealed_for_other_user() -> None:
     session = FakeSession("run_1", user_id="user_owner")
+    # Live, so this test exercises the ownership gate and not the liveness gate
+    # that now runs before it.
+    session.status = RunLifecycleStatus.RUNNING
     app_state = _make_app_state(dev_mode=False, sessions={"run_1": session})
     mock_store = MagicMock()
     mock_store.get_latest_for_topic = AsyncMock(

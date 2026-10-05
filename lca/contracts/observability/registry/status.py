@@ -66,5 +66,29 @@ class RunLifecycleStatus(StrEnum):
             return cls.CANCELLED
         return cls.COMPLETED
 
+    @classmethod
+    def is_terminal(cls, status: RunLifecycleStatus | str | None) -> bool:
+        """True when a run in this status can no longer produce stream events.
+
+        ``PAUSED`` and ``WAITING_INPUT`` are not terminal: such a run still owes
+        the user an approval card, so a caller asking "is anything live on this
+        conversation" must be told yes. ``None`` reads as terminal, because a run
+        the registry no longer holds cannot emit anything.
+        """
+        if status is None:
+            return True
+        value = status.value if isinstance(status, cls) else str(status)
+        return value in _TERMINAL_VALUES
+
+
+_TERMINAL_VALUES: frozenset[str] = frozenset(
+    {
+        RunLifecycleStatus.COMPLETED.value,
+        RunLifecycleStatus.FAILED.value,
+        RunLifecycleStatus.CANCELLED.value,
+        RunLifecycleStatus.TIMEOUT.value,
+    }
+)
+
 
 __all__ = ["RunLifecycleStatus"]
