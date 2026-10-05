@@ -186,14 +186,17 @@ _EVIDENCE_RELATIVE = "dreams/last_run.json"
 def _changed(report: DreamReport) -> bool:
     """True when this pass moved a fact or re-projected the profile.
 
-    Deliberately narrower than "the pass did work". ``synthesis_written`` is
-    hardcoded ``True`` (``dream.py:214``), ``promoted`` repeats every past
-    promotion because it is appended before the ``_already_active`` skip
-    (``dream.py:241``), ``trail_facts`` counts the whole trail corpus rather than
-    what is new in it, and ``people_indexed``/``groups_indexed``/
-    ``index_documents`` count rebuilds of artifacts every pass rewrites
-    unconditionally. Only a written semantic row and a USER.md whose rendering
-    differed from what is on disk are content differences.
+    Deliberately narrower than "the pass did work", and the reason the evidence
+    payload is as small as it is. Three fields look like work but never go
+    quiet: ``_write_synthesis`` returns a literal ``True`` for
+    ``synthesis_written``; ``run_dream`` appends to ``promoted`` before the
+    ``_already_active`` skip, so every past promotion recurs in every later
+    pass and the tuple grows with the corpus; and ``_trail_facts`` windows
+    nothing, so ``trail_facts`` counts the whole trail corpus rather than what
+    is new in it. ``people_indexed``, ``groups_indexed`` and ``index_documents``
+    count rebuilds of artifacts every pass rewrites unconditionally. Only a
+    written semantic row and a USER.md whose rendering differed from what is on
+    disk are content differences.
     """
     return bool(report.upserted or report.user_md_written)
 
@@ -206,6 +209,9 @@ def write_dream_evidence(home: Path, report: DreamReport | None, now_ms: int) ->
     minutes-level cadence does not churn it. A home with no artifact yet always
     gets one, so the file's absence means the sweep never reached that home.
 
+    The payload omits ``promoted`` and ``synthesis_written``; ``_changed``'s
+    docstring says why neither can be read at face value.
+
     The write goes through the home's atomic replace, because a half-written
     artifact is worse than a stale one: ``is_file()`` would then protect the
     corrupt file from being overwritten by every later idle pass.
@@ -216,9 +222,7 @@ def write_dream_evidence(home: Path, report: DreamReport | None, now_ms: int) ->
     payload = {
         "now_ms": now_ms,
         "upserted": report.upserted,
-        "promoted": report.promoted,
         "user_md_written": report.user_md_written,
-        "synthesis_written": report.synthesis_written,
         "trail_facts": report.trail_facts,
         "index_documents": report.index_documents,
     }

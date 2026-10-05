@@ -59,11 +59,12 @@ def _scheduler(
     tmp_path: Path,
     homes: list[Path],
     clock: list[int],
-    calls: list[Path],
+    calls: list[Path] | None = None,
     evidence: list[EvidenceCall] | None = None,
     run_dream_fn: DreamFn | None = None,
     evidence_writer: EvidenceWriter | None = None,
 ) -> DreamScheduler:
+    visited: list[Path] = [] if calls is None else calls
     recorded: list[EvidenceCall] = [] if evidence is None else evidence
 
     def fake_run_dream(
@@ -74,7 +75,7 @@ def _scheduler(
         render: _Render | None,
     ) -> DreamReport:
         assert now_ms == clock[0], "the injected clock is the value that reaches run_dream"
-        calls.append(home)
+        visited.append(home)
         return _report()
 
     def write_evidence(home: Path, report: DreamReport | None, now_ms: int) -> None:
@@ -581,17 +582,39 @@ def test_evidence_records_a_promoting_pass(tmp_path: Path) -> None:
 
     assert path is not None
     assert path == tmp_path / "dreams" / "last_run.json"
-    text = path.read_text(encoding="utf-8")
-    assert json.loads(text) == {
+    assert json.loads(path.read_text(encoding="utf-8")) == {
         "now_ms": 1_791_121_000_000,
         "upserted": 1,
-        "promoted": ["preference:verbosity"],
         "user_md_written": False,
-        "synthesis_written": False,
         "trail_facts": 3,
         "index_documents": 0,
     }
-    assert "\n" in text, "an operator cats this artifact; it is not machine-parsed"
+
+
+def test_the_artifact_text_is_a_golden_projection_of_the_pass(tmp_path: Path) -> None:
+    # Golden. The report carries a CJK dedupe key and a synthesis flag, and the
+    # artifact must carry neither, so the byte-level shape an operator cats is
+    # pinned rather than inferred from a parsed dict.
+    report = _report(
+        promoted=("偏好:简短回复",),
+        upserted=1,
+        trail_facts=3,
+        synthesis_written=True,
+        index_documents=2,
+    )
+
+    path = write_dream_evidence(tmp_path, report, 1_791_121_000_000)
+
+    assert path is not None
+    assert path.read_text(encoding="utf-8") == (
+        "{\n"
+        '  "index_documents": 2,\n'
+        '  "now_ms": 1791121000000,\n'
+        '  "trail_facts": 3,\n'
+        '  "upserted": 1,\n'
+        '  "user_md_written": false\n'
+        "}"
+    )
 
 
 def test_a_no_change_pass_does_not_rewrite_existing_evidence(tmp_path: Path) -> None:
@@ -609,11 +632,9 @@ def test_a_no_change_pass_does_not_rewrite_existing_evidence(tmp_path: Path) -> 
 
 
 def test_a_pass_that_only_rebuilt_derived_artifacts_is_not_a_change(tmp_path: Path) -> None:
-    # The report shape a real second pass produces: every artifact was rewritten
-    # and nothing moved. `synthesis_written` is hardcoded True (dream.py:214),
-    # `promoted` repeats every past promotion because it is appended before the
-    # `_already_active` skip (dream.py:241), and `trail_facts` counts the whole
-    # trail corpus rather than what is new in it (dream.py:117-134).
+    # The report shape a real second pass produces, taken from a probe against
+    # run_dream: every artifact was rewritten and nothing moved. `_changed`'s
+    # docstring says why none of these fields can mean change.
     first = write_dream_evidence(tmp_path, _report(upserted=1), 1_000)
     assert first is not None
     stamp = first.stat().st_mtime_ns
@@ -680,18 +701,15 @@ def test_a_later_promotion_updates_the_artifact(tmp_path: Path) -> None:
 
     assert second == first
     written = json.loads(first.read_text(encoding="utf-8"))
-    assert (written["now_ms"], written["upserted"], written["promoted"]) == (
-        2_000,
-        1,
-        ["identity:role"],
-    ), "an existing artifact does not make a real promotion skip its record"
+    assert (written["now_ms"], written["upserted"]) == (2_000, 1), (
+        "an existing artifact does not make a real promotion skip its record"
+    )
 
 
 async def test_an_evidence_io_failure_does_not_discard_the_report(
     tmp_path: Path, clock: list[int], caplog: pytest.LogCaptureFixture
 ) -> None:
     home = tmp_path / "a"
-    calls: list[Path] = []
     home.mkdir()
     # `dreams` occupied by a regular file, so the artifact's mkdir cannot succeed.
     (home / "dreams").write_text("not a directory", encoding="utf-8")
@@ -699,7 +717,6 @@ async def test_an_evidence_io_failure_does_not_discard_the_report(
         tmp_path,
         [home],
         clock,
-        calls,
         run_dream_fn=_promoting,
         evidence_writer=write_dream_evidence,
     )
@@ -728,15 +745,12 @@ async def test_a_broken_evidence_writer_cannot_mask_a_promotion(
     tmp_path: Path, clock: list[int], caplog: pytest.LogCaptureFixture
 ) -> None:
     home = tmp_path / "a"
-    calls: list[Path] = []
 
     def broken(seen: Path, report: DreamReport | None, now_ms: int) -> None:
         del seen, report, now_ms
         raise RuntimeError("evidence writer is misconfigured")
 
-    scheduler = _scheduler(
-        tmp_path, [home], clock, calls, run_dream_fn=_promoting, evidence_writer=broken
-    )
+    scheduler = _scheduler(tmp_path, [home], clock, run_dream_fn=_promoting, evidence_writer=broken)
 
     with caplog.at_level(logging.WARNING):
         reports = await scheduler.sweep_once()
@@ -771,7 +785,6 @@ async def test_a_sweep_writes_the_real_artifact_with_the_pass_timestamp(
     tmp_path: Path, clock: list[int]
 ) -> None:
     home = tmp_path / "a"
-    calls: list[Path] = []
     sampled: list[int] = []
 
     def advancing(
@@ -786,7 +799,6 @@ async def test_a_sweep_writes_the_real_artifact_with_the_pass_timestamp(
         tmp_path,
         [home],
         clock,
-        calls,
         run_dream_fn=advancing,
         evidence_writer=write_dream_evidence,
     )
