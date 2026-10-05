@@ -272,6 +272,54 @@ IngestCache, LLMResolver, ModeDefinition, ModelDefinition, ParsedMessages
 | **ProceduralRule** | 程序性记忆：怎么做（Soar procedural；对应 LCA skills 层） |
 
 
+## Phase B batch-3：感知 / 记忆 / 认知（ADR-0291）
+
+> ADR-0291 Phase B 第 3 批：`test_glossary_term_coverage`（forward）仍无匹配的 21 个词条。
+> 定义逐一取自类 docstring 实证（TypeDiagnostic 无 docstring，定义取自字段结构）；
+> 批次划分见 ADR-0291 §3。
+
+| 术语 | 定义 |
+|---|---|
+| **SemanticPercept** | 语义感知：一条被召回的事实断言 |
+| **EpisodicPercept** | 情景感知：一次被召回的情景记忆（C1 typed，禁止裸文本） |
+| **RelationPercept** | 人物/群组上下文感知（v1：构造时注入的静态映射，接 people/groups） |
+| **DialogueScenario** | 单套完整的多轮对话场景用例（eval） |
+| **PeopleDirectory** | 人物页目录：contextfiles 服务，一个 assistant home 的 Person pages |
+| **GroupsDirectory** | 群组页目录：contextfiles 服务，一个 assistant home 的 Group pages |
+| **Deriver** | spine 派生订阅者基类：从每个事件派生次级产物 |
+| **WaterfallDeriver** | 累积事件并渲染 HTML 瀑布图（observability） |
+| **LayaDecider** | Laya 模型打分版 decider：noul（值得提炼吗）+ choice（冲突三选一） |
+| **LayaScoredItem** | Laya 单候选打分明细 |
+| **LinkDecider** | link 对账：新 claim 与现有 claim 逐条对账 |
+| **KernelServeSpawner** | 启动一次 `lca_kernel serve`；轮询 /health 直到就绪（CLI 服务） |
+| **KernelSupervisor** | 受监督的 LCA kernel 子进程（CLI 服务） |
+| **TypeDiagnostic** | 类型检查单条诊断记录：`tool/path/line/column/message/code`（frozen dataclass） |
+| **StandardCursor** | 默认 ReplayCursor 实现（ADR-0167 D10） |
+| **StdCloseBarrier** | CloseBarrier 默认实现（ADR-0169 D5） |
+| **StackFrame** | 捕获到的 traceback 的一帧（ADR-0122） |
+| **WeightedItem** | 带相关性分数的呈现排序项（presentation） |
+| **SqliteLearningReviewTicketDatabase** | review-ticket 操作共享的持久化数据库边界（SQLite） |
+| **RuleSchemaExtractor** | v1 规则版 schema 提炼（Letta sleep-time consolidation 的占位实现） |
+| **SchemaExtractor** | sleep-time 提炼协议：离线 pass，从 episodic 提炼 semantic |
+
+
+## Phase B batch-4：连接器 / 商用（ADR-0291）
+
+> ADR-0291 Phase B 第 4 批（收官）：连接器与商用域 8 个核心类。forward 测试已在 batch-3 后
+> 转绿（词根级匹配 ≤10 门限），本批为词条级补齐；定义逐一取自类 docstring 实证。
+
+| 术语 | 定义 |
+|---|---|
+| **ConnectorVault** | 按用户隔离安全地管理连接器连接（vault） |
+| **ConnectorPermissionEngine** | 连接器操作的双层权限矩阵求值器 |
+| **ComposioIntegration** | LCA 原生 Composio 运行时（连接 SSOT 为本地连接存储） |
+| **GmailConnectorCLI** | Gmail 连接器命令的 CLI 执行器 |
+| **BrowserSubagent** | 自动化浏览器执行子代理 |
+| **WechatChannelWorker** | 微信通道 worker：为一个 Assistant 处理长轮询循环与消息分发 |
+| **CommercialEvalSuite** | 商用评测全量剧本集容器 |
+| **DegradationKind** | 工具失败降级分类 |
+
+
 ## 已废弃主名（PR-12 整理）
 
 > 这些术语曾在 codebase 中存在，现已删除 / 改名 / 退役。禁止复活
