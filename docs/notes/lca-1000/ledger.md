@@ -626,3 +626,21 @@
 - 验证结果: ruff check 1 文件首次即过（All checks passed!）；import 冒烟无循环（naming 叶子模块上移安全）；行为等价 python 断言全绿（派生值与旧字面量逐字节相等；文件内裸 `"kernel.log"` 路径构造归零；派生调用恰 1 处）；targeted pytest `tests/scenario/debug/test_debug_run_tool.py`：4 passed。
 - commit: 见 git log --grep='第0501轮'（refactor(lca-1000): 第0501轮 debug-run 读侧 kernel.log 影子拼写收敛至 naming kernel_log_filename(Seam)；未 push）。
 - 备注: 只 add 本轮 2 个文件（代码 1 + ledger.md）；编辑前 git status --porcelain 显示并发会话（ralph/10-round-arch-deepening）未提交改动（5 modified + 3 untracked），与本轮文件无交集，未触碰；备份 /tmp/bak_0501/run.py（252，原文件完整备份）。本地写脚本 + stdin 喂远程 python3（heredoc 嵌套引号翻车一次，改 stdin 文件模式后一次成功；subprocess 传 `~/.local/bin/ruff` 需 expanduser，修后一次成功）。
+
+## 第0502轮 (2026-10-06 01:33-01:41 CST)
+- 改了什么: 删除 `web_to_contracts_report` 内对 `HopVerdict.ok` 三态判断链中不可达的防御 `else` 分支（1 file，4 insertions(+)/7 deletions(-)）：
+  - `lca/plugins/transport/webserver/doctor/contracts_adapter.py:79-84`：`elif hop_value.ok is True:` + `else: # pragma: no cover (defensive) → "unknown state"` 收敛为单 `else:  # ok 恒为 True` 分支（保持 info/`detail or 'ok'` 行为）。
+- 依据 skill 哪一节: deslop 清单 无依据的防御性 guard（guard 声称的失败模式——`ok` 为 True/False/None 之外的第四态——在该模块的 interface 下不可达）+ LANGUAGE.md Interface（error mode 是 interface 的一部分：原 `else` 给 interface 塞入了一个幻影 error mode（"unknown state"），删除后 tri-state 映射穷尽于类型契约，调用方不再被误导）+ SKILL.md Deletion test（删掉分支后复杂度直接消失：该分支 `# pragma: no cover` 永不可达，无调用方/测试复刻）。
+- 为什么这是实质改动(非凑数): 删除的是可执行的防御分支（非注释措辞/空行调整），且有接口语义后果：`DoctorReport` 的 severity/message 映射此后完全由 `bool | None` 三态决定，幻影第四态从 interface 上移除。无依据证据链：(1) `HopVerdict.ok: bool | None`（frozen dataclass，models.py:26）；(2) if 链的前两分支已覆盖 `hop_value is None / ok is None` 与 `ok is False`，剩余只能是 `ok is True`；(3) lca/ 内全部 `HopVerdict(...)` 构造（doctor.py / session_check.py）均为字面量 True/False/None；(4) `HopVerdict` 只有 `as_dict` 序列化、无线反序列化入口，非 bool 值无途径流入；(5) tests/ 内无任何用例构造非 bool `ok`。
+- 关键设计决策（夜间跳过 grilling，记台账）: 用 `else` 而非保留 `elif hop_value.ok is True:` 结尾——三态穷尽在类型层面可证，`else` 使穷尽性在代码上自明，同时避免删分支后静态检查报 possibly-unbound；可达域（True/False/None）行为逐分支等价，已由 14 个既有映射测试锁定。
+- 候选清单（本轮 explore，逐一验证后取舍）：
+  1. 上述 contracts_adapter.py 防御 else 删除 —— 选中（deslop 无依据 guard；单文件聚焦；deletion test 满分；targeted 测试现成 14 个）。
+  2. supervisor.py:278 `_waiter_loop` 的 `except Exception` 防御 —— 驳回：supervisor waiter 线程职责是"进程死亡必须发 died 事件"，`proc.wait()` 在复用/异常 fd 等真实场景可抛，失败模式有据；删除会改变 supervising 模块的尽力语义，需 grilling，夜间轮不动。
+  3. accessors.py:63,82 `_resolve_spine` / `_resolve_pipeline` 的 `except Exception` 防御 —— 驳回：getter 是外部注册的任意 callable（`set_active_*_accessor`），raise 是真实可达的失败模式；删除会把异常传播进 instrumentation 包裹层，改变 error mode，需 grilling。
+  4. naming 家族 code site 复查 —— 驳回：501 结论已验证（exceptions `.exceptions.jsonl` 全库仅剩 docstring 提及，无可执行拼接；`run_paths.py` 的 `spine_path_for_run`/`exceptions_path_for_run` 已走 naming 派生函数；`boot-spine.jsonl` 唯一可执行字面是 `_DEFAULT_BOOT_PATH`，沿用 494 结论：hypothetical seam，需 grilling）。
+  5. `delete-when` 到期扫描 —— 驳回：全库无到期（最早 2026-10-15 的 recovery/plugin.py；其余 2026-12-31/2027-01-01/条件型均未达成）。
+  6. `_LEGACY_SINGLE_FILE_LAYOUT` / `legacy_terminal` 映射等 —— 驳回（沿用 500 结论：PR-4 真实 wire 兼容，非死路径）。
+  7. 轮 500/501 驳回项（三处 latest-kernel-stderr helper / supervisor 日志路径三处拼写 / AgentState.history 迁移 / `_DEFAULT_BOOT_PATH` / tail.py:81 / agent_gateway 4 处 except / 长注释块 / append.py PEP562 / s3.py PR-10）—— 驳回（沿用 500/501 结论：语义差异真实存在或需 grilling/规模超一轮）。
+- 验证结果: ruff check 1 文件首次即过（All checks passed!）；targeted pytest `tests/lca_plugins/transport/webserver/doctor/test_contracts_adapter.py`：14 passed（覆盖 ok=False/None/True → severity/message 映射全路径，删除前后行为等价）。
+- commit: 见 git log --grep='第0502轮'（refactor(lca-1000): 第0502轮 删除 contracts_adapter 不可达的 HopVerdict.ok 防御 else 分支（"unknown state" 幻影 error mode）；未 push）。
+- 备注: 只 add 本轮 2 个文件（代码 1 + ledger.md）；编辑前 git status --porcelain 显示并发会话（ralph/10-round-arch-deepening）未提交改动（6 modified + 3 untracked），与本轮文件无交集，未触碰；备份 /tmp/bak_0502/contracts_adapter.py（252，原文件完整备份）。本地写脚本 + stdin 喂远程 python3（先断言 old 文本计数==1），一次成功。
