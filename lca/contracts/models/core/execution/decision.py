@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import TYPE_CHECKING, Any
@@ -26,6 +27,7 @@ __all__ = [
     "TaskProgress",
     "ToolCall",
     "requires_human_input",
+    "strip_external_instructions_from_delegation",
 ]
 
 
@@ -224,3 +226,40 @@ class Turn:
     observation: Observation
     reflection: Reflection | None = None
     extra: dict[str, Any] = field(default_factory=dict)
+
+
+#: Directive-shaped sentence patterns (ADR-0292 C3). Imperative sentences in
+#: member reports / delegation text are instructions from an external channel
+#: and must never be re-authorized into the next round.
+_DIRECTIVE_SENTENCE_PATTERNS: tuple[re.Pattern[str], ...] = (
+    re.compile(
+        r"\u4e0b\u4e00\u6b65|\u8bf7\u6267\u884c|\u8bf7\u5220\u9664|\u8bf7\u8fd0\u884c|\u6267\u884c\u4ee5\u4e0b|\u7acb\u5373\u6267\u884c|\u63a5\u4e0b\u6765.{0,4}\u6267\u884c"
+    ),
+    re.compile(
+        r"^\s*(?:next[,:]?\s+)?(?:please\s+)?(?:delete|remove|run|execute|drop|destroy|shutdown)\b",
+        re.IGNORECASE,
+    ),
+)
+
+_SENTENCE_BOUNDARY = re.compile(r"(?<=[\u3002\uff01\uff1f.!?])")
+
+
+def strip_external_instructions_from_delegation(text: str) -> str:
+    """ADR-0292 C3: drop directive sentences from delegation text.
+
+    A delegation envelope (ADR-0257) carries only the user's real
+    authorization and its boundaries. Member reports are external content
+    (C1: fenced data); any "next, please delete Y" directive inside them is
+    never re-authorized into the next round -- this strips directive-shaped
+    sentences and returns the remaining informational content. Purely
+    directive input returns ``""``.
+
+    Best-effort sanitizer, not a parser: it drops sentences that look
+    imperative. Informational sentences pass through verbatim.
+    """
+    kept = [
+        sentence
+        for sentence in _SENTENCE_BOUNDARY.split(text)
+        if sentence and not any(p.search(sentence) for p in _DIRECTIVE_SENTENCE_PATTERNS)
+    ]
+    return "".join(kept).strip()
