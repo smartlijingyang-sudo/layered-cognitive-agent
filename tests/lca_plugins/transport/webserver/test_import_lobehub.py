@@ -9,8 +9,8 @@ from typing import Any
 import pytest
 
 from lca.plugins.transport.webserver.routes_1.routes_assistants import (
-    import_lobehub_agent,
     _extract_emoji,
+    import_lobehub_agent,
 )
 
 

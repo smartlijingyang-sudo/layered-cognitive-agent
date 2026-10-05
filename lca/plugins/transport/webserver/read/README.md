@@ -24,6 +24,6 @@ No control-plane side effects, no `Session.append`, no state repair (C7 观察�
 | 路径 | 后果 |
 |---|---|
 | `runs/terminal/failure`（现 `handlers/runs/terminal/failure/failure.py`） | 写诊断文件：`traces/runs/<run_id>/` 目录创建 + `kernel.log` 追加（`failure.py:67,72`） |
-| `runs/live` SSE 尾读 | 向 `session.tail.subscribe(after_seq=…)` 注册订阅者（不是 Session observer，不改事实流）；teardown 时向每个订阅者队列投递 `None` 关闭其迭代 |
+| `runs/live` SSE 尾读 | 向 `session.tail.subscribe` [after_seq=…] 注册订阅者（不是 Session observer，不改事实流）；teardown 时向每个订阅者队列投递 `None` 关闭其迭代 |
 
 Migration: P3-07–P3-09. Skeleton only until those PRs land.

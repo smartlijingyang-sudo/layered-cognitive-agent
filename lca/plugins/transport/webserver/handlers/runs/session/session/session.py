@@ -40,11 +40,11 @@ from lca.plugins.transport.webserver.handlers.runs.session.index.index import (
 from lca.plugins.transport.webserver.handlers.runs.session.projection.projection import (
     summary_for_session,
 )
-from lca.plugins.transport.webserver.read.runs.identity.identity import (
+from lca.plugins.transport.webserver.read.runs.identity import (
     AgentRef,
     default_agent_ref,
 )
-from lca.plugins.transport.webserver.read.runs.journal.projection_binding import (
+from lca.plugins.transport.webserver.read.runs.live import (
     ProcessJournalBinding,
 )
 from lca.session.lifecycle.bind import (

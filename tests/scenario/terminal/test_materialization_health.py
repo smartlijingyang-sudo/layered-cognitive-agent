@@ -42,11 +42,11 @@ from lca.plugins.transport.webserver.handlers.runs.session.session.session impor
     RunSession,
     RunStatus,
 )
-from lca.plugins.transport.webserver.read.runs.identity.identity import (
+from lca.plugins.transport.webserver.read.runs import terminal as materialization
+from lca.plugins.transport.webserver.read.runs.identity import (
     parse_agent_ref,
 )
-from lca.plugins.transport.webserver.read.runs.terminal import materialization
-from lca.plugins.transport.webserver.read.runs.terminal.materialization import (
+from lca.plugins.transport.webserver.read.runs.terminal import (
     record_terminal_materialization,
 )
 
@@ -248,7 +248,7 @@ def test_ter_ev_types_constant_removed() -> None:
     Consumers that needed terminal seq now go through health.
     """
     with __import__("pytest").raises(ImportError):
-        from lca.plugins.transport.webserver.read.runs.terminal.materialization import (  # noqa: F401
+        from lca.plugins.transport.webserver.read.runs.terminal import (  # noqa: F401
             _TERMINAL_EVENT_TYPES,
         )
 

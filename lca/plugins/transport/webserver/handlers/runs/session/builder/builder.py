@@ -46,7 +46,7 @@ from lca.plugins.transport.webserver.handlers.runs.session.session.session impor
     RunSession,
 )
 from lca.plugins.transport.webserver.handlers.runs.session.setup.types import RunSessionRequest
-from lca.plugins.transport.webserver.read.runs.identity.identity import default_agent_ref
+from lca.plugins.transport.webserver.read.runs.identity import default_agent_ref
 from lca.runtime.support.journal_setup import BuildJournalMetadata, build_step_coordinator
 from lca.session.lifecycle.bind import (
     bind_run_event_session_from_store,

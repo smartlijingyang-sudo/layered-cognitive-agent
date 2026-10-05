@@ -42,3 +42,11 @@ def parse_agent_ref(raw: Any) -> AgentRef:
     if not name:
         name = SOLO_ROLE if agent_id == DEFAULT_AGENT_ID else agent_id
     return AgentRef(agent_id=agent_id, name=name)
+
+
+__all__ = [
+    "DEFAULT_AGENT_ID",
+    "AgentRef",
+    "default_agent_ref",
+    "parse_agent_ref",
+]

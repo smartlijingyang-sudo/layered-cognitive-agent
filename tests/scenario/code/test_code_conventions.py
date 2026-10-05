@@ -683,7 +683,7 @@ _LINE_COUNT_EXEMPT: dict[str, str] = {
         "LcaAgentGateway WebSocket 单协议实现：recv/心跳/控制帧/中断内聚（2026-10-05 Phase C batch-1 审计，ADR-0291 "
         "§5① 仲裁；Phase D 点亮）"
     ),
-    "lca/plugins/transport/webserver/read/runs/terminal/materialization.py": (
+    "lca/plugins/transport/webserver/read/runs/terminal.py": (
         "terminal run manifest 物化函数族（watermark/ledger 高水位扫描共享 SSOT 直读上下文）；一次性诊断编排器（2026-10-05 "
         "Phase C batch-2 审计，ADR-0291 §5① 仲裁；Phase D 点亮）"
     ),

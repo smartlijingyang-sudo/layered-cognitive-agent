@@ -12,9 +12,6 @@ import structlog
 from lca.contracts.models.core.conversation.conversation import ConversationTurn
 from lca.infrastructure.attachment import FileStoreAttachmentIdentity
 from lca.infrastructure.file.store import FileStore
-from lca.plugins.transport.webserver.handlers.runs.api.file_reference_parsing import (
-    collect_file_refs as _collect_file_refs,
-)
 from lca.plugins.transport.webserver.handlers.runs.ingest.cache import (
     IngestCache,
     get_ingest_cache,
@@ -79,6 +76,10 @@ def parse_messages(
     """Parse text, current-turn file references, and compact prior-turn context."""
     if not messages:
         return ParsedMessages(user_text="")
+    from lca.plugins.transport.webserver.handlers.runs.api.file_reference_parsing import (
+        collect_file_refs as _collect_file_refs,
+    )
+
     user_text = _extract_last_user_text(messages)
     last_user = _last_user_message(messages)
     file_refs = _collect_file_refs([last_user] if last_user is not None else [])

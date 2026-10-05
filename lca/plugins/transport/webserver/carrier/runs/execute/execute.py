@@ -42,7 +42,7 @@ from lca.plugins.transport.webserver.handlers.runs.session.session.session impor
     RunRegistry,
     RunSession,
 )
-from lca.plugins.transport.webserver.read.runs.identity.identity import (
+from lca.plugins.transport.webserver.read.runs.identity import (
     AgentRef,
 )
 

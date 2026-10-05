@@ -1,26 +1,9 @@
-"""Materialize a terminal run manifest from Journal-owned facts.
+"""Materialize terminal run manifest from Journal-owned facts and provide registry queries.
 
-PR-1 / Task 1.7 close-path contract (spec §2.6, §15 G-6..G-9, G-12, G-13):
-
-- **G-6 / G-7 / G-8**: ``RunManifest.terminal_event_seq``,
-  ``ledger_high_watermark``, ``ledger_summary`` are marked
-  ``@deprecated`` (delete-when: 2027-01-01). The new
-  ``health_summary`` + ``health_hash`` fields replace them as the
-  integrity source.
-- **G-9**: the ``_TERMINAL_EVENT_TYPES`` constant is deleted (the
-  Session/Catalog vocabulary mismatch is closed; ``health_hash``
-  subsumes its integrity role).
-- **G-12** (C9 idempotency): ``_materialization_lock`` uses
-  ``fcntl.flock`` for per-run-id mutual exclusion across processes,
-  and ``record_terminal_materialization`` skips re-writing when
-  ``manifest.json`` already carries the same ``health_hash``.
-- **G-13** (C7 / C9 fail-loud): if ``flush_step_tree_artifacts``
-  returns errors, ``ManifestFlushIncompleteError`` is raised and the
-  manifest is NOT written. Catches the "broken journal.json + clean
-  manifest.json" silent-failure class.
-
-# ADR-0203 §3.3: streaming file-bytes hash; canonical_digest requires
-# full payload in memory.
+Consolidates:
+- Terminal manifest recording, integrity hashing, flock idempotency, and error collection
+- Registry run queries and streaming
+- Gateway live-tail backward compatibility facades
 """
 
 from __future__ import annotations
@@ -31,16 +14,14 @@ import hashlib
 import json
 import time
 import traceback
-from collections.abc import Iterator
+from collections.abc import AsyncIterator, Iterator
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import structlog
 
 from lca.contracts.observability.canonical_digest import canonical_digest
-from lca.contracts.observability.health.report import (
-    RunHealthSummary,
-)
+from lca.contracts.observability.health.report import RunHealthSummary
 from lca.contracts.observability.registry.run_locator import RunLocator
 from lca.contracts.observability.registry.run_manifest import RunManifest
 from lca.infrastructure.atomic.write import atomic_write_text
@@ -48,52 +29,52 @@ from lca.infrastructure.observability.journal.engine.journal_io import (
     load_journal_records,
     record_normalize,
 )
+from lca.infrastructure.observability.journal.stream.live_tail import (
+    TEXT_CHANNEL_ALL,
+    TEXT_CHANNEL_ANSWER,
+    LiveGap,
+    LiveTail,
+    encode_live_gap,
+    iter_live_sse,
+)
 from lca.infrastructure.workspace.artifact_ledger import artifact_closure_text
 from lca.plugins.observability.health.run_health_fold import fold_run_health
-from lca.plugins.transport.webserver.doctor import diagnose
-from lca.plugins.transport.webserver.handlers.runs.session.session.session import (
-    RunSession,
-)
-from lca.plugins.transport.webserver.read.runs.step.tree_flush import (
+from lca.plugins.transport.webserver.doctor import DoctorReport, diagnose
+
+if TYPE_CHECKING:
+    from lca.plugins.transport.webserver.handlers.runs.session.session.session import (
+        RunRegistry,
+        RunSession,
+    )
+from lca.plugins.transport.webserver.read.runs.live import (
     flush_step_tree_artifacts,
 )
-
-
-class ManifestFlushIncompleteError(RuntimeError):
-    """Raised when ``flush_step_tree_artifacts`` returns errors.
-
-    PR-1 / Task 1.7 (G-13): the close-path is fail-loud on partial
-    flush — a half-written ``journal.json`` paired with a clean
-    ``manifest.json`` is a C7 violation (control/observation
-    separation) and a C9 violation (recoverability). The caller can
-    catch this, surface the error, and decide whether to retry or
-    mark the run failed.
-    """
-
+from lca.plugins.transport.webserver.read.runs.live import (
+    iter_stamped_events as _iter_stamped_events,
+)
+from lca.plugins.transport.webserver.read.runs.live import (
+    stream_chat_completion as _stream_chat_completion,
+)
+from lca.plugins.transport.webserver.read.runs.live import (
+    stream_process_journal_live as _stream_process_journal_live,
+)
+from lca.plugins.transport.webserver.read.runs.live import (
+    stream_run_fold as _stream_run_fold,
+)
 
 _log = structlog.get_logger(__name__)
 
 
+# --- Terminal Manifest Materialization ---
+
+
+class ManifestFlushIncompleteError(RuntimeError):
+    """Raised when ``flush_step_tree_artifacts`` returns errors."""
+
+
 @contextlib.contextmanager
 def _materialization_lock(manifest_path: Path) -> Iterator[None]:
-    """Per-run-id ``fcntl.flock`` around manifest close-path.
-
-    PR-1 / Task 1.7 (G-12, C9 idempotency): on POSIX, hold an
-    exclusive lock on a sibling ``.lock`` file for the duration of
-    the close-path so concurrent terminal hooks (crash recovery +
-    main shutdown) cannot race. Windows falls back to a no-op; the
-    in-process early-return (existing ``manifest.json`` with same
-    ``health_hash``) still protects same-process reentry.
-
-    Note: ``fcntl.flock`` is unavailable on Windows. We do not
-    degrade silently — the ``fcntl`` import is at module load; if
-    the platform lacks it, fail loud (the alternative is a silent
-    lost-update on terminal manifest). For Windows the AGENTS.md
-    §5 guideline says "every dependency needs an owner"; here the
-    owner is the run-terminator on POSIX servers, with a documented
-    limitation for Windows that the same-process idempotency still
-    holds.
-    """
+    """Per-run-id ``fcntl.flock`` around manifest close-path."""
     lock_path = manifest_path.with_suffix(manifest_path.suffix + ".lock")
     lock_path.parent.mkdir(parents=True, exist_ok=True)
     fp = lock_path.open("w", encoding="utf-8")
@@ -108,27 +89,13 @@ def _materialization_lock(manifest_path: Path) -> Iterator[None]:
 
 
 def record_terminal_materialization(session: RunSession) -> None:
-    """Write a terminal manifest without owning facts.
-
-    PR-1 / Task 1.7 close-path:
-    - idempotent on reentry via ``_materialization_lock`` + a
-      ``health_hash`` early-return (G-12 / C9);
-    - fail-loud on partial flush via ``ManifestFlushIncompleteError``
-      (G-13 / C7 + C9);
-    - emits ``health_summary`` + ``health_hash`` as the integrity
-      source (G-6..G-8).
-
-    ADR-0164 Phase 7: 在写 manifest 之前 flush step-tree bundle(写
-    journal.json + narrative.md)。让 step-tree 是主存储,旧 stream 是 raw。
-    """
+    """Write a terminal manifest without owning facts."""
     locator = session_locator(session)
     flush_errors: list[dict[str, str]] = []
 
-    # ADR-0164: terminalize 时 step-tree flush(写 journal.json + narrative.md)
     flush_errors.extend(flush_step_artifacts_with_log(session))
 
     if flush_errors:
-        # G-13: fail-loud on partial flush; do NOT write the manifest.
         _log.error(
             "manifest_flush_incomplete",
             run_id=session.run_id,
@@ -155,9 +122,6 @@ def record_terminal_materialization(session: RunSession) -> None:
         session_error = str(session.error or "")
         session_status = str(getattr(session.status, "value", session.status) or "")
 
-        # PR-1 / Task 1.7 (G-6..G-8): fold the spine for the new
-        # health_summary + health_hash. Done BEFORE flock so we
-        # don't hold the lock for the I/O.
         try:
             health_report = fold_run_health(session.spine_path)
         except Exception as exc:
@@ -180,14 +144,10 @@ def record_terminal_materialization(session: RunSession) -> None:
             health_hash = ""
         else:
             health_summary = health_report.summary
-            # Hash excludes ``generated_at`` so a re-fold of the same
-            # spine produces the same hash (idempotent C9 check).
-            # The other 4 fields are deterministic per spec §10.5.
             payload_for_hash = health_report.model_dump(mode="json")
             payload_for_hash.pop("generated_at", None)
             health_hash = canonical_digest(payload_for_hash, length=64, prefix="")
 
-        # G-12: under the per-run-id flock, check for early-return.
         with _materialization_lock(manifest_path):
             if manifest_path.exists():
                 try:
@@ -204,7 +164,7 @@ def record_terminal_materialization(session: RunSession) -> None:
                         run_id=session.run_id,
                         health_hash=health_hash,
                     )
-                    return  # C9 idempotent early-return
+                    return
 
             manifest = RunManifest(
                 run_id=session.run_id,
@@ -213,8 +173,6 @@ def record_terminal_materialization(session: RunSession) -> None:
                 session_status=session_status,
                 health_summary=health_summary,
                 health_hash=health_hash,
-                # Legacy fields: still populated for backward
-                # compatibility (G-6..G-8 delete-when: 2027-01-01).
                 terminal_event_seq=terminal_event_seq_for(session),
                 ledger_high_watermark=ledger_high_watermark_for(session),
                 ledger_summary=ledger_summary_for(session),
@@ -231,12 +189,8 @@ def record_terminal_materialization(session: RunSession) -> None:
                 json.dumps(manifest.to_dict(), ensure_ascii=False, indent=2),
             )
     except ManifestFlushIncompleteError:
-        # Already raised above; nothing to do here. Re-raise for
-        # caller visibility.
         raise
     except Exception as exc:
-        # manifest 自身写失败 —— 已无法写到 disk, 把异常也收进 flush_errors
-        # 让上游 / debug-run 通过 structlog 看得到
         flush_errors.append(
             {
                 "operation": "manifest_write",
@@ -253,13 +207,11 @@ def record_terminal_materialization(session: RunSession) -> None:
         )
 
 
-def flush_step_artifacts_with_log(session: RunSession) -> list[dict[str, str]]:
-    """Wrap ``flush_step_tree_artifacts`` to log any errors before returning.
+materialize_terminal_manifest = record_terminal_materialization
 
-    Keeps the existing "collect errors, don't raise" semantics in one
-    place so the close-path can decide whether to raise
-    ``ManifestFlushIncompleteError`` based on the aggregated result.
-    """
+
+def flush_step_artifacts_with_log(session: RunSession) -> list[dict[str, str]]:
+    """Wrap ``flush_step_tree_artifacts`` to log any errors before returning."""
     try:
         return list(flush_step_tree_artifacts(session))
     except Exception as exc:
@@ -281,12 +233,6 @@ def flush_step_artifacts_with_log(session: RunSession) -> list[dict[str, str]]:
 
 
 def _doctor_journal_path(session: RunSession, locator: RunLocator) -> Path:
-    """Doctor 扫描路径: 优先 journal.json (step-tree), 然后 spine ledger (SSOT)。
-
-    ADR-0167 D11:
-    - journal.json 优先:它是可重建物化视图(lca.journal/3.1 step 树)
-    - spine ledger 兜底: SSOT —— 仅供迁移期 / partial profile 兜底
-    """
     step_path = locator.journal_step_path(session.run_id)
     if step_path.exists():
         return step_path
@@ -308,32 +254,17 @@ def session_locator(session: RunSession) -> RunLocator:
 
 
 def ledger_high_watermark_for(session: RunSession) -> int:
-    """Read the final Session sequence from the spine file (SSOT only).
-
-    @deprecated — delete-when: 2027-01-01 (G-7). Replaced by
-    ``health_hash`` as the integrity source.
-    """
+    """Read final Session sequence from spine file (SSOT only). @deprecated."""
     return watermark_from_file(session.spine_path)
 
 
 def terminal_event_seq_for(session: RunSession) -> int:
-    """Return the seq of the last AgentRunFinished / TeamRunFinished in spine.jsonl.
-
-    @deprecated — delete-when: 2027-01-01 (G-6). The spine vocabulary
-    mismatch between Session/Catalog events and the actual SPINE_EPs
-    is closed by removing the constant and replacing the integrity
-    role with ``health_hash``.
-    """
-    return 0  # _TERMINAL_EVENT_TYPES deleted (G-9); field stays for compat.
+    """Return seq of last terminal event. @deprecated."""
+    return 0
 
 
 def watermark_from_file(path: Path) -> int:
-    """Scan the terminal JSONL watermark; empty or malformed rows are ignored.
-
-    @deprecated — kept for legacy ``ledger_high_watermark`` field
-    compatibility. The fold view (``health_hash``) is the integrity
-    source after PR-1.
-    """
+    """Scan terminal JSONL watermark. @deprecated."""
     if not path.exists():
         return 0
     last = 0
@@ -347,21 +278,12 @@ def watermark_from_file(path: Path) -> int:
 
 
 def terminal_event_seq_from_file(path: Path) -> int:
-    """Scan JSONL in reverse for the last AgentRunFinished, RunFinished, or RunSealed seq.
-
-    @deprecated — _TERMINAL_EVENT_TYPES removed in PR-1 (G-9).
-    Kept as a stub for callers that haven't migrated; returns 0
-    unconditionally (the integrity role moved to ``health_hash``).
-    """
+    """Scan JSONL in reverse for last terminal event seq. @deprecated."""
     return 0
 
 
 def ledger_summary_for(session: RunSession) -> str:
-    """Hash the terminal one megabyte of the Journal for integrity navigation.
-
-    @deprecated — delete-when: 2027-01-01 (G-8). Replaced by
-    ``health_hash`` as the integrity source.
-    """
+    """Hash the terminal one megabyte of Journal for integrity navigation. @deprecated."""
     path = session.spine_path
     if not path.exists():
         return ""
@@ -378,12 +300,6 @@ def ledger_summary_for(session: RunSession) -> str:
 
 
 def _artifact_closure_manifest(session: RunSession) -> dict[str, Any] | None:
-    """Durable artifact-closure metric for the terminal manifest.
-
-    Mirrors what the gateway coordinator attaches to ``agent_runtime_end``.
-    ``debug-run`` / manifest readers can check whether a run that produced
-    files actually carried a deliverable closure.
-    """
     workspace = getattr(session, "workspace", None)
     if workspace is None:
         return None
@@ -396,11 +312,99 @@ def _artifact_closure_manifest(session: RunSession) -> dict[str, Any] | None:
     }
 
 
+# --- Registry Run Queries ---
+
+
+class RegistryRunQueries:
+    """Own read-only run projections and process-level observability streams."""
+
+    def __init__(self, registry: RunRegistry) -> None:
+        self._registry = registry
+
+    async def summary(self, run_id: str) -> dict[str, Any] | None:
+        self._registry.prune()
+        return self._registry.summary(run_id)
+
+    async def stream_chat_completion(self, run_id: str, last_seq: int = 0) -> AsyncIterator[bytes]:
+        """Stream a run's journal events encoded as OpenAI ChatCompletion chunks."""
+        session = self._registry.get(run_id)
+        if session is None:
+            return
+        async for line in _stream_chat_completion(session, last_seq=last_seq):
+            yield line
+
+    async def iter_stamped_events(self, run_id: str, after_seq: int = 0) -> AsyncIterator[Any]:
+        """Yield the raw ``StampedEvent`` stream for one run."""
+        session = self._registry.get(run_id)
+        if session is None:
+            return
+        async for item in _iter_stamped_events(session, after_seq=after_seq):
+            yield item
+
+    async def stream_run_fold(self, run_id: str, after: int = 0) -> AsyncIterator[bytes]:
+        """Stream a run live as four UI SSE events (reasoning|text|tool|done)."""
+        session = self._registry.get(run_id)
+        if session is None:
+            return
+        async for line in _stream_run_fold(session, after=after):
+            yield line
+
+    async def doctor(self, run_id: str) -> DoctorReport | None:
+        session = self._registry.get(run_id)
+        spine_path = (
+            session.spine_path if session is not None else self._registry.spine_path_for(run_id)
+        )
+        if session is None and not spine_path.is_file():
+            return None
+        target_path = spine_path
+        locator = getattr(session, "locator", None) if session is not None else None
+        if locator is not None:
+            step_path = locator.journal_step_path(run_id)
+            if step_path.exists():
+                target_path = step_path
+        else:
+            step_path = spine_path.parent / "journal.json"
+            if step_path.exists():
+                target_path = step_path
+        return diagnose(session, target_path)
+
+    def journal_path(self, run_id: str) -> Path | None:
+        """Return only the current run's spine path; never fall back across sessions."""
+        path = self._registry.spine_path_for(run_id)
+        return path if path.is_file() else None
+
+    def latest_bindings(self) -> object | None:
+        """Expose the context projection without exposing the Registry itself."""
+        return self._registry.latest_bindings()
+
+    def status_counts(self) -> dict[str, int]:
+        return self._registry.status_counts()
+
+    def live_totals(self) -> dict[str, int]:
+        return self._registry.live_totals()
+
+    def stream_process_journal_live(self, last_seq: int = 0) -> AsyncIterator[bytes]:
+        """Provide the process-level Journal stream for operations endpoints."""
+        return _stream_process_journal_live(
+            self._registry.journal.tail,
+            last_seq=last_seq,
+        )
+
+
 __all__ = [
+    "TEXT_CHANNEL_ALL",
+    "TEXT_CHANNEL_ANSWER",
+    "LiveGap",
+    "LiveTail",
     "ManifestFlushIncompleteError",
+    "RegistryRunQueries",
     "_materialization_lock",
+    "encode_live_gap",
+    "flush_step_artifacts_with_log",
+    "iter_live_sse",
     "ledger_high_watermark_for",
     "ledger_summary_for",
+    "materialize_terminal_manifest",
     "record_terminal_materialization",
     "session_locator",
     "terminal_event_seq_for",

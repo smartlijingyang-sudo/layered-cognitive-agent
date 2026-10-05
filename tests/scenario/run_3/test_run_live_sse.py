@@ -304,7 +304,7 @@ async def test_gateway_api_iter_live_sse_emits_frames() -> None:
     This regression confirms the carrier-facing surface still yields frames
     without the legacy ``redact=`` parameter drift.
     """
-    from lca.plugins.transport.webserver.read.runs.terminal.live_compat import (
+    from lca.plugins.transport.webserver.read.runs.terminal import (
         iter_live_sse as carrier_iter_live_sse,
     )
 

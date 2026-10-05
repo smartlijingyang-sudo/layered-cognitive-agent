@@ -20,7 +20,7 @@ from lca.plugins.transport.webserver.handlers.runs.session.session.session impor
     RunRegistry,
     RunSession,
 )
-from lca.plugins.transport.webserver.read.runs.identity.identity import parse_agent_ref
+from lca.plugins.transport.webserver.read.runs.identity import parse_agent_ref
 
 
 class _FakeLocator(RunLocator):

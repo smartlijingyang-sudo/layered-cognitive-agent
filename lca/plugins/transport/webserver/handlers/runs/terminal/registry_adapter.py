@@ -22,7 +22,7 @@ from lca.plugins.transport.webserver.handlers.runs.terminal.port.port import (
 from lca.plugins.transport.webserver.handlers.runs.terminal.registry.commands import (
     RegistryRunCommands,
 )
-from lca.plugins.transport.webserver.read.runs.terminal.registry_queries import (
+from lca.plugins.transport.webserver.read.runs.terminal import (
     RegistryRunQueries,
 )
 

@@ -6,7 +6,7 @@ import re
 from typing import Any, cast
 from urllib.parse import unquote, urlparse
 
-from lca.plugins.transport.webserver.handlers.runs.ingest import FileRef
+from lca.plugins.transport.webserver.handlers.runs.ingest.models import FileRef
 
 _ATTR_RE = re.compile(r'([\w-]+)="([^"]*)"')
 _FILE_TAG_RE = re.compile(

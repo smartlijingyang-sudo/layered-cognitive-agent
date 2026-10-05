@@ -38,7 +38,7 @@ from lca.infrastructure.channels.wechat.service import WechatChannelService
 from lca.infrastructure.observability.spine.sinks.naming import spine_filename_for_run
 from lca.plugins.transport.webserver.handlers.cors.cors import cors_headers
 from lca.plugins.transport.webserver.handlers.runs.terminal.port.port import RunRequest
-from lca.plugins.transport.webserver.read.runs.identity.identity import AgentRef
+from lca.plugins.transport.webserver.read.runs.identity import AgentRef
 from lca.plugins.transport.webserver.route.register import register_routes
 
 logger = logging.getLogger(__name__)
