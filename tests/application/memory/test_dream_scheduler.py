@@ -22,7 +22,7 @@ from lca.contracts.atoms.enums.enums import MemoryCategory, MemoryLayer
 from lca.contracts.atoms.ids.ids import utc_now_ms
 from lca.contracts.models.core.conversation.memory import MemoryRecord
 from lca.contracts.protocols.assistant.catalog import ProfilePatch
-from lca.infrastructure.memory.contextfiles.domain.edit import StaleSnapshotOperationError
+from lca.infrastructure.memory.contextfiles.sync import StaleSnapshotOperationError
 from lca.infrastructure.memory.dream import DreamReport
 from lca.plugins.assistant.profile.profile import render_user_profile
 

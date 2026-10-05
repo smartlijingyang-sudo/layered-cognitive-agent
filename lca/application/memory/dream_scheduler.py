@@ -33,7 +33,7 @@ from lca.contracts.mechanisms.content.addressable import sha256_hex
 from lca.contracts.models.core.conversation.memory import MemoryRecord
 from lca.contracts.protocols.assistant.catalog import AssistantCatalog
 from lca.infrastructure.memory.contextfiles.adapters.disk import DiskFileStore
-from lca.infrastructure.memory.contextfiles.domain.edit import StaleSnapshotOperationError
+from lca.infrastructure.memory.contextfiles.sync import StaleSnapshotOperationError
 from lca.infrastructure.memory.dream import DreamReport, run_dream
 from lca.plugins.assistant.profile.profile import ProfileBackfillService, render_user_profile
 
