@@ -29,7 +29,7 @@ from lca.contracts.runtime.intent import RunIntent
 
 @dataclass(frozen=True)
 class StubAgentRef:
-    """Stand-in for ``lca.plugins.transport.webserver.read.runs.identity.identity.AgentRef``."""
+    """Stand-in for ``lca.plugins.transport.webserver.read.runs.identity.AgentRef``."""
 
     agent_id: str
     name: str
