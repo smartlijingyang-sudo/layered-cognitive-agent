@@ -586,3 +586,24 @@
 - 验证结果: ruff check 1 文件首次即过（All checks passed!）；targeted pytest `tests/infrastructure/cli/test_kernel_restart_report.py`：8 passed；python 断言：文件内 `except ImportError` 归零、`ProgramState.RUNNING.value` 保留、模块导入无异常。
 - commit: refactor(lca-1000): 第0499轮 删除 restart_report 无依据的 ProgramState ImportError 防御 guard（hardcode "running" 兜底）；未 push。
 - 备注: 只 add 本轮 2 个文件（代码 1 + ledger.md）；编辑前 git status --porcelain 有并发会话（ralph/10-round-arch-deepening）未提交改动（docs/plans/task.md、memory/cognition/tools 等），与本轮文件无交集，未触碰；备份 /tmp/bak_0499/restart_report.py（252，原文件完整备份）。编辑经本地写脚本 + stdin 喂远程 python3（先断言 old 文本计数==1），一次成功。
+
+## 第0500轮 (2026-10-06 00:33-01:05 CST)
+- 改了什么: **本轮未发现新的实质机会，无代码改动**（诚实记账：deslop/加深扫描穷尽近期轮次的候选方向后，无一项通过实质性硬门槛）。
+- 依据 skill 哪一节: SKILL.md Process §1 Explore + §2 Present candidates（逐一列出、逐一用 deletion test / seam 纪律验证后取舍）+ LANGUAGE.md Interface/Seam（有意设计的 well-known-path 合同与 namespace 归属不碰）+ DEEPENING.md Seam discipline（single-adapter / 归属未定的 seam 不立新常量）。
+- 为什么这是实质结论(非凑数): 按规则 4，找不到实质机会就诚实记录，不硬凑 trivial commit。本轮 explore 覆盖 10 个候选方向，全部有明确驳回依据（见候选清单），没有一个是"改一句话/调标点/只改注释措辞"级别的凑数项——也没有可做的。
+- 关键设计决策（夜间跳过 grilling，记台账）: 三处"最新 kernel stderr 日志" helper（kernel.py:431 / restart_report.py:136 / driver_debug.py:145）看似重复，但 restart_report 版是 stdout-first + stderr-fallback（语义不同），kernel 版与 driver_debug 版在 is_file/prefix-filter 细节上有意不同；三者归属哪个 canonical 模块是 placement 决策，需 grilling，夜间轮不动。supervisor 日志路径三处拼写（config.py:152-153 / restart_report.py:61-63 / workflow.py:210）同理：两处注释明示"supervisor<->CLI well-known log paths"是有意合同，立新共享常量属 hypothetical seam，需 grilling。
+- 候选清单（本轮 explore，逐一验证后取舍）：
+  1. 过期 `delete-when` 标记 —— 驳回（全库日期均未到期：最早 2026-10-15；2026-12-31/2027-01-01/v1.0-release 均未到）。
+  2. in-repo `except ImportError` 无依据 guard —— 驳回（499 已全库扫完；本轮确认无新增）。
+  3. `contracts/models/session/epoch_header.py` / `event_ref.py` 纯 re-export（9-10 行）—— 驳回（docstring 明示有意设计："Re-exported here so the contracts/session namespace owns the import name"；按 498 ports.py 惯例，需 grilling）。
+  4. `contracts/protocols/graph/ports.py` —— 驳回（沿用 498：canonical import surface 是有意设计决策）。
+  5. companion `standalone.py` vs `client.py` 近乎逐字重复（pair/poll_pairing 流程）—— 驳回（standalone.py 是零依赖可下载 daemon，`GET /api/device/download/companion.py` 后脱离仓库运行；重复是 ADR-0246 M3 设计的必然代价）。
+  6. events `file_sink/__init__.py:47,73` `_LEGACY_SINGLE_FILE_LAYOUT` 兼容分支 —— 驳回（明文 PR-4 兼容理由：旧 profile 仍传 `path: events.jsonl` 时降级到 boot-spine.jsonl；495 已确认非死路径）。
+  7. `session/lifecycle/recovery.py:135` `legacy_terminal` 旧状态词映射 —— 驳回（真实 wire 迁移映射：旧 checkpoint 文件的 completed/failed/canceled → LiveAgentStatus，有明确语义，非死路径）。
+  8. supervisor 日志路径三处拼写（见上）—— 驳回（well-known-path 合同有意；seam 归属需 grilling）。
+  9. 三处 latest-kernel-stderr helper（见上）—— 驳回（语义差异真实存在；canonical 归属需 grilling）。
+  10. wire event 字符串 `"success"`/`"error"`/`"cancelled"` 等字面量比较 —— 驳回（均为 JSONL/event payload 的 wire 格式值，非 Python 常量/enum 的影子拼写）。
+  11. `format_capability_graph_from_legacy` / `legacy_result_shim` —— 驳回（均有真实调用方，非死代码）。
+- 验证结果: 无文件改动，验证门 N/A（无改动可验证；未运行 ruff/pytest——无目标文件）。
+- commit: 无（无代码改动；本条目为台账-only 记录）。
+- 备注: 编辑前 git status --porcelain 显示并发会话（ralph/10-round-arch-deepening）未提交改动（docs/plans/task.md、lca/infrastructure/tools/*/__init__.py、assistant_tools/plugin.py + 3 个 untracked），与台账文件无交集，未触碰；ledger.md 本轮追加前确认无人并发修改。
