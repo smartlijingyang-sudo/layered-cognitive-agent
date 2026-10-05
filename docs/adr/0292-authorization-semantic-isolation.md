@@ -76,7 +76,7 @@ delegation 信封只传递**用户真实授权及其边界**。子 agent 收到�
 ## 7. 诚实声明
 
 - （2026-10-05 11:09 起草时，Proposed）：本 ADR 未改动任何代码与文档现状；四个验收用例现状**均无实现**，是 Proposed 契约不是已落地；message 与 diff 相符（docs only：本文件 + README 索引 1 行）。
-- （2026-10-05 16:09 iter-arch 轮更新）：C1 已落地（证据链见 §8）；C2/C4 的 contracts 层 detector 正在主树 WIP 实施中（未提交）；C3 委派规则执行门与全部执行接线仍待排期。本节随落地同步修订，保持状态诚实。
+- （2026-10-05 17:09 iter-arch 轮更新）：C1（`6743e38bf`/`d5643f9da`）与 C2–C4 执法 seam（`a849da567`：`refuse_external_authorization_claim`/`refuse_external_instruction_override`/`strip_external_instructions_from_delegation`/`assert_standing_writer_permitted`，4 条件 xfail 自动激活、契约文件 14 绿）均已落地（证据链见 §8）；剩余**运行时执行接线**（`act.approve.gate` 查两拒绝门 / 委派信封构建点调剥离函数 / standing 写工具查写权限门 / `on_refusal`→run-trace evidence ledger 落盘）待排期（P1 派工项）。本节随落地同步修订，保持状态诚实。
 
 **裁决**：三项全部批准，按以下决策实施。
 
@@ -93,7 +93,7 @@ delegation 信封只传递**用户真实授权及其边界**。子 agent 收到�
 - 派工：quality lane 按①定标记格式与落点实现（事件信封字段 + 提示词渲染）；
   tests lane 按 T1–T4 写契约测试（T1 工具输出自称授权、T2 网页指令覆盖、T3 委派污染隔离、T4 standing 写保护）。
 
-## 8. Implementation Notes（C1 落地证据链，2026-10-05）
+## 8. Implementation Notes（C1–C4 执法 seam 落地证据链，2026-10-05）
 
 裁决①"一源两呈现"（事件信封打标为源、提示词装配围栏为派生呈现）已落地。以下均为已合 main 的 commits。
 
@@ -108,6 +108,13 @@ delegation 信封只传递**用户真实授权及其边界**。子 agent 收到�
 **文档**（2026-10-05 15:09 iter-arch 轮）：
 - `1ac0e5190` `docs/specs/glossary.md`：补录 5 词条（`ContentOrigin` / `fence_external_content` / `Observation.content_origin` / `TrustEnvelope` / `observation_content`，定义取自源码 docstring）。
 
+**C2–C4 执法 seam**（2026-10-05 16:09 iter-quality 轮，李超）：
+- `a849da567`（`lca/contracts/models/core/execution/external_content.py` + `decision.py`，+165/−1）——
+  ① `refuse_external_authorization_claim`（T1/C2）：持权声称窄模式检测（中英；"需要授权"类请求不误杀），fail-closed 返回 True；`on_refusal` 回调吐 `AuthorizationRefusal` evidence 载荷（裁决②：默认静默+evidence；contracts 层无 runtime 依赖，回调是分层正确的接线点）。
+  ② `refuse_external_instruction_override`（T2/C2）：ignore-previous-instructions 类覆盖指令检测。
+  ③ `strip_external_instructions_from_delegation`（T3/C3，decision.py）：按句剥离指令型句子（纯指令→""，信息句原样保留；best-effort sanitizer 非 parser，docstring 明示）。
+  ④ `assert_standing_writer_permitted`（T4/C2-④）：EXTERNAL 源写 standing → PermissionError（ADR-0266 写矩阵：仅 user-domain/agent-domain/background 可写）。
+- **契约 pin 自动激活**：`tests/contracts/test_adr0292_authorization_semantic_isolation.py` **14 passed**（iter-arch 17:09 轮主树复验）——4 个条件 xfail（`getattr` 探测 seam 在位→不 xfail 直接执行）全部激活，无残留 xfail。
+
 **未落地 / 进行中**（诚实边界）：
-- C2 单向门、C4 拒绝记 evidence 的**执行接线**未落地（act 审批闸、standing 写工具的调用点尚未接线）。
-- 2026-10-05 16:13 起，李超在主树 WIP 实施 C2/C4 的 contracts 层纯 detector（`AuthorizationRefusal` / `refuse_external_authorization_claim` / `refuse_external_instruction_override` / `assert_standing_writer_permitted`，未提交）——本节待其 commit 落盘后再补证据链；C3 委派规则执行门仍待排期。
+- 运行时**执行接线**未落地（seam 在位、行为未接线）：① `act.approve.gate` 在执行外部内容请求的动作前查两拒绝门；② 委派信封构建点（ADR-0257）调 `strip_external_instructions_from_delegation`；③ standing 写工具（`self_manage_tools.py`）查 `assert_standing_writer_permitted`；④ `on_refusal` → run-trace evidence ledger（ADR-0063/0065）落盘。接线层为后续 P1 派工项。
