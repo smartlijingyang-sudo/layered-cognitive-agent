@@ -18,6 +18,7 @@ from pathlib import Path
 from lca.cognition.memory.govern import govern
 from lca.infrastructure.memory.contextfiles.adapters.disk import DiskFileStore
 from lca.infrastructure.memory.contextfiles.domain.curated import contains_secret
+from lca.infrastructure.memory.contextfiles.service.indexing import index_trail_file
 from lca.infrastructure.memory.contextfiles.service.trail import TrailWriter
 from lca.infrastructure.memory.episode_buffer import EpisodeBuffer
 
@@ -91,6 +92,10 @@ def record_turn_trail(
     Private personal material is not filtered here, because the trail is
     evidence and ``memory_search`` filters on the read side.
 
+    The day's index document is refreshed once the append is durable, so the
+    line is reachable by ``memory_search`` in the same turn instead of only
+    after the next ``run_dream``. Index failure does not change the result.
+
     Missing home, empty utterance, disk failure, and a concurrent append that
     trips the trail's append-only narrow gate all return False and do not
     propagate. A lost line costs one turn of evidence; a raised error would
@@ -105,9 +110,14 @@ def record_turn_trail(
             return False
         moment = int(time.time() * 1000) if now_ms is None else now_ms
         date = datetime.fromtimestamp(moment / 1000, tz=UTC).strftime("%Y-%m-%d")
-        TrailWriter(DiskFileStore(home)).append(date, text[:_MAX_TRAIL_LINE_CHARS])
+        store = DiskFileStore(home)
+        TrailWriter(store).append(date, text[:_MAX_TRAIL_LINE_CHARS])
     except Exception:
         return False
+    # The evidence is durable at this point, so indexing sits outside the guard
+    # above and cannot flip the result. index_trail_file contains its own
+    # failures; run_dream's full rebuild is the backstop.
+    index_trail_file(home, store, date)
     return True
 
 

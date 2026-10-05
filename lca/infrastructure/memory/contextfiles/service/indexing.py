@@ -10,6 +10,7 @@ host record store.
 from __future__ import annotations
 
 import logging
+import sqlite3
 from collections.abc import Sequence
 from pathlib import Path
 
@@ -98,20 +99,61 @@ def _documents(
     for name in store.list_dir(layout.trail_dir):
         if not name.endswith(".md"):
             continue
-        relative = f"{layout.trail_dir}/{name}"
         try:
-            text = store.read_text(relative)
+            text = store.read_text(f"{layout.trail_dir}/{name}")
         except OSError:
             continue
-        documents.append(
-            IndexedDocument(
-                doc_id=f"trail-{name}",
-                kind="trail",
-                content=text,
-                path=relative,
-            )
-        )
+        documents.append(_trail_document(name, text, layout=layout))
     return documents
 
 
-__all__ = ["build_memory_index", "search_memory_index"]
+def _trail_document(name: str, text: str, *, layout: ContextLayout) -> IndexedDocument:
+    """One day's trail as a single index document.
+
+    Shared by the full rebuild and the incremental write so the two cannot
+    disagree about ``doc_id``, ``kind``, or ``path`` for the same day.
+    """
+
+    return IndexedDocument(
+        doc_id=f"trail-{name}",
+        kind="trail",
+        content=text,
+        path=f"{layout.trail_dir}/{name}",
+    )
+
+
+def index_trail_file(
+    home: str | Path,
+    store: FileStore,
+    date: str,
+    *,
+    layout: ContextLayout | None = None,
+) -> bool:
+    """Re-index one day's trail document after an append.
+
+    The caller has already made the trail durable, so failure here is contained
+    and reported as False rather than raised. The index is a rebuildable
+    projection and the next ``run_dream`` full rebuild is the backstop.
+    """
+
+    chosen = packaged_layout() if layout is None else layout
+    name = f"{date}.md"
+    try:
+        text = store.read_text(f"{chosen.trail_dir}/{name}")
+    except OSError:
+        return False
+    if not text.strip():
+        return False
+    db_path = Path(home) / chosen.index_db_path
+    index = SqliteFtsIndex(db_path)
+    try:
+        index.add(_trail_document(name, text, layout=chosen))
+    except (sqlite3.Error, OSError) as exc:
+        logger.warning("trail index write failed path=%s: %s", db_path, exc)
+        return False
+    finally:
+        index.close()
+    return True
+
+
+__all__ = ["build_memory_index", "index_trail_file", "search_memory_index"]

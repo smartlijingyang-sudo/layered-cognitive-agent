@@ -27,6 +27,15 @@ class MemoryIndex(Protocol):
     """Build and query a full-text index."""
 
     def rebuild(self, documents: list[IndexedDocument]) -> None: ...
+    def add(self, document: IndexedDocument) -> None:
+        """Insert or replace one document, keyed by ``doc_id``.
+
+        Callers that write incrementally must produce the same ``doc_id`` and
+        field shape ``rebuild`` would, or a later full rebuild leaves two
+        documents for one subject.
+        """
+        ...
+
     def search(self, query: str, *, limit: int) -> list[IndexedDocument]: ...
     def close(self) -> None: ...
 

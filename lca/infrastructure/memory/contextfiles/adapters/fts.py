@@ -73,6 +73,30 @@ class SqliteFtsIndex:
             )
         self._connection.commit()
 
+    def add(self, document: IndexedDocument) -> None:
+        """Insert or replace one document, keyed by ``doc_id``."""
+
+        if self._fts5:
+            self._connection.execute("DELETE FROM memory_fts WHERE doc_id = ?", (document.doc_id,))
+            self._connection.execute(
+                "INSERT INTO memory_fts(searchable, kind, path, doc_id, original)"
+                " VALUES (?, ?, ?, ?, ?)",
+                (
+                    _searchable(document.content),
+                    document.kind,
+                    document.path,
+                    document.doc_id,
+                    document.content,
+                ),
+            )
+        else:
+            self._connection.execute("DELETE FROM memory_docs WHERE doc_id = ?", (document.doc_id,))
+            self._connection.execute(
+                "INSERT INTO memory_docs(doc_id, kind, content, path) VALUES (?, ?, ?, ?)",
+                (document.doc_id, document.kind, document.content, document.path),
+            )
+        self._connection.commit()
+
     def search(self, query: str, *, limit: int) -> list[IndexedDocument]:
         """Return up to ``limit`` documents matching ``query``."""
 

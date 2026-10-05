@@ -120,8 +120,7 @@ class MemorySearchTool(_BaseMemoryTool):
                 query, branch, limit=limit
             )
         else:
-            indexed = self._search_indexed(query, limit=limit)
-            records = indexed if indexed is not None else self._search_main(query, limit=limit)
+            records = self._search_merged(query, limit=limit)
         # One filter over every path. The indexed path carries raw trail lines,
         # which no write-side gate has seen, and a per-branch filter is one a
         # future path can forget.
@@ -134,6 +133,27 @@ class MemorySearchTool(_BaseMemoryTool):
                 "records": records,
             },
         )
+
+    def _search_merged(self, query: str, *, limit: int) -> list[dict[str, Any]]:
+        """Union the index and the live store, deduped by record id.
+
+        Neither source is complete alone. The index is a projection that only
+        ``run_dream`` rebuilds in full, so it carries trail lines the live store
+        cannot see and misses semantic rows written since the last rebuild.
+        Treating an existing index as a replacement for the live store hides
+        those rows; a trail-only index hides every semantic record.
+        """
+
+        indexed = self._search_indexed(query, limit=limit) or []
+        merged: list[dict[str, Any]] = []
+        seen: set[str] = set()
+        for row in (*indexed, *self._search_main(query, limit=limit)):
+            key = str(row.get("record_id") or row.get("content") or "")
+            if key in seen:
+                continue
+            seen.add(key)
+            merged.append(row)
+        return merged[:limit]
 
     def _search_indexed(self, query: str, *, limit: int) -> list[dict[str, Any]] | None:
         """Query the built FTS index. Returns None when no index exists."""

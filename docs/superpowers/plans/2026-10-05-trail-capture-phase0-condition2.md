@@ -126,13 +126,19 @@ canonical owner 判定：风格偏好词表归 `contracts/models/memory/episode.
 
 ### Task 4：`MemoryIndex` 单文档写入与 trail 追加后的增量索引
 
-`ports/memory_index.py` 的 `MemoryIndex` 增加一个单文档写入方法，`adapters/fts.py` 的 `SqliteFtsIndex` 实现它，语义是 upsert 同一 `doc_id`。`build_memory_index` 的全量 `rebuild` 路径保持不变，`run_dream` 继续用它。
+状态：已完成，并修掉一个计划没预见的严重回归。
 
-调用点在 Task 3 的写入方成功追加之后，只索引新增的那一行，文档形状与 `_documents` 为 trail 产出的形状一致，否则全量重建会与增量写入产出不一致的 `doc_id`。
+`ports/memory_index.py` 的 `MemoryIndex` 增加 `add(document)`，`adapters/fts.py` 的 `SqliteFtsIndex` 实现它，语义是按 `doc_id` upsert，FTS5 与 plain 两条分支都覆盖。`build_memory_index` 的全量 `rebuild` 路径不变，`run_dream` 继续用它。
 
-索引写失败必须 contained，不能让流水已经落盘而 turn 失败。失败时记日志并返回，dream 的全量重建是它的兜底。
+**计划初稿说「只索引新增的那一行」，这是错的。** `_documents` 对整个流水文件产一个文档，`doc_id=trail-<文件名>`、`content` 是整份文件文本，粒度是文件不是行。按行索引会造出全量重建永不产生的 `doc_id`，下一次 `run_dream` 重建就把增量写进去的那个孤立掉。实际做法是追加后重索引当天整份文档，与重建同形。为保证两者不会漂移，`_documents` 的 trail 分支与新的 `index_trail_file` 共用一个 `_trail_document(name, text, layout=)` helper。
 
-验证：新增测试覆盖同 `doc_id` 二次写入不产生重复行、写入后 `search` 当轮可命中、索引异常不冒泡到 `record_turn_trail` 的返回值之外。`uv run python scripts/check_package_contracts.py` 与 `lint-imports` 跑一遍，区分本次引入与既有失败。
+`index_trail_file` 的失败 contained，返回 `False` 并记日志，捕获 `sqlite3.Error` 与 `OSError`。`record_turn_trail` 在 append 成功之后、`try` 之外调用它，所以索引失败不会把已经落盘的流水报成失败。
+
+**回归：索引一旦存在就会藏起实时语义记录。** `MemorySearchTool.execute` 原先是二选一，`indexed if indexed is not None else self._search_main(...)`。`search_memory_index` 只在 db 文件不存在时返回 `None`，所以增量索引一建出 db，`_search_main` 就再也不会被调用。实测确认：种一条语义记录时 `memory_search("简洁")` 返回它，建一个只含流水的索引之后同一次查询只返回流水行，语义记录消失。Task 3 之后每个助理每轮都写流水，这个洞普遍可达，而且会打在 Phase 1 之后唯一的在线语义写者上。
+
+修法是合并两个来源，`_search_merged` 取索引命中与 `_search_main` 命中的并集，按 `record_id` 去重后截到 `limit`。两者都不完整：索引是投影，只有 `run_dream` 做全量重建，所以它装着实时存储看不到的流水行，也缺上一次重建之后写入的语义记录。二选一的前提是索引永远完整，而这个前提从来不成立。branch 分支不参与合并，它本来就不走索引。
+
+验证：`tests/infrastructure/memory/test_trail_index_incremental.py` 5 条，覆盖同 `doc_id` 二次写入不产生重复行、增量文档与全量重建的 `doc_id`/`kind`/`path` 逐字段相同、二次追加替换同一文档、文件缺失返回 `False`、空文件返回 `False` 且不建 db。`tests/infrastructure/tools/test_memory_search_merges_sources.py` 4 条，其中回归锁断言只含流水的索引不藏实时语义记录。`tests/scenario/memory/test_trail_same_turn_reachable.py` 是 D6 前提的跨层场景锁，一轮 `record_turn_trail` 之后当轮 `memory_search` 能命中该行、且既有语义记录仍可命中。三条既有 `test_retrieval_index.py` 与三条 `test_trail_append_only.py` 继续通过。后两条锁都做过拔牙实测，把 `index_trail_file` 调用换成 `pass` 后各自失败。
 
 ### Task 5：拓宽 `_PREFERENCE`，带误报证据
 
