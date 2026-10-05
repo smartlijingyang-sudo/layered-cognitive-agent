@@ -35,7 +35,7 @@ episode 侧的缺口不在开关而在模板。`phase.perceive.observe` 每轮�
 
 **D5（交付门禁）。** Phase 0 离线轨可承接（dream 调度落地跑稳 + 目标 profile 有真实写入的在线残差捕获路径）→ Phase 1 extract 蒸馏移离线（Phase 0 验收后，退化窗口不开）→ Phase 2 认领权派生读（ADR-0260 裁决前置，可与 Phase 3 并行）→ Phase 3 对账收敛（0277 ⑥/⑦ 裁决前置）。
 
-**D6（产品决策，待接受）。** 47 个 extract-only 事实维度的落盘时延从当轮变为下一次 dream pass，是用户可感知的行为变化。建议接受条件：dream 调度周期上界不大于一次会话的自然间隔（会话结束/空闲 N 分钟触发），上界写进调度配置。只能做到每日一次时，需保留一条在线偏好纠正例外通道（那会重新引入第二写者，提案重评估）。
+**D6（产品决策，已裁决 2026-10-05，李超）。** 47 个 extract-only 事实维度的落盘时延从当轮变为下一次 dream pass，是用户可感知的行为变化。裁决：接受该时延，dream 调度周期上界为 24 小时，上界写进调度配置。24 小时正是原提案标注需重评估的「每日一次」档，因此裁决附带一项前提，即关掉间隔期的读路径缺口。缺口在读侧，`memory_search` 的 FTS 索引已覆盖 trail files（`lca/infrastructure/memory/contextfiles/service/indexing.py:34`）但仅由 `run_dream` 重建；让 trail 追加同时增量索引新行，偏好句当轮即可被 ADR-0260 C2 的强制检索命中，且不产生第二个语义写者。增量索引归入 Phase 0 条件二交付物，代价是给 `MemoryIndex`（`lca/infrastructure/memory/contextfiles/ports/memory_index.py:26`，只声明 `rebuild` / `search` / `close`，`SqliteFtsIndex` 为唯一实现）加一个单文档写入方法，属 AGENTS.md §5 的公共签名变更。前提不落地时 D6 回到重评估，Phase 1 不启动。
 
 ## 3. Alternatives considered（凝练）
 
@@ -47,7 +47,7 @@ episode 侧的缺口不在开关而在模板。`phase.perceive.observe` 每轮�
 
 ## 4. Acceptance criteria（按 Phase，凝练）
 
-- Phase 0：dream 调度落地跑稳，有真实触发证据；周期上界满足 D6 并写进配置；目标 profile 含隐式偏好陈述的 turn 后 `episodes/` 或每日流水有新增。
+- Phase 0：dream 调度落地跑稳，有真实触发证据；周期上界 24 小时（D6 裁决）并写进配置；目标 profile 含隐式偏好陈述的 turn 后 `episodes/` 或每日流水有新增；trail 追加后 `memory_search` 当轮能命中该偏好句（D6 前提）。
   - **载体是插件托管的后台循环**，照 `lca/plugins/avatar/plugin.py:302-312` 的 `AvatarCostumeScheduler` 形状（`asyncio.create_task(scheduler.run_forever())` + LIFO dispose），周期上界落在插件 `Config.tick_seconds` 并由 profile YAML 设定。
   - **载体不能是 0268 CronJob。** `CronJob.execution` 是闭合联合 `AgentExecution | SpaceActionExecution`（`lca/contracts/models/cron/models.py:152`，`extra="forbid"` 于 `:144`），`CronWorkerRunner.execute_job`（`lca/infrastructure/cron/worker_runner.py:98-200`）只能投递聊天卡片或 avatar 产物，无法调用 `run_dream` 这样的 Python 函数；加一种 execution kind 是闭集契约变更，按 AGENTS.md §1 第三行须先有 ADR。
   - **周期 CronJob 本身也不会触发。** `next_run` 以精确到微秒的 `datetime` 相等判 `due`（`lca/domain/cron/next_run.py:81-86` interval、`:90-94` hourly、`:101-106` daily、`:112-118` weekly），守护进程在 `asyncio.sleep` 后采样未对齐的 `datetime.now(UTC)`（`lca/infrastructure/cron/daemon.py:44`、`:106`、`:123`）。实测真实 `CronDaemonService` 配真实墙钟、`tick_interval_s=1`，`every_seconds=5` 的任务 30 秒内触发 0 次，同 store 的 `oneshot` 触发 1 次；宿主机 7 个生产 job 全为 `oneshot`。这是全平台缺陷（用户的周期提醒同样永不触发），须单独对 ADR-0268 §232-233 立项修订，不得并入 Phase 0；现有 cron 测试全部注入恰好落在边界的合成时钟，改语义前须先补能区分新旧行为的测试。
@@ -70,7 +70,7 @@ episode 侧的缺口不在开关而在模板。`phase.perceive.observe` 每轮�
 1. ADR-0260 C1 回执来源重述：修订 0260 或新开 ADR（Phase 2 硬前置）。
 2. ADR-0277 ⑥/⑦ 对账闸承载体（Phase 3 硬前置）。
 3. ADR-0277 ③ sleep-time 载体与 run_dream 调度归属，及 Phase 0 要求的周期上界。
-4. §D6 落盘时延的产品接受（Phase 1 不启动于接受前）。
+4. 已裁决（2026-10-05，李超）：接受 §D6 的落盘时延，周期上界 24 小时，前提是 trail 追加的增量索引落地。前提不落地时回到重评估，Phase 1 在此之前不启动。
 5. 已裁决（2026-10-05，李超）：每日流水的生产写入方归本提案 Phase 0，不归 ADR-0254 落地。裁决只解决归属，不解决覆盖面。`_PREFERENCE`（`lca/infrastructure/memory/contextfiles/domain/trail.py:18`）为 `偏好|以后|不要|必须|记住|严禁|回复要|请记`，实测对条件二的判据句「还是简洁一点好」「别那么啰嗦」「回复请简短」全部不命中，只有「以后简洁一点」命中；`govern()` 的 verbosity 规则要求 `记住|以后` 合取，同样不命中。因此条件二的交付物是两项，补齐 `TrailWriter` 的在线调用方，以及拓宽 `_PREFERENCE` 与 `govern()` 之一的偏好判定。只做前者，判据仍不达成。
 
 ## 7. Related

@@ -84,6 +84,14 @@ Phase 0 未达成时 extract 保持在线，本提案其余部分不启动。
 
 建议的接受条件是 Phase 0 的调度周期上界不大于一次会话的自然间隔，例如会话结束触发或空闲 N 分钟触发，使间隔期落在用户不感知的范围内，并把该上界写进 Phase 0 验收。若只能做到每日一次，离线轨需要保留一条在线的偏好纠正例外通道，那会重新引入第二写者，本提案需要重新评估。
 
+已裁决（2026-10-05，李超）。周期上界为 24 小时。该值正是上面「每日一次」那一档，因此裁决成立的前提是关掉间隔期的读路径缺口，而不是保留在线偏好纠正例外通道。
+
+缺口在读侧而不在写侧。`memory_search` 的 FTS 索引已覆盖 trail files（`contextfiles/service/indexing.py:34`），只是仅由 `run_dream` 重建。让 trail 追加同时增量索引新行，偏好句当轮即可被 ADR-0260 C2 的强制检索命中，且不产生第二个语义写者，`semantic.json` 的在线单写者不变量不受影响。增量索引因此是 Phase 0 条件二的交付物之一，见 [条件二实施计划](../../../superpowers/plans/2026-10-05-trail-capture-phase0-condition2.md)。
+
+这不是免费改动。`MemoryIndex`（`contextfiles/ports/memory_index.py:26`）只声明 `rebuild` / `search` / `close`，`SqliteFtsIndex` 是它唯一的实现，因此增量索引要给该 Protocol 加一个单文档写入方法并同步实现与测试，属 AGENTS.md §5 的公共签名变更。实施计划里单列一个任务。
+
+若增量索引不落地，24 小时上界重新触发本节的重评估条件，因为那时偏好被捕获后最长 24 小时既不进注入路径也搜不到。
+
 ## Alternatives considered
 
 ### Why not 砍掉 extract，只留工具写？
@@ -115,7 +123,7 @@ remember 晚于 respond，extract 结构上无法为本轮宣称提供回执。�
 Phase 0。
 
 - `{home}/routines/` 或 ADR-0268 CronJob 中存在 `run_dream` 条目，且有真实触发证据。
-- 调度周期上界满足 §产品决策待接受 的接受条件，且该上界写在调度配置里而不是只写在文档里。
+- 调度周期上界为 24 小时（2026-10-05 裁决），且该上界写在调度配置里而不是只写在文档里。
 - 目标 profile 跑一个含隐式偏好陈述的 turn 后，`{home}/memory/episodes/` 出现新增文件，或每日流水出现当轮追加行。
 
 Phase 1。
@@ -149,7 +157,7 @@ Phase 3 与守卫 remedy。
 1. ADR-0260 §3 把「不改 `take_claim_right` 的消费语义与拒绝句文案」列为非目标。本提案退役 `take_claim_right`，需要 ADR-0260 C1 的回执来源重述。Notes 体系不改老 ADR，这一项走 ADR 流程，修订 0260 或新开均可。它是 Phase 2 的硬前置，裁决前不启动实施。
 2. ADR-0277 待拍板⑥（typed 对象是运行时投影还是新存储真值，与 ADR-0254 v2 决策 A 的关系）与待拍板⑦（`SemanticClaim` 与 ADR-0247 `MemoryRecord` 是替代、包装还是并行）决定对账闸的承载体，是 Phase 3 的硬前置。见 [ADR-0277 四问深审](../../audit-2026-10-03-adr0277-review.md) Q4。
 3. ADR-0277 待拍板③（sleep-time 载体）与 `run_dream` 的调度归属是同一件事的两面，需一并裁决，并给出 Phase 0 要求的周期上界。
-4. §产品决策待接受 的落盘时延尚未获得产品负责人明确接受，接受前 Phase 1 不启动。
+4. 已裁决（2026-10-05，李超）。接受落盘时延，周期上界 24 小时。接受以 trail 追加的增量索引落地为前提，前提不成立时按 §产品决策待接受 重新评估，Phase 1 在此之前不启动。
 5. 已裁决（2026-10-05，李超）。每日流水的生产写入方归本提案 Phase 0，不归 ADR-0254 落地。`TrailWriter` 已实现且受 `DiskFileStore` 的 append-only 窄门保护，缺的是在线调用方，补它成为 Phase 0 条件二的交付物。裁决只解决归属，不解决覆盖面，见 §交付门禁 Phase 0 条件二。
 
 ## Related
