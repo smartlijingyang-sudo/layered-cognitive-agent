@@ -11,6 +11,7 @@ concept.effect.execute 图唯一节点 plugin:typed ``CommandEnvelope`` →
 from __future__ import annotations
 
 import logging
+from contextlib import nullcontext
 from dataclasses import dataclass
 from typing import Any
 
@@ -34,7 +35,11 @@ from lca.contracts.harness.composition.plugin_contract import (
     PluginContract,
     PluginIdentity,
 )
-from lca.contracts.models.core.execution.decision import Decision, Observation
+from lca.contracts.models.core.execution.decision import (
+    Decision,
+    Observation,
+    decision_scope,
+)
 from lca.contracts.models.core.state.state import AgentState
 from lca.contracts.protocols.act.command.envelope import CommandEnvelope
 from lca.contracts.protocols.declarative.declarative_1.node_executor import (
@@ -390,8 +395,15 @@ async def _dispatch(
         idempotency_required=(),
     )
 
+    # ADR-0292 section 9 wiring 3: bind the executing decision as ambient
+    # while tools run, so the standing-write tools read its instruction
+    # source (``get_current_decision().content_origin``) instead of taking
+    # an origin parameter. ``decision`` is None on legacy paths: no scope,
+    # tools see unbound (permissive) exactly as before.
+    scope = decision_scope(decision) if decision is not None else nullcontext()
     try:
-        output = await gateway.execute(envelope, policy, decision=decision, state=state)
+        with scope:
+            output = await gateway.execute(envelope, policy, decision=decision, state=state)
     except Exception as exc:
         invocation_id = envelope.idempotency_key or "unknown"
         return (

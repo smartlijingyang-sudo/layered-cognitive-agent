@@ -3,6 +3,9 @@
 from __future__ import annotations
 
 import re
+from collections.abc import Iterator
+from contextlib import contextmanager
+from contextvars import ContextVar
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import TYPE_CHECKING, Any
@@ -26,6 +29,8 @@ __all__ = [
     "Reflection",
     "TaskProgress",
     "ToolCall",
+    "decision_scope",
+    "get_current_decision",
     "requires_human_input",
     "strip_external_instructions_from_delegation",
 ]
@@ -135,6 +140,47 @@ class Decision:
     Only meaningful when ``content_origin`` is ``ContentOrigin.EXTERNAL``;
     the refusal gates scan this text, never the decision's own rationale.
     """
+
+
+# ---------------------------------------------------------------------------
+# ADR-0292 section 9 wiring 3: ambient Decision (delegation contextvar idiom).
+#
+# The standing-write tools take no ``origin`` parameter (section-9
+# adjudication: per-tool signature changes are N x M surface waste);
+# instead they read the instruction source of the decision currently
+# executing. Mirrors ``lca/contracts/models/team/delegation/context.py``
+# (``get_current_delegator`` + ``delegator_scope``): ``asyncio.create_task``
+# copies the context, so tools invoked downstream of ``decision_scope``
+# observe the decision that drove them. One mechanism, two gates: the
+# approval gate (wiring 1) reads ``Decision.content_origin`` off the typed
+# port, the standing-write tools (wiring 3) read it here.
+# ---------------------------------------------------------------------------
+
+_current_decision: ContextVar[Decision | None] = ContextVar("lca_current_decision", default=None)
+
+
+def get_current_decision() -> Decision | None:
+    """Return the Decision currently executing, or ``None`` when unbound.
+
+    ``None`` = no decision scope is active (legacy / offline / unit-test
+    paths): authorization gates treat it as "no recorded external drive".
+    """
+    return _current_decision.get()
+
+
+@contextmanager
+def decision_scope(decision: Decision) -> Iterator[None]:
+    """Bind *decision* as the ambient executing decision for the wrapped block.
+
+    The production binder is ``concept.effect.execute`` (ADR-0292 section 9
+    wiring 3): it wraps tool dispatch so the standing-write tools observe
+    the origin of the decision that invoked them. LIFO reset on exit.
+    """
+    token = _current_decision.set(decision)
+    try:
+        yield
+    finally:
+        _current_decision.reset(token)
 
 
 #: Tool names that pause the run for human input before execution. When a

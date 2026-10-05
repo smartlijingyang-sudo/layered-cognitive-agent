@@ -24,7 +24,11 @@ from lca.contracts.atoms.enums.enums import ContentType
 from lca.contracts.atoms.ids.ids import new_id
 from lca.contracts.atoms.semantic.keys import FAILURE_KIND, FAILURE_KIND_VALIDATION
 from lca.contracts.models.assistant.tool_spec import ToolSpec
-from lca.contracts.models.core.execution.decision import Observation
+from lca.contracts.models.core.execution.decision import Observation, get_current_decision
+from lca.contracts.models.core.execution.external_content import (
+    ContentOrigin,
+    assert_standing_writer_permitted,
+)
 from lca.contracts.models.core.policy.budget import DEFAULT_TOOL_TIMEOUT_S
 from lca.contracts.protocols import Tool
 from lca.contracts.protocols.assistant.catalog import ProfilePatch
@@ -98,6 +102,27 @@ class _BaseAssistantTool(Tool):
             extra={FAILURE_KIND: FAILURE_KIND_VALIDATION},
         )
 
+    def _check_standing_write_permitted(self) -> str | None:
+        """ADR-0292 section 9 wiring 3: consult the standing-writer gate.
+
+        Reads the instruction source of the decision currently executing
+        (``get_current_decision()``) instead of taking an ``origin``
+        parameter (section-9 adjudication: per-tool signature changes are
+        N x M surface waste). Returns an error message when the ambient
+        decision is EXTERNAL-driven — external content may not drive
+        standing writes — else ``None``. Unbound / unmarked decisions are
+        permissive: the gate arms only once producers record external drive.
+        """
+        decision = get_current_decision()
+        origin = decision.content_origin if decision is not None else None
+        if origin is not ContentOrigin.EXTERNAL:
+            return None
+        try:
+            assert_standing_writer_permitted(origin, f"assistant:{self.name}")
+        except PermissionError as exc:
+            return str(exc)
+        return None
+
 
 class ListAssistantSkillsTool(_BaseAssistantTool):
     """List the skills installed in the bound assistant's Home (read-only)."""
@@ -166,6 +191,9 @@ class DeleteAssistantSkillTool(_BaseAssistantTool):
 
     async def execute(self, args: dict[str, Any]) -> Observation:
         start = time.monotonic()
+        refused = self._check_standing_write_permitted()
+        if refused is not None:
+            return self._fail(start, refused)
         skill_id = str(args.get("skill_id") or "").strip()
         if not skill_id:
             return self._fail(start, "skill_id 必须为非空字符串")
@@ -213,6 +241,9 @@ class EditAssistantSkillTool(_BaseAssistantTool):
 
     async def execute(self, args: dict[str, Any]) -> Observation:
         start = time.monotonic()
+        refused = self._check_standing_write_permitted()
+        if refused is not None:
+            return self._fail(start, refused)
         skill_id = str(args.get("skill_id") or "").strip()
         skill_md = str(args.get("skill_md") or "").strip()
         if not skill_id:
@@ -263,6 +294,9 @@ class UpdateAssistantSoulTool(_BaseAssistantTool):
 
     async def execute(self, args: dict[str, Any]) -> Observation:
         start = time.monotonic()
+        refused = self._check_standing_write_permitted()
+        if refused is not None:
+            return self._fail(start, refused)
         soul = str(args.get("soul") or "").strip()
         if not soul:
             return self._fail(start, "soul 必须为非空字符串")
@@ -304,6 +338,9 @@ class UpdateAssistantProfileTool(_BaseAssistantTool):
 
     async def execute(self, args: dict[str, Any]) -> Observation:
         start = time.monotonic()
+        refused = self._check_standing_write_permitted()
+        if refused is not None:
+            return self._fail(start, refused)
         name = str(args.get("name") or "").strip()
         description = str(args.get("description") or "").strip()
         if not name and not description:
@@ -354,6 +391,9 @@ class UpdateAssistantGrantsTool(_BaseAssistantTool):
 
     async def execute(self, args: dict[str, Any]) -> Observation:
         start = time.monotonic()
+        refused = self._check_standing_write_permitted()
+        if refused is not None:
+            return self._fail(start, refused)
         grants_yaml = str(args.get("grants_yaml") or "").strip()
         if not grants_yaml:
             return self._fail(start, "grants_yaml 必须为非空字符串")
@@ -406,6 +446,9 @@ class UpdateAssistantUserTool(_BaseAssistantTool):
 
     async def execute(self, args: dict[str, Any]) -> Observation:
         start = time.monotonic()
+        refused = self._check_standing_write_permitted()
+        if refused is not None:
+            return self._fail(start, refused)
         user_md = str(args.get("user_md") or "").strip()
         if not user_md:
             return self._fail(start, "user_md 必须为非空字符串")
@@ -478,9 +521,7 @@ class ReadAssistantSelfConfigTool(_BaseAssistantTool):
         requested = args.get("files")
         if requested is None:
             names = list(self._DEFAULT_FILES)
-        elif isinstance(requested, (list, tuple)) and all(
-            isinstance(n, str) for n in requested
-        ):
+        elif isinstance(requested, (list, tuple)) and all(isinstance(n, str) for n in requested):
             names = [n.strip() for n in requested if n.strip()]
             if not names:
                 return self._fail(start, "files 为空列表")
@@ -523,9 +564,7 @@ class ReadAssistantSelfConfigTool(_BaseAssistantTool):
 
     @staticmethod
     def _redacted_skeleton(body: str) -> str:
-        headings = [
-            line.strip() for line in body.splitlines() if line.lstrip().startswith("#")
-        ]
+        headings = [line.strip() for line in body.splitlines() if line.lstrip().startswith("#")]
         note = "[已脱敏：peer 上下文仅返回标题骨架，ADR-0257 section 7]"
         skeleton = "\n".join(headings)
         return f"{note}\n{skeleton}" if skeleton else note
@@ -620,6 +659,9 @@ class CreateAssistantToolTool(_BaseAssistantTool):
 
     async def execute(self, args: dict[str, Any]) -> Observation:
         start = time.monotonic()
+        refused = self._check_standing_write_permitted()
+        if refused is not None:
+            return self._fail(start, refused)
         raw = str(args.get("tool_json") or "").strip()
         if not raw:
             return self._fail(start, "tool_json 必须为非空字符串")
@@ -663,6 +705,9 @@ class UpdateAssistantToolTool(_BaseAssistantTool):
 
     async def execute(self, args: dict[str, Any]) -> Observation:
         start = time.monotonic()
+        refused = self._check_standing_write_permitted()
+        if refused is not None:
+            return self._fail(start, refused)
         tool_id = str(args.get("tool_id") or "").strip()
         raw = str(args.get("tool_json") or "").strip()
         if not tool_id:
@@ -714,6 +759,9 @@ class DeleteAssistantToolTool(_BaseAssistantTool):
 
     async def execute(self, args: dict[str, Any]) -> Observation:
         start = time.monotonic()
+        refused = self._check_standing_write_permitted()
+        if refused is not None:
+            return self._fail(start, refused)
         tool_id = str(args.get("tool_id") or "").strip()
         if not tool_id:
             return self._fail(start, "tool_id 必须为非空字符串")
