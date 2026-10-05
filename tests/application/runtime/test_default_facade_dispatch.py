@@ -50,6 +50,11 @@ from lca.application.runtime.plan_resolution import (
 from lca.contracts.runtime.activation import SessionActivation
 from lca.contracts.runtime.facade import RunHandle
 from lca.contracts.runtime.intent import RunIntent
+from lca.contracts.runtime.trust import (
+    PluginOrigin,
+    TrustEnvelope,
+    get_current_trust_envelope,
+)
 
 # ── Helpers ───────────────────────────────────────────────────────────
 
@@ -400,3 +405,141 @@ def test_facade_does_not_import_transport() -> None:
     _walk(tree)
 
     assert offenders == [], f"{facade_path} imports forbidden transport modules: {offenders!r}"
+
+
+# ── ADR-0292 section 10: ambient TrustEnvelope binding ────────────────
+#
+# The facade is the session/run driver named by the ``trust_envelope_scope``
+# docstring: ``dispatch_run`` / ``dispatch_resume`` must bind
+# ``activation.trust_envelope`` as the ambient envelope so downstream gates
+# (``act.approve.gate``) observe the run's grants via
+# ``get_current_trust_envelope``. Pins:
+#
+#   * the envelope visible during dispatch IS the activation's envelope
+#     (identity, not a copy);
+#   * gates reading it during dispatch see the real grant set;
+#   * resume binds the same way (HIL resume entry point);
+#   * the scope resets on return (no leak across dispatches);
+#   * concurrent dispatches observe independent envelopes.
+
+
+def _envelope(*privileges: str) -> TrustEnvelope:
+    """Build a non-empty ``TrustEnvelope`` granting the given privileges."""
+    return TrustEnvelope(
+        origins=(
+            PluginOrigin(
+                source="bundled",
+                trust="core",
+                enabled_by="test",
+                discovered_at="test",
+            ),
+        ),
+        granted_privileges=frozenset(privileges),
+    )
+
+
+def _activation_with_envelope(*privileges: str) -> SessionActivation:
+    """Build a ``SessionActivation`` carrying a real (non-empty) envelope."""
+    return SessionActivation(
+        activation_ref="actref-test-001",
+        plan_ref="plan-D",
+        graph_ref="graph-D",
+        plugin_set_ref="plugin-set-D",
+        profile_path="/abs/profiles/sample.yaml",
+        session_id="sess-env",
+        trust_envelope=_envelope(*privileges),
+    )
+
+
+class _RecordingDispatcher:
+    """Structural ``RunDispatcher`` recording the ambient TrustEnvelope seen
+    during each dispatch call, then returning a fixed handle."""
+
+    def __init__(self) -> None:
+        self.seen_run: list[TrustEnvelope | None] = []
+        self.seen_resume: list[TrustEnvelope | None] = []
+
+    async def dispatch_run(
+        self,
+        activation: SessionActivation,
+        intent: RunIntent,
+    ) -> RunHandle:
+        self.seen_run.append(get_current_trust_envelope())
+        return RunHandle("run_recorded")
+
+    async def dispatch_resume(
+        self,
+        activation: SessionActivation,
+        run_id: str,
+    ) -> RunHandle:
+        self.seen_resume.append(get_current_trust_envelope())
+        return RunHandle("run_resume_recorded")
+
+
+class TestAmbientTrustEnvelopeBinding:
+    async def test_dispatch_run_binds_activation_envelope_ambient(self) -> None:
+        """The envelope ambient during dispatch IS the activation's (identity)."""
+        dispatcher = _RecordingDispatcher()
+        facade = DefaultRuntimeFacade(_plan_service(), dispatcher)
+        activation = _activation_with_envelope("shell.exec")
+
+        await facade.dispatch_run(activation, _intent(session_id="sess-env"))
+
+        assert len(dispatcher.seen_run) == 1
+        assert dispatcher.seen_run[0] is activation.trust_envelope
+
+    async def test_bound_envelope_exposes_grants_to_gates(self) -> None:
+        """A gate reading ``get_current_trust_envelope()`` during dispatch sees
+        the activation's real grant set (granted AND ungranted verbs)."""
+        dispatcher = _RecordingDispatcher()
+        facade = DefaultRuntimeFacade(_plan_service(), dispatcher)
+        activation = _activation_with_envelope("shell.exec")
+
+        await facade.dispatch_run(activation, _intent(session_id="sess-env"))
+
+        seen = dispatcher.seen_run[0]
+        assert seen is not None
+        assert seen.grants("shell.exec")
+        assert not seen.grants("network.fetch")
+
+    async def test_dispatch_resume_binds_activation_envelope_ambient(self) -> None:
+        """``dispatch_resume`` binds the same ambient envelope (HIL resume entry)."""
+        dispatcher = _RecordingDispatcher()
+        facade = DefaultRuntimeFacade(_plan_service(), dispatcher)
+        activation = _activation_with_envelope("shell.exec")
+
+        await facade.dispatch_resume(activation, "run_123")
+
+        assert len(dispatcher.seen_resume) == 1
+        assert dispatcher.seen_resume[0] is activation.trust_envelope
+
+    async def test_envelope_scope_does_not_leak_after_dispatch(self) -> None:
+        """After dispatch returns the envelope is unbound again (LIFO reset)."""
+        dispatcher = _RecordingDispatcher()
+        facade = DefaultRuntimeFacade(_plan_service(), dispatcher)
+        activation = _activation_with_envelope("shell.exec")
+        assert get_current_trust_envelope() is None
+
+        await facade.dispatch_run(activation, _intent(session_id="sess-env"))
+        await facade.dispatch_resume(activation, "run_123")
+
+        assert get_current_trust_envelope() is None
+
+    async def test_concurrent_dispatches_see_their_own_envelope(self) -> None:
+        """Two concurrent dispatches observe independent envelopes (contextvar)."""
+        dispatcher = _RecordingDispatcher()
+        facade = DefaultRuntimeFacade(_plan_service(), dispatcher)
+        activation_a = _activation_with_envelope("shell.exec")
+        activation_b = _activation_with_envelope("network.fetch")
+
+        await asyncio.gather(
+            facade.dispatch_run(activation_a, _intent(session_id="sess-a")),
+            facade.dispatch_run(activation_b, _intent(session_id="sess-b")),
+        )
+
+        seen = dispatcher.seen_run
+        assert len(seen) == 2
+        assert {id(env) for env in seen} == {
+            id(activation_a.trust_envelope),
+            id(activation_b.trust_envelope),
+        }
