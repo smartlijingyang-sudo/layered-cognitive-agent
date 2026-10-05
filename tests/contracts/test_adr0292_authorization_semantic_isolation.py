@@ -520,9 +520,10 @@ async def test_s10_approve_gate_refuses_hallucinated_authorization() -> None:
 
 
 def test_s9_standing_write_refused_for_external_ambient_decision() -> None:
-    """ADR-0292 §9-③ T4: the standing writer gate reads the ambient Decision's
-    origin — one Decision-origin mechanism, two gates. Ambient EXTERNAL
-    Decision → standing write refused."""
+    """ADR-0292 §9-③ T4 (kept under §10): the standing writer gate reads the
+    ambient Decision's content_origin — the only gate still origin-triggered
+    (§10 moved the approve gate to grant-absence; content_origin demoted to
+    audit metadata there). Ambient EXTERNAL Decision → standing write refused."""
     seam = _ambient_decision_seam()
     if seam is None or not _decision_has_content_origin():
         pytest.xfail(

@@ -766,6 +766,16 @@ _LINE_COUNT_EXEMPT: dict[str, str] = {
         "_to_jsonable/_validate_json_safe/_snapshot_data 快照 helper 族；append 面内聚（2026-10-05 "
         "iter-tests 20:09 Phase D 收尾审计，ADR-0291 §5① 仲裁）"
     ),
+    "lca/nodes/intervene/approve_gate.py": (
+        "ADR-0292 §10 grant-absence 拒绝门：node_execute 4 路 HITL 路由 + "
+        "_grant_absence_refusal 特权判定 + evidence 路由三件套单类内聚；拒绝/路由拆分"
+        "割裂拒绝不变量（2026-10-06 iter-tests 02:09 Phase D 补登记，ADR-0291 §5① 仲裁）"
+    ),
+    "lca/domain/cron/store.py": (
+        "cron job/run 文件存储：job 增删查 + run 追加/查询 + CronWorkerResult "
+        "outcome/receipts 落盘（ADR-0268 §6）；store API 面内聚（2026-10-06 iter-tests "
+        "02:09 Phase D 补登记，ADR-0291 §5① 仲裁）"
+    ),
 }
 
 
