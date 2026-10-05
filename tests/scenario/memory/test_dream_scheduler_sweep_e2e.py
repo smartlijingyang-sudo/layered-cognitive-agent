@@ -32,8 +32,15 @@ from lca.application.memory.dream_scheduler import (
     write_dream_evidence,
 )
 from lca.contracts.atoms.enums.enums import MemoryCategory
+from lca.contracts.models.assistant.spec import AssistantSpec
 from lca.contracts.models.memory.episode import EpisodeFact, ResidualClass
-from lca.contracts.protocols.assistant.catalog import ProfilePatch
+from lca.contracts.protocols.assistant.catalog import (
+    AssistantHandle,
+    AssistantSummary,
+    CreateAssistantRequest,
+    PlanRevision,
+    ProfilePatch,
+)
 from lca.infrastructure.memory.episode_buffer import EpisodeBuffer
 
 CONTENT = "用户身份：架构师"
@@ -43,7 +50,7 @@ TICK_MS = 300_000
 
 
 class _PersistingCatalog:
-    """The one member ``ProfileBackfillService`` calls, persisting as the real one does.
+    """``AssistantCatalog`` stand-in that persists the one field the sweep writes.
 
     ``_AssistantCatalogImpl.revise_profile`` writes ``patch.user_md`` to
     ``{home}/USER.md`` (``lca/plugins/domain/assistant/catalog/handlers.py``).
@@ -51,20 +58,49 @@ class _PersistingCatalog:
     so ``_sync_user_md`` would see a rendering that still differs on every later
     tick and report ``user_md_written=True`` forever. The evidence-stability
     assertion below would then fail on the double rather than on the sweep.
+
+    Every protocol member is present, not just the one that does work. The
+    alternative was suppressing the argument type at the
+    ``make_dream_callbacks`` call, and a suppression standing in for a missing
+    surface is how a real signature change slips past. It is also what the
+    plugin's own guard asks for: ``isinstance(catalog, AssistantCatalog)`` on a
+    runtime-checkable protocol answers by member presence.
     """
 
     def __init__(self, homes: Mapping[str, Path]) -> None:
         self._homes = dict(homes)
         self.revised: list[tuple[str, ProfilePatch]] = []
 
+    def create(self, req: CreateAssistantRequest) -> AssistantHandle:
+        raise NotImplementedError
+
+    def get(self, assistant_id: str) -> AssistantSpec:
+        raise NotImplementedError
+
+    def list(self, user_id: str | None = None) -> tuple[AssistantSummary, ...]:
+        del user_id
+        return ()
+
     def revise_profile(
         self, assistant_id: str, patch: ProfilePatch, *, actor: str = "system"
-    ) -> dict[str, int]:
+    ) -> PlanRevision:
         del actor
         self.revised.append((assistant_id, patch))
         if patch.user_md is not None:
             (self._homes[assistant_id] / "USER.md").write_text(patch.user_md, encoding="utf-8")
-        return {"revision_seq": len(self.revised)}
+        return PlanRevision(
+            assistant_id=assistant_id,
+            revision_seq=len(self.revised),
+            manifest_digest="0" * 64,
+            actor="system",
+            snapshot_path=f"revisions/{len(self.revised)}.json",
+        )
+
+    def reimport(self, assistant_id: str, reason: str) -> PlanRevision:
+        raise NotImplementedError
+
+    def retire(self, assistant_id: str, reason: str) -> None:
+        raise NotImplementedError
 
 
 def _identity_fact(trace_id: str) -> EpisodeFact:
@@ -105,7 +141,7 @@ def _production_sweep(
         tick_seconds=300,
         now_ms=lambda: clock[0],
         evidence_writer=write_dream_evidence,
-        callbacks=make_dream_callbacks(catalog),  # type: ignore[arg-type]
+        callbacks=make_dream_callbacks(catalog),
     )
 
 
