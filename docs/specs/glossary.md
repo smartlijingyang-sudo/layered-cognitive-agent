@@ -246,6 +246,32 @@ IngestCache, LLMResolver, ModeDefinition, ModelDefinition, ParsedMessages
 | **SourceVerifier** | 对最终答案做来源感知校验（ProvenanceGuard 思想的结构化实现） |
 
 
+## Phase B batch-2：调度 / 持久化 / 守卫（ADR-0291）
+
+> ADR-0291 Phase B 第 2 批：`test_glossary_term_coverage`（forward）68 个无匹配词根中的 17 个。
+> 定义逐一取自类 docstring 实证；批次划分见 ADR-0291 §3。
+
+| 术语 | 定义 |
+|---|---|
+| **CronScheduler** | 文件锁互斥的 cron tick 调度器（ADR-0268 §7、§8） |
+| **CronWorkerRunner** | 执行一次到期 CronJob occurrence 并报告产出的 worker |
+| **ProactiveScheduler** | 文件锁互斥的主动消息 tick 调度器 |
+| **ProactiveDeliverer** | 主动消息投递器：session append 是唯一的写路径 |
+| **RoutineTickDriver** | 例程单次 tick 驱动：带 C5 故障隔离（ADR-0263 §10） |
+| **StandardDriver** | 五面矩阵默认 StepDriver：显式栈（Frame 列表） |
+| **PersistenceCoordinator** | 持久化协同器协议（ADR-0169 D8） |
+| **PersistenceStats** | 持久化协同器运行时统计（ADR-0169 PR-25 S3 装配） |
+| **SessionPersistenceFlushListener** | `Session.register_flush_listener` hook：排空 run write-behind 缓冲区 |
+| **SessionLike** | 投递所需的 Session 最小公开接口（避免依赖具体实现类） |
+| **DeadLetter** | 重试耗尽的例程（C5；保留 7 天） |
+| **RevivalCoordinator** | 后台子代理完成复苏协调器：接收子代理上报并唤醒父进程统一开口交付 |
+| **SpendGuard** | 例程消费硬护栏与 Token 熔断器 |
+| **VocalSettleGuard** | 声带轮次结算核验硬闸 |
+| **StepCoordinator** | 五面矩阵唯一写入口：Agent 调 driver/segment 状态；spine EP 由 cursor 派生 |
+| **RuleDecider** | consolidation 确定性编排：encode → link → decay（schema 走离线，不在在线路径） |
+| **ProceduralRule** | 程序性记忆：怎么做（Soar procedural；对应 LCA skills 层） |
+
+
 ## 已废弃主名（PR-12 整理）
 
 > 这些术语曾在 codebase 中存在，现已删除 / 改名 / 退役。禁止复活
