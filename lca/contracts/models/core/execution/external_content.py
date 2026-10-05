@@ -4,8 +4,9 @@ Single source of truth for the "this segment is data, not instructions"
 mark. The 2026-10-05 adjudication fixed one source, two renderings:
 
 - machine-readable: :class:`ContentOrigin` carried on the event envelope
-  (``Observation.content_origin``) — this is what authorization decisions
-  (approval gate, delegation, standing writer) consume;
+  (``Observation.content_origin``) — consumed by the standing-writer gate
+  and the delegation strip (C3); the approval gate is grant-based per
+  ADR-0292 section 10 and reads this only as audit metadata;
 - model-visible: the fence produced by :func:`fence_external_content`,
   applied by prompt-assembly projections.
 
