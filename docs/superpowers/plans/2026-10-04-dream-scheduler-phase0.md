@@ -62,7 +62,7 @@ Every task's deliverable implicitly satisfies these. Values are copied from the 
 | `profiles/web-assistant.yaml` (modify) | Set `tick_seconds`, putting the cadence upper bound in configuration |
 | `tests/application/memory/test_dream_scheduler.py` (create) | Loop, fan-out, lock, collision, evidence, change detection |
 | `tests/plugins/test_dream_scheduler_plugin_shape.py` (create) | Plugin shape and dispose registration |
-| `tests/scenario/memory/test_dream_scheduler_live_sweep.py` (create) | End-to-end Phase 0 evidence against real homes |
+| `tests/scenario/memory/test_dream_scheduler_sweep_e2e.py` (create) | End-to-end Phase 0 evidence against real homes |
 
 `dream_scheduler.py` lives in `lca/application/memory/` because it needs `RoutineFileLock` from `lca/application/routine/locks`, and `pyproject.toml:82-92` contract 2 forbids `lca.infrastructure` from importing `lca.application`. `application` is the composition root, so it may import its own layer and downward into `lca.infrastructure.memory.dream`. The package needs an `__init__.py`: without one grimp treats the directory as a namespace package and skips it, which would leave the module outside layering enforcement entirely. The plugin file is the only place that touches the harness.
 
@@ -769,7 +769,7 @@ git commit -m "feat(memory): schedule the dream pass from a plugin-hosted loop"
 ### Task 5: End-to-end Phase 0 evidence
 
 **Files:**
-- Test: `tests/scenario/memory/test_dream_scheduler_live_sweep.py`
+- Test: `tests/scenario/memory/test_dream_scheduler_sweep_e2e.py`
 
 **Interfaces:**
 - Consumes: everything from Tasks 1-4.
@@ -778,7 +778,7 @@ git commit -m "feat(memory): schedule the dream pass from a plugin-hosted loop"
 - [ ] **Step 1: Write the failing test**
 
 ```python
-# tests/scenario/memory/test_dream_scheduler_live_sweep.py
+# tests/scenario/memory/test_dream_scheduler_sweep_e2e.py
 import json
 from pathlib import Path
 
@@ -858,7 +858,7 @@ async def test_a_second_sweep_promotes_nothing_and_keeps_the_evidence_stable(
 
 - [ ] **Step 2: Run test to verify it fails, then passes**
 
-Run: `uv run pytest tests/scenario/memory/test_dream_scheduler_live_sweep.py -v`
+Run: `uv run pytest tests/scenario/memory/test_dream_scheduler_sweep_e2e.py -v`
 Expected: FAIL first if `ResidualClass` is imported from the wrong module. It lives in `lca.contracts.models.memory.episode` (`episode.py:17-20`). After fixing the import, PASS, 2 tests. The second test is the regression lock on the 17/89 duplicate-dimension defect: it proves the dream path is idempotent on a fact already active, via `_already_active` at `dream.py:242`.
 
 - [ ] **Step 3: Confirm the real kernel picks it up**
@@ -874,7 +874,7 @@ The restart is authorized for this step only, and the lift check is not optional
 - [ ] **Step 4: Commit**
 
 ```bash
-git add tests/scenario/memory/test_dream_scheduler_live_sweep.py
+git add tests/scenario/memory/test_dream_scheduler_sweep_e2e.py
 git commit -m "test(memory): pin end-to-end dream sweep promotion and idempotency"
 ```
 

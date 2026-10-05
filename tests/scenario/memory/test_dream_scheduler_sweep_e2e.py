@@ -1,14 +1,13 @@
 """End-to-end pin on the Phase 0 dream sweep (ADR-0287 §4).
 
 Every collaborator here is the production one: the real ``run_dream``, the real
-``make_dream_callbacks`` factory, the real ``write_dream_evidence``. "Live"
-names that code path, not a running kernel. The kernel-restart leg this task's
-brief proposed is cancelled by ruling R60. The plugin ships behind
-``enabled: false`` until the ADR-0254 v3 ownership conflict recorded in R54 is
-resolved, and a disabled plugin's ``setup()`` returns before constructing
-anything, so a restart would prove only that the bundle entry resolves.
-``scripts/check_plan_lift.py`` and the shape test's ``resolve_profile`` prove
-that instead.
+``make_dream_callbacks`` factory, the real ``write_dream_evidence``. The
+kernel-restart leg this task's brief proposed is cancelled by ruling R60. The
+plugin ships behind ``enabled: false`` until the ADR-0254 v3 ownership conflict
+recorded in R54 is resolved, and a disabled plugin's ``setup()`` returns before
+constructing anything, so a restart would prove only that the bundle entry
+resolves. ``scripts/check_plan_lift.py`` and the shape test's ``resolve_profile``
+prove that instead.
 
 No test here reaches a real assistant home. ``run_dream`` rewrites
 ``MEMORY.md``, ``USER.md``, the people and groups indexes and the FTS index,
