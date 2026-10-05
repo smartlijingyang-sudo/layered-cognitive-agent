@@ -111,6 +111,30 @@ class Decision:
     # may dispatch directly; ``True`` means ``act.approve.gate`` routes
     # through the HITL interrupt seam (ADR-0228 §2.6).
     needs_approval: bool = False
+    # ADR-0292 C2 (follow-up wiring 1, adjudicated 2026-10-05 section 9):
+    # typed instruction-source channel on the Decision. ``act.approve.gate``
+    # is a pure transform of typed ports -- it cannot see *why* the model
+    # chose this action. Producers that emit a decision driven by external
+    # content (tool result / web fetch / file read / subagent report)
+    # record it here; the gate then consults the two refusal doors
+    # (``refuse_external_authorization_claim`` /
+    # ``refuse_external_instruction_override``) on the trigger text, and
+    # the standing-write tools read the ambient origin (wiring 3).
+    # ``None`` = no recorded external drive (legacy producers); the gates
+    # treat it as not-externally-driven until a producer marks explicitly.
+    content_origin: ContentOrigin | None = None
+    """Where the instruction driving this decision came from (ADR-0292 C2).
+
+    ``ContentOrigin.EXTERNAL`` + ``origin_trigger_text`` arms the
+    authorization gates; ``None`` (default) means no external drive was
+    recorded and the gates stay inert.
+    """
+    origin_trigger_text: str | None = None
+    """The external text (as received, unfenced) that drove this decision.
+
+    Only meaningful when ``content_origin`` is ``ContentOrigin.EXTERNAL``;
+    the refusal gates scan this text, never the decision's own rationale.
+    """
 
 
 #: Tool names that pause the run for human input before execution. When a
