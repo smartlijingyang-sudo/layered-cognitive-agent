@@ -10,9 +10,11 @@ import pytest
 from lca.application.memory.dream_scheduler import (
     DreamFn,
     DreamScheduler,
+    EvidenceWriter,
     _Backfill,
     _dream_lock_id,
     _Render,
+    write_dream_evidence,
 )
 from lca.application.routine.locks import RoutineFileLock
 from lca.contracts.atoms.ids.ids import utc_now_ms
@@ -46,6 +48,13 @@ def clock() -> list[int]:
     return [1_791_121_000_000]
 
 
+def _promoting(
+    home: Path, *, now_ms: int, backfill: _Backfill | None, render: _Render | None
+) -> DreamReport:
+    del home, now_ms, backfill, render
+    return _report(upserted=1, promoted=("identity:role",))
+
+
 def _scheduler(
     tmp_path: Path,
     homes: list[Path],
@@ -53,6 +62,7 @@ def _scheduler(
     calls: list[Path],
     evidence: list[EvidenceCall] | None = None,
     run_dream_fn: DreamFn | None = None,
+    evidence_writer: EvidenceWriter | None = None,
 ) -> DreamScheduler:
     recorded: list[EvidenceCall] = [] if evidence is None else evidence
 
@@ -76,7 +86,7 @@ def _scheduler(
         tick_seconds=300,
         now_ms=lambda: clock[0],
         run_dream_fn=fake_run_dream if run_dream_fn is None else run_dream_fn,
-        evidence_writer=write_evidence,
+        evidence_writer=write_evidence if evidence_writer is None else evidence_writer,
     )
 
 
@@ -561,4 +571,229 @@ def test_the_lock_id_is_a_stable_digest_across_processes() -> None:
     assert (
         _dream_lock_id(Path("/home/lichao/.lca/assistants/asst_1"))
         == "memory_dream:4f506839670286e0"
+    )
+
+
+def test_evidence_records_a_promoting_pass(tmp_path: Path) -> None:
+    report = _report(promoted=("preference:verbosity",), upserted=1, trail_facts=3)
+
+    path = write_dream_evidence(tmp_path, report, 1_791_121_000_000)
+
+    assert path is not None
+    assert path == tmp_path / "dreams" / "last_run.json"
+    text = path.read_text(encoding="utf-8")
+    assert json.loads(text) == {
+        "now_ms": 1_791_121_000_000,
+        "upserted": 1,
+        "promoted": ["preference:verbosity"],
+        "user_md_written": False,
+        "synthesis_written": False,
+        "trail_facts": 3,
+        "index_documents": 0,
+    }
+    assert "\n" in text, "an operator cats this artifact; it is not machine-parsed"
+
+
+def test_a_no_change_pass_does_not_rewrite_existing_evidence(tmp_path: Path) -> None:
+    first = write_dream_evidence(tmp_path, _report(upserted=1), 1_000)
+    assert first is not None, "the first pass always leaves an artifact"
+    stamp = first.stat().st_mtime_ns
+
+    second = write_dream_evidence(tmp_path, _report(), 2_000)
+
+    assert second is None
+    assert first.stat().st_mtime_ns == stamp
+    assert json.loads(first.read_text(encoding="utf-8"))["now_ms"] == 1_000, (
+        "the payload is the proof the file was left alone, not only its mtime"
+    )
+
+
+def test_a_pass_that_only_rebuilt_derived_artifacts_is_not_a_change(tmp_path: Path) -> None:
+    # The report shape a real second pass produces: every artifact was rewritten
+    # and nothing moved. `synthesis_written` is hardcoded True (dream.py:214),
+    # `promoted` repeats every past promotion because it is appended before the
+    # `_already_active` skip (dream.py:241), and `trail_facts` counts the whole
+    # trail corpus rather than what is new in it (dream.py:117-134).
+    first = write_dream_evidence(tmp_path, _report(upserted=1), 1_000)
+    assert first is not None
+    stamp = first.stat().st_mtime_ns
+    idle = _report(
+        promoted=("pref:short_reply", "preference:c1c2b9b80773"),
+        trail_facts=2,
+        people_indexed=2,
+        groups_indexed=1,
+        synthesis_written=True,
+        synthesis_path="dreams/alignment/derived/ALIGNMENT_SYNTHESIS.md",
+        synthesis_assertions=1,
+        index_documents=2,
+    )
+
+    assert write_dream_evidence(tmp_path, idle, 2_000) is None
+    assert first.stat().st_mtime_ns == stamp
+
+
+def test_a_home_without_evidence_gets_an_artifact_on_an_idle_first_pass(tmp_path: Path) -> None:
+    path = write_dream_evidence(tmp_path, _report(), 1_000)
+
+    assert path is not None, "a home with no artifact yet gets one even from an idle pass"
+    assert path == tmp_path / "dreams" / "last_run.json"
+    assert json.loads(path.read_text(encoding="utf-8"))["now_ms"] == 1_000
+
+
+def test_a_skipped_home_records_no_evidence(tmp_path: Path) -> None:
+    assert write_dream_evidence(tmp_path, None, 1_000) is None
+    assert not (tmp_path / "dreams").exists(), "a skipped home is not given an empty artifact"
+
+
+def test_a_failed_evidence_write_leaves_the_previous_artifact_readable(tmp_path: Path) -> None:
+    first = write_dream_evidence(tmp_path, _report(upserted=1), 1_000)
+    assert first is not None
+    before = first.read_text(encoding="utf-8")
+    dreams = tmp_path / "dreams"
+    dreams.chmod(0o500)  # readable but not writable, so no replacement can be staged
+    try:
+        with pytest.raises(OSError):
+            write_dream_evidence(tmp_path, _report(upserted=1), 2_000)
+    finally:
+        dreams.chmod(0o700)
+
+    assert first.read_text(encoding="utf-8") == before, (
+        "a full disk must not cost the operator the last good evidence"
+    )
+
+
+def test_a_reprojected_user_md_counts_as_a_change(tmp_path: Path) -> None:
+    first = write_dream_evidence(tmp_path, _report(), 1_000)
+    assert first is not None
+
+    second = write_dream_evidence(tmp_path, _report(user_md_written=True), 2_000)
+
+    assert second == first
+    assert json.loads(first.read_text(encoding="utf-8"))["now_ms"] == 2_000
+
+
+def test_a_later_promotion_updates_the_artifact(tmp_path: Path) -> None:
+    first = write_dream_evidence(tmp_path, _report(), 1_000)
+    assert first is not None
+
+    second = write_dream_evidence(tmp_path, _report(upserted=1, promoted=("identity:role",)), 2_000)
+
+    assert second == first
+    written = json.loads(first.read_text(encoding="utf-8"))
+    assert (written["now_ms"], written["upserted"], written["promoted"]) == (
+        2_000,
+        1,
+        ["identity:role"],
+    ), "an existing artifact does not make a real promotion skip its record"
+
+
+async def test_an_evidence_io_failure_does_not_discard_the_report(
+    tmp_path: Path, clock: list[int], caplog: pytest.LogCaptureFixture
+) -> None:
+    home = tmp_path / "a"
+    calls: list[Path] = []
+    home.mkdir()
+    # `dreams` occupied by a regular file, so the artifact's mkdir cannot succeed.
+    (home / "dreams").write_text("not a directory", encoding="utf-8")
+    scheduler = _scheduler(
+        tmp_path,
+        [home],
+        clock,
+        calls,
+        run_dream_fn=_promoting,
+        evidence_writer=write_dream_evidence,
+    )
+
+    with caplog.at_level(logging.WARNING):
+        reports = await scheduler.sweep_once()
+
+    assert reports == (_report(upserted=1, promoted=("identity:role",)),), (
+        "the promotion is already on disk; a projection that cannot be written must not hide it"
+    )
+    assert any(
+        record.levelname == "ERROR"
+        and "dream evidence write failed" in record.message
+        and "home=a" in record.message
+        for record in caplog.records
+    ), "an evidence failure is diagnosed as evidence and names the home"
+    assert not any("dream pass failed on I/O" in record.message for record in caplog.records), (
+        "an unwritable dreams/ must not read as a failed consolidation"
+    )
+    after = _home_lock(tmp_path / "locks", home)
+    assert after.acquire() is True, "a failed evidence write must not strand its lock"
+    after.release()
+
+
+async def test_a_broken_evidence_writer_cannot_mask_a_promotion(
+    tmp_path: Path, clock: list[int], caplog: pytest.LogCaptureFixture
+) -> None:
+    home = tmp_path / "a"
+    calls: list[Path] = []
+
+    def broken(seen: Path, report: DreamReport | None, now_ms: int) -> None:
+        del seen, report, now_ms
+        raise RuntimeError("evidence writer is misconfigured")
+
+    scheduler = _scheduler(
+        tmp_path, [home], clock, calls, run_dream_fn=_promoting, evidence_writer=broken
+    )
+
+    with caplog.at_level(logging.WARNING):
+        reports = await scheduler.sweep_once()
+
+    assert reports == (_report(upserted=1, promoted=("identity:role",)),)
+    assert any("dream evidence write failed" in record.message for record in caplog.records), (
+        "the writer is an injected seam, so the containment is not OSError-shaped"
+    )
+
+
+async def test_a_scheduler_without_an_evidence_writer_stays_quiet(
+    tmp_path: Path, clock: list[int], caplog: pytest.LogCaptureFixture
+) -> None:
+    scheduler = DreamScheduler(
+        homes=lambda: [tmp_path / "a"],
+        lock_dir=tmp_path / "locks",
+        tick_seconds=300,
+        now_ms=lambda: clock[0],
+        run_dream_fn=_promoting,
+    )
+
+    with caplog.at_level(logging.WARNING):
+        reports = await scheduler.sweep_once()
+
+    assert reports == (_report(upserted=1, promoted=("identity:role",)),)
+    assert not caplog.records, (
+        "the constructor's default writer is a configuration, not a fault to log per home"
+    )
+
+
+async def test_a_sweep_writes_the_real_artifact_with_the_pass_timestamp(
+    tmp_path: Path, clock: list[int]
+) -> None:
+    home = tmp_path / "a"
+    calls: list[Path] = []
+    sampled: list[int] = []
+
+    def advancing(
+        seen: Path, *, now_ms: int, backfill: _Backfill | None, render: _Render | None
+    ) -> DreamReport:
+        del seen, backfill, render
+        sampled.append(now_ms)
+        clock[0] += 91_000
+        return _report(upserted=1)
+
+    scheduler = _scheduler(
+        tmp_path,
+        [home],
+        clock,
+        calls,
+        run_dream_fn=advancing,
+        evidence_writer=write_dream_evidence,
+    )
+
+    await scheduler.sweep_once()
+
+    artifact = home / "dreams" / "last_run.json"
+    assert json.loads(artifact.read_text(encoding="utf-8"))["now_ms"] == sampled[0], (
+        "the artifact carries the timestamp run_dream consolidated under, not a fresh read"
     )

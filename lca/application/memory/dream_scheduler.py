@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import json
 import logging
 from collections.abc import Callable, Sequence
 from pathlib import Path
@@ -21,6 +22,7 @@ from pathlib import Path
 from lca.application.routine.locks import RoutineFileLock
 from lca.contracts.mechanisms.content.addressable import sha256_hex
 from lca.contracts.models.core.conversation.memory import MemoryRecord
+from lca.infrastructure.memory.contextfiles.adapters.disk import DiskFileStore
 from lca.infrastructure.memory.contextfiles.domain.edit import StaleSnapshotOperationError
 from lca.infrastructure.memory.dream import DreamReport, run_dream
 
@@ -139,8 +141,7 @@ class DreamScheduler:
                 self._callbacks(home) if self._callbacks is not None else (None, None)
             )
             report = self._run_dream(home, now_ms=now_ms, backfill=backfill, render=render)
-            if self._evidence_writer is not None:
-                self._evidence_writer(home, report, now_ms)
+            self._record_evidence(home, report, now_ms)
             return report
         except StaleSnapshotOperationError:
             # An online memory tool rewrote semantic.json mid-pass. The next
@@ -160,3 +161,68 @@ class DreamScheduler:
                     home.name,
                     held_ms,
                 )
+
+    def _record_evidence(self, home: Path, report: DreamReport | None, now_ms: int) -> None:
+        """Write the run artifact, inside the lock, without owning the report.
+
+        ``run_dream`` has already committed its promotions when this runs, and
+        the artifact is a rebuildable projection of them, so no writer failure
+        may turn a successful consolidation into a reported loss. The handler is
+        ``Exception`` rather than ``OSError`` because the writer is an injected
+        seam whose failure modes this module does not own; ``BaseException``
+        still propagates, so dispose-by-cancel is unaffected.
+        """
+        if self._evidence_writer is None:
+            return
+        try:
+            self._evidence_writer(home, report, now_ms)
+        except Exception:
+            logger.exception("dream evidence write failed: home=%s", home.name)
+
+
+_EVIDENCE_RELATIVE = "dreams/last_run.json"
+
+
+def _changed(report: DreamReport) -> bool:
+    """True when this pass moved a fact or re-projected the profile.
+
+    Deliberately narrower than "the pass did work". ``synthesis_written`` is
+    hardcoded ``True`` (``dream.py:214``), ``promoted`` repeats every past
+    promotion because it is appended before the ``_already_active`` skip
+    (``dream.py:241``), ``trail_facts`` counts the whole trail corpus rather than
+    what is new in it, and ``people_indexed``/``groups_indexed``/
+    ``index_documents`` count rebuilds of artifacts every pass rewrites
+    unconditionally. Only a written semantic row and a USER.md whose rendering
+    differed from what is on disk are content differences.
+    """
+    return bool(report.upserted or report.user_md_written)
+
+
+def write_dream_evidence(home: Path, report: DreamReport | None, now_ms: int) -> Path | None:
+    """Record the pass under ``{home}/dreams/last_run.json``.
+
+    A pass that changed nothing leaves the previous evidence in place, so the
+    file's mtime stays a truthful "last time memory moved" marker and a
+    minutes-level cadence does not churn it. A home with no artifact yet always
+    gets one, so the file's absence means the sweep never reached that home.
+
+    The write goes through the home's atomic replace, because a half-written
+    artifact is worse than a stale one: ``is_file()`` would then protect the
+    corrupt file from being overwritten by every later idle pass.
+    """
+    path = home / _EVIDENCE_RELATIVE
+    if report is None or (not _changed(report) and path.is_file()):
+        return None
+    payload = {
+        "now_ms": now_ms,
+        "upserted": report.upserted,
+        "promoted": report.promoted,
+        "user_md_written": report.user_md_written,
+        "synthesis_written": report.synthesis_written,
+        "trail_facts": report.trail_facts,
+        "index_documents": report.index_documents,
+    }
+    DiskFileStore(home).atomic_replace(
+        _EVIDENCE_RELATIVE, json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True)
+    )
+    return path
