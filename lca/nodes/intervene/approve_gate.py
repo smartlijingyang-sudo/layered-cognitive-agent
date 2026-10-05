@@ -18,6 +18,7 @@ Boundary discipline:
 
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass
 
 from lca.contracts.atoms.control.slot import ControlSlot
@@ -33,6 +34,16 @@ from lca.contracts.harness.composition.plugin_contract import (
     PluginIdentity,
 )
 from lca.contracts.models.core.execution.decision import Decision
+from lca.contracts.models.core.execution.external_content import (
+    AuthorizationRefusal,
+    ContentOrigin,
+    refuse_external_authorization_claim,
+    refuse_external_instruction_override,
+)
+from lca.contracts.observability.evidence.evidence import (
+    Classification,
+    RetentionClass,
+)
 from lca.contracts.protocols.declarative.declarative_1.node_executor import (
     NodeContext,
     NodeInput,
@@ -56,13 +67,80 @@ _NEXT_HINT_APPROVE_APPROVED = "approve_approved"
 _NEXT_HINT_APPROVE_REJECTED = "approve_rejected"
 
 
+def _external_content_refusal(decision: Decision) -> AuthorizationRefusal | None:
+    """ADR-0292 C2: consult the two refusal doors for EXTERNAL-driven decisions.
+
+    Returns the first tripped :class:`AuthorizationRefusal`, or ``None``
+    when the decision carries no recorded external drive
+    (``content_origin`` is not EXTERNAL), has no trigger text, or neither
+    door trips. The seam detectors own the classification; this function
+    only wires them to the typed ``Decision`` channel.
+    """
+    if decision.content_origin is not ContentOrigin.EXTERNAL:
+        return None
+    text = decision.origin_trigger_text
+    if not text:
+        return None
+    refusals: list[AuthorizationRefusal] = []
+    refuse_external_authorization_claim(text, on_refusal=refusals.append)
+    refuse_external_instruction_override(text, on_refusal=refusals.append)
+    return refusals[0] if refusals else None
+
+
+def _route_refusal_to_evidence(refusal: AuthorizationRefusal, decision_id: str) -> None:
+    """ADR-0292 C4 (wiring 4): route a blocked claim to the evidence ledger.
+
+    Mechanical wiring per the 2026-10-05 section-9 adjudication: resolve the
+    ambient evidence pair exactly like ``safe_executor._resolve_evidence_pair``
+    and prepare the refusal payload (the blocked attack itself is the
+    evidence). The import is deferred so this module never takes a hard
+    dependency on the observability stack at load time. No bound
+    observability (unit tests / offline paths) -> no-ref path: refusal
+    routing still holds, only the evidence copy is skipped.
+    """
+    try:
+        from lca.infrastructure.observability import current_bound
+    except ImportError:  # pragma: no cover - packaged without observability
+        return
+    bound = current_bound()
+    if bound is None:
+        return
+    store = bound.evidence_binding().store
+    if store is None:
+        return
+    payload = json.dumps(
+        {
+            "event": "authorization_refusal",
+            "gate": "act.approve.gate",
+            "adr": "0292",
+            "decision_id": decision_id,
+            "kind": refusal.kind,
+            "refused_at": refusal.refused_at.isoformat(),
+            "text": refusal.text,
+        },
+        ensure_ascii=False,
+    ).encode("utf-8")
+    store.prepare(
+        payload,
+        classification=Classification.INTERNAL,
+        retention=RetentionClass.RUN_DEFAULT,
+        media_type="application/json",
+        prepared_by="act.approve.gate",
+    )
+
+
 @dataclass(frozen=True, slots=True)
 class ApproveGateExecutor:
     """intervene node: gate ``decision`` flow on HITL approval semantics.
 
     The node is a pure transform of the typed ``decision`` + ``command``
-    ports. It never reads runtime state, never mutates ``AgentState``,
-    and never touches I/O. The four routing outcomes:
+    ports for routing purposes. It never reads ``context.runtime``, never
+    mutates ``AgentState``. On the ``approve_refused`` path only, the gate
+    additionally routes the refusal payload to the run-trace evidence
+    ledger through the ambient observability seam (same pattern as
+    ``safe_executor._resolve_evidence_pair``; no-ref path when unbound) —
+    ADR-0292 C4, "the blocked attack itself is security evidence".
+    The four routing outcomes:
 
     - ``approve_skipped`` — ``decision.needs_approval`` is False →
       pass-through to ``act.envelope`` with the original decision.
@@ -73,7 +151,10 @@ class ApproveGateExecutor:
       Currently unreachable (full-restart resume enters at perceive.main).
     - ``approve_rejected`` — ``command.kind`` is ``"reject"`` /
       ``"redirect"`` or ``"resume"`` → route to ``terminal.commit``
-      to abort cleanly.
+      to abort cleanly. ADR-0292 C2: also the routing for a refused
+      EXTERNAL-driven privilege claim / instruction override — the claim
+      never reaches ``act.envelope``; the refusal payload is routed to
+      the run-trace evidence ledger (C4).
     """
 
     semantic_name: str = "act.approve.gate"
@@ -116,6 +197,28 @@ class ApproveGateExecutor:
             )
 
         req = input.port_values.get(PortName("approval_requirement"))
+
+        # ADR-0292 C2 (wiring 1): security gate before approval routing.
+        # An EXTERNAL-driven decision whose trigger text asserts held
+        # authority or overrides prior instructions is refused outright —
+        # external content can never be a source of authorization, and no
+        # user interrupt is spent on an attack.
+        refusal = _external_content_refusal(decision)
+        if refusal is not None:
+            _route_refusal_to_evidence(refusal, decision.decision_id)
+            refused_routing = RoutingDecision(
+                action_type=ActionType.RESPOND,
+                next_node="terminal.commit",
+                next_hint=_NEXT_HINT_APPROVE_REJECTED,
+            )
+            refused_ports = {
+                PortName("decision"): decision,
+                PortName("approval_routing"): refused_routing,
+            }
+            if req is not None:
+                refused_ports[PortName("approval_requirement")] = req
+            return NodeOutput(port_values=refused_ports)
+
         if req is not None and hasattr(req, "required"):
             needs_approval = bool(req.required)
         else:
