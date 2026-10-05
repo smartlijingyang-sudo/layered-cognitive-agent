@@ -8,7 +8,7 @@ from unittest.mock import MagicMock
 
 from lca.cognition.body.actions.action_handlers import resolve_spec_timeout_s
 from lca.cognition.body.tools.tool_registry import SimpleToolRegistry
-from lca.cognition.brain.decision_gates.must.consult_all import MustConsultAllMembers
+from lca.cognition.brain.decision_gates.consult import MustConsultAllMembers
 from lca.cognition.member_status import (
     InMemoryMemberStatus,
     classify_synthesis,

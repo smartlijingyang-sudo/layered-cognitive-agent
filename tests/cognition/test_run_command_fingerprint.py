@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from lca.cognition.brain.decision_gates.loop.fingerprint import tool_call_fingerprint
+from lca.cognition.brain.decision_gates.multi_tool_loop import tool_call_fingerprint
 from lca.contracts.models.core.execution.decision import ToolCall
 
 

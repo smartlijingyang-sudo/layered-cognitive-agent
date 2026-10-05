@@ -52,6 +52,6 @@ class Config(BaseModel):
     ),
 )
 async def setup(ctx: PluginContext, config: Config) -> None:
-    from lca.cognition.brain.decision_gates.terminal.respond import TerminalRespondGate
+    from lca.cognition.brain.decision_gates.terminal import TerminalRespondGate
 
     ctx.require("gates").add(TerminalRespondGate, id="terminal-respond", slot="loop", order=40)

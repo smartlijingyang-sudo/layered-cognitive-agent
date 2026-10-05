@@ -15,7 +15,7 @@ from pathlib import Path
 
 import pytest
 
-from lca.cognition.brain.decision_gates.artifact.respond_injector import (
+from lca.cognition.brain.decision_gates.artifact import (
     ArtifactRespondInjector,
 )
 from lca.contracts.atoms.enums.enums import ActionType
@@ -31,8 +31,7 @@ INJECTOR_PATH = (
     / "cognition"
     / "brain"
     / "decision_gates"
-    / "artifact"
-    / "respond_injector.py"
+    / "artifact.py"
 )
 
 

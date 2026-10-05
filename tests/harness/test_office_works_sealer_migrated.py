@@ -114,7 +114,7 @@ class TestOfficeWorksSealerMigration:
         if not SEALER_PATH.exists():
             return  # acceptable: file removed outright
         spec = importlib.util.spec_from_file_location(
-            "lca.cognition.brain.decision_gates.office.works_sealer",
+            "lca.cognition.brain.decision_gates.office",
             SEALER_PATH,
         )
         assert spec is not None and spec.loader is not None

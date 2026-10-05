@@ -60,7 +60,7 @@ class Config(BaseModel):
     ),
 )
 async def setup(ctx: PluginContext, config: Config) -> None:
-    from lca.cognition.brain.decision_gates.delivery.satisfied import DeliverySatisfiedGate
+    from lca.cognition.brain.decision_gates.delivery import DeliverySatisfiedGate
     from lca.cognition.convergence.runtime import ConvergenceRuntime
 
     runtime = ctx.require("convergence_runtime")

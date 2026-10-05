@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from lca.cognition.brain.decision_gates.chained.chained import record_gate_decided
+from lca.cognition.brain.decision_gates.chained import record_gate_decided
 from lca.cognition.convergence.runtime import ConvergenceRuntime
 from lca.contracts.atoms.enums.enums import ActionType
 from lca.contracts.atoms.ids.ids import new_id

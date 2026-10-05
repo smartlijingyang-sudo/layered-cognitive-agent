@@ -92,7 +92,7 @@ def test_no_direct_import_of_other_plugins():
 
 def test_gate_implements_decision_gate_protocol():
     """MultiToolLoopBreakerGate 实现 DecisionGate 协议。"""
-    from lca.cognition.brain.decision_gates.loop.multi_tool_breaker import (
+    from lca.cognition.brain.decision_gates.multi_tool_loop import (
         MultiToolLoopBreakerGate,
     )
     from lca.contracts.models.core.policy.loop_policy import DEFAULT_LOOP_POLICY

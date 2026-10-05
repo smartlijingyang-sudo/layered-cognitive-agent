@@ -1,12 +1,8 @@
 """Seal Office Works before user-facing respond (LobeHub completion-time scan).
 
 DEPRECATED (v3 §9.2 / PR6.D.5): the world-side-effect call ``seal_office_works()``
-migrated to ``SimpleBody.finalize``.  The class is retained for backwards-compat
+migrated to ``SimpleBody.finalize``. The class is retained for backwards-compat
 imports but ``build_workspace_agent_gate`` no longer instantiates it.
-
-PR4: rewrite verdicts MUST record a GateDecided event.  This gate is a
-side-effect gate, not a Decision rewriter; it just records an allow
-verdict (which is intentionally NOT recorded per spec §3.5).
 """
 
 from __future__ import annotations
@@ -36,3 +32,6 @@ def _should_seal(state: AgentState, decision: Decision) -> bool:
         return True
     max_steps = state.budget.max_steps or 0
     return state.step >= max(0, max_steps - TERMINAL_RESERVE_STEPS)
+
+
+__all__ = ["OfficeWorksSealer"]

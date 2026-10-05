@@ -1,17 +1,8 @@
-"""Terminal respond gate — reserve last step for user-facing closure (ADR-0051 + PR6).
-
-PR4: rewrite verdicts MUST record a GateDecided event.  When the gate
-forces a respond, a GateDecided event with verdict=rewrite is recorded.
-
-PR6: the gate reads workspace artifacts **exclusively** from
-``AgentState.perceive`` manifest items.  Live ``get_run_workspace()`` reads
-from the Reasoner / Gates are forbidden (v3 §5.1) — the workspace is a
-Sensor-owned surface.
-"""
+"""Terminal respond gate — reserve last step for user-facing closure (ADR-0051 + PR6)."""
 
 from __future__ import annotations
 
-from lca.cognition.brain.decision_gates.chained.chained import record_gate_decided
+from lca.cognition.brain.decision_gates.chained import record_gate_decided
 from lca.cognition.convergence.delivery_synth import synthesize_delivery_response
 from lca.cognition.convergence.evidence import build_delivery_evidence
 from lca.cognition.convergence.producer_tools import is_producer_tool

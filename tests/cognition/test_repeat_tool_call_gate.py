@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import asyncio
 
-from lca.cognition.brain.decision_gates.repeat.tool_call import RepeatToolCallGate
+from lca.cognition.brain.decision_gates.repeat import RepeatToolCallGate
 from lca.cognition.brain.guard.loop_policy import LoopGuardPolicyView, StaticLoopGuardPolicy
 from lca.contracts.atoms.enums.enums import ActionType
 from lca.contracts.models.core.execution.decision import Decision, Observation, ToolCall, Turn

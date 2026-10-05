@@ -5,23 +5,22 @@ Gate chains assemble via ``GateService`` + ``gates.chain.sequential`` bundle.
 Tests may use :func:`build_default_workspace_gate_chain` for the standard 6-gate chain.
 """
 
-from lca.cognition.brain.decision_gates.artifact.respond_injector import (
-    ArtifactRespondInjector,
-)
-from lca.cognition.brain.decision_gates.chained.chained import (
+from lca.cognition.brain.decision_gates.artifact import ArtifactRespondInjector
+from lca.cognition.brain.decision_gates.auth import AuthUrlProvenanceGate
+from lca.cognition.brain.decision_gates.chained import (
     ChainedDecisionGate,
     record_gate_decided,
 )
-from lca.cognition.brain.decision_gates.delivery.satisfied import DeliverySatisfiedGate
-from lca.cognition.brain.decision_gates.must.consult_all import (
-    MustConsultAllMembers,
-)
-from lca.cognition.brain.decision_gates.progress.loop_detector import (
+from lca.cognition.brain.decision_gates.consult import MustConsultAllMembers
+from lca.cognition.brain.decision_gates.delivery import DeliverySatisfiedGate
+from lca.cognition.brain.decision_gates.loop_guards import (
     ProgressLoopDetector,
+    ToolLoopBreakerGate,
 )
-from lca.cognition.brain.decision_gates.repeat.tool_call import RepeatToolCallGate
-from lca.cognition.brain.decision_gates.terminal.respond import TerminalRespondGate
-from lca.cognition.brain.decision_gates.tool.loop_breaker import ToolLoopBreakerGate
+from lca.cognition.brain.decision_gates.multi_tool_loop import MultiToolLoopBreakerGate
+from lca.cognition.brain.decision_gates.office import OfficeWorksSealer
+from lca.cognition.brain.decision_gates.repeat import RepeatToolCallGate
+from lca.cognition.brain.decision_gates.terminal import TerminalRespondGate
 from lca.cognition.convergence.runtime import ConvergenceRuntime
 from lca.contracts.protocols.think.cognition import DecisionGate
 
@@ -49,10 +48,13 @@ def build_workspace_agent_gate() -> DecisionGate:
 
 __all__ = [
     "ArtifactRespondInjector",
+    "AuthUrlProvenanceGate",
     "ChainedDecisionGate",
     "DecisionGate",
     "DeliverySatisfiedGate",
+    "MultiToolLoopBreakerGate",
     "MustConsultAllMembers",
+    "OfficeWorksSealer",
     "ProgressLoopDetector",
     "RepeatToolCallGate",
     "TerminalRespondGate",

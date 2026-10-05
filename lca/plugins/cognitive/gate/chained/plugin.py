@@ -4,7 +4,7 @@ from collections.abc import Sequence
 
 from pydantic import BaseModel
 
-from lca.cognition.brain.decision_gates.chained.chained import ChainedDecisionGate
+from lca.cognition.brain.decision_gates.chained import ChainedDecisionGate
 from lca.contracts.atoms.control.slot import ControlSlot
 from lca.contracts.atoms.functional.group import FunctionalGroup
 from lca.contracts.atoms.scope.scope import Scope

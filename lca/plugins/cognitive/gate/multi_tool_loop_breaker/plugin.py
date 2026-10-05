@@ -67,7 +67,7 @@ class Config(BaseModel):
     ),
 )
 async def setup(ctx: PluginContext, config: Config) -> None:
-    from lca.cognition.brain.decision_gates.loop.multi_tool_breaker import (
+    from lca.cognition.brain.decision_gates.multi_tool_loop import (
         MultiToolLoopBreakerGate,
     )
     from lca.plugins.cognitive.gate._loop_policy import resolve_loop_thresholds

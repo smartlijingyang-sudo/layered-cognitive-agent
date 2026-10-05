@@ -17,7 +17,7 @@ from dataclasses import dataclass
 
 import pytest
 
-from lca.cognition.brain.decision_gates.loop.multi_tool_breaker import (
+from lca.cognition.brain.decision_gates.multi_tool_loop import (
     MultiToolLoopBreakerGate,
 )
 from lca.contracts.atoms.enums.enums import ActionType
@@ -335,7 +335,7 @@ def test_confidence_history_from_projection_window():
     for c in [0.1, 0.2, 0.3, 0.4, 0.5]:
         p._confidence_history.append(c)
 
-    from lca.cognition.brain.decision_gates.loop.multi_tool_breaker import (
+    from lca.cognition.brain.decision_gates.multi_tool_loop import (
         _confidence_history_from_projection,
     )
 
@@ -348,7 +348,7 @@ def test_completed_growth_when_history_too_short_returns_window():
     from lca.plugins.session.task_progress.projection import TaskProgressProjection
 
     p = TaskProgressProjection()
-    from lca.cognition.brain.decision_gates.loop.multi_tool_breaker import (
+    from lca.cognition.brain.decision_gates.multi_tool_loop import (
         _completed_growth,
     )
 
@@ -361,7 +361,7 @@ def test_completed_growth_zero_when_no_new_steps():
     p = TaskProgressProjection()
     for snap in [("a",), ("a",), ("a",), ("a",)]:
         p._completed_history.append(snap)
-    from lca.cognition.brain.decision_gates.loop.multi_tool_breaker import (
+    from lca.cognition.brain.decision_gates.multi_tool_loop import (
         _completed_growth,
     )
 
@@ -374,7 +374,7 @@ def test_completed_growth_counts_new_unique_steps():
     p = TaskProgressProjection()
     for snap in [(), ("a",), ("a", "b"), ("a", "b", "c")]:
         p._completed_history.append(snap)
-    from lca.cognition.brain.decision_gates.loop.multi_tool_breaker import (
+    from lca.cognition.brain.decision_gates.multi_tool_loop import (
         _completed_growth,
     )
 
@@ -383,7 +383,7 @@ def test_completed_growth_counts_new_unique_steps():
 
 
 def test_force_respond_preserves_decision_id():
-    from lca.cognition.brain.decision_gates.loop.multi_tool_breaker import (
+    from lca.cognition.brain.decision_gates.multi_tool_loop import (
         _force_respond,
     )
 
@@ -399,7 +399,7 @@ def test_force_respond_preserves_decision_id():
 
 def test_fingerprint_variance_with_empty_turns_returns_one():
     """无 turn → variance=1.0 (fail-open, 不触发 fingerprint_static)。"""
-    from lca.cognition.brain.decision_gates.loop.multi_tool_breaker import (
+    from lca.cognition.brain.decision_gates.multi_tool_loop import (
         _fingerprint_variance_over_turns,
     )
 
@@ -408,7 +408,7 @@ def test_fingerprint_variance_with_empty_turns_returns_one():
 
 
 def test_multi_tool_break_verdict_is_frozen():
-    from lca.cognition.brain.decision_gates.loop.multi_tool_breaker import (
+    from lca.cognition.brain.decision_gates.multi_tool_loop import (
         MultiToolBreakVerdict,
     )
 

@@ -15,7 +15,7 @@ from pathlib import Path
 
 import pytest
 
-from lca.cognition.brain.decision_gates.auth.url_provenance import (
+from lca.cognition.brain.decision_gates.auth import (
     AuthUrlProvenanceGate,
     is_auth_intent_url,
 )

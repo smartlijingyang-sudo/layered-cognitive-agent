@@ -52,7 +52,7 @@ class Config(BaseModel):
     ),
 )
 async def setup(ctx: PluginContext, config: Config) -> None:
-    from lca.cognition.brain.decision_gates.repeat.tool_call import RepeatToolCallGate
+    from lca.cognition.brain.decision_gates.repeat import RepeatToolCallGate
     from lca.plugins.cognitive.gate._loop_policy import resolve_loop_policy
 
     policy = resolve_loop_policy(ctx)

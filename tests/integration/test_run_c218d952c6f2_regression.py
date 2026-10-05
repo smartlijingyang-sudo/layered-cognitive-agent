@@ -19,7 +19,7 @@ from pathlib import Path
 
 import pytest
 
-from lca.cognition.brain.decision_gates.loop.multi_tool_breaker import (
+from lca.cognition.brain.decision_gates.multi_tool_loop import (
     MultiToolLoopBreakerGate,
 )
 from lca.contracts.atoms.enums.enums import ActionType

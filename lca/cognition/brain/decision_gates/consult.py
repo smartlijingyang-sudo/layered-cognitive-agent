@@ -1,8 +1,4 @@
-"""MustConsultAllMembers — force consulting every required member before respond.
-
-ADR-0049：短路与强制改写均挂载 DelegationBudget（timeout_s），
-并按 ConsultPolicy 只 fan-out「仍应咨询」的角色（usable partial 不再重试）。
-"""
+"""MustConsultAllMembers — force consulting every required member before respond (ADR-0049)."""
 
 from __future__ import annotations
 
@@ -73,12 +69,7 @@ def _next_from_state(state: AgentState) -> ConsultNextAction | None:
 
 
 class MustConsultAllMembers(DecisionGate):
-    """Rewrite decisions that violate the "all required roles must respond" invariant.
-
-    With multi-delegate support: when multiple roles are waiting, a DELEGATE
-    whose targets are a non-empty subset of waiting is accepted; shortcut may
-    fan-out to **policy-selected** waiting roles in one step (not blind retry).
-    """
+    """Rewrite decisions that violate the "all required roles must respond" invariant."""
 
     async def try_shortcut(self, state: AgentState) -> Decision | None:
         nxt = _next_from_state(state)
@@ -103,7 +94,6 @@ class MustConsultAllMembers(DecisionGate):
             board = duty_board(state)
             if board is None:
                 return decision
-            # 无 duty 对象时退回旧 board 逻辑
             required = compute_required_action(board)
             if required.kind == "may_respond":
                 if decision.action_type == ActionType.DELEGATE:
@@ -137,7 +127,6 @@ class MustConsultAllMembers(DecisionGate):
             and target_roles.issubset(waiting_set)
         )
         if already_correct:
-            # 补齐缺失的 timeout_s
             patched: list[DelegationSpec] = []
             for spec in specs:
                 if spec.timeout_s is None:
@@ -155,8 +144,6 @@ class MustConsultAllMembers(DecisionGate):
                     )
                 else:
                     patched.append(spec)
-            # Decision is frozen: build the patched copy instead of
-            # mutating (the old assignment raised FrozenInstanceError).
             return replace(decision, delegations=patched)
 
         roles = list(nxt.target_roles)
@@ -167,3 +154,6 @@ class MustConsultAllMembers(DecisionGate):
             rationale=rationale,
             timeout_s=nxt.budget.timeout_s,
         )
+
+
+__all__ = ["MustConsultAllMembers"]

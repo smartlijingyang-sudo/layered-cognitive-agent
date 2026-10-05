@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from lca.cognition.brain.decision_gates.chained.chained import record_gate_decided
+from lca.cognition.brain.decision_gates.chained import record_gate_decided
 from lca.contracts.harness.fold.perceive import (
     fold_context_manifest_from_events,
     fold_gate_decisions_from_events,

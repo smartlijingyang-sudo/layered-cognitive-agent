@@ -7,7 +7,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from lca.cognition.brain.decision_gates.must.consult_all import (
+from lca.cognition.brain.decision_gates.consult import (
     MustConsultAllMembers,
 )
 from lca.cognition.brain.pipeline.modular_brain import ModularBrain

@@ -1,47 +1,21 @@
-"""Multi-tool loop circuit breaker — wide-angle progress view (ADR-0214 PR-B).
-
-Companion to :class:`ToolLoopBreakerGate`.  The single-tool breaker counts
-consecutive same-tool failures and breaks on the third; a model that switches
-between two tools while both fail slips through that count and consumes the
-whole run.  This gate looks at *progress* across a sliding window instead of
-*per-tool failure streaks*.
-
-Three trigger conditions, evaluated in order:
-
-1. ``TaskProgressProjection.is_stuck(window, threshold)`` — confidence
-   declined more than ``threshold`` over the last ``window`` commits and
-   ``completed`` did not grow.  This is the core signal: the model is
-   observing no new information about the task.
-2. ``completed_set_growth == 0`` over the last ``progress_break`` steps —
-   progress has flatlined at the observation level even if confidence has
-   not crashed.
-3. ``fingerprint_variance == 0`` over the last ``consecutive_repeat_max``
-   turns — the model is re-issuing the same tool call with the same
-   observation; this is the classic polling loop the single-tool breaker
-   misses because the tools alternate. The window is sized for the
-   production repeat distribution (default 2, see
-   ``LoopPolicyThresholds.consecutive_repeat_max``).
-
-The gate sits in the Think plane and only rewrites a candidate Decision.
-It never executes a tool, mutates an external system, or changes graph
-topology.  The owning Gate plugin makes this policy profile-selectable
-through :class:`LoopPolicyThresholds`.
-"""
+"""Multi-tool loop circuit breaker and fingerprint helpers (ADR-0214 PR-B, ADR-0191 R7)."""
 
 from __future__ import annotations
 
 from collections.abc import Sequence
 from dataclasses import dataclass
 
-from lca.cognition.brain.decision_gates.chained.chained import record_gate_decided
-from lca.cognition.brain.decision_gates.loop.fingerprint import (
-    tool_call_fingerprint,
-    view_tool_fingerprint,
-)
+from lca.cognition.brain.decision_gates.chained import record_gate_decided
 from lca.contracts.atoms.enums.enums import ActionType
 from lca.contracts.atoms.ids.ids import new_id
 from lca.contracts.models.core.execution.control_turn import ControlTurnView
 from lca.contracts.models.core.execution.decision import Decision, ToolCall
+from lca.contracts.models.core.execution.fingerprint import (
+    fingerprint_payload,
+    normalize_for_fingerprint,
+    tool_call_fingerprint,
+    view_tool_fingerprint,
+)
 from lca.contracts.models.core.policy.gate_policy import GateDecided, PolicyFact
 from lca.contracts.models.core.policy.loop_policy import (
     DEFAULT_LOOP_POLICY,
@@ -60,14 +34,22 @@ _BLOCKED_PROGRESS_RATIONALE = (
 )
 
 
+def view_observation_fingerprint(turn: ControlTurnView) -> str | None:
+    payload = normalize_for_fingerprint(
+        {
+            "success": turn.observation_success,
+            "payload": turn.observation_payload,
+            "error": turn.observation_error,
+        }
+    )
+    if payload is None:
+        return None
+    return fingerprint_payload(payload)
+
+
 @dataclass(frozen=True, slots=True)
 class MultiToolBreakVerdict:
-    """Diagnostic payload attached to the rewrite for downstream consumers.
-
-    Filled by the gate before calling :meth:`DecisionGate` 's enforcement
-    path; pure data, no I/O, no plugin side effects.  Stored on the gate
-    decision via :class:`PolicyFact`.
-    """
+    """Diagnostic payload attached to the rewrite for downstream consumers."""
 
     kind: str  # "stuck_progress" | "completed_flatline" | "fingerprint_static"
     window: int
@@ -81,7 +63,6 @@ def _confidence_history_from_projection(
     window: int,
 ) -> tuple[float, ...]:
     """Return the most recent ``window`` confidence values, oldest-first."""
-
     history = projection.confidence_history
     if len(history) <= window:
         return history
@@ -92,15 +73,7 @@ def _fingerprint_variance_over_turns(
     turns: Sequence[ControlTurnView],
     candidate: ToolCall,
 ) -> float:
-    """Discrete variance across the recent turn fingerprints.
-
-    Returns a value in ``[0, 1]``: ``0.0`` when every recent turn produced
-    the same normalized fingerprint as the candidate, ``1.0`` when every
-    turn produced a distinct fingerprint.  ``None`` is treated as missing
-    data and falls open to ``1.0`` so a serialization edge case does not
-    silently hard-stop the agent.
-    """
-
+    """Discrete variance across the recent turn fingerprints."""
     candidate_fp = tool_call_fingerprint(candidate)
     if candidate_fp is None:
         return 1.0
@@ -129,18 +102,15 @@ def _completed_growth(
     window: int,
 ) -> int:
     """Count how many unique completed step_ids were added across the last
-    ``window`` projection snapshots.  This requires projection to record
-    per-snapshot completed sets; when unavailable, return ``window`` so the
-    caller fails open (never falsely breaks a real-progress run).
+    ``window`` projection snapshots.
     """
-
     snapshots = getattr(projection, "completed_history", None)
     if snapshots is None or len(snapshots) < 2:
-        return window  # fail open
+        return window
 
     recent = snapshots[-window:] if len(snapshots) >= window else list(snapshots)
     if len(recent) < 2:
-        return window  # fail open
+        return window
 
     growth = 0
     prev = recent[0]
@@ -151,28 +121,7 @@ def _completed_growth(
 
 
 class MultiToolLoopBreakerGate(DecisionGate):
-    """Wide-angle progress breaker — complement to ToolLoopBreakerGate.
-
-    Trigger ladder (in order):
-
-    1. ``fingerprint_variance == 0`` over ``consecutive_repeat_max``
-       recent turns for the candidate tool → break, kind=fingerprint_static
-       (catches the same-args-same-tool polling loop that single-tool
-       breaker misses when alternating). Window defaults to 2 because the
-       production repeat distribution peaks at two calls. Runs first so
-       the gate remains effective even when ``task_progress_projection``
-       wiring (ADR-0214 PR-F) has not landed.
-    2. ``confidence_delta < -stuck_threshold`` (over ``progress_break``
-       steps) AND ``completed_growth == 0`` → break, kind=stuck_progress
-    3. ``completed_growth == 0`` over ``progress_break`` steps → break,
-       kind=completed_flatline (catches models that hold confidence flat
-       while spinning wheels)
-
-    All thresholds come from :class:`LoopPolicyThresholds` so the gate is
-    profile-configurable.  The single-tool ``ToolLoopBreakerGate`` is kept
-    as defense-in-depth; this gate is the primary line of defense for
-    multi-tool patterns.
-    """
+    """Wide-angle progress breaker — complement to ToolLoopBreakerGate."""
 
     def __init__(
         self,
@@ -187,10 +136,6 @@ class MultiToolLoopBreakerGate(DecisionGate):
 
         candidate = decision.tool_calls[0]
 
-        # ── Trigger 3 first: pure fingerprint comparison, no projection
-        # required. Production data shows most repeat-tool loops surface at
-        # the second call; gating this on projection availability makes the
-        # gate a no-op when wiring (ADR-0214 PR-F) hasn't landed yet.
         recent_turns: list[ControlTurnView] = []
         for turn in iter_control_turns_reversed(state):
             recent_turns.append(turn)
@@ -219,16 +164,13 @@ class MultiToolLoopBreakerGate(DecisionGate):
 
         projection = self._resolve_projection(state)
         if projection is None:
-            # C9 fail-open for triggers 1/2: projection missing means we
-            # cannot evaluate progress; trigger 3 already ran above.
             return decision
 
-        # Layer 4 ladder (per LoopPolicyThresholds field docs).
         history = _confidence_history_from_projection(projection, self._thresholds.progress_break)
         confidence_delta = history[-1] - history[0] if len(history) >= 2 else 0.0
         growth = _completed_growth(projection, self._thresholds.progress_break)
 
-        # ── Trigger 1: stuck progress ──────────────────────────────────
+        # Trigger 1: stuck progress
         if (
             len(history) >= self._thresholds.progress_break
             and confidence_delta < -self._thresholds.progress_warn * 0.1
@@ -253,7 +195,7 @@ class MultiToolLoopBreakerGate(DecisionGate):
                 ),
             )
 
-        # ── Trigger 2: completed flatline ──────────────────────────────
+        # Trigger 2: completed flatline
         if len(history) >= self._thresholds.progress_break and growth == 0:
             return self._block(
                 state,
@@ -272,21 +214,9 @@ class MultiToolLoopBreakerGate(DecisionGate):
                 ),
             )
 
-        # ── Trigger 3 has moved above the projection resolution so it
-        # remains effective even when ``task_progress_projection`` is not
-        # bound (production path today). ──
-
         return decision
 
     def _resolve_projection(self, state: AgentState) -> TaskProgressProjection | None:
-        """Pull the bound projection off state, returning ``None`` when absent.
-
-        Plugin wiring is added by the PR-B plugin (see
-        ``lca/plugins/cognitive/gate/multi_tool_loop_breaker/plugin.py``).
-        Until that plugin runs, the gate is a no-op — that is the fail-open
-        path for C9.
-        """
-
         return getattr(state, "task_progress_projection", None)
 
     def _block(
@@ -316,20 +246,11 @@ class MultiToolLoopBreakerGate(DecisionGate):
                 ),
             ),
         )
-        # Stash the diagnostic verdict on the gate for the call-site
-        # ``record_gate_decided`` to attach; kept as an attribute on the
-        # forced decision so downstream tooling can introspect.
         object.__setattr__(forced, "_multi_tool_break_verdict", verdict)
         return forced
 
 
 def _force_respond(decision: Decision, *, rationale: str, response: str) -> Decision:
-    """Convert unsafe continuation into a RESPOND carrying the rationale.
-
-    Mirrors :meth:`ToolLoopBreakerGate._force_respond` so the two breakers
-    produce identical Decision shapes for downstream consumers.
-    """
-
     return Decision(
         decision_id=decision.decision_id,
         action_type=ActionType.RESPOND,
@@ -343,4 +264,9 @@ def _force_respond(decision: Decision, *, rationale: str, response: str) -> Deci
 __all__ = [
     "MultiToolBreakVerdict",
     "MultiToolLoopBreakerGate",
+    "fingerprint_payload",
+    "normalize_for_fingerprint",
+    "tool_call_fingerprint",
+    "view_observation_fingerprint",
+    "view_tool_fingerprint",
 ]

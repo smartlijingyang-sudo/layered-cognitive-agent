@@ -13,7 +13,7 @@ import dataclasses
 
 import pytest
 
-from lca.cognition.brain.decision_gates.chained.chained import ChainedDecisionGate
+from lca.cognition.brain.decision_gates.chained import ChainedDecisionGate
 from lca.contracts.models.core.execution.decision import Decision
 
 

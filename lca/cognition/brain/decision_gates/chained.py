@@ -58,3 +58,6 @@ class ChainedDecisionGate(DecisionGate):
 def record_gate_decided(state: AgentState, event: GateDecided) -> None:
     """Append a ``gate.decided.v1`` Session fact for the current think step."""
     emit_gate_decided_from_policy(state, event)
+
+
+__all__ = ["ChainedDecisionGate", "record_gate_decided"]

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from lca.cognition.brain.decision_gates.progress.loop_detector import ProgressLoopDetector
+from lca.cognition.brain.decision_gates.loop_guards import ProgressLoopDetector
 from lca.contracts.atoms.enums.enums import ActionType
 from lca.contracts.models.core.execution.decision import Decision, Observation, ToolCall, Turn
 from lca.contracts.models.core.state.state import AgentState, Budget

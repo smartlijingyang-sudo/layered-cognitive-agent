@@ -13,8 +13,8 @@ from typing import Any
 
 import pytest
 
-from lca.cognition.brain.decision_gates.chained.chained import ChainedDecisionGate
-from lca.cognition.brain.decision_gates.tool.loop_breaker import ToolLoopBreakerGate
+from lca.cognition.brain.decision_gates.chained import ChainedDecisionGate
+from lca.cognition.brain.decision_gates.loop_guards import ToolLoopBreakerGate
 from lca.cognition.brain.pipeline.default_factory import SimpleBrainFactory
 from lca.contracts.atoms.enums.enums import ActionType
 from lca.contracts.models.core.execution.decision import (

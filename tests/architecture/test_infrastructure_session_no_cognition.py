@@ -4,7 +4,7 @@ AGENTS.md §2.1 fixes the dependency direction ``contracts -> infrastructure ->
 cognition -> runtime -> agent``. ``turn_control_reader`` sits in
 infrastructure; the round-e refactor removed its upward imports of
 ``lca.cognition.convergence.payload`` and
-``lca.cognition.brain.decision_gates.loop.fingerprint``. This test scans the
+``lca.cognition.brain.decision_gates.multi_tool_loop``. This test scans the
 session/context package so a future change cannot silently reintroduce that
 edge.
 """

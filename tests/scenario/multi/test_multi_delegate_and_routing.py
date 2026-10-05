@@ -7,7 +7,7 @@ import unittest
 from unittest.mock import AsyncMock, MagicMock
 
 from lca.cognition.body.tools.tool_registry import SimpleToolRegistry
-from lca.cognition.brain.decision_gates.must.consult_all import MustConsultAllMembers
+from lca.cognition.brain.decision_gates.consult import MustConsultAllMembers
 from lca.cognition.member_status import InMemoryMemberStatus
 from lca.contracts.atoms.enums.enums import DecisionGateName, RoleStatus
 from lca.contracts.models.core.execution.decision import Decision, DelegationSpec, Observation

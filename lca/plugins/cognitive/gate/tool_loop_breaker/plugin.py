@@ -52,7 +52,7 @@ class Config(BaseModel):
     ),
 )
 async def setup(ctx: PluginContext, config: Config) -> None:
-    from lca.cognition.brain.decision_gates.tool.loop_breaker import ToolLoopBreakerGate
+    from lca.cognition.brain.decision_gates.loop_guards import ToolLoopBreakerGate
     from lca.plugins.cognitive.gate._loop_policy import resolve_loop_thresholds
 
     thresholds = resolve_loop_thresholds(ctx)

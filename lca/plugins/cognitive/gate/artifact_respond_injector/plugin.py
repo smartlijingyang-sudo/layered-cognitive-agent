@@ -52,7 +52,7 @@ class Config(BaseModel):
     ),
 )
 async def setup(ctx: PluginContext, config: Config) -> None:
-    from lca.cognition.brain.decision_gates.artifact.respond_injector import (
+    from lca.cognition.brain.decision_gates.artifact import (
         ArtifactRespondInjector,
     )
 

@@ -1,16 +1,12 @@
-"""Auth URL Provenance Gate — intercepts unverified authorization URLs (INV-CONN-03).
-
-Enforces that any OAuth, authorize, or token URL produced by the model
-MUST have proven fact lineage in the session (e.g. from tool receipts or
-user messages), blocking hallucinated auth links at the cognitive boundary.
-"""
+"""Auth URL Provenance Gate — intercepts unverified authorization URLs (INV-CONN-03)."""
 
 from __future__ import annotations
 
+import contextlib
 import re
 from urllib.parse import parse_qs, urlparse
 
-from lca.cognition.brain.decision_gates.chained.chained import record_gate_decided
+from lca.cognition.brain.decision_gates.chained import record_gate_decided
 from lca.contracts.atoms.ids.ids import new_id
 from lca.contracts.models.core.execution.decision import Decision
 from lca.contracts.models.core.policy.gate_policy import GateDecided
@@ -30,16 +26,13 @@ def is_auth_intent_url(url: str) -> bool:
     lower_netloc = parsed.netloc.lower()
     lower_path = parsed.path.lower()
 
-    # Skip localhost / loopback
     if lower_netloc in ("127.0.0.1", "localhost"):
         return False
 
-    # Check path and domain keywords
     for kw in _AUTH_KEYWORDS:
         if kw in lower_netloc or kw in lower_path:
             return True
 
-    # Check OAuth query parameters
     query_params = parse_qs(parsed.query)
     return any(k in _AUTH_QUERY_KEYS for k in query_params)
 
@@ -48,7 +41,6 @@ def _get_provenance_set(state: AgentState) -> set[str]:
     perceive = getattr(state, "perceive", None)
     if perceive is not None and isinstance(perceive, dict):
         return perceive.setdefault(_PROVENANCE_KEY, set())
-    # Fallback to in-memory tag
     if not hasattr(state, _PROVENANCE_KEY):
         setattr(state, _PROVENANCE_KEY, set())
     return getattr(state, _PROVENANCE_KEY)
@@ -75,7 +67,6 @@ class AuthUrlProvenanceGate(DecisionGate):
         prov = _get_provenance_set(state)
         unverified: list[str] = []
         for url in auth_urls:
-            # Check direct match or normalized prefix match
             clean_url = url.rstrip("/.,;)")
             if not any(clean_url == p.rstrip("/.,;)") or clean_url in p or p in clean_url for p in prov):
                 unverified.append(url)
@@ -83,7 +74,6 @@ class AuthUrlProvenanceGate(DecisionGate):
         if not unverified:
             return decision
 
-        # Rewrite decision: remove hallucinated URLs and inject tool guidance
         rewritten_text = text
         for bad_url in unverified:
             rewritten_text = rewritten_text.replace(
@@ -107,7 +97,7 @@ class AuthUrlProvenanceGate(DecisionGate):
             needs_approval=decision.needs_approval,
         )
 
-        with contextlib_suppress():
+        with contextlib.suppress(Exception):
             record_gate_decided(
                 state,
                 GateDecided(
@@ -124,6 +114,4 @@ class AuthUrlProvenanceGate(DecisionGate):
         return forced
 
 
-def contextlib_suppress():
-    import contextlib
-    return contextlib.suppress(Exception)
+__all__ = ["AuthUrlProvenanceGate", "is_auth_intent_url"]
