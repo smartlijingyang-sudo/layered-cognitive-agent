@@ -22,7 +22,9 @@ import yaml
 from pydantic import ValidationError
 
 from lca.application.memory.dream_scheduler import _dream_lock_id, write_dream_evidence
+from lca.contracts.atoms.functional.group import FunctionalGroup
 from lca.contracts.atoms.ids.ids import utc_now_ms
+from lca.contracts.atoms.scope.scope import Scope
 from lca.contracts.models.assistant.spec import AssistantSpec
 from lca.contracts.protocols.assistant.catalog import (
     AssistantCatalog,
@@ -31,6 +33,7 @@ from lca.contracts.protocols.assistant.catalog import (
     PlanRevision,
     ProfilePatch,
 )
+from lca.contracts.protocols.declarative.declarative_1.declarative_common import PluginSpecKind
 from lca.harness.plugin_api import definition_from_plugin
 from lca.plugins.memory import dream_scheduler as plugin_module
 
@@ -175,6 +178,30 @@ def test_the_module_exports_its_public_surface() -> None:
     assert callable(plugin_module.setup.setup)
 
 
+def test_the_manifest_declares_its_kind_group_scope_and_ownership() -> None:
+    definition = definition_from_plugin(plugin_module.setup)
+    contract = definition.contract
+
+    assert definition.spec.kind is PluginSpecKind.PROVIDER
+    assert plugin_module.setup.meta["kind"] == "provider", (
+        "the declared kind, not the projection: spec_projection folds SEAM into PROVIDER "
+        "for any plugin with non-none effects, so the spec alone cannot tell them apart"
+    )
+    assert definition.spec.verification.test_suite == str(Path(__file__).relative_to(REPO)), (
+        "the declared suite is the file that pins this plugin, so it cannot rot silently"
+    )
+    assert contract is not None
+    # G3_FACTS is where the v3-to-0069 mapping puts Memory; the sweep writes
+    # semantic rows and the USER.md projection, both facts.
+    assert contract.architecture.group is FunctionalGroup.G3_FACTS
+    assert contract.lifecycle.allowed_scopes == (Scope.PROFILE,), (
+        "the loop lives as long as the profile that loaded it, not as long as a run"
+    )
+    assert definition.ownership is not None
+    assert definition.ownership.reads == ("assistant.catalog",)
+    assert definition.ownership.state_mutation == "forbidden"
+
+
 # ── home discovery ────────────────────────────────────────────────
 
 
@@ -210,6 +237,18 @@ def test_a_home_without_a_memory_tree_is_not_dreamed(tmp_path: Path) -> None:
     assert found == [remembered], (
         "consolidating a home that never had memory would manufacture a memory tree in it"
     )
+
+
+def test_homes_keeps_catalog_order(tmp_path: Path) -> None:
+    # Listed late-first, so neither a reversal nor a sort can pass. Catalog
+    # order decides which home a tick that overruns the fleet starves, so the
+    # sweep has no business reordering it.
+    late = _home_with_memory(tmp_path, "zz_late")
+    early = _home_with_memory(tmp_path, "aa_early")
+
+    found = plugin_module._homes(_StubCatalog([_summary(late), _summary(early)]))
+
+    assert found == [late, early]
 
 
 # ── setup wiring ──────────────────────────────────────────────────
