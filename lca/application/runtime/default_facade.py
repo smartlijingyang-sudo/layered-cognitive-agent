@@ -52,7 +52,7 @@ from lca.application.runtime.plan_resolution import PlanResolutionService
 from lca.contracts.runtime.activation import SessionActivation
 from lca.contracts.runtime.facade import RunHandle, RuntimeFacade
 from lca.contracts.runtime.intent import RunIntent
-from lca.contracts.runtime.trust import EMPTY_TRUST_ENVELOPE
+from lca.contracts.runtime.trust import EMPTY_TRUST_ENVELOPE, trust_envelope_scope
 from lca.harness.runtime.activation_ref import compute_activation_ref
 
 if TYPE_CHECKING:
@@ -213,8 +213,14 @@ class DefaultRuntimeFacade(RuntimeFacade):
 
         Returns a :data:`RunHandle` straight from the dispatcher. The
         facade does not mint or rewrite the handle.
+
+        Binds ``activation.trust_envelope`` as the ambient TrustEnvelope
+        for the dispatch (ADR-0292 section 10): downstream gates (e.g.
+        ``act.approve.gate``) read grants via ``get_current_trust_envelope``.
+        The scope resets on return — no envelope leaks across dispatches.
         """
-        return await self._dispatcher.dispatch_run(activation, intent)
+        with trust_envelope_scope(activation.trust_envelope):
+            return await self._dispatcher.dispatch_run(activation, intent)
 
     async def dispatch_resume(
         self,
@@ -228,8 +234,13 @@ class DefaultRuntimeFacade(RuntimeFacade):
         the resume stays inside the original compiled closure (I-HPC-2).
         The ``run_id`` is forwarded as-is — the dispatcher / lifecycle
         coordinator owns durable identity (it lives in ``Session``).
+
+        Binds ``activation.trust_envelope`` as the ambient TrustEnvelope
+        for the resume (ADR-0292 section 10) — same contract as
+        ``dispatch_run``.
         """
-        return await self._dispatcher.dispatch_resume(activation, run_id)
+        with trust_envelope_scope(activation.trust_envelope):
+            return await self._dispatcher.dispatch_resume(activation, run_id)
 
 
 __all__ = ("DefaultRuntimeFacade", "RunDispatcher")
