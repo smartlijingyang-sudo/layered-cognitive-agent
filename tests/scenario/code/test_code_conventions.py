@@ -222,6 +222,550 @@ _LINE_COUNT_EXEMPT: dict[str, str] = {
         "L4 门面单文件承载 Agent / Team / cast 入口（ADR-0005）"
         "（2026-10-05 Phase A：随包化搬迁改键）"
     ),
+    "lca/agent/cognitive_agent.py": (
+        "CognitiveAgent 单 agent 运行单元（Runtime + RoleProfile 可调度单元：run/resume/cancel）（2026-10-05 "
+        "Phase C batch-2 审计，ADR-0291 §5① 仲裁；Phase D 点亮）"
+    ),
+    "lca/application/routine/tick.py": (
+        "ADR-0263 T5/C5 RoutineTickDriver：tick 驱动 + 失败隔离/重试退避/dead-letter 状态机（7 类）；C5 "
+        "状态机拆散割裂不变量（2026-10-05 Phase C batch-2 审计，ADR-0291 §5① 仲裁；Phase D 点亮）"
+    ),
+    "lca/application/runtime/coordinator/event_translator.py": (
+        "StampedEvent → AgentStreamEvent.data 纯 fold（EventTranslator 单类 + wire "
+        "helper）；活动流投影单点（2026-10-05 Phase C batch-1 审计，ADR-0291 §5① 仲裁；Phase D 点亮）"
+    ),
+    "lca/cognition/body/emit/tool_journal.py": (
+        "ToolStarted/Invoked/Denied prepare+record+emit 三件套函数族；证据平面缝单文件（2026-10-05 Phase C "
+        "batch-1 审计，ADR-0291 §5① 仲裁；Phase D 点亮）"
+    ),
+    "lca/cognition/body/executor/safe_executor/executor.py": (
+        "SimpleSafeExecutor "
+        "单管线：permission→validate→ToolStarted→cache→retry→execute→ToolInvoked（2026-10-05 Phase C "
+        "batch-1 审计，ADR-0291 §5① 仲裁；Phase D 点亮）"
+    ),
+    "lca/cognition/body/executor/simple_body.py": (
+        "SimpleBody 默认 Body 实现：显式 ActionRegistry 分发 + Observation 投影 helper；执行器边界内聚（2026-10-05 "
+        "Phase C batch-2 审计，ADR-0291 §5① 仲裁；Phase D 点亮）"
+    ),
+    "lca/cognition/body/tools/tool_batch_executor.py": (
+        "ToolBatchExecutor 单类：model 批工具调用经 SafeExecutor 缝的单一执行入口；_canonicalise/_resolve_* "
+        "围绕单批执行内聚（2026-10-05 Phase C batch-3 审计，ADR-0291 §5① 仲裁；Phase D 点亮）"
+    ),
+    "lca/cognition/brain/decision_gates/loop/multi_tool_breaker.py": (
+        "ADR-0214 PR-B 多工具循环断路器（MultiToolLoopBreakerGate + verdict + 置信度/指纹 helper）；gate "
+        "单职责内聚（2026-10-05 Phase C batch-3 审计，ADR-0291 §5① 仲裁；Phase D 点亮）"
+    ),
+    "lca/cognition/memory/consolidation.py": (
+        "ADR-0277 §2.3 remember 显式 consolidation 四决策：RuleDecider/LayaDecider 可互换决策器族（2026-10-05 "
+        "Phase C batch-1 审计，ADR-0291 §5① 仲裁；Phase D 点亮）"
+    ),
+    "lca/cognition/memory/laya_backend.py": (
+        "ADR-0277 Phase 4 Laya System-1 决策后端（LayaScoreEngine + LayaScore/LayaDecision）：评分与 "
+        "consolidation 决策单文件（2026-10-05 Phase C batch-3 审计，ADR-0291 §5① 仲裁；Phase D 点亮）"
+    ),
+    "lca/cognition/memory/sensors.py": (
+        "ADR-0277 Phase 2 perceive 记忆传感器注册表：9 传感器/percept 类 + 6 校验/评分 helper；注册表单文件（2026-10-05 "
+        "Phase C batch-2 审计，ADR-0291 §5① 仲裁；Phase D 点亮）"
+    ),
+    "lca/cognition/memory/simple/memory.py": (
+        "SimpleMemorySystem 四类记忆最小实现单类（Working/Semantic/Episodic/Procedural）；记忆系统边界内聚（2026-10-05 "
+        "Phase C batch-2 审计，ADR-0291 §5① 仲裁；Phase D 点亮）"
+    ),
+    "lca/cognition/memory/temporal/memory.py": (
+        "TemporalMemorySystem 单类（durable TemporalMemoryStore "
+        "背后的查询感知时序记忆）；认知生命周期记忆系统单实现（2026-10-05 Phase C batch-3 审计，ADR-0291 §5① 仲裁；Phase D 点亮）"
+    ),
+    "lca/contracts/atoms/plan/template.py": (
+        "ADR-0069 §五 PlanTemplate 12 标准模板词表单文件（PlanTemplateId/PlanTemplate + "
+        "构造器）；模板拆散会破坏契约单一事实源（2026-10-05 Phase C batch-2 审计，ADR-0291 §5① 仲裁；Phase D 点亮）"
+    ),
+    "lca/contracts/harness/composition/plugin_contract.py": (
+        "ADR-0069 §六 + ADR-0199 §3.1 PluginContract 10 段契约词表单文件（10 契约类 + fold/compose "
+        "helper）；契约拆散会破坏声明单一事实源（2026-10-05 Phase C batch-2 审计，ADR-0291 §5① 仲裁；Phase D 点亮）"
+    ),
+    "lca/contracts/harness/memory/events.py": (
+        "session 事件契约词表（spec §2.2.3，30+ 事件类）；契约词汇单文件（2026-10-05 Phase C batch-1 审计，ADR-0291 §5① "
+        "仲裁；Phase D 点亮）"
+    ),
+    "lca/contracts/models/cognition/prompt_assembly.py": (
+        "ADR-0175 prompt 装配契约词表单文件（Section/Template/Trace 16 类 + 3 归一化函数）；契约拆散会破坏装配 seam "
+        "单一事实源（2026-10-05 Phase C batch-2 审计，ADR-0291 §5① 仲裁；Phase D 点亮）"
+    ),
+    "lca/contracts/models/observability/activity.py": (
+        "Activity 动态栏模型词表（ActivityStatus/Category/Item/StepEvidence）+ step 解析；模型定义集中（2026-10-05 "
+        "Phase C batch-1 审计，ADR-0291 §5① 仲裁；Phase D 点亮）"
+    ),
+    "lca/contracts/observability/event/meta_event_taxonomy.py": (
+        "Meta-event taxonomy 词表 SSOT（MetaEventDomain/Plane Literal + 事件键元组 + MetaEventSlot）；全 run "
+        "栈可观测性单一事实源，拆散破坏“先登记再发布”的调试契约（2026-10-05 Phase C batch-3 审计，ADR-0291 §5① 仲裁；Phase D 点亮）"
+    ),
+    "lca/contracts/protocols/act/command/envelope.py": (
+        "ADR-0068/ADR-0074 PR-7 数据契约词表（CommandEnvelope/RunFact/RunDelta/Verdict + "
+        "factory/helper）；契约词汇单文件是仲裁设计，拆散破坏 effect 唯一入口的事实源（2026-10-05 Phase C batch-3 审计，ADR-0291 "
+        "§5① 仲裁；Phase D 点亮）"
+    ),
+    "lca/contracts/protocols/declarative/declarative_1/declarative_graph.py": (
+        "声明式阶段图数据契约词表（14 类：PhaseNode/PhaseEdge/EffectPolicyPlan/ActionAuthorityPlan "
+        "等）；契约词汇集中声明是仲裁设计（2026-10-05 Phase C batch-3 审计，ADR-0291 §5① 仲裁；Phase D 点亮）"
+    ),
+    "lca/contracts/transport/agent_stream_event.py": (
+        "AgentStreamEvent union wire 契约词表单文件（33 类，TS types.ts 1-54 镜像）；跨语言契约镜像必须单文件对位（2026-10-05 "
+        "Phase C batch-2 审计，ADR-0291 §5① 仲裁；Phase D 点亮）"
+    ),
+    "lca/framework/graph/host_wiring.py": (
+        "PlanInterpreterAdapter host wiring 装配函数族（build_registry/make_*_runner/legacy "
+        "shim）；解释器装配单模块，闭包共享 host 上下文（2026-10-05 Phase C batch-3 审计，ADR-0291 §5① 仲裁；Phase D 点亮）"
+    ),
+    "lca/framework/graph/lift/parsers.py": (
+        "plan lift 缝 YAML/DTO parser 函数族（binding/io_schema/when/loop/predicate coerce）：lift "
+        "解析语义共享，拆分只增跳转成本（2026-10-05 Phase C batch-3 审计，ADR-0291 §5① 仲裁；Phase D 点亮）"
+    ),
+    "lca/framework/graph/plan_sdk.py": (
+        "Plan SDK 类型化谓词/路由构造函数族（21 个无状态纯函数）；SDK 表面集中，拆分只增跳转成本（2026-10-05 Phase C batch-2 "
+        "审计，ADR-0291 §5① 仲裁；Phase D 点亮）"
+    ),
+    "lca/harness/declarative/compile/instrument/events.py": (
+        "wrap_instrument spine 发射 helper "
+        "族（_safe_append/_emit_via_pipeline/_publish_i17_rejection）：contained failure 发射语义共享，拆散割裂 "
+        "I17 语义（2026-10-05 Phase C batch-3 审计，ADR-0291 §5① 仲裁；Phase D 点亮）"
+    ),
+    "lca/harness/declarative/compile/instrument/wrap.py": (
+        "wrap_instrument phase 图装配装饰器函数族（sync/async wrapper + @overload 签名 + "
+        "wrap_executor）；instrument 面集中（2026-10-05 Phase C batch-2 审计，ADR-0291 §5① 仲裁；Phase D 点亮）"
+    ),
+    "lca/harness/declarative/compile/subgraph_resolver.py": (
+        "BundleSubgraphResolver bundle 相对子图解析器：10 个编译/嗅探 helper 共享 bundle 路径解析上下文（2026-10-05 "
+        "Phase C batch-2 审计，ADR-0291 §5① 仲裁；Phase D 点亮）"
+    ),
+    "lca/harness/plan.py": (
+        "编译计划散列/来源/可解释性投影函数族（*_sub_plan_hash + to_dict + provenance）：canonical JSON "
+        "投影语义共享，拆散割裂投影一致性（2026-10-05 Phase C batch-3 审计，ADR-0291 §5① 仲裁；Phase D 点亮）"
+    ),
+    "lca/harness/plugin/declaration.py": (
+        "插件声明 Cordis 载体适配器：归一化函数族共享 declaration 语义（2026-10-05 Phase C batch-1 审计，ADR-0291 §5① "
+        "仲裁；Phase D 点亮）"
+    ),
+    "lca/infrastructure/attachment/default/provider.py": (
+        "ADR-0121 PR-B Default FileRef provider：resolver/stager/renderer 三 seam 默认实现单文件；seam "
+        "面集中（2026-10-05 Phase C batch-2 审计，ADR-0291 §5① 仲裁；Phase D 点亮）"
+    ),
+    "lca/infrastructure/cli/commands/journal_extra/journal_trace/render.py": (
+        "journal trace 纯终端渲染函数族（table/human 双视图）；无状态，拆分无收益（2026-10-05 Phase C batch-1 审计，ADR-0291 "
+        "§5① 仲裁；Phase D 点亮）"
+    ),
+    "lca/infrastructure/cli/commands/kernel/kernel.py": (
+        "lca-ops kernel 子命令装配（2026-10-05 Phase C batch-1 审计，ADR-0291 §5① 仲裁；Phase D 点亮）"
+    ),
+    "lca/infrastructure/cli/commands/kernel/supervisor.py": (
+        "lca-ops kernel-supervisor 一次性进程管理命令族（start/stop/restart/_tail_log/_kill_orphans 共享 "
+        "_render 输出面）（2026-10-05 Phase C batch-2 审计，ADR-0291 §5① 仲裁；Phase D 点亮）"
+    ),
+    "lca/infrastructure/cli/commands/observation/debug_graph.py": (
+        "lca-ops debug-graph 一次性诊断编排器：_load_events/_classify_node/build_debug_graph/render_human "
+        "共享 spine 直读上下文（2026-10-05 Phase C batch-2 审计，ADR-0291 §5① 仲裁；Phase D 点亮）"
+    ),
+    "lca/infrastructure/cli/commands/profile/declarative.py": (
+        "declarative 计划编译/检查 Typer 命令族（2026-10-05 Phase C batch-1 审计，ADR-0291 §5① 仲裁；Phase D 点亮）"
+    ),
+    "lca/infrastructure/cli/commands/profile/inspect.py": (
+        "profile 诊断命令族（inspect-tree/dump-profile/why/why-plugin/graph/debug 共享 pipeline bundle "
+        "视图）（2026-10-05 Phase C batch-2 审计，ADR-0291 §5① 仲裁；Phase D 点亮）"
+    ),
+    "lca/infrastructure/cli/commands/runs/debug.py": (
+        "lca-ops runs debug 一次性诊断编排器：_layer_* 投影函数族共享 spine 折叠上下文（2026-10-05 Phase C batch-1 "
+        "审计，ADR-0291 §5① 仲裁；Phase D 点亮）"
+    ),
+    "lca/infrastructure/cli/commands/runs/driver_debug.py": (
+        "driver 级诊断命令族（cmd_debug_* 共享 kernel stderr 解析上下文）；继续膨胀时按命令拆子模块（2026-10-05 Phase C "
+        "batch-1 审计，ADR-0291 §5① 仲裁；Phase D 点亮）"
+    ),
+    "lca/infrastructure/cli/commands/runs/runs.py": (
+        "lca-ops runs CLI 命令装配（含 --facade in-process 分发）；命令入口集中（2026-10-05 Phase C batch-1 "
+        "审计，ADR-0291 §5① 仲裁；Phase D 点亮）"
+    ),
+    "lca/infrastructure/cli/service/service.py": (
+        "Service Protocol 核心抽象 + 进程/端口/健康检查工具函数族（kill_tree/free_port/pid_alive "
+        "等）；平台服务边界内聚（2026-10-05 Phase C batch-2 审计，ADR-0291 §5① 仲裁；Phase D 点亮）"
+    ),
+    "lca/infrastructure/cli/services/kernel/restart_report.py": (
+        "kernel 重启后三阶段健康检查编排单模块（boot_check/fiber_report/health_probe）（2026-10-05 Phase C batch-1 "
+        "审计，ADR-0291 §5① 仲裁；Phase D 点亮）"
+    ),
+    "lca/infrastructure/cli/services/kernel/supervisor/supervisor.py": (
+        "KernelSupervisor 进程 supervisor 单类（start/stop/restart + waiter/readiness/decider "
+        "三线程循环）（2026-10-05 Phase C batch-1 审计，ADR-0291 §5① 仲裁；Phase D 点亮）"
+    ),
+    "lca/infrastructure/computer/companion/client.py": (
+        "ADR-0246 M3 CompanionClient 单类（GatewayClient 协议执行面）（2026-10-05 Phase C batch-1 "
+        "审计，ADR-0291 §5① 仲裁；Phase D 点亮）"
+    ),
+    "lca/infrastructure/computer/companion/standalone.py": (
+        "ADR-0246 M3 用户机 side-effect 平面单入口（main + CompanionClient）；部署单元内聚（2026-10-05 Phase C "
+        "batch-1 审计，ADR-0291 §5① 仲裁；Phase D 点亮）"
+    ),
+    "lca/infrastructure/computer/machine/machine.py": (
+        "MachineComputer sidecar/SSH transport 单类（File/shell/search/code）；computer "
+        "边界内聚（2026-10-05 Phase C batch-2 审计，ADR-0291 §5① 仲裁；Phase D 点亮）"
+    ),
+    "lca/infrastructure/computer/runtime/exec.py": (
+        "ComputerRuntime execution plane "
+        "mixin（execute_code/run_command/background/export）；执行面内聚，mixin 拆散无收益（2026-10-05 Phase C "
+        "batch-2 审计，ADR-0291 §5① 仲裁；Phase D 点亮）"
+    ),
+    "lca/infrastructure/cron/scheduler.py": (
+        "ADR-0268 §7/§8 tick 调度器（CronScheduler + CronTickReport）：文件锁互斥与 tick 摘要内聚，调度器单模块拆散割裂 P3 "
+        "调度语义（2026-10-05 Phase C batch-3 审计，ADR-0291 §5① 仲裁；Phase D 点亮）"
+    ),
+    "lca/infrastructure/integrations/composio/service/service.py": (
+        "Composio 集成服务单类（composio.* spine 事件 SSOT 边界）；集成服务边界内聚（2026-10-05 Phase C batch-3 "
+        "审计，ADR-0291 §5① 仲裁；Phase D 点亮）"
+    ),
+    "lca/infrastructure/memory/assistant_memory.py": (
+        "ADR-0242 D5 per-assistant MemorySystem 单类实现（读写 {home}/memory/，键按助理隔离）（2026-10-05 Phase C "
+        "batch-1 审计，ADR-0291 §5① 仲裁；Phase D 点亮）"
+    ),
+    "lca/infrastructure/memory/contextfiles/domain/layout.py": (
+        "context-file layout TOML 解析函数族（read/merge/packaged/layout_for_home + "
+        "_table/_from_mapping 等）；layout 解析语义单模块内聚（2026-10-05 Phase C batch-3 审计，ADR-0291 §5① "
+        "仲裁；Phase D 点亮）"
+    ),
+    "lca/infrastructure/memory/contextfiles/domain/standing.py": (
+        "standing 文件装配/重注函数族（split/pack/render/assemble/rehydrate/refresh）：section "
+        "装配语义共享，压缩后重注内聚（2026-10-05 Phase C batch-3 审计，ADR-0291 §5① 仲裁；Phase D 点亮）"
+    ),
+    "lca/infrastructure/memory/dream.py": (
+        "ADR-0249 Dream 语义记忆巩固单模块（run_dream + _trail/_write_synthesis 编排）；consolidation "
+        "一次执行语义内聚（2026-10-05 Phase C batch-3 审计，ADR-0291 §5① 仲裁；Phase D 点亮）"
+    ),
+    "lca/infrastructure/observability/activity_feed.py": (
+        "ActivityFeed 纯 fold 读投影：_fold_journal/_fold_spine 等 fold 函数族共享 run ledger 折叠上下文，拆散割裂 "
+        "fold 不变量（2026-10-05 Phase C batch-2 审计，ADR-0291 §5① 仲裁；Phase D 点亮）"
+    ),
+    "lca/infrastructure/observability/adapters/adapters.py": (
+        "TelemetryLLMAdapter 装饰单类：Session EP emit 唯一职责（无 legacy journal 写回）（2026-10-05 Phase C "
+        "batch-1 审计，ADR-0291 §5① 仲裁；Phase D 点亮）"
+    ),
+    "lca/infrastructure/observability/meta_event_emit.py": (
+        "meta-event 双通道发射函数族（20 个 emit_* 无状态函数共享 Session catalog + spine 发射面）；拆分无收益（2026-10-05 "
+        "Phase C batch-2 审计，ADR-0291 §5① 仲裁；Phase D 点亮）"
+    ),
+    "lca/infrastructure/observability/running_operation_store.py": (
+        "RunningOperationStore 双后端（SQLite dev + Postgres LobeHub）+ resolve 函数；store "
+        "选择面集中（2026-10-05 Phase C batch-2 审计，ADR-0291 §5① 仲裁；Phase D 点亮）"
+    ),
+    "lca/infrastructure/observability/spine/sinks/file_sink.py": (
+        "FileSink append-only JSONL sink 契约实现单类 + offload/序列化 helper；sink 边界内聚（2026-10-05 Phase C "
+        "batch-2 审计，ADR-0291 §5① 仲裁；Phase D 点亮）"
+    ),
+    "lca/infrastructure/observability/stream/trace_inspector.py": (
+        "面向 Coding Agent 的运行账本检查器（TraceInspector + TraceReport）：诊断单职责单模块（2026-10-05 Phase C "
+        "batch-3 审计，ADR-0291 §5① 仲裁；Phase D 点亮）"
+    ),
+    "lca/infrastructure/openai/compat.py": (
+        "上游 OpenAI Responses/chat 兼容适配函数族（normalize_*/create_*/resolve_*，8 函数）；兼容缝单模块，LobeHub "
+        "对接的映射语义集中（2026-10-05 Phase C batch-3 审计，ADR-0291 §5① 仲裁；Phase D 点亮）"
+    ),
+    "lca/infrastructure/persistence/user_store.py": (
+        "ADR-0252 D2/D3 UserAssistantStore 双实现（SQLite/Postgres）同文件对照（2026-10-05 Phase C batch-1 "
+        "审计，ADR-0291 §5① 仲裁；Phase D 点亮）"
+    ),
+    "lca/infrastructure/preset/fs_repository.py": (
+        "FileSystemPresetRepository PresetRepositoryProtocol 文件系统实现单类；repository 边界内聚（2026-10-05 "
+        "Phase C batch-2 审计，ADR-0291 §5① 仲裁；Phase D 点亮）"
+    ),
+    "lca/infrastructure/proactive/scheduler.py": (
+        "ADR-0263 §9 主动消息 tick 调度器（ProactiveScheduler）：文件锁互斥单类，与 cron 调度器同构的调度语义内聚（2026-10-05 "
+        "Phase C batch-3 审计，ADR-0291 §5① 仲裁；Phase D 点亮）"
+    ),
+    "lca/infrastructure/sandbox/local/adapter.py": (
+        "host-backed LocalSandboxAdapter 单类（阻塞式文件 I/O + 子进程 exec）；SANDBOX plane "
+        "单执行实现，部署单元内聚（2026-10-05 Phase C batch-3 审计，ADR-0291 §5① 仲裁；Phase D 点亮）"
+    ),
+    "lca/infrastructure/sandbox/onlyboxes/adapter.py": (
+        "OnlyboxesSandboxAdapter HTTP client 单类（terminalExec 统一通道）；adapter 边界内聚（2026-10-05 Phase "
+        "C batch-2 审计，ADR-0291 §5① 仲裁；Phase D 点亮）"
+    ),
+    "lca/infrastructure/session/emit/lifecycle_emit.py": (
+        "Session lifecycle 事件发射函数族（turn/step/model/session.created/checkpoint 等 v1 事件）；DSH ↔ LCA "
+        "spec §5 对齐的发射词表，拆散割裂生命周期语义（2026-10-05 Phase C batch-3 审计，ADR-0291 §5① 仲裁；Phase D 点亮）"
+    ),
+    "lca/infrastructure/tool_defer/session.py": (
+        "ToolDeferSession per-run defer 会话状态单类 + ambient publish/reset；run-scoped "
+        "状态拆散无收益（2026-10-05 Phase C batch-2 审计，ADR-0291 §5① 仲裁；Phase D 点亮）"
+    ),
+    "lca/infrastructure/tools/assistant/create_tool.py": (
+        "ADR-0187 §3 D12 create_assistant 工具类 + 10 个 SOUL/home 解析 helper；对话创建助理执行面内聚（2026-10-05 "
+        "Phase C batch-2 审计，ADR-0291 §5① 仲裁；Phase D 点亮）"
+    ),
+    "lca/infrastructure/tools/assistant/memory_tools.py": (
+        "ADR-0246 PR-6 受治理记忆工具族（8 工具类 + 基类）单文件注册（2026-10-05 Phase C batch-1 审计，ADR-0291 §5① "
+        "仲裁；Phase D 点亮）"
+    ),
+    "lca/infrastructure/tools/assistant/self_manage_tools.py": (
+        "ADR-0242 D6 助理自管理工具族（14 工具类 + 基类）单文件注册；拆成 14 文件只增跳转成本（2026-10-05 Phase C batch-1 "
+        "审计，ADR-0291 §5① 仲裁；Phase D 点亮）"
+    ),
+    "lca/infrastructure/tools/box/tool.py": (
+        "ADR-0248 §3.2 “我的电脑” box 工具族（4 工具类 + build_box_tools）单文件注册；拆成 4 文件只增跳转成本（2026-10-05 "
+        "Phase C batch-3 审计，ADR-0291 §5① 仲裁；Phase D 点亮）"
+    ),
+    "lca/infrastructure/tools/composio/__init__.py": (
+        "Composio LLM 工具族注册包入口（ComposioManagementExecutor/ComposioActionExecutor + "
+        "build_tools）；工具族注册集中（2026-10-05 Phase C batch-2 审计，ADR-0291 §5① 仲裁；Phase D 点亮）"
+    ),
+    "lca/infrastructure/tools/contract/sandbox/contracts.py": (
+        "ADR-0102 per-tool RenderContract 注册表单文件（各工具 FieldSpec 元组集中声明）；per-tool "
+        "契约词表拆散会重蹈“通用契约丢字段”覆辙（2026-10-05 Phase C batch-3 审计，ADR-0291 §5① 仲裁；Phase D 点亮）"
+    ),
+    "lca/loop/commit/tool_journal.py": (
+        "ADR-0194 tool journal catalog commit 缝：commit_* 函数族经 FactGateway 单一提交（2026-10-05 Phase C "
+        "batch-1 审计，ADR-0291 §5① 仲裁；Phase D 点亮）"
+    ),
+    "lca/loop/fact_gateway.py": (
+        "ADR-0194 §3.1 G0 单一事实生产门面（DefaultFactGateway）：append/catalog/enrich 函数族经 Session "
+        "收口，门面拆散割裂唯一生产语义（2026-10-05 Phase C batch-3 审计，ADR-0291 §5① 仲裁；Phase D 点亮）"
+    ),
+    "lca/nodes/concept/tool_fork/dispatch.py": (
+        "phase.concept.tool.fork.dispatch 节点：ToolForkDispatchExecutor + typed BindingsView 拉取/过滤 "
+        "helper 内聚（2026-10-05 Phase C batch-2 审计，ADR-0291 §5① 仲裁；Phase D 点亮）"
+    ),
+    "lca/nodes/reflect/memory_extract/memory_extract.py": (
+        "phase.reflect.memory.extract 原语节点：ReflectMemoryExtractExecutor + LLM 解析/格式化 helper "
+        "内聚（2026-10-05 Phase C batch-2 审计，ADR-0291 §5① 仲裁；Phase D 点亮）"
+    ),
+    "lca/nodes/think/context/summarize.py": (
+        "ADR-0283 think.context.summarize 图节点（Executor + summarize/build/render 纯逻辑 + setup "
+        "注册）；节点实现单文件，纯逻辑与节点薄包装同在便于对位（2026-10-05 Phase C batch-3 审计，ADR-0291 §5① 仲裁；Phase D 点亮）"
+    ),
+    "lca/nodes/think/history/assemble.py": (
+        "think.history.assemble 图节点：HistoryDeriveExecutor + _forked_to_tools 等 13 个组装 helper 共享 "
+        "prompt 组装上下文（2026-10-05 Phase C batch-2 审计，ADR-0291 §5① 仲裁；Phase D 点亮）"
+    ),
+    "lca/plugins/assistant/events/_events.py": (
+        "ADR-0187 §3 D8 助理域 EP payload 词表（9 payload 类 + 四件套字段守门）；事件发射契约集中，拆散破坏 D8 "
+        "单一事实源（2026-10-05 Phase C batch-3 审计，ADR-0291 §5① 仲裁；Phase D 点亮）"
+    ),
+    "lca/plugins/assistant/evolve/evolve.py": (
+        "ADR-0187 §3 D9 assistant.evolve 插件实现单类 + 错误词表（fail-closed 语义集中）（2026-10-05 Phase C "
+        "batch-1 审计，ADR-0291 §5① 仲裁；Phase D 点亮）"
+    ),
+    "lca/plugins/assistant/home/_home_layout.py": (
+        "ADR-0187 §3 D2 AssistantHome 目录布局 + manifest schema + digest 校验内聚（6 错误类 + 20 "
+        "布局函数）；布局/digest/校验跨文件拆分得不偿失（2026-10-05 Phase C batch-2 审计，ADR-0291 §5① 仲裁；Phase D 点亮）"
+    ),
+    "lca/plugins/assistant/jobs/jobs.py": (
+        "ADR-0187 §3 D10 assistant.jobs plugin boot + 内部实现单文件；plugin setup 注入 "
+        "catalog，拆分只增跳转成本（2026-10-05 Phase C batch-2 审计，ADR-0291 §5① 仲裁；Phase D 点亮）"
+    ),
+    "lca/plugins/assistant/skill/overlay/overlay.py": (
+        "assistant.skill_overlay 实现单类（plugin setup 注入 catalog/emitter）（2026-10-05 Phase C batch-1 "
+        "审计，ADR-0291 §5① 仲裁；Phase D 点亮）"
+    ),
+    "lca/plugins/assistant/tool/overlay.py": (
+        "ADR-0243 D4 assistant.tool_overlay plugin boot + 内部实现单文件；plugin setup 注入 "
+        "catalog/emitter（2026-10-05 Phase C batch-2 审计，ADR-0291 §5① 仲裁；Phase D 点亮）"
+    ),
+    "lca/plugins/avatar/events.py": (
+        "ADR-0269 §6 Avatar WS 推送通道（AvatarEventPublisher + 鉴权/握手/转发 helper 族）；WS "
+        "协议单实现，_auth/*_failed 与 gateway WS 同型内聚（2026-10-05 Phase C batch-3 审计，ADR-0291 §5① "
+        "仲裁；Phase D 点亮）"
+    ),
+    "lca/plugins/avatar/routes.py": (
+        "Avatar REST 路由端点族（ADR-0269 §5/spec §9）：_auth_prelude/_ownership 鉴权前置共享，21 个 handler "
+        "拆分无收益（2026-10-05 Phase C batch-2 审计，ADR-0291 §5① 仲裁；Phase D 点亮）"
+    ),
+    "lca/plugins/avatar/service.py": (
+        "ADR-0269 §4/spec §7 Avatar 领域服务与状态机（AvatarService + Store/Provider/Publisher "
+        "协议）；领域服务边界内聚（2026-10-05 Phase C batch-2 审计，ADR-0291 §5① 仲裁；Phase D 点亮）"
+    ),
+    "lca/plugins/avatar/store.py": (
+        "ADR-0269 §2 AvatarStore 文件存储单类（修订号/原子写 PNG/路径白名单）；存储语义内聚（2026-10-05 Phase C batch-3 "
+        "审计，ADR-0291 §5① 仲裁；Phase D 点亮）"
+    ),
+    "lca/plugins/avatar/tools.py": (
+        "ADR-0269 §4 avatar 工具族（6 工具类：create/edit/set/get/clear/schedule）单文件注册（2026-10-05 Phase C "
+        "batch-1 审计，ADR-0291 §5① 仲裁；Phase D 点亮）"
+    ),
+    "lca/plugins/domain/assistant/catalog/handlers.py": (
+        "Assistant Catalog 内部实现单类（Home CRUD + manifest digest 守门）；helper 经 plugin setup 共享 "
+        "ctx，跨文件传参得不偿失（2026-10-05 Phase C batch-1 审计，ADR-0291 §5① 仲裁；Phase D 点亮）"
+    ),
+    "lca/plugins/events/hooks/model_visible/adapter.py": (
+        "LLM adapter decorator（ModelVisibleHookAdapter）接线单模块：_snapshot/_kwargs/_emit_* helper "
+        "族围绕单次 LLM 调用边界内聚（2026-10-05 Phase C batch-3 审计，ADR-0291 §5① 仲裁；Phase D 点亮）"
+    ),
+    "lca/plugins/events/hooks/model_visible/hook.py": (
+        "ADR-0185 §3.2 ModelVisibleHook LLM 边界 model-visible 拦截钩子；hook 实现单文件（2026-10-05 Phase C "
+        "batch-2 审计，ADR-0291 §5① 仲裁；Phase D 点亮）"
+    ),
+    "lca/plugins/loop/reducer/plugin.py": (
+        "ADR-0066 boot-time 默认 Reducer 单实现（DefaultReducer，C4 单一写）（2026-10-05 Phase C batch-1 "
+        "审计，ADR-0291 §5① 仲裁；Phase D 点亮）"
+    ),
+    "lca/plugins/observability/spine/classifiers/exception_builtin.py": (
+        "ExceptionBuiltinClassifier Layer-A 已知异常分类器单类 + plugin setup；classifier 实现单文件（2026-10-05 "
+        "Phase C batch-2 审计，ADR-0291 §5① 仲裁；Phase D 点亮）"
+    ),
+    "lca/plugins/observability/spine/derivers/anomaly.py": (
+        "AnomalyDetector spine deriver（8 不变量违例检测器）；deriver 实现单文件（2026-10-05 Phase C batch-2 "
+        "审计，ADR-0291 §5① 仲裁；Phase D 点亮）"
+    ),
+    "lca/plugins/observability/spine/runtime_hooks.py": (
+        "spine 事件发射 pipeline 钩子函数族（ctx_effect/ctx_intercept 双 wrap 种经 "
+        "emit_pipeline）；发射缝单文件（2026-10-05 Phase C batch-3 审计，ADR-0291 §5① 仲裁；Phase D 点亮）"
+    ),
+    "lca/plugins/session/derivers/step_tree/journal_fold.py": (
+        "ADR-0186 PR-3g 纯 fold 单入口：事件流 fold 出 JournalDocument；_Frame 累积器内聚，拆散割裂 fold "
+        "不变量（2026-10-05 Phase C batch-1 审计，ADR-0291 §5① 仲裁；Phase D 点亮）"
+    ),
+    "lca/plugins/session/projection_cache/projection_cache.py": (
+        "ProjectionCache DSH session-projection-cache LCA 形态：per-session 检查点缓存 + flush listener + "
+        "observer 适配器内聚（2026-10-05 Phase C batch-2 审计，ADR-0291 §5① 仲裁；Phase D 点亮）"
+    ),
+    "lca/plugins/session/projection_registry/projection_registry.py": (
+        "ProjectionRegistry DSH session-projection 一比一 LCA 实现：注册表 + _Cell 水位 + observer "
+        "适配器内聚，fold 状态机拆散割裂不变量（2026-10-05 Phase C batch-2 审计，ADR-0291 §5① 仲裁；Phase D 点亮）"
+    ),
+    "lca/plugins/session/telemetry_otel/telemetry_otel.py": (
+        "OtelTelemetryBackend DSH session-telemetry-otel 一比一实现：有界队列 + daemon 批量导出 + "
+        "_NoOpExporter；后端边界内聚（2026-10-05 Phase C batch-2 审计，ADR-0291 §5① 仲裁；Phase D 点亮）"
+    ),
+    "lca/plugins/session/title_service/title_service.py": (
+        "ADR-0188 SessionTitleService：fold 读取 + Session.append 写回内聚（DSH 一比一对位）（2026-10-05 Phase C "
+        "batch-1 审计，ADR-0291 §5① 仲裁；Phase D 点亮）"
+    ),
+    "lca/plugins/tools/diagnostics/debug/run.py": (
+        "ADR-0122 lca-ops debug run 8-section 诊断：DebugRunReport 单类 + 提取函数族（2026-10-05 Phase C "
+        "batch-1 审计，ADR-0291 §5① 仲裁；Phase D 点亮）"
+    ),
+    "lca/plugins/transport/device_hub/routes/routes_http.py": (
+        "设备通道 HTTP handler 注册表单文件（14 个 /api/device/* 端点）；协议面集中（2026-10-05 Phase C batch-1 "
+        "审计，ADR-0291 §5① 仲裁；Phase D 点亮）"
+    ),
+    "lca/plugins/transport/webserver/carrier/runs/execute/execution_environment.py": (
+        "RunExecutionEnvironment legacy run carrier scope 组装单模块；scope 顺序显式集中（2026-10-05 Phase C "
+        "batch-2 审计，ADR-0291 §5① 仲裁；Phase D 点亮）"
+    ),
+    "lca/plugins/transport/webserver/carrier/runs/lifecycle/runnable_assembly.py": (
+        "run 输入物化与 adapter resolver 装配单模块（CognitiveRunnableAssembler + LlmResolver + "
+        "tools_from_scope）：assembler 装配语义内聚（2026-10-05 Phase C batch-3 审计，ADR-0291 §5① 仲裁；Phase D "
+        "点亮）"
+    ),
+    "lca/plugins/transport/webserver/doctor/steps/hops.py": (
+        "doctor.v3 hop 判定函数族（H1..H8/seg/phase/xref/ssot/mv-journal/fold）（2026-10-05 Phase C "
+        "batch-1 审计，ADR-0291 §5① 仲裁；Phase D 点亮）"
+    ),
+    "lca/plugins/transport/webserver/doctor/steps/scan.py": (
+        "doctor.v3 数据面 StepScan 事实收集函数族（_scan_* 共享 journal/spine/fold 上下文）；ADR-0185 "
+        "PR-3.1（2026-10-05 Phase C batch-1 审计，ADR-0291 §5① 仲裁；Phase D 点亮）"
+    ),
+    "lca/plugins/transport/webserver/handlers/runs/api/command_endpoints.py": (
+        "ADR-0163 run carrier 命令端点族：decode/validate/render 内聚，端点增删单文件可见（2026-10-05 Phase C "
+        "batch-1 审计，ADR-0291 §5① 仲裁；Phase D 点亮）"
+    ),
+    "lca/plugins/transport/webserver/handlers/runs/api/query_endpoints.py": (
+        "run carrier 查询端点族（GET /runs/* 投影）；与 command_endpoints 对称，端点增删单文件可见（2026-10-05 Phase C "
+        "batch-1 审计，ADR-0291 §5① 仲裁；Phase D 点亮）"
+    ),
+    "lca/plugins/transport/webserver/handlers/runs/session/builder/builder.py": (
+        "RunSessionBuilder legacy RunSession 组装器：身份分配 + carrier 归一化 + fold deriver "
+        "装配内聚（2026-10-05 Phase C batch-2 审计，ADR-0291 §5① 仲裁；Phase D 点亮）"
+    ),
+    "lca/plugins/transport/webserver/handlers/runs/session/session/session.py": (
+        "Legacy run-session aggregate（RunSession）+ RunRegistry "
+        "兼容门面共生单模块；聚合与门面天然一体，拆散得不偿失（2026-10-05 Phase C batch-3 审计，ADR-0291 §5① 仲裁；Phase D 点亮）"
+    ),
+    "lca/plugins/transport/webserver/handlers/runs/terminal/registry/commands.py": (
+        "RegistryRunCommands 单类：legacy run 的 create/cancel/approval-resume 变异内聚（2026-10-05 Phase "
+        "C batch-3 审计，ADR-0291 §5① 仲裁；Phase D 点亮）"
+    ),
+    "lca/plugins/transport/webserver/handlers/runs/terminal/streaming/agent_gateway.py": (
+        "LcaAgentGateway WebSocket 单协议实现：recv/心跳/控制帧/中断内聚（2026-10-05 Phase C batch-1 审计，ADR-0291 "
+        "§5① 仲裁；Phase D 点亮）"
+    ),
+    "lca/plugins/transport/webserver/read/runs/terminal/materialization.py": (
+        "terminal run manifest 物化函数族（watermark/ledger 高水位扫描共享 SSOT 直读上下文）；一次性诊断编排器（2026-10-05 "
+        "Phase C batch-2 审计，ADR-0291 §5① 仲裁；Phase D 点亮）"
+    ),
+    "lca/plugins/transport/webserver/routes_1/routes_assistants/codecs.py": (
+        "assistants 路由共享 JSON 整形函数族（error envelope/COMPAT/鉴权探针 17 个）；跨路由共享面集中（2026-10-05 Phase C "
+        "batch-2 审计，ADR-0291 §5① 仲裁；Phase D 点亮）"
+    ),
+    "lca/plugins/transport/webserver/routes_1/routes_assistants/jobs.py": (
+        "ADR-0268 P4 /v1/assistants jobs 端点族（cron.list/add 投影）（2026-10-05 Phase C batch-1 "
+        "审计，ADR-0291 §5① 仲裁；Phase D 点亮）"
+    ),
+    "lca/plugins/transport/webserver/routes_1/routes_assistants/profile.py": (
+        "/v1/assistants profile 端点族（CRUD 映射）；ADR-0252 D6 归属隔离（2026-10-05 Phase C batch-1 "
+        "审计，ADR-0291 §5① 仲裁；Phase D 点亮）"
+    ),
+    "lca/plugins/transport/webserver/routes_1/routes_assistants/standing_files.py": (
+        "standing-files 端点族（list/get/update + dispatcher 共享 _prelude "
+        "鉴权前置）；协议面集中，端点增删单文件可见（2026-10-05 Phase C batch-2 审计，ADR-0291 §5① 仲裁；Phase D 点亮）"
+    ),
+    "lca/plugins/transport/webserver/routes_1/routes_onboarding.py": (
+        "onboarding 端点族（presets/welcome/naming_settle，ADR-0252 D7）；协议面集中（2026-10-05 Phase C "
+        "batch-2 审计，ADR-0291 §5① 仲裁；Phase D 点亮）"
+    ),
+    "lca/plugins/transport/webserver/routes_3/routes_rooms.py": (
+        "/v1/rooms 群聊房间 REST 端点族（Room Runtime Go-Live M1）；RoomDispatcher "
+        "接线共享，端点增删单文件可见（2026-10-05 Phase C batch-2 审计，ADR-0291 §5① 仲裁；Phase D 点亮）"
+    ),
+    "lca/runtime/session/run_session_writer.py": (
+        "ADR-0226 §1 RunSessionWriter：run-scoped Session 单一 surface append 路径拥有者（2026-10-05 Phase "
+        "C batch-1 审计，ADR-0291 §5① 仲裁；Phase D 点亮）"
+    ),
+    "lca/runtime/support/runtime_bindings.py": (
+        "DeclarativeRuntimeBindings 声明式 Turn 依赖闭包契约（2 frozen 类）；绑定闭包拆散无收益（2026-10-05 Phase C "
+        "batch-2 审计，ADR-0291 §5① 仲裁；Phase D 点亮）"
+    ),
+    "lca/session/lifecycle/repair.py": (
+        "崩溃恢复 repair 函数族（DSH interruptedTurnClosers）：repair_interrupted_turn + _coerce/_extract_* "
+        "围绕开尾 turn 闭合语义内聚（2026-10-05 Phase C batch-3 审计，ADR-0291 §5① 仲裁；Phase D 点亮）"
+    ),
+    "lca/cognition/memory/scoring.py": (
+        "ADR-0277 Phase 3 检索评分 SSOT：MemoryScorer/WeightedScorer/HybridScorer + Laya/Shadow "
+        "评分器族共享评分公式上下文；评分器拆散割裂评分不变量（2026-10-05 iter-tests 20:09 Phase D 收尾审计，ADR-0291 §5① 仲裁）"
+    ),
+    "lca/contracts/event.py": (
+        "ADR-0180 事件层 v2 协议骨架：Category/Plane 闭集 + EventPayload 基类 + "
+        "团队委派事件；协议词表单文件，拆散破坏协议单一事实源（2026-10-05 iter-tests 20:09 Phase D 收尾审计，ADR-0291 §5① 仲裁）"
+    ),
+    "lca/infrastructure/observability/events/event/doc/doc.py": (
+        "todo-57 数据表化后形态：_DOC_TABLE 53 事件词条数据表 + 注册装饰器/查询函数；词条增删改数据即可，属词表单文件（2026-10-05 "
+        "iter-tests 20:09 Phase D 收尾审计，ADR-0291 §5① 仲裁）"
+    ),
+    "lca/infrastructure/session/emit/cognitive_emit/reflection_events.py": (
+        "ADR-0194 P1-15/ADR-0220 §6.2 brain-internal spine EP "
+        "发射器族（critic/synthesize/skill_router/prompt_assembler/reasoner）；单生产缝，发射器拆散割裂发射面（2026-10-05 "
+        "iter-tests 20:09 Phase D 收尾审计，ADR-0291 §5① 仲裁）"
+    ),
+    "lca/nodes/concept/effect/execute.py": (
+        "phase.concept.effect_execute 图唯一节点：EffectExecuteExecutor typed effect 分发 + _dispatch + "
+        "tool result 归因 helper 族共享分发上下文（2026-10-05 iter-tests 20:09 Phase D 收尾审计，ADR-0291 §5① 仲裁）"
+    ),
+    "lca/plugins/session/telemetry_capture/telemetry_capture.py": (
+        "DSH SessionTelemetryCoordinator 一比一 LCA 实现：SessionTelemetryCapture 单类 + "
+        "attach/observe/cursor helper；后端边界内聚（2026-10-05 iter-tests 20:09 Phase D 收尾审计，ADR-0291 "
+        "§5① 仲裁）"
+    ),
+    "lca/plugins/strategies/graph/graph.py": (
+        "GraphStrategy DAG 工作流引擎（resolved-counter 模型）+ GraphExecutionState + "
+        "factory/setup；策略引擎单文件内聚（2026-10-05 iter-tests 20:09 Phase D 收尾审计，ADR-0291 §5① 仲裁）"
+    ),
+    "lca/plugins/transport/webserver/carrier/runs/lifecycle/lifecycle.py": (
+        "RunLifecycleCoordinator：单 run 执行/暂停/恢复/终态编排单类；run 生命周期状态机拆散割裂不变量（2026-10-05 iter-tests "
+        "20:09 Phase D 收尾审计，ADR-0291 §5① 仲裁）"
+    ),
+    "lca/plugins/transport/webserver/routes_channels_wechat.py": (
+        "WeChat channel 管理鉴权端点族（bind/unbind/qrcode/status/config + "
+        "网关分发）；通道协议面集中，端点增删单文件可见（2026-10-05 iter-tests 20:09 Phase D 收尾审计，ADR-0291 §5① 仲裁）"
+    ),
+    "lca/session/append.py": (
+        "ADR-0195 P1-03 Session append 公共 API：Session 类 + "
+        "_to_jsonable/_validate_json_safe/_snapshot_data 快照 helper 族；append 面内聚（2026-10-05 "
+        "iter-tests 20:09 Phase D 收尾审计，ADR-0291 §5① 仲裁）"
+    ),
 }
 
 
