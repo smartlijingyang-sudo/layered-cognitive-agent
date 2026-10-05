@@ -14,13 +14,17 @@ from lca.application.memory.dream_scheduler import (
     _Backfill,
     _dream_lock_id,
     _Render,
+    make_dream_callbacks,
     write_dream_evidence,
 )
 from lca.application.routine.locks import RoutineFileLock
+from lca.contracts.atoms.enums.enums import MemoryCategory, MemoryLayer
 from lca.contracts.atoms.ids.ids import utc_now_ms
 from lca.contracts.models.core.conversation.memory import MemoryRecord
+from lca.contracts.protocols.assistant.catalog import ProfilePatch
 from lca.infrastructure.memory.contextfiles.domain.edit import StaleSnapshotOperationError
 from lca.infrastructure.memory.dream import DreamReport
+from lca.plugins.assistant.profile.profile import render_user_profile
 
 EvidenceCall = tuple[Path, DreamReport | None, int]
 
@@ -59,12 +63,13 @@ def _scheduler(
     tmp_path: Path,
     homes: list[Path],
     clock: list[int],
-    calls: list[Path] | None = None,
+    # Required rather than defaulted: a caller that forgot it would assert on
+    # its own never-populated list and pass vacuously.
+    calls: list[Path],
     evidence: list[EvidenceCall] | None = None,
     run_dream_fn: DreamFn | None = None,
     evidence_writer: EvidenceWriter | None = None,
 ) -> DreamScheduler:
-    visited: list[Path] = [] if calls is None else calls
     recorded: list[EvidenceCall] = [] if evidence is None else evidence
 
     def fake_run_dream(
@@ -75,7 +80,7 @@ def _scheduler(
         render: _Render | None,
     ) -> DreamReport:
         assert now_ms == clock[0], "the injected clock is the value that reaches run_dream"
-        visited.append(home)
+        calls.append(home)
         return _report()
 
     def write_evidence(home: Path, report: DreamReport | None, now_ms: int) -> None:
@@ -284,8 +289,7 @@ async def test_a_lock_younger_than_the_reclaim_bound_is_not_stolen(
 async def test_a_write_collision_is_contained_not_raised(
     tmp_path: Path, clock: list[int], caplog: pytest.LogCaptureFixture
 ) -> None:
-    calls: list[Path] = []
-    scheduler = _scheduler(tmp_path, [tmp_path / "a"], clock, calls, run_dream_fn=_colliding)
+    scheduler = _scheduler(tmp_path, [tmp_path / "a"], clock, [], run_dream_fn=_colliding)
 
     with caplog.at_level(logging.WARNING):
         reports = await scheduler.sweep_once()
@@ -298,8 +302,7 @@ async def test_a_write_collision_is_contained_not_raised(
 
 async def test_the_lock_is_released_after_a_collision(tmp_path: Path, clock: list[int]) -> None:
     home = tmp_path / "a"
-    calls: list[Path] = []
-    scheduler = _scheduler(tmp_path, [home], clock, calls, run_dream_fn=_colliding)
+    scheduler = _scheduler(tmp_path, [home], clock, [], run_dream_fn=_colliding)
 
     await scheduler.sweep_once()
 
@@ -467,7 +470,6 @@ async def test_a_pass_that_overruns_a_tenth_of_the_bound_is_logged(
     tmp_path: Path, clock: list[int], caplog: pytest.LogCaptureFixture
 ) -> None:
     home = tmp_path / "a"
-    calls: list[Path] = []
 
     def slow(
         seen: Path, *, now_ms: int, backfill: _Backfill | None, render: _Render | None
@@ -476,7 +478,7 @@ async def test_a_pass_that_overruns_a_tenth_of_the_bound_is_logged(
         clock[0] += 91_000  # past the 90s observation bound, a tenth of the reclaim bound
         return _report()
 
-    scheduler = _scheduler(tmp_path, [home], clock, calls, run_dream_fn=slow)
+    scheduler = _scheduler(tmp_path, [home], clock, [], run_dream_fn=slow)
 
     with caplog.at_level(logging.WARNING):
         reports = await scheduler.sweep_once()
@@ -717,6 +719,7 @@ async def test_an_evidence_io_failure_does_not_discard_the_report(
         tmp_path,
         [home],
         clock,
+        [],
         run_dream_fn=_promoting,
         evidence_writer=write_dream_evidence,
     )
@@ -750,7 +753,9 @@ async def test_a_broken_evidence_writer_cannot_mask_a_promotion(
         del seen, report, now_ms
         raise RuntimeError("evidence writer is misconfigured")
 
-    scheduler = _scheduler(tmp_path, [home], clock, run_dream_fn=_promoting, evidence_writer=broken)
+    scheduler = _scheduler(
+        tmp_path, [home], clock, [], run_dream_fn=_promoting, evidence_writer=broken
+    )
 
     with caplog.at_level(logging.WARNING):
         reports = await scheduler.sweep_once()
@@ -799,6 +804,7 @@ async def test_a_sweep_writes_the_real_artifact_with_the_pass_timestamp(
         tmp_path,
         [home],
         clock,
+        [],
         run_dream_fn=advancing,
         evidence_writer=write_dream_evidence,
     )
@@ -808,4 +814,54 @@ async def test_a_sweep_writes_the_real_artifact_with_the_pass_timestamp(
     artifact = home / "dreams" / "last_run.json"
     assert json.loads(artifact.read_text(encoding="utf-8"))["now_ms"] == sampled[0], (
         "the artifact carries the timestamp run_dream consolidated under, not a fresh read"
+    )
+
+
+class _RecordingCatalog:
+    """The one member ``ProfileBackfillService`` calls.
+
+    Shape follows ``tests/plugins/assistant/test_profile_backfill.py``; this
+    repo keeps its catalog doubles local to the file whose subject needs one.
+    """
+
+    def __init__(self) -> None:
+        self.revisions: list[tuple[str, object]] = []
+
+    def revise_profile(self, assistant_id: str, patch: object) -> dict[str, int]:
+        self.revisions.append((assistant_id, patch))
+        return {"revision_seq": len(self.revisions)}
+
+
+def _identity_record(content: str = "用户身份：架构师") -> MemoryRecord:
+    return MemoryRecord(
+        record_id="mem_1",
+        content=content,
+        memory_type=MemoryLayer.SEMANTIC,
+        importance=0.9,
+        category=MemoryCategory.IDENTITY,
+    )
+
+
+def test_the_production_factory_pairs_the_real_render_with_a_catalog_backfill(
+    tmp_path: Path,
+) -> None:
+    """``user_md_written`` is only ever True when both callbacks are supplied.
+
+    Until this factory existed, ``_locked_pass`` passed ``(None, None)`` and
+    Task 3's change-detection predicate reduced to ``upserted`` alone. This is
+    the test that the other half is live.
+    """
+    catalog = _RecordingCatalog()
+    records = [_identity_record()]
+
+    render, backfill = make_dream_callbacks(catalog)(tmp_path)  # type: ignore[arg-type]
+
+    assert render is render_user_profile, (
+        "the sweep re-projects USER.md with the same renderer the online path uses"
+    )
+    assert backfill is not None
+    backfill("asst_1", records)
+
+    assert catalog.revisions == [("asst_1", ProfilePatch(user_md=render_user_profile(records)))], (
+        "backfill routes through ProfileBackfillService into catalog.revise_profile"
     )

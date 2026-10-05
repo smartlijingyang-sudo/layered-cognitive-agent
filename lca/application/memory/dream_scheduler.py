@@ -8,6 +8,11 @@ satisfies, so every periodic schedule kind is unreachable there.
 ``run_dream`` is synchronous and does file I/O, so the sweep dispatches the
 whole locked pass, lock files and evidence write included, to an executor
 thread. The kernel process serves HTTP on the same loop.
+
+The production implementation of the two seams the sweep injects,
+``evidence_writer`` and ``callbacks``, also lives here. ``application`` is the
+composition root, so it is the one layer that may name a concrete plugin; a
+plugin may not name another plugin.
 """
 
 from __future__ import annotations
@@ -18,19 +23,45 @@ import json
 import logging
 from collections.abc import Callable, Sequence
 from pathlib import Path
+from typing import Protocol
 
 from lca.application.routine.locks import RoutineFileLock
 from lca.contracts.mechanisms.content.addressable import sha256_hex
 from lca.contracts.models.core.conversation.memory import MemoryRecord
+from lca.contracts.protocols.assistant.catalog import AssistantCatalog
 from lca.infrastructure.memory.contextfiles.adapters.disk import DiskFileStore
 from lca.infrastructure.memory.contextfiles.domain.edit import StaleSnapshotOperationError
 from lca.infrastructure.memory.dream import DreamReport, run_dream
+from lca.plugins.assistant.profile.profile import ProfileBackfillService, render_user_profile
 
 logger = logging.getLogger(__name__)
 
 _Backfill = Callable[[str, list[MemoryRecord]], object]
 _Render = Callable[[Sequence[MemoryRecord]], str]
-DreamFn = Callable[..., DreamReport | None]
+
+
+class DreamFn(Protocol):
+    """The one call shape ``_locked_pass`` makes into the consolidation pass.
+
+    ``Callable[..., DreamReport | None]`` checks the return type and nothing
+    else, so a production callable with ``backfill`` and ``render`` transposed
+    type-checked clean and degraded at runtime to a contained per-home
+    failure. ``home`` is positional-only because that is how the sweep calls
+    it, which also keeps the parameter name free for doubles to differ on.
+    """
+
+    def __call__(
+        self,
+        home: Path,
+        /,
+        *,
+        now_ms: int,
+        backfill: _Backfill | None,
+        render: _Render | None,
+    ) -> DreamReport | None: ...
+
+
+DreamCallbacks = Callable[[Path], tuple[_Render | None, _Backfill | None]]
 EvidenceWriter = Callable[[Path, DreamReport | None, int], object]
 
 _ROUTINE_ID = "memory_dream"
@@ -66,7 +97,7 @@ class DreamScheduler:
         now_ms: Callable[[], int],
         run_dream_fn: DreamFn = run_dream,
         evidence_writer: EvidenceWriter | None = None,
-        callbacks: Callable[[Path], tuple[_Render | None, _Backfill | None]] | None = None,
+        callbacks: DreamCallbacks | None = None,
     ) -> None:
         self._homes = homes
         self._lock_dir = Path(lock_dir)
@@ -230,3 +261,28 @@ def write_dream_evidence(home: Path, report: DreamReport | None, now_ms: int) ->
         _EVIDENCE_RELATIVE, json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True)
     )
     return path
+
+
+def make_dream_callbacks(catalog: AssistantCatalog) -> DreamCallbacks:
+    """The production ``(render, backfill)`` pair the sweep hands ``run_dream``.
+
+    Without both, ``run_dream`` skips the USER.md projection and reports
+    ``user_md_written=False`` on every pass, so the evidence artifact's change
+    signal narrows to ``upserted`` alone.
+
+    ``home`` is unused because the pair is catalog-bound: ``revise_profile``
+    addresses a home by ``assistant_id``, and the catalog already knows every
+    home's path. The parameter stays because ``_locked_pass`` calls the factory
+    once per home, off the event loop.
+    """
+    service = ProfileBackfillService(catalog)
+
+    def callbacks(home: Path) -> tuple[_Render | None, _Backfill | None]:
+        del home
+
+        def backfill(assistant_id: str, records: list[MemoryRecord]) -> object:
+            return service.backfill_from_records(assistant_id, records)
+
+        return render_user_profile, backfill
+
+    return callbacks
