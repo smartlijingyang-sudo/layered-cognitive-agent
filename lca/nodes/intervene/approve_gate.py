@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass
+from datetime import UTC, datetime
 
 from lca.contracts.atoms.control.slot import ControlSlot
 from lca.contracts.atoms.enums.enums import ActionType
@@ -34,12 +35,6 @@ from lca.contracts.harness.composition.plugin_contract import (
     PluginIdentity,
 )
 from lca.contracts.models.core.execution.decision import Decision
-from lca.contracts.models.core.execution.external_content import (
-    AuthorizationRefusal,
-    ContentOrigin,
-    refuse_external_authorization_claim,
-    refuse_external_instruction_override,
-)
 from lca.contracts.observability.evidence.evidence import (
     Classification,
     RetentionClass,
@@ -55,6 +50,7 @@ from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import
 )
 from lca.contracts.protocols.graph.command import Command
 from lca.contracts.protocols.graph.routing import RoutingDecision
+from lca.contracts.runtime.trust import get_current_trust_envelope
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 
 # ``next_hint`` values consumed by the outer bundle edges in
@@ -67,36 +63,60 @@ _NEXT_HINT_APPROVE_APPROVED = "approve_approved"
 _NEXT_HINT_APPROVE_REJECTED = "approve_rejected"
 
 
-def _external_content_refusal(decision: Decision) -> AuthorizationRefusal | None:
-    """ADR-0292 C2: consult the two refusal doors for EXTERNAL-driven decisions.
+def _grant_absence_refusal(decision: Decision, req: object | None) -> tuple[list[str], bool] | None:
+    """ADR-0292 section 10: fail-closed grant check for privileged actions.
 
-    Returns the first tripped :class:`AuthorizationRefusal`, or ``None``
-    when the decision carries no recorded external drive
-    (``content_origin`` is not EXTERNAL), has no trigger text, or neither
-    door trips. The seam detectors own the classification; this function
-    only wires them to the typed ``Decision`` channel.
+    A decision is *privileged* when the ``approval_requirement`` port's
+    ``required`` flag is set — the authoritative policy signal from
+    ``act.authorize`` (``ApprovalPolicyEngine``), not the model's
+    self-reported ``decision.needs_approval`` (which a hallucinating model
+    can clear while claiming authorization; §10's grant check is precisely
+    the backstop for that case).
+
+    For privileged decisions, every tool call names its required privilege
+    in ``capability.verb`` form (e.g. ``"shell.exec"``); the ambient
+    TrustEnvelope (ADR-0199, bound via ``trust_envelope_scope``) must grant
+    each one. A missing grant — including the case where no envelope is
+    bound at all — refuses the decision. This is a fail-closed allowlist,
+    not source tracking: ``Decision.content_origin`` is audit metadata only.
+
+    Returns ``(missing_privileges, envelope_bound)`` when the decision is
+    privileged and at least one grant is absent, else ``None``.
+    Non-privileged decisions, and privileged decisions without tool calls
+    (no privilege to check), are untouched.
     """
-    if decision.content_origin is not ContentOrigin.EXTERNAL:
+    if req is None or not bool(getattr(req, "required", False)):
         return None
-    text = decision.origin_trigger_text
-    if not text:
+    tool_names = [
+        call.tool_name
+        for call in (decision.tool_calls or [])
+        if isinstance(getattr(call, "tool_name", None), str) and call.tool_name
+    ]
+    if not tool_names:
         return None
-    refusals: list[AuthorizationRefusal] = []
-    refuse_external_authorization_claim(text, on_refusal=refusals.append)
-    refuse_external_instruction_override(text, on_refusal=refusals.append)
-    return refusals[0] if refusals else None
+    envelope = get_current_trust_envelope()
+    missing = [name for name in tool_names if envelope is None or not envelope.grants(name)]
+    if not missing:
+        return None
+    return (missing, envelope is not None)
 
 
-def _route_refusal_to_evidence(refusal: AuthorizationRefusal, decision_id: str) -> None:
-    """ADR-0292 C4 (wiring 4): route a blocked claim to the evidence ledger.
+def _route_refusal_to_evidence(
+    decision: Decision,
+    missing_privileges: list[str],
+    envelope_bound: bool,
+) -> None:
+    """ADR-0292 C4 + section 10: route a grant-absence refusal to the evidence ledger.
 
-    Mechanical wiring per the 2026-10-05 section-9 adjudication: resolve the
-    ambient evidence pair exactly like ``safe_executor._resolve_evidence_pair``
-    and prepare the refusal payload (the blocked attack itself is the
-    evidence). The import is deferred so this module never takes a hard
-    dependency on the observability stack at load time. No bound
-    observability (unit tests / offline paths) -> no-ref path: refusal
-    routing still holds, only the evidence copy is skipped.
+    Mechanical wiring per the section-10 adjudication: resolve the ambient
+    evidence pair exactly like ``safe_executor._resolve_evidence_pair`` and
+    prepare the refusal payload (the blocked ungrantable action itself is the
+    evidence). ``Decision.content_origin`` is recorded as audit metadata —
+    "which external claim, if any, was present" — not as a trigger. The
+    import is deferred so this module never takes a hard dependency on the
+    observability stack at load time. No bound observability (unit tests /
+    offline paths) -> no-ref path: refusal routing still holds, only the
+    evidence copy is skipped.
     """
     try:
         from lca.infrastructure.observability import current_bound
@@ -108,15 +128,18 @@ def _route_refusal_to_evidence(refusal: AuthorizationRefusal, decision_id: str) 
     store = bound.evidence_binding().store
     if store is None:
         return
+    origin = decision.content_origin
     payload = json.dumps(
         {
             "event": "authorization_refusal",
             "gate": "act.approve.gate",
             "adr": "0292",
-            "decision_id": decision_id,
-            "kind": refusal.kind,
-            "refused_at": refusal.refused_at.isoformat(),
-            "text": refusal.text,
+            "section": "10",
+            "decision_id": decision.decision_id,
+            "missing_grants": missing_privileges,
+            "envelope_bound": envelope_bound,
+            "content_origin": origin.value if origin is not None else None,
+            "refused_at": datetime.now(UTC).isoformat(),
         },
         ensure_ascii=False,
     ).encode("utf-8")
@@ -135,9 +158,13 @@ class ApproveGateExecutor:
 
     The node is a pure transform of the typed ``decision`` + ``command``
     ports for routing purposes. It never reads ``context.runtime``, never
-    mutates ``AgentState``. On the ``approve_refused`` path only, the gate
-    additionally routes the refusal payload to the run-trace evidence
-    ledger through the ambient observability seam (same pattern as
+    mutates ``AgentState``. ADR-0292 section 10: before approval routing, a
+    grant-absence gate refuses privileged actions (``needs_approval``) whose
+    tool privileges are absent from the ambient TrustEnvelope — fail-closed
+    allowlist, ``content_origin`` as audit metadata only. On the
+    ``approve_refused`` path only, the gate additionally routes the refusal
+    payload to the run-trace evidence ledger through the ambient
+    observability seam (same pattern as
     ``safe_executor._resolve_evidence_pair``; no-ref path when unbound) —
     ADR-0292 C4, "the blocked attack itself is security evidence".
     The four routing outcomes:
@@ -151,9 +178,9 @@ class ApproveGateExecutor:
       Currently unreachable (full-restart resume enters at perceive.main).
     - ``approve_rejected`` — ``command.kind`` is ``"reject"`` /
       ``"redirect"`` or ``"resume"`` → route to ``terminal.commit``
-      to abort cleanly. ADR-0292 C2: also the routing for a refused
-      EXTERNAL-driven privilege claim / instruction override — the claim
-      never reaches ``act.envelope``; the refusal payload is routed to
+      to abort cleanly. ADR-0292 section 10: also the routing for a
+      refused grant-absence privilege claim — the ungrantable action never
+      reaches ``act.envelope``; the refusal payload is routed to
       the run-trace evidence ledger (C4).
     """
 
@@ -198,14 +225,16 @@ class ApproveGateExecutor:
 
         req = input.port_values.get(PortName("approval_requirement"))
 
-        # ADR-0292 C2 (wiring 1): security gate before approval routing.
-        # An EXTERNAL-driven decision whose trigger text asserts held
-        # authority or overrides prior instructions is refused outright —
-        # external content can never be a source of authorization, and no
-        # user interrupt is spent on an attack.
-        refusal = _external_content_refusal(decision)
-        if refusal is not None:
-            _route_refusal_to_evidence(refusal, decision.decision_id)
+        # ADR-0292 section 10: grant-absence gate before approval routing.
+        # A privileged action without a matching grant in the ambient
+        # TrustEnvelope is refused outright — authorization comes only from
+        # user grants (TrustEnvelope) + rule defaults, never from the
+        # decision's own claims. No user interrupt is spent on an
+        # ungrantable action. content_origin is audit metadata only.
+        grant_refusal = _grant_absence_refusal(decision, req)
+        if grant_refusal is not None:
+            missing, envelope_bound = grant_refusal
+            _route_refusal_to_evidence(decision, missing, envelope_bound)
             refused_routing = RoutingDecision(
                 action_type=ActionType.RESPOND,
                 next_node="terminal.commit",

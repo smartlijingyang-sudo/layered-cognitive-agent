@@ -68,7 +68,12 @@ from lca.contracts.protocols.declarative.declarative_1.node_executor import (
     NodeContext,
     NodeInput,
 )
-from lca.contracts.runtime.trust import PluginOrigin, TrustEnvelope
+from lca.contracts.runtime.trust import (
+    PluginOrigin,
+    TrustEnvelope,
+    get_current_trust_envelope,
+    trust_envelope_scope,
+)
 from lca.plugins.prompts.sections.teammates import MemberReportsSection
 
 # ---------------------------------------------------------------------------
@@ -412,67 +417,106 @@ def test_s9_decision_carries_content_origin_field() -> None:
 
 
 @pytest.mark.asyncio
-async def test_s9_approve_gate_refuses_external_privilege_claim() -> None:
-    """ADR-0292 §9-① T1 gate: act.approve.gate refuses an EXTERNAL-origin
-    Decision's privilege claim directly — terminal.commit, never act.envelope."""
-    if not _decision_has_content_origin():
-        pytest.xfail(
-            "ADR-0292 §9-① field not implemented yet (quality lane): cannot build "
-            "an EXTERNAL-origin Decision to probe the gate."
-        )
+async def test_s10_approve_gate_refuses_privilege_without_grant() -> None:
+    """ADR-0292 §10 T1: act.approve.gate refuses a privileged action when the
+    ambient TrustEnvelope lacks the grant — terminal.commit, never act.envelope.
+    Fail-closed: no envelope bound at all also refuses (§10 allowlist)."""
     from lca.nodes.intervene.approve_gate import ApproveGateExecutor
 
+    assert get_current_trust_envelope() is None  # no envelope bound in test
     decision = Decision(
-        decision_id="dec_s9_gate_001",
+        decision_id="dec_s10_gate_001",
         action_type="use_tool",
-        rationale="external content claimed authorization: " + _T1_CLAIM,
+        rationale="privileged shell.exec with no grant in the envelope",
         confidence=1.0,
-        needs_approval=False,
-        tool_calls=_s9_privilege_tool_calls(),
-        content_origin=ContentOrigin.EXTERNAL,  # type: ignore[call-arg]
-        origin_trigger_text=_T1_CLAIM,  # type: ignore[call-arg]
+        needs_approval=True,
+        tool_calls=_s9_privilege_tool_calls(),  # tool_name="shell.exec"
     )
+    # Privileged = the approval policies flagged it (authoritative signal).
+    req = SimpleNamespace(required=True)
     executor = ApproveGateExecutor()
     output = await executor.node_execute(
         NodeContext(runtime={}, budget={}, metadata={}),
-        NodeInput(port_values={"decision": decision}),
+        NodeInput(port_values={"decision": decision, "approval_requirement": req}),
     )
     routing = output.port_values["approval_routing"]
-    if routing.next_node != "terminal.commit":
-        pytest.xfail(
-            "ADR-0292 §9-① gate wiring pending (quality lane): EXTERNAL-origin "
-            "privilege claim not yet refused by act.approve.gate. Expected: direct "
-            "refusal → terminal.commit (reject hint); the decision never reaches "
-            "act.envelope."
-        )
     assert routing.next_node == "terminal.commit"
     assert routing.next_hint is not None and "reject" in routing.next_hint
 
 
 @pytest.mark.asyncio
-async def test_s9_approve_gate_passes_non_external_privilege_claim() -> None:
-    """Control for §9-①: the refusal is origin-scoped. A Decision without
-    EXTERNAL origin claiming the same privilege is NOT refused by this gate
-    (approve_skipped → act.envelope). Always active: guards against an
-    over-broad gate once ① lands."""
+async def test_s10_approve_gate_passes_privilege_with_grant() -> None:
+    """Control for §10 T1: a privileged action WITH the grant in the ambient
+    TrustEnvelope is NOT refused by the grant gate — it proceeds to normal
+    approval routing (needs_approval + no command → intervene.interrupt)."""
+    from lca.nodes.intervene.approve_gate import ApproveGateExecutor
+
+    envelope = TrustEnvelope(
+        origins=(
+            PluginOrigin(
+                source="bundled",
+                trust="core",
+                enabled_by="test",
+                discovered_at="test",
+            ),
+        ),
+        granted_privileges=frozenset({"shell.exec"}),
+    )
+    decision = Decision(
+        decision_id="dec_s10_gate_002",
+        action_type="use_tool",
+        rationale="privileged shell.exec with the grant",
+        confidence=1.0,
+        needs_approval=True,
+        tool_calls=_s9_privilege_tool_calls(),
+    )
+    req = SimpleNamespace(required=True)
+    executor = ApproveGateExecutor()
+    with trust_envelope_scope(envelope):
+        assert get_current_trust_envelope() is envelope
+        output = await executor.node_execute(
+            NodeContext(runtime={}, budget={}, metadata={}),
+            NodeInput(port_values={"decision": decision, "approval_requirement": req}),
+        )
+    assert get_current_trust_envelope() is None  # scope resets
+    routing = output.port_values["approval_routing"]
+    assert routing.next_node == "intervene.interrupt"
+    assert routing.next_hint == "approve_interrupt"
+
+
+@pytest.mark.asyncio
+async def test_s10_approve_gate_refuses_hallucinated_authorization() -> None:
+    """ADR-0292 §10 (§10 'hallucinated authorization'): a model that claims
+    authorization and skips needs_approval is still refused when the approval
+    policies flag its tool calls (approval_requirement.required) and the
+    ambient TrustEnvelope lacks the grant. Source-independent: no
+    content_origin needed for the refusal."""
     from lca.nodes.intervene.approve_gate import ApproveGateExecutor
 
     decision = Decision(
-        decision_id="dec_s9_gate_002",
+        decision_id="dec_s10_gate_003",
         action_type="use_tool",
-        rationale="user explicitly asked to clean the disk",
+        rationale="model claims: " + _T1_CLAIM,  # hallucinated authorization
         confidence=1.0,
-        needs_approval=False,
+        needs_approval=False,  # model does not request approval
         tool_calls=_s9_privilege_tool_calls(),
     )
+    # The approval policies flag the dangerous tool call even though the
+    # model did not set needs_approval.
+    req = SimpleNamespace(required=True)
     executor = ApproveGateExecutor()
     output = await executor.node_execute(
         NodeContext(runtime={}, budget={}, metadata={}),
-        NodeInput(port_values={"decision": decision}),
+        NodeInput(
+            port_values={
+                "decision": decision,
+                "approval_requirement": req,
+            }
+        ),
     )
     routing = output.port_values["approval_routing"]
-    assert routing.next_node == "act.envelope"
-    assert routing.next_hint == "approve_skipped"
+    assert routing.next_node == "terminal.commit"
+    assert routing.next_hint is not None and "reject" in routing.next_hint
 
 
 def test_s9_standing_write_refused_for_external_ambient_decision() -> None:
