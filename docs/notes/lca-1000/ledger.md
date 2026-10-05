@@ -773,5 +773,21 @@
   6. `_get_role_library`（fold.py vs triage.py）—— 驳回：沿用 508（绑定 self._role_library，需 grilling）。
   7. `_format_duration` / `_catalog_digest` / `_turn_of` / `parameters` / `target` / `_transaction` / `read_file` / `_ok` / `_emit` / `_fail` 家族—— 驳回：沿用 507/508（跨子系统语义未确证 / 刻意对称双 adapter / 命名家族需 grilling / adapter interface 本身）。
 - 验证结果: `~/.local/bin/ruff check` 3 文件 All checks passed（首次即过）；`ruff format --check` 3 文件 already formatted；import 冒烟（两模块 helper identity + property 委托 + 9 字段映射逐一断言 + `__all__` 未泄露）OK；targeted pytest 2 文件（tests/observability/loop_cursor/test_in_memory.py、test_protocol.py）：10 passed。
-- commit: refactor(lca-1000): 第0509轮 收敛 snapshot 投影重复到 state/_snapshot_from_state（未 push）。
+- commit: b96479927 refactor(lca-1000): 第0509轮 收敛 snapshot 投影重复到 state/_snapshot_from_state（未 push）。
 - 备注: 只 add 本轮 4 个文件（代码 3 + ledger.md），用 `git commit -- <paths>` 指定路径提交；并发会话已 staged 的 2 个测试文件改动及 untracked（docs/notes/audit-2026-10-05.md、ralph/）全程未触碰。备份 /tmp/bak_0509/（252，改动前 3 文件）。scan0509.py/patch0509.py/smoke0509.py 留本地 hidden_files/scratch（非仓库文件）。
+
+## 第0510轮 (2026-10-06 05:33-05:52 CST)
+- 改了什么: 删除 `lca/plugins/composition/` 整棵死迁移子树（`git rm -r`，7 tracked 文件：5 个 .py + 2 个 README.md）：`composition/composer/__init__.py`、`act/body_provider.py`、`composition/prompt_catalog.py`、`perceive/provider.py`、`think/brain_provider.py`、`composition/composer/README.md`、`composition/README.md`。
+- 依据 skill 哪一节: deslop 清单 死兼容路径（2026-09-06 rename commit 4a6b5e04a 建的迁移目标树，被废弃：live 树仍在 `lca/plugins/composer/` 继续演进，新提交 b95c2973b/c6d49d445 都落在旧路径；新树自 rename 后零提交）+ SKILL.md Deletion test（删后复杂度直接消失：全库零调用方，删掉不会在 N 个调用方处重造）+ LANGUAGE.md Interface（interface 含"调用方必须知道的一切"：子 README 虚假声称 "Canonical home for plan-bound Agent assembly (migrated from `plugins/composer/`)"，与事实相反——消除误导即收敛 interface）。
+- 为什么这是实质改动(非凑数): 删的是真实的死并行树（7 文件），不是注释/空行。证据链：(1) `git grep -rn 'plugins.composition.composer' -- lca/ tests/ scripts/ docs/ bundles/` = 0 行引用；(2) 动态发现扫描：无 pkgutil/walk_packages/iter_modules 遍历 plugins 目录；无 pyproject/setup/yaml/json entrypoint 引用（import-linter cache 命中是 `lca.contracts.harness.composition.composer` 不同路径；snapshot_capability_tree.py:138 的 `^lca/plugins/composition/` 只是分类正则）；(3) 死树自身文件反向 import live 树（body_provider.py:22 `from lca.plugins.composer.act.body_composer import BodyComposer`），证实是未执行的影子拷贝；(4) 语义已分叉：死树 `prompt_catalog.render_skill_discovery` 绕过 ADR-0196 PromptSurface SSOT 自实现 XML 渲染（中文 docstring + `_EMPTY_TOOLS`），与 live 行为不一致——留着是误导源；(5) 删除后 `import lca.plugins.composer.composition.prompt_catalog` 冒烟 OK。
+- 关键设计决策（夜间跳过 grilling，记台账）: 整棵删而非逐文件——7 文件同属一次废弃迁移，无一存活，逐文件成轮是凑数；README 一并删除（其 "Legacy `plugins/composer/` → `plugins/composition/*`" 映射表已与事实相反，ADR-0195 的映射声明留待白天 grilling 修订，本轮不动 ADR）。`lca/plugins/__init__.py:18-19` 的 "moves to `lca.application.composer`" docstring 同为 aspirational（该目录不存在），但它是 live 包文档，改动属文档语义，留给 grilling。
+- 候选清单（本轮 explore：AST 同体扫描 36 组 + 死树专项验证，逐一取舍）:
+  1. 上述 `lca/plugins/composition/` 死迁移子树 —— 选中。
+  2. `validate` ×2（plugins/avatar/tools.py:129/206，同文件 8 行同体）—— 驳回：同文件两类各自定义 validate，收敛为模块级 helper 需确认两类校验语义确同且无子类 override 差异，留作后续候选。
+  3. `__init__` ×2（infrastructure/tools/sandbox/runtime_tools.py:51/104，同文件 7 行同体）—— 驳回：两类构造器同体多为刻意对称，需确认非刻意，留作后续候选。
+  4. `dispatch_rpc` / `poll_pairing` / `_edit_file`（companion client.py vs standalone.py）—— 驳回：沿用 508/509（sync/async 桥接刻意镜像，deletion test 未过）。
+  5. `_fail` ×8 / `_emit` ×5 / `_ok` ×2 家族 —— 驳回：沿用 508/509（跨包命名家族，统一错误语义需 grilling）。
+  6. `_get_role_library` / `_format_duration` / `_catalog_digest` / `_turn_of` / `parameters` / `target` / `_transaction` / `read_file` / `apply` / `_run` —— 驳回：沿用 507/508/509（跨子系统语义未确证 / 需 grilling / 闭包绑定差异）。
+- 验证结果: `~/.local/bin/ruff check`（live 对应文件 `lca/plugins/composer/composition/prompt_catalog.py`）All checks passed；残余引用 `git grep -rn 'plugins.composition.composer'` = 0 行；import 冒烟（live prompt_catalog）OK；targeted pytest `tests/composer/test_prompt_catalog.py`：3 passed。相邻 `tests/architecture/test_brain_prompt_catalog_capability.py` 1 failed 系**预先存在、与本轮无关**：`lca/plugins/composer/think/brain.py:144` 的 `PROMPT_TEMPLATE_PROVIDER` require 由他人提交 a19f0ef22（ADR-0220 P10）引入，测试 mock 未同步更新；brain.py 与测试文件工作区均 clean，本轮未触碰；失败调用路径全在 live 树内。
+- commit: PLACEHOLDER_HASH refactor(lca-1000): 第0510轮 删除 plugins/composition 死迁移子树（未 push）。
+- 备注: 只 add/commit 本轮 8 个文件（删除 7 + ledger.md），`git commit -- <paths>` 显式路径；并发会话已 staged 的 2 个测试文件改动及 untracked（docs/notes/audit-2026-10-05.md、ralph/）全程未触碰；ledger.md 未提交的一行（509 补 hash）属本 campaign 自有 bookkeeping，随本次一并提交（沿用 505 做法）。备份 /tmp/bak_0510/composition/（252，删除前整树）。
