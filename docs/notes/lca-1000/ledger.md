@@ -607,3 +607,22 @@
 - 验证结果: 无文件改动，验证门 N/A（无改动可验证；未运行 ruff/pytest——无目标文件）。
 - commit: 无（无代码改动；本条目为台账-only 记录）。
 - 备注: 编辑前 git status --porcelain 显示并发会话（ralph/10-round-arch-deepening）未提交改动（docs/plans/task.md、lca/infrastructure/tools/*/__init__.py、assistant_tools/plugin.py + 3 个 untracked），与台账文件无交集，未触碰；ledger.md 本轮追加前确认无人并发修改。
+
+## 第0501轮 (2026-10-06 01:03-01:13 CST)
+- 改了什么: debug-run 读侧 `kernel.log` 影子拼写收敛至 naming SSOT seam（1 file，2 insertions(+)，1 deletion(-)）：
+  - `lca/plugins/tools/diagnostics/debug/run.py:222`：`kernel_log_path = run_dir / "kernel.log"` → `run_dir / kernel_log_filename(run_id)`；
+  - 模块级 import 块补上 `from lca.infrastructure.observability.spine.sinks.naming import kernel_log_filename`（isort 顺序正确：contracts.* < infrastructure.*）。
+- 依据 skill 哪一节: DEEPENING.md Seam discipline（`naming.KERNEL_LOG_FILENAME` / `kernel_log_filename()` 是 kernel log 命名的真实 seam：已有两个 production adapter——唯一写者 `failure.py:54`（`record_run_failure`）与 contract reader `ssot.py:94`（`find_kernel_log`）——都经该 seam 派生；debug-run 读侧的字面量是全库唯一的绕开 seam 的 code site）+ SKILL.md Deletion test（若删掉常量/派生函数，写者与 contract 读者的命名会散开，复杂度回潮到 N 个调用方手拼；收敛后 seam 真实收口）+ LANGUAGE.md Locality（kernel log 文件名改一处——naming.py）/ Interface（error mode 未碰：`kernel_log_path` 缺失是常态（ssot docstring 明示），`_tail_lines` 容错行为原样保留）。
+- 为什么这是实质改动(非凑数): 读/写名不一的沉默 bug 类（同 494/495 弧）：常量若变更，写者按新名写、debug-run 读旧名 → 诊断报告 `[3/8] kernel.log` 节永远读空且无报错。非"改措辞"：收敛的是可执行路径构造。字节级等价已断言（`kernel_log_filename("run_abc") == "kernel.log" == KERNEL_LOG_FILENAME` 逐字节相等）；naming.py 是零 import 叶子模块，无循环风险（import 冒烟验证通过）。
+- 关键设计决策（夜间跳过 grilling，记台账）: 用派生函数 `kernel_log_filename(run_id)` 而非裸常量 `KERNEL_LOG_FILENAME`——与现有两个 adapter（writer `run_dir / kernel_log_filename(facts.run_id)` / ssot reader `run_dir / kernel_log_filename(run_id)`）调用惯例一致，"文件名固定、run 归属由目录表达"语义保持显性；不动 `[3/8] kernel.log` 展示标签（section label 非 code site，按 495 惯例）。
+- 候选清单（本轮 explore，逐一验证后取舍）：
+  1. 上述 kernel.log 读侧字面量收敛至 `kernel_log_filename` —— 选中（全库唯一 code site；seam 真实：两处现有 production adapter；命名收敛弧 494/495 的自然延续，kernel log 是 naming 家族最后一个未收口成员）。
+  2. `agent_gateway.py` 4 处 `except Exception: pass`（terminal streaming）—— 驳回：均为 best-effort teardown（websocket.close 已断开、pump 订阅异常由上层重连处理、cancel/resume_approval 尽力语义）；删除会改变异常传播行为，需 grilling，夜间轮不动。
+  3. 长注释块（cordis_event_table.py:38、journal.py:923 等）—— 驳回：承载 interface invariant（如"禁止业务/plugin 代码直接 `ctx.emit('agent.*')` 必须经 `EventDescriptor.derive()` 走本表"），是 interface 文档而非叙事 slop。
+  4. `append.py` `_read_max_snapshot_bytes`（`globals().get` + PEP 562 `__getattr__`）—— 驳回：0412 轮审定的有意设计（懒读 env 避 import 期崩溃），relitigate 风险，不动。
+  5. `delete-when` 标记 —— 驳回：全库无到期（最早 2026-10-15）；`adapters/__init__.py:9` 的"delete-when met"是早轮已删除的 TelemetryMemoryAdapter 的记述，非待办。
+  6. `writable_matrix/storage/s3.py` PR-10 TODO 占位 —— 驳回：ADR-0167 声明的占位实现，有意设计。
+  7. 轮500 驳回项（三处 latest-kernel-stderr helper / supervisor 日志路径三处拼写 / AgentState.history 迁移 / `_DEFAULT_BOOT_PATH` / tail.py:81）—— 驳回（沿用 500 结论：语义差异真实存在或需 grilling/规模超一轮）。
+- 验证结果: ruff check 1 文件首次即过（All checks passed!）；import 冒烟无循环（naming 叶子模块上移安全）；行为等价 python 断言全绿（派生值与旧字面量逐字节相等；文件内裸 `"kernel.log"` 路径构造归零；派生调用恰 1 处）；targeted pytest `tests/scenario/debug/test_debug_run_tool.py`：4 passed。
+- commit: 见 git log --grep='第0501轮'（refactor(lca-1000): 第0501轮 debug-run 读侧 kernel.log 影子拼写收敛至 naming kernel_log_filename(Seam)；未 push）。
+- 备注: 只 add 本轮 2 个文件（代码 1 + ledger.md）；编辑前 git status --porcelain 显示并发会话（ralph/10-round-arch-deepening）未提交改动（5 modified + 3 untracked），与本轮文件无交集，未触碰；备份 /tmp/bak_0501/run.py（252，原文件完整备份）。本地写脚本 + stdin 喂远程 python3（heredoc 嵌套引号翻车一次，改 stdin 文件模式后一次成功；subprocess 传 `~/.local/bin/ruff` 需 expanduser，修后一次成功）。

@@ -43,6 +43,7 @@ from lca.contracts.observability.observability.failure_reason_map import (
     FAILURE_KIND_TO_ERROR_REASON,
 )
 from lca.contracts.observability.registry.run_locator import RunLocator
+from lca.infrastructure.observability.spine.sinks.naming import kernel_log_filename
 
 
 @dataclass(frozen=True, slots=True)
@@ -219,7 +220,7 @@ class DebugRunToolAdapter:
         run_dir = self._locator.run_dir(run_id)
         manifest_path = self._locator.manifest_path(run_id)
         spine_events_path = self._locator.events_path(run_id)
-        kernel_log_path = run_dir / "kernel.log"
+        kernel_log_path = run_dir / kernel_log_filename(run_id)
 
         manifest_summary = _safe_json(manifest_path)
         if not manifest_summary:
