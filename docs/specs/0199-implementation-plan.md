@@ -239,7 +239,7 @@ Authority: ADR-0199 §2.2.2 SessionActivation; I-HPC-1, I-HPC-2, I-HPC-3
 Read First (read in full before writing code):
   - docs/adr/0199-hermes-inspired-cognitive-plugin-convergence.md §2.2
   - lca/application/runtime/plan_resolution.py (P1-07 output)
-  - lca/application/runtime/adapters/intent_from_transport.py
+  - lca/application/runtime/adapters.py
   - lca/contracts/runtime/activation.py
   - lca/harness/runtime/activation_ref.py
   - lca/harness/profile/resolve/resolve.py (do not duplicate logic)
@@ -279,7 +279,7 @@ Verify (all exit 0):
 | `contracts/runtime/*` | DTO + Protocol | 稳定 wire/意图形状 | resolve/compile/boot |
 | `harness/runtime/activation_ref.py` | 纯函数 Utility | 确定性 hash | I/O |
 | `application/runtime/plan_resolution.py` | Application Service | K1+K2 编排 | HTTP/CLI 解析 |
-| `application/runtime/adapters/*` | Adapter | L0→RunIntent | 业务逻辑 |
+| `application/runtime/adapters.py` | Adapter | L0→RunIntent | 业务逻辑 |
 | `application/runtime/default_facade.py` | Facade | L1 入口 | phase 解释 |
 | `harness/diagnostics/doctor/*` | Specification + Composite | 编译期验证组合 | 修复/启动 |
 | transport handlers | Adapter | bytes→RunIntent→Facade | resolve_profile |
