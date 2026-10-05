@@ -116,23 +116,25 @@ class Decision:
     # may dispatch directly; ``True`` means ``act.approve.gate`` routes
     # through the HITL interrupt seam (ADR-0228 §2.6).
     needs_approval: bool = False
-    # ADR-0292 C2 (follow-up wiring 1, adjudicated 2026-10-05 section 9):
-    # typed instruction-source channel on the Decision. ``act.approve.gate``
-    # is a pure transform of typed ports -- it cannot see *why* the model
-    # chose this action. Producers that emit a decision driven by external
-    # content (tool result / web fetch / file read / subagent report)
-    # record it here; the gate then consults the two refusal doors
-    # (``refuse_external_authorization_claim`` /
-    # ``refuse_external_instruction_override``) on the trigger text, and
-    # the standing-write tools read the ambient origin (wiring 3).
-    # ``None`` = no recorded external drive (legacy producers); the gates
-    # treat it as not-externally-driven until a producer marks explicitly.
+    # ADR-0292 C2 (follow-up wiring 1, adjudicated 2026-10-05 section 9;
+    # section 10 revised the approve-gate trigger to grant-absence):
+    # typed instruction-source channel on the Decision. Producers that emit
+    # a decision driven by external content (tool result / web fetch / file
+    # read / subagent report) record it here. ``act.approve.gate`` no longer
+    # reads this as a trigger -- section 10 moved the gate to a fail-closed
+    # grant check on the ambient TrustEnvelope, keeping ``content_origin``
+    # as audit metadata only. The standing-write tools still read the
+    # ambient origin (wiring 3). ``None`` = no recorded external drive
+    # (legacy producers); the gates treat it as not-externally-driven
+    # until a producer marks explicitly.
     content_origin: ContentOrigin | None = None
     """Where the instruction driving this decision came from (ADR-0292 C2).
 
     ``ContentOrigin.EXTERNAL`` + ``origin_trigger_text`` arms the
-    authorization gates; ``None`` (default) means no external drive was
-    recorded and the gates stay inert.
+    standing-write gate (wiring 3). The approval gate is grant-based per
+    section 10 and treats this field as audit metadata only. ``None``
+    (default) means no external drive was recorded and the gates stay
+    inert.
     """
     origin_trigger_text: str | None = None
     """The external text (as received, unfenced) that drove this decision.
@@ -151,9 +153,10 @@ class Decision:
 # executing. Mirrors ``lca/contracts/models/team/delegation/context.py``
 # (``get_current_delegator`` + ``delegator_scope``): ``asyncio.create_task``
 # copies the context, so tools invoked downstream of ``decision_scope``
-# observe the decision that drove them. One mechanism, two gates: the
-# approval gate (wiring 1) reads ``Decision.content_origin`` off the typed
-# port, the standing-write tools (wiring 3) read it here.
+# observe the decision that drove them. Post section-10 the two gates
+# diverge: the approval gate (wiring 1) reads the ambient TrustEnvelope
+# grants (``content_origin`` is audit metadata only there); the
+# standing-write tools (wiring 3) still read the ambient origin here.
 # ---------------------------------------------------------------------------
 
 _current_decision: ContextVar[Decision | None] = ContextVar("lca_current_decision", default=None)
