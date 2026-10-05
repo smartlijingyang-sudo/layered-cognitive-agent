@@ -3,24 +3,30 @@
 from __future__ import annotations
 
 import re
+from dataclasses import dataclass, field
+from pathlib import Path
+from typing import Any
 
 import structlog
 
+from lca.contracts.models.core.conversation.conversation import ConversationTurn
+from lca.infrastructure.attachment import FileStoreAttachmentIdentity
 from lca.infrastructure.file.store import FileStore
-from lca.plugins.transport.webserver.handlers.runs.ingest.cache.cache import (
+from lca.plugins.transport.webserver.handlers.runs.api.file_reference_parsing import (
+    collect_file_refs as _collect_file_refs,
+)
+from lca.plugins.transport.webserver.handlers.runs.ingest.cache import (
     IngestCache,
     get_ingest_cache,
 )
-from lca.plugins.transport.webserver.handlers.runs.ingest.fetcher.fetcher import (
+from lca.plugins.transport.webserver.handlers.runs.ingest.fetcher import (
     FileFetcher,
     HttpxFileFetcher,
-)
-from lca.plugins.transport.webserver.handlers.runs.ingest.integrity.integrity import (
     content_hash,
     decode_data_uri,
     validate_file_integrity,
 )
-from lca.plugins.transport.webserver.handlers.runs.ingest.models.models import (
+from lca.plugins.transport.webserver.handlers.runs.ingest.models import (
     MAX_INGEST_FILE_BYTES,
     MAX_INGEST_FILES,
     FileIntegrityError,
@@ -30,9 +36,97 @@ from lca.plugins.transport.webserver.handlers.runs.ingest.models.models import (
     LobeHubBridgeSettings,
     bridge_settings,
 )
+from lca.plugins.transport.webserver.handlers.runs.session.message.history import (
+    extract_prior_turns,
+)
+from lca.plugins.transport.webserver.handlers.runs.session.message.text import (
+    history_plain_text as _history_plain_text,
+)
+from lca.plugins.transport.webserver.handlers.runs.session.message.text import (
+    visible_user_text as _visible_user_text,
+)
 
 _log = structlog.get_logger(__name__)
 _LOCAL_FILE_URL_RE = re.compile(r"^/files/([a-z]+_[a-z0-9]+)$", re.IGNORECASE)
+
+
+@dataclass(frozen=True)
+class ParsedMessages:
+    """Structured view of a LobeHub chat/completions payload."""
+
+    user_text: str
+    file_refs: tuple[FileRef, ...] = ()
+    prior_turns: tuple[ConversationTurn, ...] = ()
+
+
+@dataclass(frozen=True)
+class LobeHubRunInput:
+    """Final input for ``create_run_session`` from an OpenAI messages array."""
+
+    user_text: str
+    question: str
+    prior_turns: tuple[ConversationTurn, ...] = ()
+    attachment_ids: tuple[str, ...] = ()
+    skipped_files: tuple[str, ...] = field(default_factory=tuple)
+
+
+def parse_messages(
+    messages: list[Any],
+    *,
+    assistant_home: Path | None = None,
+    topic_id: str = "",
+) -> ParsedMessages:
+    """Parse text, current-turn file references, and compact prior-turn context."""
+    if not messages:
+        return ParsedMessages(user_text="")
+    user_text = _extract_last_user_text(messages)
+    last_user = _last_user_message(messages)
+    file_refs = _collect_file_refs([last_user] if last_user is not None else [])
+    prior_turns = extract_prior_turns(
+        messages,
+        plain_text_fn=_history_plain_text,
+        assistant_home=assistant_home,
+        topic_id=topic_id,
+    )
+    return ParsedMessages(
+        user_text=user_text,
+        file_refs=tuple(file_refs),
+        prior_turns=prior_turns,
+    )
+
+
+def compose_run_question(
+    user_text: str,
+    attachment_ids: tuple[str, ...],
+    store: FileStore,
+) -> str:
+    """Compose user text with this turn's FileStore-backed attachment context."""
+    return FileStoreAttachmentIdentity(store).compose_question(user_text, attachment_ids)
+
+
+async def prepare_run_from_messages(
+    messages: list[Any],
+    store: FileStore,
+    *,
+    fetcher: FileFetcher | None = None,
+    assistant_home: Path | None = None,
+    topic_id: str = "",
+) -> LobeHubRunInput:
+    """Parse, mirror current-turn files, and compose a final LCA run task."""
+    parsed = parse_messages(messages, assistant_home=assistant_home, topic_id=topic_id)
+    if not parsed.user_text:
+        return LobeHubRunInput(user_text="", question="")
+    ingest = await ingest_file_refs(
+        parsed.file_refs, store, fetcher=fetcher, conversation_id=topic_id or None
+    )
+    question = compose_run_question(parsed.user_text, ingest.attachment_ids, store)
+    return LobeHubRunInput(
+        user_text=parsed.user_text,
+        question=question,
+        prior_turns=parsed.prior_turns,
+        attachment_ids=ingest.attachment_ids,
+        skipped_files=ingest.skipped,
+    )
 
 
 def select_ingest_files(refs: tuple[FileRef, ...]) -> tuple[FileRef, ...]:
@@ -136,13 +230,6 @@ async def load_bytes(ref: FileRef, fetcher: FileFetcher) -> tuple[bytes, str]:
 
 def try_resolve_local_file(ref: FileRef, store: FileStore | None) -> str | None:
     """Resolve local ``/files/{id}`` and LobeHub-ID references without HTTP."""
-    # Defensive guard: callers that boot the gateway without a bootstrap_factory
-    # (e.g. ``scripts/serve_observability.py``) historically arrived here with
-    # ``store is None`` and surfaced ``AttributeError: 'NoneType' object has
-    # no attribute 'exists'`` as a 500 on POST /runs for any message that
-    # carried a ``fileList`` / ``imageList``. Returning ``None`` lets the
-    # remote/cache/loader fallback path try to attach the file instead of
-    # failing the whole run.
     if store is None:
         return None
     url = ref.url.strip()
@@ -154,4 +241,32 @@ def try_resolve_local_file(ref: FileRef, store: FileStore | None) -> str | None:
     return attachment_id if store.exists(attachment_id) else None
 
 
-__all__ = ["ingest_file_refs", "load_bytes", "select_ingest_files", "try_resolve_local_file"]
+def _last_user_message(messages: list[Any]) -> dict[str, Any] | None:
+    for item in reversed(messages):
+        if isinstance(item, dict) and item.get("role") == "user":
+            return item
+    return None
+
+
+def _extract_last_user_text(messages: list[Any]) -> str:
+    for item in reversed(messages):
+        if not isinstance(item, dict) or item.get("role") != "user":
+            continue
+        text = _visible_user_text(item.get("content"))
+        if text:
+            return text
+    return ""
+
+
+__all__ = [
+    "LobeHubRunInput",
+    "ParsedMessages",
+    "compose_run_question",
+    "extract_prior_turns",
+    "ingest_file_refs",
+    "load_bytes",
+    "parse_messages",
+    "prepare_run_from_messages",
+    "select_ingest_files",
+    "try_resolve_local_file",
+]

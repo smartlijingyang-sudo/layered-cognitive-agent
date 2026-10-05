@@ -11,7 +11,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from lca.plugins.transport.webserver.handlers.runs.ingest.ingress.ingress import (
+from lca.plugins.transport.webserver.handlers.runs.ingest import (
     parse_messages,
 )
 

@@ -6,7 +6,6 @@ lives on the host, and uploads land under it with a real conversation_id.
 """
 
 import base64
-import os
 
 import pytest
 
@@ -92,10 +91,8 @@ async def test_wsot05_ingest_writes_conversation_id(monkeypatch, tmp_path):
     _clean_env(monkeypatch)
     monkeypatch.setenv("LCA_WORKSPACE_ROOT", str(tmp_path / "ws"))
     from lca.infrastructure.file.store import LocalFileStore
-    from lca.plugins.transport.webserver.handlers.runs.ingest.models.models import (
+    from lca.plugins.transport.webserver.handlers.runs.ingest import (
         FileRef,
-    )
-    from lca.plugins.transport.webserver.handlers.runs.ingest.service.service import (
         ingest_file_refs,
     )
 
@@ -112,11 +109,14 @@ async def test_wsot05_ingest_writes_conversation_id(monkeypatch, tmp_path):
     assert stored is not None
     assert stored.conversation_id == "topic_9"
     assert store.read_bytes(result.attachment_ids[0]) == b"ingest-me"
+
+
 # ---------------------------------------------------------------------------
 # WSOT-07: per-run assistant resolution — the run's assistant wins over the
 # global LCA_ASSISTANT_ID default; other assistants are never pointed at the
 # default assistant's workspace.
 # ---------------------------------------------------------------------------
+
 
 def test_ssot_run_assistant_beats_global_default(monkeypatch, tmp_path):
     """run 作用域绑定的 assistant 优先于全局 LCA_ASSISTANT_ID 默认值。"""

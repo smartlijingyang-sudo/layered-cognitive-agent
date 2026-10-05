@@ -35,7 +35,7 @@ from lca.cognition.team.modes_catalog import resolve_profile_mode
 from lca.contracts.models.core.conversation.conversation import ConversationTurn
 from lca.infrastructure.file.store import LocalFileStore
 from lca.plugins.transport.webserver.handlers.cors.cors import cors_headers
-from lca.plugins.transport.webserver.handlers.runs.ingest.ingress.ingress import (
+from lca.plugins.transport.webserver.handlers.runs.ingest import (
     LobeHubRunInput,
     prepare_run_from_messages,
 )

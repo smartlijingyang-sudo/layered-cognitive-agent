@@ -1,13 +1,23 @@
-"""Validate remote file bytes before they cross into the managed FileStore."""
-# ADR-0203 §3.3: raw-bytes content hash; not canonical-JSON digest.
+"""Remote byte-fetching adapters and content integrity validation for file ingest."""
 
 from __future__ import annotations
 
 import base64
 import re
+from typing import Protocol
+
+import httpx
 
 from lca.contracts.mechanisms.content.addressable import sha256_hex
-from lca.plugins.transport.webserver.handlers.runs.ingest.models.models import FileIntegrityError
+from lca.plugins.transport.webserver.handlers.runs.ingest.models import (
+    FILE_DOWNLOAD_TIMEOUT_S,
+    FileIntegrityError,
+    LobeHubBridgeSettings,
+    bridge_settings,
+)
+from lca.plugins.transport.webserver.handlers.runs.ingest.policy import (
+    assert_ingest_url_allowed,
+)
 
 _MAGIC_BYTES: dict[str, bytes] = {
     "application/pdf": b"%PDF",
@@ -74,4 +84,37 @@ def looks_like_html(content: bytes) -> bool:
     return bool(_HTML_DOCTYPE.search(head) or _HTML_TAG.search(head))
 
 
-__all__ = ["content_hash", "decode_data_uri", "looks_like_html", "validate_file_integrity"]
+class FileFetcher(Protocol):
+    """Retrieve content bytes and the actual transport MIME type for one URL."""
+
+    async def fetch(self, url: str) -> tuple[bytes, str]: ...
+
+
+class HttpxFileFetcher:
+    """HTTP(S) downloader protected by the ingest URL policy and timeout."""
+
+    def __init__(self, settings: LobeHubBridgeSettings | None = None) -> None:
+        self._settings = settings if settings is not None else bridge_settings()
+
+    async def fetch(self, url: str) -> tuple[bytes, str]:
+        """Fetch one allowed URL and normalize its response MIME type."""
+        assert_ingest_url_allowed(url, self._settings)
+        async with httpx.AsyncClient(
+            follow_redirects=True,
+            timeout=httpx.Timeout(FILE_DOWNLOAD_TIMEOUT_S),
+        ) as client:
+            response = await client.get(url)
+            response.raise_for_status()
+            content_type = response.headers.get("content-type", "application/octet-stream")
+            mime = content_type.split(";")[0].strip() or "application/octet-stream"
+            return response.content, mime
+
+
+__all__ = [
+    "FileFetcher",
+    "HttpxFileFetcher",
+    "content_hash",
+    "decode_data_uri",
+    "looks_like_html",
+    "validate_file_integrity",
+]

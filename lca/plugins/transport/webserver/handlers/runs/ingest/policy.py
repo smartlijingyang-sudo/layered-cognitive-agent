@@ -5,7 +5,7 @@ from __future__ import annotations
 import ipaddress
 from urllib.parse import urlparse
 
-from lca.plugins.transport.webserver.handlers.runs.ingest.models.models import (
+from lca.plugins.transport.webserver.handlers.runs.ingest.models import (
     IngestUrlPolicyError,
     LobeHubBridgeSettings,
     bridge_settings,

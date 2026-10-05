@@ -15,14 +15,12 @@ from lca.plugins.transport.webserver.handlers.runs.ingest import (
     IngestUrlPolicyError,
     LobeHubBridgeSettings,
     assert_ingest_url_allowed,
-    ingest_file_refs,
-    reset_ingest_cache_for_tests,
-    select_ingest_files,
-)
-from lca.plugins.transport.webserver.handlers.runs.ingest.ingress.ingress import (
     compose_run_question,
+    ingest_file_refs,
     parse_messages,
     prepare_run_from_messages,
+    reset_ingest_cache_for_tests,
+    select_ingest_files,
 )
 
 

@@ -12,8 +12,8 @@ from typing import Any
 import structlog
 
 from lca.infrastructure.file.store import FileStore
-from lca.plugins.transport.webserver.handlers.runs.ingest.integrity.integrity import content_hash
-from lca.plugins.transport.webserver.handlers.runs.ingest.models.models import (
+from lca.plugins.transport.webserver.handlers.runs.ingest.fetcher import content_hash
+from lca.plugins.transport.webserver.handlers.runs.ingest.models import (
     FileRef,
     LobeHubBridgeSettings,
     bridge_settings,

@@ -26,8 +26,8 @@ independent of the boot wiring.
 
 from __future__ import annotations
 
-from lca.plugins.transport.webserver.handlers.runs.ingest import FileRef
-from lca.plugins.transport.webserver.handlers.runs.ingest.service.service import (
+from lca.plugins.transport.webserver.handlers.runs.ingest import (
+    FileRef,
     try_resolve_local_file,
 )
 

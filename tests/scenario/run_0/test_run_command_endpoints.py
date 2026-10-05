@@ -15,7 +15,7 @@ from starlette.routing import Route
 from starlette.testclient import TestClient
 
 from lca.plugins.transport.webserver.handlers.runs.api.command_endpoints import create_run
-from lca.plugins.transport.webserver.handlers.runs.ingest.ingress.ingress import LobeHubRunInput
+from lca.plugins.transport.webserver.handlers.runs.ingest import LobeHubRunInput
 from lca.plugins.transport.webserver.handlers.runs.terminal.port.port import RunReceipt
 from lca.plugins.transport.webserver.handlers.runs.terminal.streaming import (
     auth,
