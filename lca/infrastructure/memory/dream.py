@@ -22,12 +22,14 @@ from lca.contracts.atoms.ids.ids import new_id
 from lca.contracts.mechanisms.content.addressable import sha256_hex
 from lca.contracts.models.core.conversation.memory import MemoryRecord
 from lca.contracts.models.memory.episode import (
+    STYLE_PREFERENCE_DIMENSION,
     ClusterView,
     EpisodeFact,
     LifecycleState,
     ResidualClass,
     canonical_dedupe_key,
     consolidate,
+    matched_style_token,
 )
 from lca.infrastructure.memory.assistant_memory import AssistantMemory
 from lca.infrastructure.memory.contextfiles.adapters.disk import DiskFileStore
@@ -139,7 +141,10 @@ def _trail_episode(entry: TrailEntry) -> EpisodeFact:
     if is_preference_statement(entry.content):
         category = MemoryCategory.PREFERENCE
         authority = True
-        raw_key = f"preference:{digest}"
+        # 风格偏好归到共享维度键，同一维度的不同措辞才聚进一个 cluster。
+        # 摘要键留给无维度可映射的偏好。
+        style = matched_style_token(entry.content)
+        raw_key = STYLE_PREFERENCE_DIMENSION if style is not None else f"preference:{digest}"
     else:
         category = MemoryCategory.FACT
         authority = False

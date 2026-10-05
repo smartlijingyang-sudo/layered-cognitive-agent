@@ -24,7 +24,9 @@
 
 **其一，trail 事实拿不到 recurrence 保护。** `_trail_episode` 的 `dedupe_key` 是 `preference:<内容摘要>`，`source_trace_id` 是 `<流水文件名>:<同一摘要>`。`_cluster`（`contracts/models/memory/episode.py:85-92`）按 `dedupe_key` 分组，`recurrence` 是组内不同 `source_trace_id` 的个数。同一句话跨两天复现能凑到 2，但「还是简洁一点好」与「回复请简短」是不同内容、不同摘要、不同 key，永远不聚在一组。于是 `_lifecycle`（`episode.py:74-82`）的 `recurrence >= 2` 分支对同一维度的不同措辞不可达，唯一的提升路径是 `explicit_user_authority=True`。
 
-后果是 `_PREFERENCE` 命中一次即永久提升，没有复现兜底。这与 `487a9fdff` 修的缺陷同形，一条错的事实带 authority 提升后不再被审视。所以必须先给流水偏好一个稳定维度键，再拓宽探测器。顺序反过来会把缺陷放大。
+后果是 `_PREFERENCE` 命中一次即永久提升，没有复现兜底，因为 `_lifecycle` 的 authority 分支先于 `recurrence` 短路。这与 `487a9fdff` 修的缺陷同形，一条错的事实带 authority 提升后不再被审视。
+
+顺序必须是先给稳定维度键（Task 2）再拓宽探测器（Task 5），但理由不是维度键能带来复现保护，它带不来，authority 仍然短路。真正的理由是拓宽会放大重复。Task 5 让更多流水行被判为偏好，若它们仍各自持有 `preference:<摘要>` 键，每一行都新开一个维度、各自提升一条语义记录，重复维度按拓宽幅度成倍增长。先落维度键，同一风格维度的新命中才会收敛成一条记录。authority 造成的误报暴露两个任务都不解决，留给 Task 5 的规则。
 
 **其二，索引检索路径没有隐私过滤。** `MemorySearchTool.execute`（`infrastructure/tools/assistant/memory_tools.py:118-126`）只在 `branch is not None` 的分支对 `_search_main` 结果套 `is_private_personal`，`_search_indexed` 与 else 分支的 `_search_main` 都不过滤。今天索引里只有经 `contains_secret` 写入的 curated 记录，所以缺口不可达。流水开始承载原始话轮后，未经过滤的用户原文会经索引进入 `memory_search` 结果，再进入模型上下文。写入方与这个过滤必须同一个 PR 落地。
 
@@ -92,11 +94,17 @@ canonical owner 判定：风格偏好词表归 `contracts/models/memory/episode.
 
 ### Task 2：`_trail_episode` 对风格偏好发稳定维度键
 
-`dream.py:_trail_episode` 在 `is_preference_statement` 命中后，先问 `matched_style_token(entry.content)`；命中就用 `STYLE_PREFERENCE_DIMENSION`，否则回落 `preference:<摘要>`。`source_trace_id` 保持 `<流水文件名>:<摘要>`，因为同一维度跨天复现要靠不同的 trace 才能把 `recurrence` 累到 2。
+状态：已完成。
 
-这一步让同一维度的不同措辞聚进一个 cluster，`_lifecycle` 的 `recurrence >= 2` 分支对流水偏好重新可达，单次误命中不再直接永久提升。
+`dream.py:_trail_episode` 在 `is_preference_statement` 命中后先问 `matched_style_token(entry.content)`，命中就用 `STYLE_PREFERENCE_DIMENSION`，否则回落 `preference:<摘要>`。`source_trace_id` 保持 `<流水文件名>:<摘要>`。
 
-验证：新增测试断言「还是简洁一点好」与「回复请简短」两条不同措辞的流水行经 `consolidate` 落进同一个 `dedupe_key=preference:verbosity` 的 cluster，且单条出现时 `lifecycle` 为 `ephemeral_fast`、跨两个 source 复现时为 `consolidated_slow`。
+实测修正了本任务的理由。改动前 `以后回复简洁一点` 与 `回复要简洁` 经 `consolidate` 产出两个 cluster，各 `recurrence=1`、各 `consolidated_slow`，提升为两条独立语义记录。改动后合成一个 `dedupe_key=preference:verbosity` 的 cluster。所以本任务买到的是维度身份，一个维度一条记录，`_already_active` 的 NOOP 也因此对风格偏好生效。
+
+本任务没有买到误报防护。`_lifecycle` 先判 `explicit_user_authority` 且 category 属 IDENTITY 或 PREFERENCE，命中即 `consolidated_slow`，永远走不到 `recurrence >= 2`。流水偏好的 authority 恒为 `True`，所以单次提及仍然首次即永久提升。初稿写的「单次误命中不再直接永久提升」与「单条出现时 lifecycle 为 ephemeral_fast」都不成立，误报防护属 Task 5 的 authority 规则。
+
+验证：`tests/infrastructure/memory/test_trail_style_dimension.py` 在 `run_dream` 真实入口上跑，不经私有函数。断言两种措辞只产一条 `preference:verbosity` 记录、非风格偏好保留摘要键、非偏好行不提升、单次提及仍提升（钉住上面这条反面事实）、第二次 dream 不新增。测试数据用 `以后回复简洁一点` 与 `回复要简洁`，两者都命中 `_PREFERENCE` 且都含风格词。初稿写的「还是简洁一点好」不命中 `_PREFERENCE`，「回复请简短」的 `简短` 不在 Task 1 的词表里，两者都要等 Task 5 才可用。
+
+遗留观察，供 Task 5 使用。`source_trace_id` 是 `<流水文件名>:<内容摘要>`，所以 `recurrence` 数的是不同措辞而不是不同场合。同一句话在同一天的流水里出现两次得到相同 `source_trace_id`，`recurrence` 仍为 1；两种不同措辞在同一天出现则 `recurrence` 为 2。若 Task 5 收窄 authority、让 `recurrence` 成为唯一提升门，这个语义要先定清楚。
 
 ### Task 3：在线流水写入方，与索引检索的隐私过滤同 PR
 
@@ -126,7 +134,7 @@ canonical owner 判定：风格偏好词表归 `contracts/models/memory/episode.
 
 `trail.py:18` 的 `_PREFERENCE` 增加无记忆动词的风格偏好形状，目标覆盖判据句「还是简洁一点好」「别那么啰嗦」「回复请简短」「我喜欢简洁的回复」。
 
-拓宽必须与 authority 规则同时定，不能只改词表。`_trail_episode` 今天对任何 `is_preference_statement` 命中都给 `authority=True`，而 `preference:<摘要>` 的键形状让 `recurrence` 恒为 1，所以每次命中都是首次即永久提升，没有复现兜底。Task 2 只给风格类偏好换了稳定维度键，非风格类偏好仍走摘要键，这个暴露在本任务必须一并处理。
+拓宽必须与 authority 规则同时定，不能只改词表。`_trail_episode` 对任何 `is_preference_statement` 命中都给 `authority=True`，而 `_lifecycle` 的 authority 分支先于 `recurrence` 短路，所以每次命中都是首次即永久提升，与键形状无关。Task 2 给风格类偏好换了稳定维度键，消掉的是重复记录，不是这个暴露；非风格类偏好仍走摘要键，两类的暴露都在本任务处理。
 
 两条候选。一是把 authority 收窄到能映射出稳定维度的行，代价是「以后不要用 emoji」这类合法的非风格偏好要凑够两天复现才提升。二是给非风格偏好也建维度分类，代价是引入一套新的维度词表，与 Task 1 收敛词表的方向相反。
 
