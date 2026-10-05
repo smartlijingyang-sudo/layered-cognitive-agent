@@ -17,7 +17,7 @@ from __future__ import annotations
 from dataclasses import dataclass, replace
 from typing import Any
 
-from lca.cognition.memory.daytime import record_task_episode
+from lca.cognition.memory.daytime import record_task_episode, record_turn_trail
 from lca.contracts.atoms.control.slot import ControlSlot
 from lca.contracts.atoms.enums.enums import ActionType
 from lca.contracts.atoms.functional.group import FunctionalGroup
@@ -64,13 +64,17 @@ class PerceiveObserveExecutor:
         state = input.port_values.get(PortName("state"))
         if state is None and hasattr(runtime, "get"):
             state = runtime.get("agent_state")
+        # Two independent records: the episode is template-gated, the trail is not.
         record_task_episode(runtime, state)
+        record_turn_trail(runtime, state)
         hub = getattr(runtime, "perceive_hub", None)
         if hub is None and hasattr(runtime, "get"):
             hub = runtime.get("perceive_hub")
         routing = RoutingDecision(action_type=ActionType.RESPOND)
         if not isinstance(hub, PerceiveHub):
-            return NodeOutput(port_values={PortName("manifest"): None, PortName("routing"): routing})
+            return NodeOutput(
+                port_values={PortName("manifest"): None, PortName("routing"): routing}
+            )
         manifest = await hub.perceive(state)  # type: ignore[arg-type]
         merged = await self._merge_assistant_bootstrap(runtime, manifest)
         return NodeOutput(port_values={PortName("manifest"): merged, PortName("routing"): routing})

@@ -108,17 +108,19 @@ canonical owner 判定：风格偏好词表归 `contracts/models/memory/episode.
 
 ### Task 3：在线流水写入方，与索引检索的隐私过滤同 PR
 
-`daytime.py` 新增 `record_turn_trail(runtime, state, *, now_ms=None) -> bool`，与 `record_task_episode` 同形：`episode_home(runtime)` 解析失败、`state` 为空、话轮为空都返回 `False`，任何异常吞掉返回 `False`，不向上传播。它不调用 `govern()`，因此不受闭合模板门控。
+状态：已完成。
 
-写入前两道处理，顺序固定。先 `contains_secret(content)`（`contextfiles/domain/curated.py`），命中则不写并返回 `False`，这是 ADR-0260 C3-3 凭证红线，`run_56c3352cd22e` 的明文口令是先例。再按字符数截断到上界，上界取常量并写测试钉住，避免一条超长话轮把整日流水撑大。
+`daytime.py` 新增 `record_turn_trail(runtime, state, *, now_ms=None) -> bool`，与 `record_task_episode` 同形，`episode_home(runtime)` 解析失败、`state` 为空、话轮为空都返回 `False`，任何异常吞掉返回 `False`。它不调用 `govern()`，因此不受闭合模板门控。`observe.py` 在 `record_task_episode` 旁调用它，两者互不门控。
 
-日期取 `now_ms` 派生的 UTC 日期，与 `trail_date` / `_TRAIL_FILE` 的 `memory/YYYY-MM-DD.md` 形状一致。时间来源经参数注入，不读时钟，符合 C8 确定性。
+写入侧只挡凭证。`contains_secret(text)` 命中即返回 `False` 且不落盘，这是 ADR-0260 C3-3 的红线，`run_56c3352cd22e` 的明文口令是先例。私人信息不在写入侧过滤，因为 `is_private_personal` 本身已经包含 `contains_secret`，两者是写侧红线与读侧过滤的分工，不是重复。单行上界 `_MAX_TRAIL_LINE_CHARS = 200`，测试钉住。
 
-`observe.py:67` 在 `record_task_episode(runtime, state)` 旁调用它。两者互不门控，`govern()` 返回 `None` 时流水照写。
+日期由 `now_ms` 派生的 UTC 日期得出，时间经参数注入不读墙钟，符合 C8。派生用的 `datetime.fromtimestamp(now_ms / 1000, tz=UTC).strftime("%Y-%m-%d")` 与 `dream.py` 和 `assistant_memory.py` 里的写法相同，现在是第三处。三处是抽取阈值，但抽取要动另外两层，不并进本任务，留作后续。
 
-同 PR 必须包含 `memory_tools.py` 的过滤修复：`_search_indexed` 的返回值与 else 分支的 `_search_main` 返回值都套 `is_private_personal`，与 `branch is not None` 分支现有的过滤对齐。漏掉这一半等于把未过滤的用户原文送进模型上下文。
+隐私过滤做成了所有路径之后的一次统一过滤，不是计划里写的两处分别套。这样 `_search_branch` 的结果也一并过滤，它原先没有过滤。范围比计划大一点，代价是多过滤一条本来就不该出现在检索结果里的私人内容，收益是以后新增检索路径不会漏掉这一层。
 
-验证：新增 `tests/cognition/memory/test_record_turn_trail.py`，覆盖判据句写入、`govern()` 不命中时仍写入、含口令话轮不写入、超长话轮被截断、home 缺失返回 `False`。新增 `tests/infrastructure/tools/test_memory_search_filters_private.py`，覆盖索引命中含私人信息时不出现在结果里。既有 `tests/infrastructure/memory/test_trail_append_only.py` 三条必须继续通过。
+`TrailWriter.append` 是读改写，本身不原子。`DiskFileStore._refuse_trail_overwrite` 会把非严格追加的写入判为 `NarrowGateViolationError`，所以两个并发话轮相撞时结果是其中一行丢失并返回 `False`，而不是文件被写坏。这是接受的语义，`record_turn_trail` 的 docstring 写明了。要消除丢失需要给 trail 加锁，`EpisodeBuffer` 用一事实一文件规避了同一个问题，但那是另一种存储形状，不在本任务范围。
+
+验证：`tests/cognition/memory/test_record_turn_trail.py` 11 条，覆盖判据句写入（含 `还是简洁一点好`、`别那么啰嗦`、`回复请简短` 三条 `govern()` 全部返回 `None` 的句子）、日期来自注入时钟、两次写入是追加不是覆盖、凭证被拒、私人信息照写（钉住写读两侧的分工）、超长截断、home 缺失、空话轮、`state` 为 `None`。`tests/infrastructure/tools/test_memory_search_filters_private.py` 3 条，覆盖索引路径与无索引回退路径都过滤，以及正常记录不被连带吃掉。既有 `tests/infrastructure/memory/test_trail_append_only.py` 三条窄门断言继续通过。
 
 ### Task 4：`MemoryIndex` 单文档写入与 trail 追加后的增量索引
 
@@ -159,7 +161,7 @@ canonical owner 判定：风格偏好词表归 `contracts/models/memory/episode.
 - 每任务：`uv run ruff check` + `uv run ruff format --check` + 该任务的 pytest
 - 汇总：`uv run pytest tests/contracts tests/cognition/memory tests/reflect tests/remember tests/infrastructure/memory tests/scenario/memory -q --no-cov`
 - 公共签名：`uv run mypy` 对改动文件，报告须区分本次引入与 56 条既有基线
-- 分层：`lint-imports` + `uv run python scripts/check_package_contracts.py`，两者当前有既有失败，报告须分开列
+- 分层：`lint-imports` 基线 exit 1，原因是两条 `No matches for ignored import` 的陈旧忽略项；`check_package_contracts.py` 基线 `FAIL: 60 issues across 82 packages`。两者都用 stash 对照确认差值为 0，不能只看退出码。取退出码时不要在管道后读 `$?`，那是管道末命令的状态，不是门禁的。
 - 插件形状不受影响，本计划不新增 plugin；若 Task 4 触及 plugin 则加 `./scripts/lca-ops audit-plugin-shape`
 - 文档门禁：`verify_md_links.py`、`notes-check`、`verify_doc_budgets.py`、`check_doc_layering.py --strict`，五个门禁当前全部 exit 1 属既有失败，只要求改动文件未被点名
 

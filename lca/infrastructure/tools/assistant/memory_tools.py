@@ -116,14 +116,16 @@ class MemorySearchTool(_BaseMemoryTool):
             limit = 5
         branch = str(args.get("branch") or "").strip() or None
         if branch is not None:
-            records = [
-                row
-                for row in self._search_main(query, limit=limit)
-                if not is_private_personal(str(row.get("content") or ""))
-            ] + self._search_branch(query, branch, limit=limit)
+            records = self._search_main(query, limit=limit) + self._search_branch(
+                query, branch, limit=limit
+            )
         else:
             indexed = self._search_indexed(query, limit=limit)
             records = indexed if indexed is not None else self._search_main(query, limit=limit)
+        # One filter over every path. The indexed path carries raw trail lines,
+        # which no write-side gate has seen, and a per-branch filter is one a
+        # future path can forget.
+        records = [row for row in records if not is_private_personal(str(row.get("content") or ""))]
         return self._ok(
             start,
             {
