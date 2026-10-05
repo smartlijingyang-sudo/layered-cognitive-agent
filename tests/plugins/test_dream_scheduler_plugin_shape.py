@@ -35,6 +35,7 @@ from lca.contracts.protocols.assistant.catalog import (
 )
 from lca.contracts.protocols.declarative.declarative_1.declarative_common import PluginSpecKind
 from lca.harness.plugin_api import definition_from_plugin
+from lca.plugins.assistant.profile.profile import render_user_profile
 from lca.plugins.memory import dream_scheduler as plugin_module
 
 REPO = Path(__file__).resolve().parents[2]
@@ -272,7 +273,8 @@ async def test_setup_injects_the_production_seams(
 
     monkeypatch.setattr(plugin_module, "DreamScheduler", _Recorder)
     home = _home_with_memory(isolated_lca_home / "assistants", "asst_1")
-    ctx = _StubCtx(_StubCatalog([_summary(home)]))
+    catalog = _StubCatalog([_summary(home)])
+    ctx = _StubCtx(catalog)
 
     await plugin_module.setup.setup(ctx, plugin_module.Config(tick_seconds=42))
 
@@ -284,7 +286,18 @@ async def test_setup_injects_the_production_seams(
         "the scheduler and RoutineFileLock must read one clock, or the reclaim bound lies"
     )
     assert captured["evidence_writer"] is write_dream_evidence
-    assert captured["callbacks"] is not None
+
+    render, backfill = captured["callbacks"](home)
+    assert render is render_user_profile, (
+        "a scheduler that boots clean and never re-projects USER.md is the silent failure "
+        "this wiring exists to end, so the pair itself is pinned rather than its presence"
+    )
+    assert backfill is not None
+    backfill("asst_1", [])
+    assert [assistant_id for assistant_id, _ in catalog.revised] == ["asst_1"], (
+        "the injected backfill writes through the catalog this plugin resolved"
+    )
+
     assert captured["homes"]() == [home]
 
 

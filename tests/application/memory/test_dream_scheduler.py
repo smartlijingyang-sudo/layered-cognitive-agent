@@ -315,15 +315,13 @@ async def test_an_io_failure_is_contained_and_diagnosed(
     tmp_path: Path, clock: list[int], caplog: pytest.LogCaptureFixture
 ) -> None:
     home = tmp_path / "a"
-    calls: list[Path] = []
 
     def unreadable(
         seen: Path, *, now_ms: int, backfill: _Backfill | None, render: _Render | None
     ) -> DreamReport:
-        calls.append(seen)
         raise FileNotFoundError(f"{seen}/memory/semantic.json")
 
-    scheduler = _scheduler(tmp_path, [home], clock, calls, run_dream_fn=unreadable)
+    scheduler = _scheduler(tmp_path, [home], clock, [], run_dream_fn=unreadable)
 
     with caplog.at_level(logging.WARNING):
         reports = await scheduler.sweep_once()
@@ -437,6 +435,31 @@ async def test_two_homes_sharing_a_basename_get_distinct_locks(
     assert calls == [second], "the lock key is the home path, so a basename twin is not skipped"
     assert reports == (None, _report())
     holder.release()
+
+
+async def test_home_discovery_runs_off_the_event_loop_thread(
+    tmp_path: Path, clock: list[int]
+) -> None:
+    loop_thread = threading.get_ident()
+    off_loop: list[bool] = []
+
+    def homes() -> list[Path]:
+        off_loop.append(threading.get_ident() != loop_thread)
+        return []
+
+    scheduler = DreamScheduler(
+        homes=homes,
+        lock_dir=tmp_path / "locks",
+        tick_seconds=300,
+        now_ms=lambda: clock[0],
+    )
+
+    await scheduler.sweep_once()
+
+    assert off_loop == [True], (
+        "discovery lists the catalog and stats every home, which on the live fleet "
+        "costs 120ms warm and 4s cold; the loop it would block serves HTTP"
+    )
 
 
 async def test_run_forever_survives_a_raising_homes_callable(

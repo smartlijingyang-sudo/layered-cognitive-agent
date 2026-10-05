@@ -14,7 +14,11 @@ provider's and ``assistant.catalog`` is provided at L4.
 Dispose only signals ``DreamScheduler.stop``. A pass already inside ``run_dream``
 runs to completion on its executor thread, because cancelling that await would
 release the home's lock while ``run_dream`` still held it. A shutdown landing
-mid-pass therefore blocks for one pass, measured at 11-30ms per home.
+mid-pass therefore waits for it, and nothing bounds that wait: executor threads
+are non-daemon and are joined at loop shutdown. A healthy pass costs 11-30ms per
+home, so the wait is normally invisible. A hung pass blocks the shutdown for as
+long as it hangs. The 900s reclaim bound says when another process may take that
+home's lock, not when this shutdown gives up.
 """
 
 from __future__ import annotations

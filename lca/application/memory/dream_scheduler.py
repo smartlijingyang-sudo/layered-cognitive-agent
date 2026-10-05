@@ -7,7 +7,10 @@ satisfies, so every periodic schedule kind is unreachable there.
 
 ``run_dream`` is synchronous and does file I/O, so the sweep dispatches the
 whole locked pass, lock files and evidence write included, to an executor
-thread. The kernel process serves HTTP on the same loop.
+thread. Home discovery goes off the loop for the same reason: it lists the
+catalog, which reads and parses every home's ``manifest.json``, and against
+the live 576-home fleet that costs 130ms warm and 3.9s cold. The kernel
+process serves HTTP on the same loop.
 
 The production implementation of the two seams the sweep injects,
 ``evidence_writer`` and ``callbacks``, also lives here. ``application`` is the
@@ -129,7 +132,8 @@ class DreamScheduler:
             return ()
         self._next_due_ms = now + self._tick_seconds * 1000
         reports: list[DreamReport | None] = []
-        for home in self._homes():
+        homes = await asyncio.to_thread(self._homes)
+        for home in homes:
             try:
                 reports.append(await self._run_home(home, now))
             except Exception:
