@@ -11,7 +11,7 @@ from __future__ import annotations
 import asyncio
 import logging
 from collections.abc import Awaitable, Callable
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING, Any, cast
 
 if TYPE_CHECKING:
     from lca.infrastructure.observability.spine.event.record import Outcome
@@ -215,19 +215,22 @@ class CognitiveRuntime(Runtime):
                 prior_turns = ctx.prior_turns if ctx else ()
                 if prior_turns:
                     run_writer.seed_prior_turns(prior_turns)
-                run_writer.append_user_message(
-                    message_id=f"task:{trace_id}",
-                    role="user",
-                    content=task,
-                )
-                seed = (ctx.extra or {}).get("developer_seed") if ctx else None
+                loop_extra: dict[str, Any] = (ctx.extra or {}) if ctx else {}
+                seed = loop_extra.get("developer_seed")
                 if isinstance(seed, str) and seed:
-                    # ADR-0268 §6：handoff 在用户轮之后、第一次模型调用之前落盘。
+                    # ADR-0268 §6：handoff 轮没有用户轮。只落 developer 消息，
+                    # 否则 user_text 上那个去重占位标记会变成一条用户气泡。
                     run_writer.append_developer_message(
                         message_id=f"handoff:{trace_id}",
                         content=seed,
-                        job_id=(ctx.extra or {}).get("developer_seed_job_id") or None,
+                        job_id=loop_extra.get("developer_seed_job_id") or None,
                         run_id=trace_id,
+                    )
+                else:
+                    run_writer.append_user_message(
+                        message_id=f"task:{trace_id}",
+                        role="user",
+                        content=task,
                     )
             # ADR-0248: 运行态声带与硬闸解析
             vocal_mode = None

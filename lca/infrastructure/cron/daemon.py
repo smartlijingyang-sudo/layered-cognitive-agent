@@ -34,6 +34,7 @@ class CronDaemonService:
         worker_runner: Callable[[str], Any] | None = None,
         tick_interval_s: int = 15,
         clock: Callable[[], datetime] | None = None,
+        handoff_dispatcher: Any | None = None,
     ) -> None:
         self._store = store
         self._lock_dir = Path(lock_dir)
@@ -52,6 +53,7 @@ class CronDaemonService:
             workspace_path=self._workspace_path,
             worker_runner=self._worker_runner,
             default_interval_s=self._tick_interval_s,
+            handoff_dispatcher=handoff_dispatcher,
             clock=self._clock,
         )
 

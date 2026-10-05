@@ -305,7 +305,7 @@ worker 结束时先追加 run，`outcome` 已定。`receipts` 在投递决定写
 
 **所有者。** 追加发生在 worker 结束时，写 `run_id`、`outcome`、`finished_at`，`receipts` 为空。关闭发生在 handoff 轮结束时，只写 `receipts`。`run_id`、`outcome`、`finished_at` 一经追加不再改变。除这两次写入之外没有第三种写。
 
-**关闭之前先落 dispatch 身份。** `CronRun` 增加 `handoff_run_ids: tuple[str, ...]`，一个投递目标一个 id，在起 handoff run 之前写入。顺序是先写盘再起 run。反过来不成立：先起 run 再写盘，进程在两步之间死掉，重启后读到一条既未决又没派过 run 的记录，重新推导会再派一次，用户收到两条同样的提醒。写在前面的那个身份让重复投递在结构上不可能，而不是靠重试逻辑小心。
+**关闭之前先落 dispatch 身份。** `CronRun` 增加 `handoff_run_ids: tuple[str, ...]`，一个投递目标一个 id。id 由 dispatch 铸造，所以写不进「起 run 之前」；能成立的顺序是每派完一个目标立刻落它的 id，然后才等那一轮，也才派下一个目标。这样进程死掉时，记录上已有的 id 数就等于已经派出的 run 数，恢复读那些 run 的结果，不重派。反过来不成立：等全部目标都派完再一次性落盘，中间死掉会让重启读到一条未决且看起来没派过的记录，于是把已经发出去的提醒再发一遍。逐个落身份让重复投递在结构上不可能，而不是靠重试逻辑小心。
 
 `handoff_run_ids` 缺省为空，读作「还没派」。既有记录全部落在这个读法上，不需要迁移脚本。
 

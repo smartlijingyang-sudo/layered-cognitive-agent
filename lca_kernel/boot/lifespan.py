@@ -73,6 +73,9 @@ def make_lifespan(
             from lca.domain.cron.store import MultiAssistantCronStore
             from lca.infrastructure.cron.daemon import CronDaemonService
             from lca.infrastructure.path.locator import get_lca_home
+            from lca.plugins.transport.webserver.handlers.runs.terminal.handoff_dispatch import (
+                LcaRunHandoffDispatcher,
+            )
 
             lca_home = get_lca_home()
             store = MultiAssistantCronStore(lca_home / "assistants")
@@ -84,6 +87,10 @@ def make_lifespan(
                 store=store,
                 lock_dir=lock_dir,
                 workspace_path=workspace_path,
+                # Resolves run_port / registry off app.state at dispatch time,
+                # so boot ordering between the webserver bootstrap and this
+                # block does not matter.
+                handoff_dispatcher=LcaRunHandoffDispatcher(app),
             )
             await cron_daemon.start()
             app.state.cron_daemon = cron_daemon

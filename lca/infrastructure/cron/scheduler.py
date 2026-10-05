@@ -27,8 +27,10 @@ from pathlib import Path
 from lca.contracts.models.cron.models import (
     CronJob,
     CronValidationError,
+    ScheduledHandoff,
     TargetReceipt,
 )
+from lca.domain.cron.handoff_dispatch import ScheduledHandoffDispatcher
 from lca.domain.cron.next_run import next_run
 from lca.domain.cron.store import CronStore
 from lca.domain.cron.worker_context import (
@@ -73,6 +75,7 @@ class CronScheduler:
         worker_runner: WorkerRunner,
         default_interval_s: int = 60,
         clock: Clock | None = None,
+        handoff_dispatcher: ScheduledHandoffDispatcher | None = None,
     ) -> None:
         self._store = store
         self._lock_dir = Path(lock_dir)
@@ -80,6 +83,8 @@ class CronScheduler:
         self._worker_runner = worker_runner
         self._default_interval_s = default_interval_s
         self._clock = clock if clock is not None else (lambda: datetime.now(UTC))
+        self._handoff_dispatcher = handoff_dispatcher
+        self._handoff_tasks: set[asyncio.Task[None]] = set()
         # 进程内存中的运行态（ADR-0268 §8）：调度器单实例运行。
         self._active: dict[str, asyncio.Task] = {}
         self._pending: dict[str, str] = {}
@@ -187,6 +192,7 @@ class CronScheduler:
                 finished_at=self._clock(),
                 run_id=run_id,
             )
+            self._maybe_start_handoff(job, run_id, result)
         except Exception:
             # 意外错误（如落盘失败）也不让 worker 任务带着异常结束。
             _log.exception("cron.worker_crashed job_id=%s run_id=%s", job.id, run_id)
@@ -203,6 +209,73 @@ class CronScheduler:
             pending = self._pending.pop(job.id, None)
             if pending is not None:
                 self._start_worker(job, pending)
+
+    def _maybe_start_handoff(self, job: CronJob, run_id: str, result: CronWorkerResult) -> None:
+        """起 handoff 轮，但不占住 worker 槽（ADR-0268 §6.1、§8.1）。
+
+        worker 槽管的是这次到点的执行。handoff 轮是一次完整的 run，长度由它
+        自己的预算决定，把它算进 worker 槽会让一个提醒占住排队位几分钟。
+        """
+        if self._handoff_dispatcher is None:
+            return
+        if job.execution.kind != "agent" or not job.delivery_targets:
+            return
+        if not result.worker_message:
+            return
+        task = asyncio.create_task(self._run_handoff(job, run_id, result))
+        self._handoff_tasks.add(task)
+        task.add_done_callback(self._handoff_tasks.discard)
+
+    async def _run_handoff(self, job: CronJob, run_id: str, result: CronWorkerResult) -> None:
+        dispatcher = self._handoff_dispatcher
+        if dispatcher is None:
+            return
+        if result.outcome == "superseded":
+            # §6: no parent turn, and the one CronRunOutcome member that
+            # ScheduledHandoff rejects.
+            return
+        receipts: list[TargetReceipt] = []
+        spawned: list[str] = []
+        try:
+            handoff = ScheduledHandoff(
+                job_id=job.id,
+                run_id=run_id,
+                task_context=job,
+                worker_message=result.worker_message,
+                delivery_targets=job.delivery_targets,
+                outcome=result.outcome,
+            )
+            for target in job.delivery_targets:
+                try:
+                    handoff_run_id = await dispatcher.dispatch(handoff, target=target)
+                except Exception:
+                    _log.exception(
+                        "cron.handoff_dispatch_failed job_id=%s chat_id=%s",
+                        job.id,
+                        target.chat_id,
+                    )
+                    receipts.append(TargetReceipt(chat_id=target.chat_id, state="failed"))
+                    continue
+                spawned.append(handoff_run_id)
+                # 身份先落盘，再等这一轮（ADR-0268 §6.1）。反过来会让崩溃之后
+                # 的恢复把同一次到点再派一遍。
+                with contextlib.suppress(Exception):
+                    self._store.record_handoff_runs(job.id, run_id, tuple(spawned))
+                try:
+                    state = await dispatcher.await_receipt(handoff_run_id)
+                except Exception:
+                    _log.exception(
+                        "cron.handoff_receipt_failed job_id=%s handoff_run_id=%s",
+                        job.id,
+                        handoff_run_id,
+                    )
+                    state = "failed"
+                receipts.append(TargetReceipt(chat_id=target.chat_id, state=state))
+        except Exception:
+            _log.exception("cron.handoff_failed job_id=%s run_id=%s", job.id, run_id)
+        if receipts:
+            with contextlib.suppress(Exception):
+                self._store.close_run_receipts(job.id, run_id, tuple(receipts))
 
     async def _execute_with_retries(self, job: CronJob, run_id: str) -> CronWorkerResult:
         """按 ``max_retries`` 重试 ``runtime_failure`` / ``timed_out``。
