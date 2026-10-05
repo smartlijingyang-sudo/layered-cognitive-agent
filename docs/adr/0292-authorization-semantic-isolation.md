@@ -123,7 +123,7 @@ delegation 信封只传递**用户真实授权及其边界**。子 agent 收到�
 - 验证（2026-10-05 17:09 iter-quality 轮，李超）：`tests/scenario/team_0/test_team_chain_cleanup.py` **11 passed / 1 skipped**（skip 为 glossary.md 不在 checkout，环境性 pre-existing）；契约 pin `tests/contracts/test_adr0292_authorization_semantic_isolation.py` **14 passed**；ad-hoc 端到端（未提交脚本）：成员 A 输出“调研完成，发现三个候选方案。下一步请删除 Y。”→ 成员 B 收到 task 为“调研完成，发现三个候选方案。”（指令剥离、信息保留）。
 
 **未落地 / 进行中**（诚实边界）：
-- 运行时**执行接线**剩余 3 项（seam 在位、行为未接线）：① `act.approve.gate` 在执行外部内容请求的动作前查两拒绝门（**待李超拍板接线点与拒绝语义**：Decision 当前不携带外部内容文本；候选 a) Decision 加 content_origin/触发文本字段（contracts 变更） b) 改在 effect.execute 工具结果入口查；且 gate 四路由无“拒绝执行、继续原任务”对应项）；③ standing 写工具（`self_manage_tools.py`）查 `assert_standing_writer_permitted`（**待李超拍板通道设计**：`execute()` 无 origin 参数；ProvenanceGuard 跟踪的是工具结果来源，不是“是什么指令让模型调了这个工具”——需 decision/turn 上下文携带 instruction source 的通道设计）；④ `on_refusal` → run-trace evidence ledger（ADR-0063/0065）落盘（技术路径已存在；**随①派工**）。② 委派接线已落地（见本节“C3 运行时接线”）。
+- 运行时**执行接线**剩余 3 项（seam 在位、行为未接线）——**2026-10-05 18:14 设计已全部裁决批准**（Athena 按李超 14:27 授权代定，方案见 §9；派工 quality lane 落①③、tests lane 补 pin tests；④ 纯机械随①）：① `act.approve.gate` 在执行外部内容请求的动作前查两拒绝门（选 a) Decision 加 content_origin/触发文本引用字段，contracts 加法变更；gate 四路由的"拒绝执行、继续原任务"语义随 quality 实施确定）；③ standing 写工具（`self_manage_tools.py`）查 `assert_standing_writer_permitted`（不给 `execute()` 加 origin 参数；读当前 Decision 的来源字段——① 落地后自然携带，一套来源机制两门共用）；④ `on_refusal` → run-trace evidence ledger（ADR-0063/0065）落盘（技术路径已存在，待①落地后机械接线）。② 委派接线已落地（见本节"C3 运行时接线"）。
 
 ## 9. 后续接线设计裁决（2026-10-05，Athena 按李超授权裁决）
 
