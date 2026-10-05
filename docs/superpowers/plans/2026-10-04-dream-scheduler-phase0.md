@@ -401,6 +401,8 @@ git commit -m "fix(memory): contain dream write collisions instead of stranding 
 
 ### Task 3: File-based run evidence and change detection
 
+**Shipped code is authoritative.** Task 3 landed as `96aa44998` and was amended by `a67ee8259` under ruling R40, which dropped `synthesis_written` and `promoted` from the payload. The `_report` helper, the `_changed` predicate and the payload shape in the listings below no longer match the shipped code. Read `lca/application/memory/dream_scheduler.py` and `tests/application/memory/test_dream_scheduler.py` rather than copying from this section. The plan's prose and rulings still bind.
+
 **Hazard carried from Task 2 (ruling R20).** Task 2 put the evidence write inside the same synchronous function as `run_dream`, under one `except OSError` that logs the failure as a dream pass failure. So an I/O error writing `{home}/dreams/last_run.json` is currently indistinguishable from `run_dream` itself failing, and the promotion that already succeeded is reported as lost. Task 3 must separate the two: the evidence write gets its own containment, so a failed artifact write logs as an evidence failure and still returns the report that says what was promoted. Evidence is a rebuildable projection and must not be able to mask a successful consolidation.
 
 ADR-0287 §4 Phase 0 requires "真实触发证据". A new execution point would need a whitelist entry, a SpineHandler, a test, and an ADR (C11), so the evidence is a file. `run_dream` emits nothing today, and its `backfill` reaches `revise_profile`, whose `assistant.profile.revised` EP is already dropped without an emitter.
@@ -819,7 +821,8 @@ async def test_a_sweep_promotes_a_captured_episode_and_leaves_evidence(
 
     evidence = json.loads((home / "dreams" / "last_run.json").read_text(encoding="utf-8"))
     assert evidence["upserted"] == 1
-    assert evidence["promoted"] == ["identity:role"]
+    assert evidence["upserted"] == 1
+    assert evidence["now_ms"] == 1_791_121_000_000
 
 
 async def test_a_second_sweep_promotes_nothing_and_keeps_the_evidence_stable(
@@ -855,8 +858,13 @@ Expected: FAIL first if `ResidualClass` is imported from the wrong module. It li
 
 - [ ] **Step 3: Confirm the real kernel picks it up**
 
-Run: `./scripts/lca-ops kernel-restart && sleep 320 && cat /home/lichao/.lca/assistants/asst_ce7fecd65188/dreams/last_run.json`
-Expected: a JSON document with a `now_ms` inside the last 6 minutes. This is the "真实触发证据" ADR-0287 §4 Phase 0 requires. If the file is absent, check `./scripts/lca-ops status --json` and the kernel log for `dream sweep failed`.
+Run: `uv run python scripts/check_plan_lift.py` first and require exit 0, then `./scripts/lca-ops kernel-restart`, then wait one tick plus margin and read the kernel log for the sweep.
+
+Expected: the lift check exits 0, and the log shows the sweep running on the cadence set in `profiles/web-assistant.yaml`. That log line is the "真实触发证据" ADR-0287 §4 Phase 0 requires.
+
+Do NOT take liveness from `{home}/dreams/last_run.json`. Per ruling R34 that artifact records the last pass that moved memory, not the last pass that ran, so an idle home legitimately shows a days-old stamp and asserting a recent `now_ms` fails against a healthy scheduler. It would pass on a first run only because the file does not exist yet, and fail on every re-run. The two questions, "did the loop run" and "did memory move", were conflated into one file; the log answers the first and the artifact answers the second. The artifact is still worth catting, as evidence that a promotion landed, with `upserted` and `now_ms` as the keys to read.
+
+The restart is authorized for this step only, and the lift check is not optional: the workspace rule records that skipping it before a bundle change has taken this shared kernel down twice, and Task 4 edits both a bundle and a profile.
 
 - [ ] **Step 4: Commit**
 
