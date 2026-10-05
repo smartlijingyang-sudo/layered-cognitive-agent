@@ -218,7 +218,7 @@ IngestCache, LLMResolver, ModeDefinition, ModelDefinition, ParsedMessages
 ## Phase B batch-1：观测 / 事件 / 持久化 / 语音 / 记忆（ADR-0291）
 
 > ADR-0291 Phase B 第 1 批：`test_glossary_term_coverage`（forward）68 个无匹配词根中的 22 个。
-> 定义逐一取自类 docstring / 模块 docstring 实证；批次划分见 `hidden_files/phaseB-batch-plan.md`。
+> 定义逐一取自类 docstring / 模块 docstring 实证；后续批次与 reverse 处置见 ADR-0291 §3 Phase B。
 
 | 术语 | 定义 |
 |---|---|
