@@ -21,6 +21,7 @@ from lca.contracts.observability.observation import (
     PlanBlueprint,
 )
 from lca.infrastructure.cli.commands._shared.projection import load_spine_facts
+from lca.infrastructure.cli.commands.observation._shared import _find_blueprint
 from lca.plugins.diagnosis.failure_explainer.plugin import explain_failure
 
 _LOG = logging.getLogger(__name__)
@@ -49,19 +50,6 @@ def register(app: typer.Typer) -> None:
             typer.echo(json.dumps(report, ensure_ascii=False, indent=2))
         else:
             _render_human(report)
-
-
-
-
-def _find_blueprint(facts: list[dict[str, Any]]) -> PlanBlueprint | None:
-    for f in facts:
-        if (f.get("execution_point") or "") == "observation.plan_blueprint":
-            try:
-                return PlanBlueprint.model_validate(f["payload"])
-            except Exception as exc:
-                _LOG.debug("malformed fact: %s", exc)
-                continue
-    return None
 
 
 def _build_diff_and_ctrl(

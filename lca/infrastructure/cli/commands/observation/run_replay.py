@@ -17,11 +17,11 @@ from lca.contracts.observability.observation import (
     ControlTrace,
     DecisionTrace,
     LLMCallTrace,
-    PlanBlueprint,
     RunReplay,
     ToolCallTrace,
 )
 from lca.infrastructure.cli.commands._shared.projection import load_spine_facts
+from lca.infrastructure.cli.commands.observation._shared import _find_blueprint
 from lca.infrastructure.observability.graph_timeline import (
     is_graph_event,
     render_record,
@@ -80,19 +80,6 @@ def register(app: typer.Typer) -> None:
         ),
     ) -> None:
         run_replay_command(run_id=run_id, show_graph=show_graph, as_json=json_mode)
-
-
-
-
-def _find_blueprint(facts: list[dict[str, Any]]) -> PlanBlueprint | None:
-    for f in facts:
-        if (f.get("execution_point") or "") == "observation.plan_blueprint":
-            try:
-                return PlanBlueprint.model_validate(f["payload"])
-            except Exception as exc:
-                _LOG.debug("malformed fact: %s", exc)
-                continue
-    return None
 
 
 def _collect(facts: list[dict[str, Any]], ep: str) -> list[Any]:

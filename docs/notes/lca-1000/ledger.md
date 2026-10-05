@@ -741,3 +741,20 @@
 - 验证结果: ruff check 3 文件 All checks passed（首次即过）；import 冒烟（identity + 三种输入形态行为等价）OK；targeted pytest 2 文件（tests/plan/test_plan_compose_phase_plugin.py、test_plan_revise_phase_plugin.py）：18 passed。
 - commit: refactor(lca-1000): 第0507轮 收敛 _extract_task_list 重复定义到 nodes/plan/_shared（未 push）。
 - 备注: 只 add/commit 本轮 4 个文件（代码 3 + ledger.md），用 `git commit -- <paths>` 指定路径提交，避免带入并发会话已 staged 的 2 个测试文件改动；其 staged/untracked（docs/notes/audit-2026-10-05.md、ralph/）全程未触碰。备份 /tmp/bak_0507/（252，改动前 compose.py/revise.py 原文件）。本地写脚本 + stdin 喂远程 python3（断言 anchor 计数==1），一次成功。
+## 第0508轮 (2026-10-06 04:33-04:45 CST)
+- 改了什么: 收敛 `_find_blueprint` 重复定义（改动 2 文件 +2/-19，新文件 1）：删除 `lca/infrastructure/cli/commands/observation/run_explain.py:56` 与 `run_replay.py:87` 两处逐字相同的 def（各 -9 行），canonical 放到新建 `lca/infrastructure/cli/commands/observation/_shared.py`；两模块各加 1 行 import；调用点（explain:44 / replay:48）零改动；run_replay.py 顺手删掉因 def 删除而闲置的 `PlanBlueprint` import（ruff F401 告警驱动，非凑数）。语义逐字相同。
+- 依据 skill 哪一节: SKILL.md Deletion test（删一处副本后复杂度直接消失：另一处副本被同一包内共享的 canonical 定义替代，无 N 调用方重造）+ DEEPENING.md Seam discipline / Locality（同包两处定义 = 提取语义的漂移风险；收敛到包内 internal seam `_shared.py`，只改一处）+ LANGUAGE.md Module/Interface/Leverage（helper 的 leverage 来自其 interface，重复定义不增加 leverage，是 shallow 拷贝）。
+- 为什么这是实质改动(非凑数): 消除的是真实的代码重复（两处逐字相同的 9 行实现：遍历 facts 找 observation.plan_blueprint + model_validate + malformed-fact debug 日志跳过），不是注释措辞/空行/标点。证据链：(1) AST dump 本体逐字相同（stdin-python 断言通过）；(2) 两文件各仅 1 处内部调用点，无外部/测试直接引用该私有名（git grep 全库仅两处 def + 两处调用 + 新 import）；(3) `_shared.py` 是代码库既定惯例（nodes/plan/_shared.py，507 轮同模式）；(4) import 冒烟断言 `explain._find_blueprint is _shared._find_blueprint` 且 `replay._find_blueprint is _shared._find_blueprint` 通过。
+- 关键设计决策（夜间跳过 grilling，记台账）: canonical 放 observation 包内 `_shared.py` 而非父级 `commands/_shared/`——因为 `commands/_shared/projection.py` 文档明示"CLI surface 不 import contracts"（靠镜像常量避免 contracts 依赖），而 `_find_blueprint` 必须 import `PlanBlueprint`；放 observation 包内保持 contracts import 的既有 seam（两叶模块本来就 import contracts），不把 contracts 依赖引入 CLI 共享层。`_shared.py` 的 `__all__` 仅列 `_find_blueprint`，包 `__init__.py` 不 re-export（internal seam 纪律）。
+- 候选清单（本轮 explore，逐一验证后取舍）:
+  1. `_find_blueprint` 同包去重 —— 选中（506/507 轮同模式；同一包、同体、同为 CLI 命令模块）。
+  2. `_get_role_library`（application/collaboration/fold.py vs triage.py，同包同体）—— 驳回：是绑定 `self._role_library` 的方法，收敛需确认两类实例属性语义一致，需 grilling。
+  3. `_is_use_tool`（convergence/evidence.py vs material.py）—— 驳回：2 行单表达式函数，搬家接近凑数边界（沿用 507 结论）。
+  4. `_require_non_empty` / `_require_unit_interval`（memory/sensors.py vs types.py）—— 驳回：私有校验惯例，跨模块导入私有名需 grilling（沿用 507 结论）。
+  5. `_sync_*` 簇（computer/companion/standalone.py vs client.py，5 对）—— 驳回：疑似 sync/async 桥接的刻意镜像，deletion test 未过（删掉后调用方复杂度重现），需确证。
+  6. `_fail` 簇（8 个工具模块）/ `_emit` 簇（5 个插件）/ `_ok` 对 —— 驳回：跨包命名家族，收敛即统一错误语义，需 grilling，规模超一轮。
+  7. `_format_duration`（narrative_writer/sections.py vs cli journal_steps.py）—— 驳回：跨子系统 digest 语义未确证（沿用 507 结论）。
+  8. `_find_blueprint` 之外 505/506/507 驳回项沿用（_ws_placeholder、failover 4 raises、supervisor waiter、accessors excepts、predicate_evaluator raises、serve.py stubs、plugin.py fail-soft、s3.py PR-10 TODO、delete-when 到期、双 SearchProvider/FileStore Protocol、terminal.py 另 4 个 @deprecated、命名家族、append.py PEP562、_turn_of、_catalog_digest 等）—— 驳回（语义真实或需 grilling/规模超一轮）。
+- 验证结果: ruff check 3 文件首次报 F401（run_replay PlanBlueprint 闲置，删掉后）All checks passed；ruff format --check 无需改；AST 等价（新旧 def AST dump 逐字相同）+ import identity 冒烟 OK；targeted pytest 1 文件（tests/infrastructure/cli/test_run_replay_graph_timeline.py）：2 passed。
+- commit: refactor(lca-1000): 第0508轮 收敛 _find_blueprint 重复定义到 observation/_shared（未 push）。
+- 备注: 只 add 本轮 4 个文件（代码 3 + ledger.md），用 `git commit -- <paths>` 指定路径提交，避免带入并发会话（ralph）已 staged 的 2 个测试文件改动；其 staged/untracked（docs/notes/audit-2026-10-05.md、ralph/）全程未触碰。备份 /tmp/bak_0508/（252，改动前 run_explain.py/run_replay.py 原文件）。教训：ssh 管道 exit code 取的是 grep 的（run 1 的真实失败被 2>/dev/null 吃掉且 exit 码不可信），以后关键步骤 stderr 不得丢弃、用显式状态文件或 grep 断言输出。
