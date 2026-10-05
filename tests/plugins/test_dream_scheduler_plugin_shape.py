@@ -35,6 +35,7 @@ from lca.contracts.protocols.assistant.catalog import (
 )
 from lca.contracts.protocols.declarative.declarative_1.declarative_common import PluginSpecKind
 from lca.harness.plugin_api import definition_from_plugin
+from lca.infrastructure.memory.dream import run_dream
 from lca.plugins.assistant.profile.profile import render_user_profile
 from lca.plugins.memory import dream_scheduler as plugin_module
 
@@ -288,6 +289,11 @@ async def test_setup_injects_the_production_seams(
         "the scheduler and RoutineFileLock must read one clock, or the reclaim bound lies"
     )
     assert captured["evidence_writer"] is write_dream_evidence
+    # `.get` with the real pass as the default, because the plugin omits the
+    # argument and relies on the constructor's. A plugin that injected a stub
+    # here would boot clean, sweep on cadence, write evidence, and consolidate
+    # nothing, which is the silent failure this whole wiring test exists to end.
+    assert captured.get("run_dream_fn", run_dream) is run_dream
 
     render, backfill = captured["callbacks"](home)
     assert render is render_user_profile, (
