@@ -1,6 +1,5 @@
 """Verify that RunBootSnapshotRecorder writes the profile_snapshot.json file at run boot."""
 
-from pathlib import Path
 from unittest.mock import MagicMock
 
 from lca.plugins.observability.profile.snapshot_run_boot_provider import RunBootSnapshot
@@ -55,10 +54,18 @@ def test_snapshot_recorder_swallows_write_errors(monkeypatch) -> None:
 
 
 def test_snapshot_outdir_uses_default_when_no_locator() -> None:
-    """Without run_locator capability, falls back to traces/runs/<id>."""
+    """Without run_locator capability, falls back to traces/runs/<id>.
+
+    NOTE: assert the tail structure, not the absolute root. The conftest
+    autouse fixture points LCA_RUNS_ROOT at a per-test tmp dir, and
+    _DEFAULT_PROFILE_SNAPSHOT_ROOT is frozen at the diagnostics module's
+    first import, so the absolute root depends on import timing (collection
+    vs. in-test import). The contract under test is the traces/runs/<id>
+    tail, which holds either way.
+    """
     from lca.plugins.transport.webserver.handlers.runs.session.diagnostics.diagnostics import (
         _snapshot_outdir_for,
     )
 
     outdir = _snapshot_outdir_for("r1", ctx=None)
-    assert outdir == Path("traces/runs") / "r1"
+    assert outdir.parts[-3:] == ("traces", "runs", "r1")
