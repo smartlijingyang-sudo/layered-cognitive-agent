@@ -82,8 +82,8 @@ IngestCache, LLMResolver, ModeDefinition, ModelDefinition, ParsedMessages
 | **Decision** | 一步行动决策；委派目标仅存于 `delegations` |
 | **Observation** | 行动结果 |
 | **Reflection** | 自省判定 |
-| **StopPolicy** / **StopDecision** / **StopReason** | Stop 阶段的 State 群策略：判断是否结束循环；不属于 AgentGraph 顶层能力。 |
-| **DefaultStopPolicy** | 默认终止策略（``plugins/state/stop_policy.py``）；在一个深模块内收敛完成与预算耗尽判定。 |
+| **StopDecision** / **StopReason** | 循环终结载荷契约：`TerminateStrategy`（`binding: terminate`）据模型 decision / `should_terminate` 端口 / 预算守卫构建的四字段结构；无主机侧 policy 类（StopPolicy 语义缝已退役，见「已废弃主名」）。 |
+
 | **Brain** / **Body** / **MemorySystem** | 想 / 做 / 记 |
 | **ModularBrain** | 默认 Brain（reasoner / critic 可替换）；原生 function calling 直接产出 Decision，无需 DecisionParser |
 | **Turn** | 单步记录：decision + act result + reflection |
@@ -98,7 +98,7 @@ IngestCache, LLMResolver, ModeDefinition, ModelDefinition, ParsedMessages
 | **RunStore** | 运行事件账本：词表校验 → 关联盖章 → 策略强制 → 原子追加 → 提交后投影；查询与洞察不进写路径 |
 | **JournalProjector** / **ProjectionRegistry** | 兼容投影契约 / 按装配顺序分发已提交事件并隔离投影故障的注册表 |
 | **TraceInspector** / **TraceReport** | 面向 Coding Agent 的只读账本检查器 / 可序列化的因果链、失败、瓶颈、复现与插件交互图报告 |
-| **OtelProjector** / **ConsoleJournalProjector** / **JsonlJournalProjector** | journal → OTel span（显式定父）/ console 场景卡·叙事·Run Card·序列图 / jsonl 落盘投影器 |
+| **ConsoleJournalProjector** | journal → console 场景卡·叙事·Run Card·序列图投影器；容器事件分派表与 OTel 投影器句柄同构（OtelProjector / JsonlJournalProjector 名已废弃，见「已废弃主名」）。 |
 | **LLMResponse** / **TokenUsage** | LLM 结构化返回（文本 + 模型 + token 用量），成本链路单一事实源 |
 | **StateStore** / **StateSnapshot** | 状态持久化与快照 |
 
@@ -113,7 +113,7 @@ IngestCache, LLMResolver, ModeDefinition, ModelDefinition, ParsedMessages
 | **ToolRegistry** / **Tool** / **ToolPermissionManifest** | 工具注册与权限 |
 | **ToolManifest** / **ToolApi** | 一组工具的声明式清单（identifier + api surface），对齐 LobeHub BuiltinToolManifest |
 | **ExecutionTarget** / **ExecutionPlan** | 执行路由：sandbox / device / auto / none + fallback |
-| **GatewayHttpClient** | Layer0 访问 `/api/device/*` 的 HTTP 客户端 |
+
 | **SandboxPolicy** | 沙箱可写根 / 禁写根 / 网络 / 环境白名单 |
 | **Sandbox** / **SandboxResult** / **SandboxFile** | 隔离代码执行协议与终态结果（ADR-0044） |
 | **OnlyboxesSandboxAdapter** | Onlyboxes console `pythonExec`（需 `ONLYBOXES_BASE_URL` + `ONLYBOXES_ACCESS_TOKEN`） |
@@ -173,15 +173,15 @@ IngestCache, LLMResolver, ModeDefinition, ModelDefinition, ParsedMessages
 | **GateDecided** / **PolicyFact** | Gate 出门判定事件 + 提示词用政策事实（v3 §3.5 / PR4） |
 | **ExecutionEnvelope** / **envelope_from_decision** | Body.act 必须收到的执行包（v3 §9.1 / PR6） |
 | **SimpleMemoryPolicy** / **SimpleCompactionPolicy** | MemoryPolicy / CompactionPolicy 默认实现 |
-| **DiagnosePattern** / **diagnose_loop_stuck** / **diagnose_model_not_seen** / **diagnose_memory_poisoned** / **diagnose_approval_rejected** | v3 §24.5 诊断模式（CLI `lca-ops diagnose`） |
-| **DiagnosisReport** | 诊断模式输出报告（根因 + 修复建议 + 证据链） |
+
+
 | **AttachmentManifest** | 文件元数据文档（路径 + mime + 大小 + 校验和） |
 | **Finding** | 检索 / 诊断发现的原子单元（source + claim + confidence） |
 | **HealthCheck** / **HostEnvironment** / **InfraConfig** / **InfraService** | 基础设施探活 + 主机环境 + 配置（lca-ops heal 子命令） |
 | **LLMFace** / **ProductionLLMResolver** | LLM 适配门面 + 解析器（多 backend / 多 mode 路由） |
 | **MachineComputer** | ComputerRuntime 协议的具体机器实例（local subprocess / docker / e2b） |
 | **ModelDefinition** | LLM 模式定义（model id + adapter + 价格 + 限额） |
-| **NullSink** | ManifestSink no-op 实现（测试用） |
+
 | **OpsConfig** | lca-ops 全局配置（基于 pydantic-settings） |
 | **PathConfig** / **PathProvider** / **PlaneRequest** / **ResolvedEndpoint** / **WorkspaceProvider** | 路径配置 + provider + 平面请求 + endpoint 解析 + workspace provider |
 | **ProgressLoopDetector** | 同名工具调用循环检测（DecisionGate 组件） |
@@ -215,6 +215,37 @@ IngestCache, LLMResolver, ModeDefinition, ModelDefinition, ParsedMessages
 | **PresetLayout** | Creator preset 目录布局（PR-12 V7 publish） |
 | **ProductionLLMResolver** | 生产环境 LLM 解析器（多 backend 路由 + 限额 + 价格） |
 
+## Phase B batch-1：观测 / 事件 / 持久化 / 语音 / 记忆（ADR-0291）
+
+> ADR-0291 Phase B 第 1 批：`test_glossary_term_coverage`（forward）68 个无匹配词根中的 22 个。
+> 定义逐一取自类 docstring / 模块 docstring 实证；批次划分见 `hidden_files/phaseB-batch-plan.md`。
+
+| 术语 | 定义 |
+|---|---|
+| **ActivityFeed** | run 账本的纯折叠视图：按 run 级折叠为 activity 行（`lca.infrastructure.observability.activity_feed`） |
+| **SpineEmitter** | 五面矩阵默认 EventEmitter：调用 `EventSpine.append`（ADR-0167 D11） |
+| **SpineHandler** | SpineRegistry 登记项：执行点（EP）与其 wrap_fn 的绑定；Handler 为命名宪法 §4.1 合法后缀（ADR-0290 豁免归档） |
+| **SpineLike** | SpineEmitter 期望的最小鸭子类型表面（Protocol） |
+| **SpineRow** | 单条 spine 行的容错视图（dict 子类；`payload` 为生产者写入的 dict） |
+| **NdjsonSerializer** | 五面矩阵默认序列化器：utf-8 ndjson 一行一记录（ADR-0167 D11） |
+| **MetricsProjection** | metrics 出口：计数器派生自 spine 事件（`LoopProjectionDefinition`，ADR-0172 D1） |
+| **StepGroupedReader** | journal.json 无状态读取器：反序列化 JournalDocument（ADR-0164 草案） |
+| **AtomicJsonSnapshot** | 整文件 JSON 快照的待写载荷（write-behind 目标，整文件缓存） |
+| **WriteBehindBuffer** | 有界 write-behind 批量写缓冲区（Session persistence 内部基础设施） |
+| **WakeClassifier** | 按入站线索与触发方式分类，生成强类型 WakeContext（vocal） |
+| **ReplyFirstMiddleware** | Reply-First 承接提醒中间件：用户在场且未 Ack 时提醒模型先发声（vocal） |
+| **RenderContract** | 工具数据 → 渲染器期望的映射契约（render 契约定义与注册表） |
+| **ConnectionMetadata** | 连接器实例元数据：活跃 / 待建的连接器实例（连接器状态机契约 INV-01/02/03） |
+| **ResolvedEndpoint** | 面孔解析后的不可变 LLM 端点（pydantic settings；调用方不得重读 env） |
+| **RoomDispatcher** | room 运行时分发器：消息摄取 / run 分发 / 懒复活（room runtime M1 + Phase 2） |
+| **DeliveryMaterial** | 控制轮折叠出的用户可见交付材料视图（ADR-0196） |
+| **SalienceVerdict** | 显著性门控裁决：记忆候选的新颖性 / 复用价值 / 稳定性（防单次偶发泛化为偏好） |
+| **ConsolidationDecider** | consolidation 决策器协议：RuleDecider（确定性规则）/ LayaDecider（模型打分）可互换（ADR-0277 §2.3） |
+| **ShadowComparator** | Shadow 模式比较器：双轨并行打分，结果追加写 JSONL（ADR-0277 Phase 3） |
+| **SemanticClaim** | 语义记忆：提炼出的事实断言（Tulving semantic；对应 LCA L2 MEMORY.md 层） |
+| **SourceVerifier** | 对最终答案做来源感知校验（ProvenanceGuard 思想的结构化实现） |
+
+
 ## 已废弃主名（PR-12 整理）
 
 > 这些术语曾在 codebase 中存在，现已删除 / 改名 / 退役。禁止复活
@@ -235,6 +266,19 @@ IngestCache, LLMResolver, ModeDefinition, ModelDefinition, ParsedMessages
 | **SimpleHookRegistry** | 本地钩子分发兼容实现；已退役 — 替代：由 booted Cordis Context 持有的 `CordisHookRegistry` |
 | **SpanContext** | 旧 span context 类；改名 — 替代：lca.contracts.atoms.semantic_keys.SpanContext |
 | **UpstreamTree** | upstream 仓库目录树；已退役 — 替代：Layer0 upstream patch scan |
+| **StopPolicy** | Stop 阶段状态群策略语义缝；已退役 — 替代：`TerminateStrategy`（`binding: terminate`）+ `StopDecision` / `StopReason` 契约（`docs/plans/2026-09-14-stop-decision-retirement.md`） |
+| **DefaultStopPolicy** | `plugins/state/stop_policy.py` 默认终止判定；已退役 — 替代：同 StopPolicy |
+| **JsonlJournalProjector** | journal jsonl 落盘投影器名；从未落地为类 — 替代：`ConsoleJournalProjector` |
+| **OtelProjector** | journal → OTel span 投影器名；从未落地为类 — 替代：Layer0 observability 直接 |
+| **GatewayHttpClient** | Layer0 访问 `/api/device/*` 的 HTTP 客户端名；legacy 别名，从未落地为类 — 替代：`device_hub` client |
+| **DiagnosePattern** | v3 §24.5 诊断模式名（CLI `lca-ops diagnose`）；无类定义 — 替代：现行 diagnose 诊断实现 |
+| **DiagnosisReport** | 诊断模式输出报告名（根因 + 修复建议 + 证据链）；无类定义 — 替代：同 DiagnosePattern |
+| **NullSink** | ManifestSink no-op 实现名（测试用）；代码中零引用 — 替代：测试内联 no-op |
+| **CandidateEvaluationPipeline** | 候选评估流水线；已删除 — 替代：无（ADR-0291 Phase B 移入废弃表） |
+| **DecisionParser** | 决策解析器；已删除 — 替代：原生 function calling 直接产出 Decision（`ModularBrain`） |
+| **DegradationPolicy** | 降级策略；已删除 — 替代：无（ADR-0291 Phase B 移入废弃表） |
+| **GracefulDegradation** | 优雅降级；已删除 — 替代：无（ADR-0291 Phase B 移入废弃表） |
+| **SimpleDecisionParser** | 决策解析器简单实现；已删除 — 替代：同 DecisionParser |
 
 
 
