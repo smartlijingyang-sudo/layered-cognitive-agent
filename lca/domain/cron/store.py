@@ -15,8 +15,15 @@ import tempfile
 import uuid
 from datetime import datetime
 from pathlib import Path
+from typing import Any
 
-from lca.contracts.models.cron.models import CronJob, CronRun, CronRunOutcome, TargetReceipt
+from lca.contracts.models.cron.models import (
+    CronJob,
+    CronRun,
+    CronRunConflictError,
+    CronRunOutcome,
+    TargetReceipt,
+)
 
 __all__ = ["CronStore", "MultiAssistantCronStore"]
 
@@ -118,6 +125,50 @@ class CronStore:
             return None
         return CronRun.model_validate(json.loads(path.read_text(encoding="utf-8")))
 
+    def record_handoff_runs(
+        self, job_id: str, run_id: str, handoff_run_ids: tuple[str, ...]
+    ) -> CronRun | None:
+        """起 handoff run 之前落下它们的 run id（ADR-0268 §6.1）。
+
+        写在起 run 之前是幂等的承载点：先起 run 再落身份，进程在两步之间死掉
+        会让恢复读到的记录看起来没派过，于是再派一次，用户收到两条同样的提醒。
+        同一组 id 重写是无操作，不同的一组抛 :class:`CronRunConflictError`。
+        记录不存在返回 ``None``。
+        """
+        return self._complete_run_field(job_id, run_id, "handoff_run_ids", handoff_run_ids)
+
+    def close_run_receipts(
+        self, job_id: str, run_id: str, receipts: tuple[TargetReceipt, ...]
+    ) -> CronRun | None:
+        """handoff 轮结束时补写 ``receipts``（ADR-0268 §6.1）。
+
+        同一组回执重复关闭是无操作。不同的一组抛
+        :class:`CronRunConflictError`，一次到点有两个投递决定是矛盾，不是更新。
+        记录不存在返回 ``None``。
+        """
+        return self._complete_run_field(job_id, run_id, "receipts", receipts)
+
+    def _complete_run_field(
+        self, job_id: str, run_id: str, field: str, value: tuple[Any, ...]
+    ) -> CronRun | None:
+        run = self.get_run(job_id, run_id)
+        if run is None:
+            return None
+        incoming = tuple(value)
+        existing = getattr(run, field)
+        if existing:
+            if existing == incoming:
+                return run
+            raise CronRunConflictError(
+                f"cron run {run_id} already closed {field} with a different value"
+            )
+        updated = run.model_copy(update={field: incoming})
+        _atomic_write_text(
+            self._runs_dir(job_id) / f"{run_id}.json",
+            updated.model_dump_json(indent=2),
+        )
+        return updated
+
     def list_runs(self, job_id: str) -> list[CronRun]:
         """按 run_id 字典序返回 run 记录（调用方负责时间语义）。"""
         return self.get_run_records(job_id)
@@ -190,6 +241,22 @@ class MultiAssistantCronStore:
                     run_id=run_id,
                 )
         return f"{job_id}-{uuid.uuid4().hex}"
+
+    def record_handoff_runs(
+        self, job_id: str, run_id: str, handoff_run_ids: tuple[str, ...]
+    ) -> CronRun | None:
+        for s in self._stores().values():
+            if s.get_job(job_id) is not None:
+                return s.record_handoff_runs(job_id, run_id, handoff_run_ids)
+        return None
+
+    def close_run_receipts(
+        self, job_id: str, run_id: str, receipts: tuple[TargetReceipt, ...]
+    ) -> CronRun | None:
+        for s in self._stores().values():
+            if s.get_job(job_id) is not None:
+                return s.close_run_receipts(job_id, run_id, receipts)
+        return None
 
     def list_runs(self, job_id: str) -> list[CronRun]:
         for s in self._stores().values():

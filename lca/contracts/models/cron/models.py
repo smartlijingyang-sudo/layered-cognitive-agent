@@ -18,6 +18,7 @@ __all__ = [
     "CronJob",
     "CronListItem",
     "CronRun",
+    "CronRunConflictError",
     "CronRunOutcome",
     "CronValidationError",
     "DailySchedule",
@@ -43,6 +44,15 @@ class CronValidationError(ValueError):
     """Type-level rejection for cron inputs (ADR-0268 §13).
 
     调用方捕获它得到类型化拒绝；不抛裸异常。
+    """
+
+
+class CronRunConflictError(RuntimeError):
+    """一次到点的补写与已落盘的值矛盾（ADR-0268 §6.1）。
+
+    ``handoff_run_ids`` 与 ``receipts`` 各补写一次。同一组值重写是无操作，
+    不同的一组是矛盾：一次到点不能有两组 handoff run，也不能有两个投递
+    决定。抛这个而不是覆盖，让调用方看见冲突而不是 silently 取最后一个。
     """
 
 
@@ -208,11 +218,18 @@ class TargetReceipt(BaseModel):
 
 
 class CronRun(BaseModel):
-    """一条 cron run 记录（只追加，ADR-0268 §6）。
+    """一条 cron run 记录（ADR-0268 §6，补写语义见 §6.1）。
 
-    ``receipts`` 在投递决定写下之前可以为空（未决）；``finished_at``
-    记下 worker 结束时间。``superseded`` 和成功的 ``space_action``
-    追加时就写上 ``not_sent``。
+    一次到点追加一条。``receipts`` 在投递决定写下之前可以为空（未决）；
+    ``finished_at`` 记下 worker 结束时间。``superseded`` 和成功的
+    ``space_action`` 追加时就写上 ``not_sent``。
+
+    ``handoff_run_ids`` 在起 handoff run **之前**写入，一个投递目标一个
+    run id。写在前面是幂等的承载点：先起 run 再落身份，进程在两步之间死掉
+    会让恢复逻辑把这次到点重新派一遍。空元组读作「还没派」，既有记录都
+    落在这个读法上，不需要迁移。
+
+    ``run_id``、``outcome``、``finished_at`` 一经追加不再改变。
     """
 
     model_config = ConfigDict(frozen=True, extra="forbid")
@@ -220,6 +237,7 @@ class CronRun(BaseModel):
     run_id: str = Field(..., min_length=1)
     outcome: CronRunOutcome
     receipts: tuple[TargetReceipt, ...] = ()
+    handoff_run_ids: tuple[str, ...] = ()
     finished_at: datetime | None = None
 
 
