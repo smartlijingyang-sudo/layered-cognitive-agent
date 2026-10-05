@@ -137,7 +137,7 @@ def test_route_legacy_patterns_reports_no_facade_bypass_in_cli() -> None:
 def test_route_legacy_patterns_reports_no_intent_construction_outside_adapters() -> None:
     """#4: zero ``intent_construction_outside_adapters`` findings on the
     current tree. The canonical ``RunIntent`` is only constructed in
-    ``lca/application/runtime/adapters/`` + ``default_facade.py``; tests
+    ``lca/application/runtime/adapters.py`` + ``default_facade.py``; tests
     in ``tests/**`` and a local-carrier ``RunIntent`` in
     ``lca/plugins/transport/.../intent.py`` are correctly excluded.
     """
@@ -145,7 +145,7 @@ def test_route_legacy_patterns_reports_no_intent_construction_outside_adapters()
     findings = payload["by_kind"].get("intent_construction_outside_adapters", [])
     assert findings == [], (
         "RunIntent must only be constructed in lca/application/runtime/"
-        "adapters/ + default_facade.py (ADR-0199 §10 I-HPC-1). Offenders:\n"
+        "adapters.py + default_facade.py (ADR-0199 §10 I-HPC-1). Offenders:\n"
         + "\n".join(f"  {v['path']}:{v['line']} {v['kind']}" for v in findings)
     )
 
@@ -196,14 +196,14 @@ def test_route_legacy_patterns_finds_intentional_violation(
 
 
 def test_route_legacy_patterns_adapters_are_exempt(tmp_path: Path, script_scan_module) -> None:
-    """#6: a fixture file under ``lca/application/runtime/adapters/``
+    """#6: a fixture file ``lca/application/runtime/adapters.py``
     calling ``RunIntent(...)`` is NOT flagged (the adapters are the
     canonical construction site per I-HPC-1).
     """
     synthetic_repo = tmp_path / "repo"
-    adapters_dir = synthetic_repo / "lca" / "application" / "runtime" / "adapters"
-    adapters_dir.mkdir(parents=True)
-    adapter_file = adapters_dir / "fixture_adapter.py"
+    runtime_dir = synthetic_repo / "lca" / "application" / "runtime"
+    runtime_dir.mkdir(parents=True)
+    adapter_file = runtime_dir / "adapters.py"
     adapter_file.write_text(
         "from lca.contracts.runtime.intent import RunIntent\n"
         "def build():\n"
@@ -224,7 +224,7 @@ def test_route_legacy_patterns_adapters_are_exempt(tmp_path: Path, script_scan_m
     findings = script_scan_module._scan_intent_construction_outside_adapters(synthetic_repo)
     adapter_findings = [f for f in findings if Path(f.path).resolve() == adapter_file.resolve()]
     assert adapter_findings == [], (
-        "adapters/ must be exempt from intent_construction_outside_adapters "
+        "adapters.py must be exempt from intent_construction_outside_adapters "
         f"(I-HPC-1). Found: {adapter_findings}"
     )
 

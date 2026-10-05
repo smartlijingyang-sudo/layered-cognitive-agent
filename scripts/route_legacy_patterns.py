@@ -15,7 +15,7 @@ PR-0199-P1-14 扩展:新增两个 ADR-0199 §11 / §12.1 审计种类:
   ``lca/application/runtime/`` 之外的生产代码(HPC-L2)。harness 是合法
   内部使用方;tests / scripts / vendor / lca_kernel 全部豁免。
 - ``intent_construction_outside_adapters`` — ``RunIntent(...)`` 构造出现在
-  ``lca/application/runtime/adapters/`` 与 ``default_facade.py`` 之外
+  ``lca/application/runtime/adapters.py`` 与 ``default_facade.py`` 之外
   (I-HPC-1)。仅当文件 import 了 ``lca.contracts.runtime.intent.RunIntent``
   才计入;transport handlers 内的本地同名词 dataclass 不误报。
 
@@ -146,7 +146,7 @@ _FACADE_BYPASS_FORBIDDEN: frozenset[str] = frozenset({"resolve_profile", "compil
 
 # I-HPC-1: ``RunIntent(...)`` constructor must only fire from the L1
 # adapters + facade. Exempt paths are checked below.
-_INTENT_ADAPTERS_PATH = "lca/application/runtime/adapters/"
+_INTENT_ADAPTERS_PATH = "lca/application/runtime/adapters.py"
 _INTENT_FACADE_PATH = "lca/application/runtime/default_facade.py"
 _INTENT_CONTRACT_PATH = "lca/contracts/runtime/intent.py"
 
@@ -303,7 +303,7 @@ def _scan_facade_bypass(repo: Path) -> list[Finding]:
 
 def _scan_intent_construction_outside_adapters(repo: Path) -> list[Finding]:
     """I-HPC-1 audit: ``RunIntent(...)`` constructed outside
-    ``lca/application/runtime/adapters/`` and ``default_facade.py``.
+    ``lca/application/runtime/adapters.py`` and ``default_facade.py``.
 
     To avoid false positives on locally-defined ``class RunIntent`` (e.g.
     ``lca/plugins/transport/webserver/handlers/runs/session/intent/intent.py``
@@ -338,7 +338,7 @@ def _scan_intent_construction_outside_adapters(repo: Path) -> list[Finding]:
                     kind="intent_construction_outside_adapters",
                     message=(
                         "RunIntent(...) constructed outside "
-                        "lca/application/runtime/adapters/ + default_facade.py "
+                        "lca/application/runtime/adapters.py + default_facade.py "
                         "(ADR-0199 §10 I-HPC-1). Surface adapters must "
                         "translate wire formats to RunIntent."
                     ),
