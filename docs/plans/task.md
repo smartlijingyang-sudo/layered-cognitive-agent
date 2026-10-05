@@ -599,6 +599,11 @@
 | ARCH-IMPROVE-CONTEXT | 深度梳理 4 大架构重构候选上下文与约束 | Completed | 已深度梳理 4 大候选（Transport终态生命周期、ContextFiles虚设Seam、Cron多租户遍历、SelfManage权限拦截）的现状与负向边界 |
 | ARCH-IMPROVE-QUESTIONS | 澄清全量 4 大候选演进排期与执行策略（单步提问） | Completed | 用户选定「分阶段单流推进」策略（Phase 1: Transport → Phase 2: Tools → Phase 3: Cron → Phase 4: ContextFiles） |
 | ARCH-IMPROVE-APPROACHES | 提炼分阶段架构重构执行方案与权衡对比 | Completed | 用户明确确认选定方案 A（严格就地加深与干净收敛，零跨PR兼容垫片残留） |
-| ARCH-IMPROVE-DESIGN-SECTIONS | 逐步呈现设计细节（Owns/Does NOT own/不变量测试）并获取审批 | In Progress | 正在逐步呈现 §1 边界自治与等级、§2 四阶段深度架构设计、§3 测试不变量矩阵 |
-| ARCH-IMPROVE-DESIGN-DOC | 沉淀设计文档至 docs/plans/ 并提交 git | Pending | |
-| ARCH-IMPROVE-TRANSITION | 转换至实施计划制定（writing-plans） | Pending | |
+| ARCH-IMPROVE-DESIGN-SECTIONS | 逐步呈现设计细节（Owns/Does NOT own/不变量测试）并获取审批 | Completed | 全部 3 大小节（§1 边界自治与等级、§2 四阶段深度架构设计、§3 测试不变量矩阵）均获用户审批通过 |
+| ARCH-IMPROVE-DESIGN-DOC | 沉淀设计文档至 docs/plans/ 并提交 git | Completed | 成功落盘 docs/plans/2026-10-05-codebase-architecture-deepening-design.md 并提交 git (commit d47f6f1e8) |
+| ARCH-IMPROVE-TRANSITION | 转换至实施计划制定（writing-plans） | Completed | 成功落盘 docs/plans/2026-10-05-codebase-architecture-deepening-plan.md 并完成 5 大单流任务分解 |
+| ARCH-TASK-1-TRANSPORT | Phase 1 - Transport Run 终态生命周期加深 (INV-ARCH-01, INV-ARCH-02) | Pending | |
+| ARCH-TASK-2-TOOLS | Phase 2 - Assistant Tools 基类统一拦截 Seam (INV-ARCH-03, INV-ARCH-04) | Pending | |
+| ARCH-TASK-3-CRON | Phase 3 - Cron 存储多租户索引与 Seam 封装 (INV-ARCH-05) | Pending | |
+| ARCH-TASK-4-CONTEXTFILES | Phase 4 - ContextFiles 虚设 Seam 与微分层收敛 (INV-ARCH-06) | Pending | |
+| ARCH-TASK-5-VERIFY-REGRESSION | Phase 5 - 全链路回归、契约门禁与 Pre-push 验收 (INV-ARCH-07) | Pending | |
