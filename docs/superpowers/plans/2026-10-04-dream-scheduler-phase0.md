@@ -14,6 +14,11 @@
 
 ## Why the carrier is a plugin loop and not cron or routines
 
+**Phase 0 ships disabled (R54, R61).** `Config.enabled` defaults to `False` and `profiles/web-assistant.yaml` sets `enabled: false` explicitly. A read-only scan of all 578 live assistant homes found that the first enabled tick would rewrite `USER.md` in 8 of them, and one, `asst_8849841f4f9a`, carries a hard safety constraint about payment and account-modification operations that exists in no semantic record, so rendering the profile from records would drop it. ADR-0254 v3 rules user-domain Markdown an SSOT the system must not rebuild from JSON and names a full `USER.md` rebuild a bug, which conflicts with the ADR-0249 and ADR-0287 dream track treating `USER.md` as a projection. Enable-when is recorded at the `Config.enabled` field.
+
+Consequence for Task 5: its Step 3 live-kernel restart is cancelled by R60 rather than merely deferred. With the plugin disabled, `setup()` returns before constructing anything, so a restart would prove only that the bundle entry resolves, which `scripts/check_plan_lift.py` at exit 0 and the shape test's real `resolve_profile` call already prove. ADR-0287 §4 Phase 0's live trigger evidence is therefore NOT satisfied: Phase 0 is complete as an implementation and incomplete as an acceptance, and the gap belongs to the ADR-0254 v3 conflict. Do not report Phase 0 as accepted on the strength of a disabled-plugin boot.
+
+
 ADR-0287 §4 Phase 0 names two carriers: "`{home}/routines/` 或 0268 CronJob 有 `run_dream` 条目". Neither can work. This section is the evidence, and it is the reason this plan exists in this shape. **ADR-0287 §4 Phase 0 must be amended to name the plugin loop before Task 4 lands.**
 
 | Blocker | Evidence | Consequence |
