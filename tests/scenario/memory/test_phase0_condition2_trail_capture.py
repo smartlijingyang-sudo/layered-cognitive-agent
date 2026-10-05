@@ -89,6 +89,11 @@ def _rows(payload: dict | None) -> list[dict]:
     return list((payload or {}).get("records") or [])
 
 
+def _is_curated(row: dict) -> bool:
+    """True for a row backed by a memory record rather than a trail document."""
+    return not str(row.get("record_id") or "").startswith("trail-")
+
+
 @pytest.mark.asyncio
 async def test_phase0_condition2_end_to_end(tmp_path: Path) -> None:
     home = tmp_path / "asst"
@@ -131,7 +136,12 @@ async def test_phase0_condition2_end_to_end(tmp_path: Path) -> None:
 
 @pytest.mark.asyncio
 async def test_promoted_record_survives_the_full_index_rebuild(tmp_path: Path) -> None:
-    """dream 重建全量索引后，提升出来的记录仍然可检索。"""
+    """dream 重建全量索引后，提升出来的记录仍然可检索。
+
+    按 `record_id` 前缀区分来源，不按 `category`。索引命中把 `category` 填成
+    index kind（`semantic` / `trail`），实时存储命中填成记忆类目（`preference`），
+    同一条记录经两个来源会给出不同的 `category`，这个字段当前不可用于判别来源。
+    """
     home = tmp_path / "asst"
     (home / "memory").mkdir(parents=True)
 
@@ -142,18 +152,30 @@ async def test_promoted_record_survives_the_full_index_rebuild(tmp_path: Path) -
     search = MemorySearchTool(memory=AssistantMemory(home))
     observation = await search.execute({"query": "简洁", "limit": 10})
 
-    semantic_hits = [row for row in _rows(observation.payload) if row.get("category") == "semantic"]
-    assert [row.get("content") for row in semantic_hits] == [_CRITERION]
+    curated = [row for row in _rows(observation.payload) if _is_curated(row)]
+    assert [row.get("content") for row in curated] == [_CRITERION]
 
 
 @pytest.mark.asyncio
-async def test_trail_documents_are_whole_day_files(tmp_path: Path) -> None:
-    """钉住当前的检索噪音形状，让它不能静默增长。
+async def test_a_trail_row_carries_one_line_not_a_whole_day(tmp_path: Path) -> None:
+    """行粒度的核心：命中只带回它自己那一行，不拖进同一天的其他话轮。"""
+    home = tmp_path / "asst"
+    (home / "memory").mkdir(parents=True)
 
-    `_documents` 按整个流水文件产一个文档，所以一条事实会同时以 curated 记录
-    与每个含它的流水文件出现。这里两天下同一句，结果是 1 条 semantic 加 2 条
-    trail。粒度或排序若要改，这条测试会变红，改动必须是显式的。
-    """
+    await _turn(home, _CRITERION)
+    await _turn(home, "帮我查一下明天天气")
+
+    search = MemorySearchTool(memory=AssistantMemory(home))
+    observation = await search.execute({"query": "简洁", "limit": 10})
+    rows = _rows(observation.payload)
+
+    assert [row.get("content") for row in rows] == [_CRITERION]
+    assert not any(_is_curated(row) for row in rows)
+
+
+@pytest.mark.asyncio
+async def test_one_fact_returns_one_row(tmp_path: Path) -> None:
+    """提升后的记录与它所来自的流水行文本相同，合并去重后只剩 curated 那条。"""
     home = tmp_path / "asst"
     (home / "memory").mkdir(parents=True)
 
@@ -165,6 +187,6 @@ async def test_trail_documents_are_whole_day_files(tmp_path: Path) -> None:
     observation = await search.execute({"query": "简洁", "limit": 10})
     rows = _rows(observation.payload)
 
-    kinds = sorted(str(row.get("category")) for row in rows)
-    assert kinds == ["semantic", "trail", "trail"]
-    assert all(_CRITERION in str(row.get("content") or "") for row in rows)
+    assert len(rows) == 1
+    assert rows[0].get("content") == _CRITERION
+    assert _is_curated(rows[0])

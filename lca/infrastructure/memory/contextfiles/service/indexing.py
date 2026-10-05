@@ -14,8 +14,10 @@ import sqlite3
 from collections.abc import Sequence
 from pathlib import Path
 
+from lca.contracts.mechanisms.content.addressable import sha256_hex
 from lca.infrastructure.memory.contextfiles.adapters.fts import SqliteFtsIndex
 from lca.infrastructure.memory.contextfiles.domain.layout import ContextLayout, packaged_layout
+from lca.infrastructure.memory.contextfiles.domain.trail import trail_lines
 from lca.infrastructure.memory.contextfiles.events.publisher import IndexRebuilt
 from lca.infrastructure.memory.contextfiles.ports.events import DomainEventPublisher
 from lca.infrastructure.memory.contextfiles.ports.file_store import FileStore
@@ -103,33 +105,44 @@ def _documents(
             text = store.read_text(f"{layout.trail_dir}/{name}")
         except OSError:
             continue
-        documents.append(_trail_document(name, text, layout=layout))
+        # dream.py:_trail_facts derives the date the same way, so the indexed
+        # documents and the promoted facts agree on which day a line came from.
+        date = name[: -len(".md")]
+        for line in trail_lines(text):
+            documents.append(_trail_line_document(date, line, layout=layout))
     return documents
 
 
-def _trail_document(name: str, text: str, *, layout: ContextLayout) -> IndexedDocument:
-    """One day's trail as a single index document.
+def _trail_line_document(date: str, line: str, *, layout: ContextLayout) -> IndexedDocument:
+    """One trail line as one index document.
 
     Shared by the full rebuild and the incremental write so the two cannot
-    disagree about ``doc_id``, ``kind``, or ``path`` for the same day.
+    disagree about ``doc_id``, ``kind``, ``path``, or ``content`` for the same
+    line. The date is part of ``doc_id`` so one sentence repeated on two days
+    yields two documents and neither path depends on ``list_dir`` order.
     """
 
+    digest = sha256_hex(line.encode("utf-8"), length=12)
     return IndexedDocument(
-        doc_id=f"trail-{name}",
+        doc_id=f"trail-{date}-{digest}",
         kind="trail",
-        content=text,
-        path=f"{layout.trail_dir}/{name}",
+        content=line,
+        path=f"{layout.trail_dir}/{date}.md",
     )
 
 
-def index_trail_file(
+def index_trail_line(
     home: str | Path,
-    store: FileStore,
     date: str,
+    content: str,
     *,
     layout: ContextLayout | None = None,
 ) -> bool:
-    """Re-index one day's trail document after an append.
+    """Index one just-appended trail line.
+
+    The caller already holds the date and the exact text it wrote, so this does
+    not read the file back. Reading it would also index lines another writer
+    appended in between and attribute them to this call.
 
     The caller has already made the trail durable, so failure here is contained
     and reported as False rather than raised. The index is a rebuildable
@@ -137,17 +150,13 @@ def index_trail_file(
     """
 
     chosen = packaged_layout() if layout is None else layout
-    name = f"{date}.md"
-    try:
-        text = store.read_text(f"{chosen.trail_dir}/{name}")
-    except OSError:
-        return False
-    if not text.strip():
+    line = content.strip()
+    if not line:
         return False
     db_path = Path(home) / chosen.index_db_path
     index = SqliteFtsIndex(db_path)
     try:
-        index.add(_trail_document(name, text, layout=chosen))
+        index.add(_trail_line_document(date, line, layout=chosen))
     except (sqlite3.Error, OSError) as exc:
         logger.warning("trail index write failed path=%s: %s", db_path, exc)
         return False
@@ -156,4 +165,4 @@ def index_trail_file(
     return True
 
 
-__all__ = ["build_memory_index", "index_trail_file", "search_memory_index"]
+__all__ = ["build_memory_index", "index_trail_line", "search_memory_index"]

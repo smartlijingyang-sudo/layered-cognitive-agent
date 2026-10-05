@@ -18,7 +18,7 @@ from lca.infrastructure.memory.assistant_memory import AssistantMemory
 from lca.infrastructure.memory.contextfiles.adapters.disk import DiskFileStore
 from lca.infrastructure.memory.contextfiles.service.indexing import (
     build_memory_index,
-    index_trail_file,
+    index_trail_line,
 )
 from lca.infrastructure.tools.assistant.memory_tools import MemorySearchTool
 
@@ -61,7 +61,7 @@ async def test_trail_only_index_does_not_hide_live_semantic(tmp_path: Path) -> N
     home = tmp_path / "asst"
     memory = _memory_with_semantic(home)
     _append_trail(home, _TRAIL_LINE)
-    assert index_trail_file(home, DiskFileStore(home), _DATE) is True
+    assert index_trail_line(home, _DATE, _TRAIL_LINE) is True
 
     observation = await MemorySearchTool(memory=memory).execute({"query": "简洁", "limit": 10})
 
@@ -99,7 +99,7 @@ async def test_limit_still_caps_the_merged_result(tmp_path: Path) -> None:
     home = tmp_path / "asst"
     memory = _memory_with_semantic(home)
     _append_trail(home, _TRAIL_LINE)
-    index_trail_file(home, DiskFileStore(home), _DATE)
+    index_trail_line(home, _DATE, _TRAIL_LINE)
 
     observation = await MemorySearchTool(memory=memory).execute({"query": "简洁", "limit": 1})
 
