@@ -104,6 +104,9 @@ class CreateRunRequest:
     """ADR-0187 §3 D7 一次性 run 绑定（``asst_*``）；空 = 遗留默认 agent。"""
     user_id: str = ""
     """ADR-0252: 调用者用户身份（来自 x-lca-user-id 头）。"""
+    topic_id: str = ""
+    """本次 run 所属会话。随请求进 session，绑定发生在 dispatch 之前，见
+    :func:`~lca.plugins.transport.webserver.handlers.runs.terminal.streaming.gateway_lifecycle.register_gateway_run`。"""
     run_id: str = ""
     """精准指定要恢复的 run_id，避免并发/多轮时 topic 最新指针漂移导致的 409 Conflict。"""
     resume_approval: dict[str, Any] | None = None
@@ -158,11 +161,12 @@ async def decode_create_run(
     if isinstance(resume_tool_result, JSONResponse):
         return resume_tool_result
 
+    topic_id = topic_id_from_body(body)
     run_input: LobeHubRunInput = await prepare_run_from_messages(
         messages,
         file_store,
         assistant_home=_assistant_home_of(assistant_id),
-        topic_id=topic_id_from_body(body),
+        topic_id=topic_id,
     )
     if resume_approval is None and resume_tool_result is None and not run_input.user_text.strip():
         return _err("messages must include a non-empty user message", status_code=400)
@@ -186,6 +190,7 @@ async def decode_create_run(
         ctx=ctx,
         assistant_id=assistant_id,
         user_id=user_id,
+        topic_id=topic_id,
         run_id=run_id,
         resume_approval=resume_approval,
         resume_tool_result=resume_tool_result,
@@ -359,6 +364,7 @@ def _to_run_request(carrier: CreateRunRequest) -> RunRequest:
         ctx=carrier.ctx,
         assistant_id=carrier.assistant_id,
         user_id=carrier.user_id,
+        topic_id=carrier.topic_id,
     )
 
 

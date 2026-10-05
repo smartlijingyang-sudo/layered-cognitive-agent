@@ -79,7 +79,9 @@ async def register_gateway_run(
     if session is None:
         return
     # 缺陷1修复：把 topic_id 落到 session，跨 run 会话自愈日志按 topic 归档。
-    if topic_id:
+    # 不覆盖已有值：run 请求带着 topic_id 进 create_run_session，绑定发生在
+    # dispatch 之前，那次写入才是权威。这里只补没带 topic 的调用方。
+    if topic_id and not getattr(session, "topic_id", ""):
         session.topic_id = topic_id
 
     resolved_user_id = user_id or getattr(session, "user_id", "") or None

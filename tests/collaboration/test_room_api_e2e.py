@@ -152,6 +152,7 @@ def test_room_api_closed_loop(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     assert run_request.user_text == "请评估当前架构风险"
     assert run_request.mode == "team"
     assert run_request.profile == "web-assistant"
+    assert run_request.topic_id == "room_e2e"
 
     # 4. gateway registration fired with the room as topic
     assert len(gateway_calls) == 1

@@ -28,6 +28,8 @@ class RunSessionRequest:
     """ADR-0187 §3 D7 一次性 run 绑定（``asst_*``）；空 = 遗留默认 agent。"""
     user_id: str = ""
     """ADR-0252: 调用者用户身份（来自 x-lca-user-id 头）。"""
+    topic_id: str = ""
+    """本 run 所属会话。在 dispatch 之前落到 session，见 ``RunRequest.topic_id``。"""
     origin: str = "user"
     """ADR-0268 §4：``handoff`` 轮才把 ``lca.nothing_to_do`` 放上 wire。"""
 

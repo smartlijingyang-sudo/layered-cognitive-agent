@@ -59,9 +59,9 @@ class _FakeCoordinator:
 def _app(*, coordinator: Any = None, registry: Any = None) -> Starlette:
     app = Starlette()
     if coordinator is not None:
-        app.state.agent_runtime_coordinator = coordinator  # type: ignore[attr-defined]
+        app.state.agent_runtime_coordinator = coordinator
     if registry is not None:
-        app.state.registry = registry  # type: ignore[attr-defined]
+        app.state.registry = registry
     return app
 
 
@@ -286,6 +286,29 @@ def test_parent_message_id_from_body_accepts_both_casings() -> None:
     assert parent_message_id_from_body({"parent_message_id": ""}) is None
     assert parent_message_id_from_body({"parent_message_id": 7}) is None
     assert parent_message_id_from_body({}) is None
+
+
+@pytest.mark.asyncio
+async def test_a_topic_already_on_the_session_is_not_overwritten(
+    pump_calls: list[tuple[Any, ...]],
+) -> None:
+    """Binding before dispatch is the authority; this call only fills a gap.
+
+    ``create_and_dispatch`` schedules the run task and returns without awaiting,
+    and ``register_gateway_run`` stamps the topic before its own first await.
+    Nothing between them yields today, so the stamp wins by accident. A session
+    that already carries its topic makes the ordering irrelevant.
+    """
+    session = _FakeSession(topic_id="tpc_bound_before_dispatch")
+    coordinator = _FakeCoordinator()
+    app = _app(coordinator=coordinator, registry=_FakeRegistry(session))
+
+    await register_gateway_run(app, run_id="r", topic_id="tpc_bound_after_dispatch", agent_id="a")
+
+    assert session.topic_id == "tpc_bound_before_dispatch"
+    # The coordinator ctx still carries what this caller was given, because the
+    # running-op row is written from the parameter and not from the session.
+    assert coordinator.started[0][1]["topic_id"] == "tpc_bound_after_dispatch"
 
 
 def test_module_exports_its_public_names() -> None:

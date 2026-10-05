@@ -40,6 +40,15 @@ class RunRequest:
     legacy default agent (forward-compatible, I-A1)."""
     user_id: str = ""
     """Caller user identity (from x-lca-user-id header) for multi-tenant isolation."""
+    topic_id: str = ""
+    """Conversation this run belongs to.
+
+    Carried on the request so the session is stamped before the run task is
+    scheduled. ``register_gateway_run`` also stamps it, after dispatch, and
+    ``RunExecutionEnvironment.prepare`` reads it off the session to build
+    ``RunAmbit``. Binding before dispatch is what makes that read independent
+    of whether anything between the two awaits yields.
+    """
     origin: str = "user"
     """Which kind of turn this run is (ADR-0268 §4).
 

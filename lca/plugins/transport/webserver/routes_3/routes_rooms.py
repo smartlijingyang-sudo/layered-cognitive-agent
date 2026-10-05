@@ -125,6 +125,7 @@ async def _start_run(
             "selected_peers": list(selected_peers or ()),
         },
         ctx=ctx,
+        topic_id=room_id,
     )
     receipt = await run_port.create_and_dispatch(run_request)
     if receipt.accepted:

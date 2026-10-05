@@ -69,6 +69,7 @@ def create_run_session(
     execution_target: str = "",
     assistant_id: str = "",
     user_id: str = "",
+    topic_id: str = "",
     origin: str = "user",
     ctx: Any | None = None,
 ) -> RunSession:
@@ -104,6 +105,7 @@ def create_run_session(
             execution_target=execution_target.strip(),
             assistant_id=assistant_id.strip(),
             user_id=user_id.strip(),
+            topic_id=topic_id.strip(),
             origin=origin,
         )
     )
