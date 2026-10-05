@@ -20,6 +20,9 @@ or ``lca.plugins``.
 
 from __future__ import annotations
 
+from collections.abc import Iterator
+from contextlib import contextmanager
+from contextvars import ContextVar
 from dataclasses import dataclass
 from typing import Literal, Self, cast
 
@@ -29,6 +32,8 @@ __all__ = (
     "PluginSource",
     "PluginTrustLevel",
     "TrustEnvelope",
+    "get_current_trust_envelope",
+    "trust_envelope_scope",
 )
 
 
@@ -173,3 +178,44 @@ privileges``) pass. It is *not* a valid envelope for attaching to a
 :class:`SessionActivation` — only empty-envelope checks (doctor reports,
 kernel startup before any plugin has been admitted) should read it.
 """
+
+
+# ── Ambient TrustEnvelope seam (ADR-0292 section 10) ──────────────────
+#
+# Mirrors ``lca.contracts.models.core.execution.decision``
+# (``get_current_decision`` + ``decision_scope``): a contextvar carries the
+# TrustEnvelope bound for the current run, so authorization gates (e.g.
+# ``act.approve.gate``) can consult the grant set without a hard dependency
+# on the session wiring. ``asyncio.create_task`` copies the context, so
+# gates invoked downstream of ``trust_envelope_scope`` observe the envelope
+# bound for them.
+# ---------------------------------------------------------------------------
+
+_current_trust_envelope: ContextVar[TrustEnvelope | None] = ContextVar(
+    "lca_current_trust_envelope", default=None
+)
+
+
+def get_current_trust_envelope() -> TrustEnvelope | None:
+    """Return the TrustEnvelope bound for the current run, or ``None`` when unbound.
+
+    ``None`` = no envelope scope is active (legacy / offline / unit-test
+    paths): ADR-0292 section-10 gates treat it as "no grants recorded" and
+    fail closed on privileged actions.
+    """
+    return _current_trust_envelope.get()
+
+
+@contextmanager
+def trust_envelope_scope(envelope: TrustEnvelope) -> Iterator[None]:
+    """Bind *envelope* as the ambient TrustEnvelope for the wrapped block.
+
+    The production binder is the session/run driver (ADR-0199: the
+    ``SessionActivation`` carries the ``TrustEnvelope``); gates read it via
+    :func:`get_current_trust_envelope`. LIFO reset on exit.
+    """
+    token = _current_trust_envelope.set(envelope)
+    try:
+        yield
+    finally:
+        _current_trust_envelope.reset(token)
