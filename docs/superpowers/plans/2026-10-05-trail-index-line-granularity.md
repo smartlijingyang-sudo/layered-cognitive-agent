@@ -98,6 +98,8 @@ canonical owner：行抽取归 `domain/trail.py`，文档形状归 `service/inde
 
 ### Task 1：抽出 `trail_lines`，`parse_trail` 改为消费它
 
+状态：已完成。
+
 `domain/trail.py` 增加 `trail_lines(text) -> tuple[str, ...]`，承接现在 `parse_trail` 里的 `_BULLET` 匹配、空行跳过与 `<!--` 注释跳过。`parse_trail` 改为遍历它构造 `TrailEntry`，签名与返回不变。
 
 先写失败测试：`trail_lines` 对含标题、空行、注释与两条 bullet 的文本返回恰好两条内容，且与 `parse_trail` 的 `content` 序列逐项相同。后者是收敛证明，两个函数不会对同一份文本给出不同的行集合。
@@ -106,6 +108,8 @@ canonical owner：行抽取归 `domain/trail.py`，文档形状归 `service/inde
 
 ### Task 2：`_documents` 的 trail 分支改行粒度
 
+状态：已完成，与 Task 3 合并为一个提交。两者共用「增量与重建产出同一批文档」这一条不变量，单独落 Task 2 会让 `test_incremental_document_matches_the_full_rebuild` 在中间态变红，一个验证单元不能以红结束。
+
 `service/indexing.py` 的 `_trail_document` 从「一天一个文档」改为「一行一个文档」，`doc_id=f"trail-{date}-{digest}"`，`digest` 用 `sha256_hex(line, length=12)`，与 `_trail_episode` 的 `fact_id` 同源。`path` 保持当天的相对路径。`_documents` 的 trail 分支改为遍历 `trail_lines(text)` 逐行产文档。
 
 摘要函数不新写。`dream.py` 已经从 `lca.contracts.mechanisms.content.addressable` 导入 `sha256_hex`，`indexing.py` 用同一个。
@@ -113,6 +117,8 @@ canonical owner：行抽取归 `domain/trail.py`，文档形状归 `service/inde
 验证：改写 `test_trail_index_incremental.py` 中钉住 `doc_id == f"trail-{_DATE}.md"` 的那条，改为断言两行文本产出两个文档、`doc_id` 各含日期与摘要、`content` 各为单行。全量重建与增量写入的一致性断言保留，逐字段比较 `doc_id`/`kind`/`path`。
 
 ### Task 3：增量写入改为单行，退役 `index_trail_file`
+
+状态：已完成，与 Task 2 同一提交。`index_trail_file` 已删除，无别名无 COMPAT，唯一调用方 `daytime.py` 同 PR 改完。截断值与写入值的一致性用同一个 `line` 局部变量保证，不再有两处各自截断的机会。
 
 `index_trail_file(home, store, date)` 删除，换成 `index_trail_line(home, date, content) -> bool`。它不回读文件、不需要 `FileStore`，直接用传入的日期与内容构造文档并 `add`。失败语义与 Task 4 相同，捕获 `sqlite3.Error` 与 `OSError`，记日志返回 `False`，不上抛。
 
@@ -124,6 +130,26 @@ canonical owner：行抽取归 `domain/trail.py`，文档形状归 `service/inde
 
 ### Task 4：合并侧改排序与 content 去重，并重建现存索引
 
+状态：合并侧已完成。生产索引重建**未做**，需批准，见下。
+
+`memory_tools.py` 的 `_search_merged` 已改为实时存储命中在前、索引独有命中在后，去重键在 `record_id` 之外加 `content`。
+
+#### 未完成：生产索引重建
+
+`asst_ce7fecd65188/memory/index/fts.sqlite3` 里仍是一个整日文档。重建有两种做法，都会写活助理的 home，属共享系统写操作，未获批准前不做。
+
+一是只重建投影，调 `build_memory_index(home, DiskFileStore(home), AssistantMemory(home).query(SEMANTIC))`。它只重写索引 db，不动 `semantic.json`、`MEMORY.md`、`USER.md`。索引自述为「可重建、绝不成为真值」，所以这一种是可逆的。
+
+二是跑 `lca-ops memory dream`。它除索引外还会把 episode 提升进 `semantic.json` 并重写三个投影文件，不可逆。
+
+时机上也未必需要现在做。运行中的内核加载的是 `4f2a295d1`，仍按整日粒度写索引，所以当前索引内部是自洽的，没有新旧混存。混存只会在内核重启加载本计划代码之后出现，因此重建应当与那次重启绑定，而条件一本来就要求重启。
+
+#### 顺带发现：`category` 字段被两个来源赋予不同语义
+
+`_search_indexed` 把 `category` 填成 index kind（`semantic` / `trail`），`_search_main` 填成记忆类目（`preference` / `fact` / `identity`）。同一条记录经两个来源会给出不同的 `category`，所以它不能用于判别来源。改排序前索引命中在前，curated 记录的 `category` 显示为 `semantic`；改排序后实时命中在前，同一条显示为 `preference`。
+
+本计划不改这个字段，因为它是 `memory_search` 对外输出契约的一部分，改它要同时定「category 到底指什么」，属独立裁决。测试改为按 `record_id` 前缀判别来源，并在 `test_promoted_record_survives_the_full_index_rebuild` 的 docstring 里写明这个字段当前不可用于判别。
+
 `memory_tools.py` 的 `_search_merged` 改为实时存储命中在前、索引独有命中在后，去重键在 `record_id` 之外加 `content`。语义记录与其对应的流水行文本相同，只按 `record_id` 去重抓不到，curated 记录应当赢。
 
 同时把生产那一个索引 db 重建一次。`run_dream` 在生产从未运行，旧的整日文档不会自己消失。重建方式是在本任务里跑一次 `lca-ops memory dream`，或者由条件一的调度首次触发时完成，二选一，但不能两者都不做。
@@ -131,6 +157,14 @@ canonical owner：行抽取归 `domain/trail.py`，文档形状归 `service/inde
 验证：改写 `test_phase0_condition2_trail_capture.py` 的 `test_trail_documents_are_whole_day_files`，它现在钉的是整日形状，本计划刻意让它变红。新断言是一条事实一行，即 `memory_search` 对判据句返回恰好 1 行 semantic，流水行因 content 相同被去重掉。`test_promoted_record_survives_the_full_index_rebuild` 保持绿。
 
 ### Task 5：验收与噪音实测
+
+状态：测试侧已完成，生产侧待索引重建后补测。
+
+判据句场景的实测对照。改动前 `memory_search` 返回 3 行，1 行 curated 加 2 行整日流水文档，每个流水文档的 `content` 是整天原文，生产上单个整日文档实测 623 字符并随 cron 探针增长。改动后返回 1 行，`content` 为 8 字符的判据句本身，由 `test_one_fact_returns_one_row` 钉住。
+
+行粒度的判别力做过拔牙实测，未改源码：按旧的整日形状构造一个文档后查询，返回的 `content` 是 `# 2026-10-05\n\n- 还是简洁一点好\n- 帮我查一下明天天气\n`，同一天的无关话轮被一并带回，断言 `[content] == [判据句]` 不成立。所以 `test_a_trail_row_carries_one_line_not_a_whole_day` 确实锁住了粒度，不是恒真断言。
+
+生产那一个索引的重建未做，见 Task 4，因此生产侧的噪音数字要等重建后再测。
 
 复跑 Task 6 的端到端场景，实测并记录 `memory_search` 对判据句返回的行数与总字符数，与 `abd7b5780` 记录的 3 行对照。把数字写进本计划，不留「应该变好了」。
 

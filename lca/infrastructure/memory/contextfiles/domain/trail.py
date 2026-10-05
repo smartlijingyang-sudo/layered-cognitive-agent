@@ -43,30 +43,44 @@ def trail_date(filename: str) -> str:
     return match.group(1) if match else ""
 
 
-def parse_trail(text: str, *, source: str, observed_at_ms: int) -> tuple[TrailEntry, ...]:
-    """Parse bullet lines from a trail file into entries.
+def trail_lines(text: str) -> tuple[str, ...]:
+    """Return a trail file's evidence lines, in order.
 
-    Headings, blank lines, and HTML comments are skipped. The trigger is the
-    source date so provenance renders as ``when YYYY-MM-DD``.
+    Headings, blank lines, and HTML comments are skipped. A multi-line bullet
+    contributes only its first line, because ``_BULLET`` is anchored per line.
+
+    This is the single definition of what counts as a trail line. ``parse_trail``
+    and the search index both consume it, so indexed documents and promoted facts
+    cannot drift into describing different line sets.
     """
 
-    entries: list[TrailEntry] = []
-    for line in text.splitlines():
-        match = _BULLET.match(line)
+    lines: list[str] = []
+    for raw in text.splitlines():
+        match = _BULLET.match(raw)
         if match is None:
             continue
         content = match.group(1).strip()
         if not content or content.startswith("<!--"):
             continue
-        entries.append(
-            TrailEntry(
-                content=content,
-                source=source,
-                trigger=source,
-                observed_at_ms=observed_at_ms,
-            )
+        lines.append(content)
+    return tuple(lines)
+
+
+def parse_trail(text: str, *, source: str, observed_at_ms: int) -> tuple[TrailEntry, ...]:
+    """Wrap each trail line into an entry.
+
+    The trigger is the source date so provenance renders as ``when YYYY-MM-DD``.
+    """
+
+    return tuple(
+        TrailEntry(
+            content=content,
+            source=source,
+            trigger=source,
+            observed_at_ms=observed_at_ms,
         )
-    return tuple(entries)
+        for content in trail_lines(text)
+    )
 
 
 def render_trail_day(date: str, entries: Sequence[TrailEntry]) -> str:
@@ -118,4 +132,5 @@ __all__ = [
     "parse_trail",
     "render_trail_day",
     "trail_date",
+    "trail_lines",
 ]

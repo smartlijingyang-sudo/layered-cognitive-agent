@@ -154,23 +154,30 @@ class MemorySearchTool(_BaseMemoryTool):
         )
 
     def _search_merged(self, query: str, *, limit: int) -> list[dict[str, Any]]:
-        """Union the index and the live store, deduped by record id.
+        """Union the live store and the index, deduped by record id and content.
 
         Neither source is complete alone. The index is a projection that only
         ``run_dream`` rebuilds in full, so it carries trail lines the live store
         cannot see and misses semantic rows written since the last rebuild.
         Treating an existing index as a replacement for the live store hides
         those rows; a trail-only index hides every semantic record.
+
+        The live store comes first so a curated record wins over the trail line
+        it was promoted from. Content is a dedup key as well as record id because
+        those two carry the same text under different ids.
         """
 
-        indexed = self._search_indexed(query, limit=limit) or []
         merged: list[dict[str, Any]] = []
         seen: set[str] = set()
-        for row in (*indexed, *self._search_main(query, limit=limit)):
-            key = str(row.get("record_id") or row.get("content") or "")
-            if key in seen:
+        for row in (
+            *self._search_main(query, limit=limit),
+            *(self._search_indexed(query, limit=limit) or []),
+        ):
+            keys = {str(row.get("record_id") or ""), str(row.get("content") or "")}
+            keys.discard("")
+            if keys & seen:
                 continue
-            seen.add(key)
+            seen |= keys
             merged.append(row)
         return merged[:limit]
 
