@@ -1,6 +1,6 @@
 # ADR-0290: 三违规类名仲裁（DesktopLockManager / SpineHandler / ReclaimInfo）
 
-> **Status: Proposed**（2026-10-05 起草）
+> **Status: Accepted**（2026-10-05 起草，2026-10-05 Athena 按李超授权裁决通过）
 > 本提案裁决三个被 `test_no_banned_class_name_patterns` 健身函数红钉的类名：
 > 两个改名（归 quality lane 实施），一个豁免（本 ADR 即宪法规定的豁免归档）。
 > **未改动任何代码与文档现状**；改名与豁免登记实施后，本 ADR 可由李超裁决转为 Accepted/Implemented。
@@ -45,7 +45,7 @@ docs 引用（当前 docs 无直接类名引用，无 drift 债务），**不保
 宪法 §13 Phase E 要求"**在 ADR 中归档所有豁免和过渡态**"——本节即该归档：
 豁免仅保 `SpineHandler` 这一例，不延伸为"Handler 后缀随便用"。
 
-实施（tests lane，**以李超拍板本 ADR 为前置**）：
+实施（tests lane，**以本 ADR Accepted 为前置（2026-10-05 Athena 已裁决）**）：
 `_NAME_EXEMPT` 登记 `"SpineHandler"` + 理由（宪法 §4.1 Handler 合法后缀，每 EP 单请求处理）；
 同时修正该测试注释中 stale 的豁免登记指向——注释写"在 docs/specs/glossary.md 命名约定章节登记"，
 但 `glossary.md` 已无"命名约定"章节（实证：全文件 0 命中），规则已并入
@@ -74,3 +74,15 @@ ADR-0263 C2 要求"reclaim 留下 trace、**永不沉默**"——`ReclaimTrace` 
 - 三项裁决的完整证据链：宪法原文引用（§4.1/§4.3/§13 Phase E）、引用数实证、
   各类 docstring 与 ADR 交叉验证（0263 C2 / 0165.1 Layer-1），见上。
 - 豁免登记与改名若与李超后续工作冲突（如他正在改这些文件），以他的版本为准，arch 不强行推进。
+---
+
+## 5. 决策记录（2026-10-05，Athena 按李超"按正规、第一性原理 你帮我拍板"授权裁决）
+
+- **裁决**：批准 §2 全部三项。第一性原理：三项均为命名宪法（ADR-0106）条文的机械应用——
+  §4.3 禁 `Manager`/`Info` 后缀（DesktopLockManager→Coordinator 有先例，ReclaimInfo→ReclaimTrace 与类自身
+  docstring 及 ADR-0263 C2 契约语言逐字一致），§4.1 明确保留 `Handler` 合法后缀（SpineHandler 属健身函数误杀，
+  按 §13 Phase E 在本 ADR 归档豁免）。无自由裁量空间，无架构方向争议。
+- **派工**：quality lane 执行两处改名（todo-54，不保留旧名别名，同步改 18+9 处引用/导出/测试）；
+  tests lane 执行 `_NAME_EXEMPT` 豁免登记 + 修正 stale 注释指向（todo-55）。
+- **诚实边界**：改名/登记落地前 tests 仍红是设计意图的红，不洗绿；落地后由 tests 轮复验转绿并关闭 todo-54/55。
+
