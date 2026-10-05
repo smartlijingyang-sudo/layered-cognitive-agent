@@ -34,7 +34,6 @@ from lca.plugins.transport.webserver.read.runs.live import (
     journal_outcome_from_session,
     stream_chat_completion,
     stream_process_journal_live,
-    stream_run_fold,
 )
 from lca.plugins.transport.webserver.read.runs.terminal import (
     TEXT_CHANNEL_ALL,
@@ -89,7 +88,6 @@ __all__ = [
     "session_locator",
     "stream_chat_completion",
     "stream_process_journal_live",
-    "stream_run_fold",
     "terminal_event_seq_for",
     "terminal_event_seq_from_file",
     "watermark_from_file",

@@ -644,3 +644,25 @@
 - 验证结果: ruff check 1 文件首次即过（All checks passed!）；targeted pytest `tests/lca_plugins/transport/webserver/doctor/test_contracts_adapter.py`：14 passed（覆盖 ok=False/None/True → severity/message 映射全路径，删除前后行为等价）。
 - commit: 见 git log --grep='第0502轮'（refactor(lca-1000): 第0502轮 删除 contracts_adapter 不可达的 HopVerdict.ok 防御 else 分支（"unknown state" 幻影 error mode）；未 push）。
 - 备注: 只 add 本轮 2 个文件（代码 1 + ledger.md）；编辑前 git status --porcelain 显示并发会话（ralph/10-round-arch-deepening）未提交改动（6 modified + 3 untracked），与本轮文件无交集，未触碰；备份 /tmp/bak_0502/contracts_adapter.py（252，原文件完整备份）。本地写脚本 + stdin 喂远程 python3（先断言 old 文本计数==1），一次成功。
+
+
+## 第0503轮 (2026-10-06 02:03-02:25 CST)
+- 改了什么: 删除 legacy `RunPort` seam 上已退休的 `stream_run_fold` 入口及其整条实现链（4 files，27 deletions(-)，纯删除）：
+  - `lca/plugins/transport/webserver/read/runs/live.py`：删除 `async def stream_run_fold` 桩（docstring 自标 "Retired — P1 uses LcaAgentGateway WebSocket instead of Journal SSE"；本体 `del session, after` + `if False: # pragma: no cover: yield b""`，零行为）；`__all__` 去条目；
+  - `lca/plugins/transport/webserver/read/runs/terminal.py`：删除类上的 `stream_run_fold` 透传方法 + `stream_run_fold as _stream_run_fold` 导入（该导入块被抽空后整体删除）；
+  - `lca/plugins/transport/webserver/read/runs/__init__.py`：去 live-import 条目 + `__all__` 条目；
+  - `lca/plugins/transport/webserver/handlers/runs/terminal/port/port.py`：legacy `RunPort` Protocol 删除 `stream_run_fold` 入口点。
+- 依据 skill 哪一节: deslop 清单 死兼容路径（"Retired" 自标 + 全库零调用方 + tests/ 零引用，路径已死）+ DEEPENING.md Seam discipline（seam interface 收敛：迁移已在 P1 的新 `RunPort` Protocol（agent_gateway.py:53）上完成——新协议只有 `cancel`/`resume_approval`，根本未声明 `stream_run_fold`；旧 seam 上的退休入口是幻影 capability）+ SKILL.md Deletion test（删后复杂度消失：旧函数本体是 `if False` no-op，无 N 个调用方会重造）+ LANGUAGE.md Interface（interface 包含 error modes：退休 stub 曾向调用方承诺一个永远产空流的 entry point，从 interface 上移除后 surface 收敛）。
+- 为什么这是实质改动(非凑数): 删除的是真实的 interface surface（Protocol 入口点 + 唯一 adapter 实现 + 包 re-export），非注释措辞/空行调整。证据链：(1) lca/ 内零 `.stream_run_fold(` 调用（grep）；(2) tests/ 内零 `stream_run_fold` 引用；(3) 唯一 adapter 是 terminal.py 的透传（class method → `_stream_run_fold`），删协议入口只需删这一处实现；(4) 函数本体逐字是 `if False` no-op，删后行为零变化；(5) 新 P1 `RunPort`（agent_gateway.py）早已不声明该入口，迁移事实完成，旧 seam 入口纯属遗留接线。
+- 关键设计决策（夜间跳过 grilling，记台账）: 整条链（函数 + 透传 + re-export + protocol 入口）一次性删除而非仅删本体——旧 seam 的 protocol 入口是幻影 capability，留着会误导未来 explorer 认为"Journal SSE 折叠流仍是 RunPort 的能力"；仅剩 port.py 的 docstring（"创建、控制、查询、诊断和健康投影均由同一 owner 提供"）与能力列表一致，无需改动。未动 `routes.py:34` 的 `_ws_placeholder`（不同死桩，需 grilling，留给下轮）。
+- 候选清单（本轮 explore，逐一验证后取舍）：
+  1. 上述 stream_run_fold 退休链删除 —— 选中（deslop 死兼容路径；证据链完整：零调用/零测试/新协议已收敛；4 文件 27 deletions，纯删除）。
+  2. `predicate_evaluator.py:72,103` 两处 `raise ValueError(unhandled ...)` —— 驳回：`kind` 是否 closed Literal 未在类型层面确证；删除 raise 会把非法 kind 的行为从显式 ValueError 变为隐式 return None，属 error mode 变更，需 grilling，夜间轮不动。
+  3. `failover.py` 4 处 `raise RuntimeError("... exhausted without a ... result")` —— 驳回：虽标 `pragma: no cover`，但失败模式真实可达（全部 adapter 失败），是 interface 的真实 error mode，删除等于删 error mode，需 grilling。
+  4. `supervisor.py:278` `_waiter_loop` 的 `except Exception` —— 驳回（沿用 502 结论：尽力语义有据）。
+  5. `accessors.py:63,82` 的 `except Exception` —— 驳回（沿用 502 结论：外部注册 getter 可达异常）。
+  6. `delete-when` 到期扫描 —— 驳回：全库无到期（最早 2026-10-15）。
+  7. 轮 500/501/502 驳回项（agent_gateway 4 处 except / 长注释块 / append.py PEP562 / s3.py PR-10 / naming 家族 / `_DEFAULT_BOOT_PATH` / tail.py:81 / 三处 latest-kernel-stderr / supervisor 日志路径 / AgentState.history / contracts_adapter 已做）—— 驳回（沿用结论：语义真实或需 grilling/规模超一轮）。
+- 验证结果: ruff check 4 文件首次修复后即过（中间插曲：terminal.py 出现空 `from ... import ()`，补删后 All checks passed!）；残余引用 `grep -rn stream_run_fold lca/ --include=*.py` = 0 行；import 冒烟（read.runs / terminal / port.port 三模块导入 + `__all__` 断言）OK；targeted pytest 3 文件（test_read_runs_unified.py / test_runs_sessions_facade_path.py / test_run_isolation.py）：14 passed。
+- commit: 见 git log --grep='第0503轮'（refactor(lca-1000): 第0503轮 删除 legacy RunPort 上退休的 stream_run_fold 入口及其实现链（死兼容路径）；未 push）。
+- 备注: 只 add 本轮 5 个文件（代码 4 + ledger.md）；编辑前 git status --porcelain 显示并发会话（ralph/10-round-arch-deepening）未提交改动（6 modified + 3 untracked），与本轮文件无交集，未触碰；备份 /tmp/bak_0503/（252，4 文件原文件完整备份）。本地写脚本 + stdin 喂远程 python3（断言计数==1），主脚本一次成功；修复空导入块追加一次。
