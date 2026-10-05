@@ -607,3 +607,8 @@
 | ARCH-TASK-3-CRON | Phase 3 - Cron 存储多租户索引与 Seam 封装 (INV-ARCH-05) | Completed | MultiAssistantCronStore 增加 _job_to_assistant O(1) 内存索引与自愈扫描，冲突与删除一致性闭环，76 项测试全绿，commit 47b2255ff |
 | ARCH-TASK-4-CONTEXTFILES | Phase 4 - ContextFiles 虚设 Seam 与微分层收敛 (INV-ARCH-06) | Completed | 收敛 diff/edit/memory_edit_sync 微分层为 contextfiles/sync.py，切除虚设 ports.file_store 依赖，16 项回归测试全绿，commit 71ea80e83 |
 | ARCH-TASK-5-VERIFY-REGRESSION | Phase 5 - 全链路回归、契约门禁与 Pre-push 验收 (INV-ARCH-07) | Completed | ruff check 0 报错、git diff --check 干净，全量 128 项跨阶段回归测试 100% 通过（耗时 5.52s），负边界 100% 遵守 |
+| ARCH-R2-TASK-1-GATES | Phase 1 - Cognition DecisionGates 微目录扁平化与策略聚合 (INV-ARCH-08, INV-ARCH-09) | In_Progress | 正在开始执行 TDD 编写失败测试 |
+| ARCH-R2-TASK-2-INGEST | Phase 2 - Transport Ingest 文件摄取流水线深度收拢 (INV-ARCH-10, INV-ARCH-11) | Pending | 待执行 |
+| ARCH-R2-TASK-3-SHIMS-TOOLS | Phase 3 - ContextFiles 滞留垫片清零与 MemoryTools 接缝 (INV-ARCH-12, INV-ARCH-13) | Pending | 待执行 |
+| ARCH-R2-TASK-4-READ-RUNS | Phase 4 - Transport Read Runs 读侧微目录收拢 (INV-ARCH-14) | Pending | 待执行 |
+| ARCH-R2-TASK-5-VERIFY-REGRESSION | Phase 5 - 全链路回归验证、门禁体检与追踪看板闭环 (INV-ARCH-15) | Pending | 待执行 |
