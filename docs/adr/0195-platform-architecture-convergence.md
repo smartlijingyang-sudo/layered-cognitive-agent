@@ -17,6 +17,8 @@
 
 **延伸并统摄**：[ADR-0194](0194-cognitive-loop-architecture-convergence.md)（Loop）、[ADR-0115](0115-kernel-transport-boundary.md)（Kernel/Transport）、[ADR-0183](0183-event-bus-framework-ssot.md) / [0186](0186-session-as-event-ssot.md)（事件 SSOT）、[ADR-0190](adr-0190-extreme-plugin-organization.md)（插件物理组织）、[ADR-0191](0191-runtime-loop-dsh-convergence-and-control-plane.md)（四态分离）、[ADR-0075](0075-declarative-phase-graph-and-minimal-trusted-kernel.md)（图内核）。
 
+**更新注记（2026-10-06，iter-arch）**：`lca/plugins/composition/` 已于 lca-1000 第0510轮（`34c71e577`）删除（bot 判为死迁移子树：仅 README × 2 + `composer/` 4 个 provider 垫片，本轮实证 lca//tests/ 零活引用——唯一内容命中为 contracts 层的 `lca.contracts.harness.composition.composer`，为另一模块）。现状：composer/factories/profile/bundles/prompts/roles 仍为 `plugins/` 顶层目录——§2.5 的 composition 合并目标（`plugins/composition/*`）尚未发生。§2.5 原文为 2026-09-06 目标快照，保留不改。
+
 **本文档角色**：全项目**元架构**——把 Loop、Kernel、Webserver、Observability、Plugins 五块叠层债务收束为**一套**可读的环状依赖 + **一条**事实链 + **一种**插件粒度。
 
 ---
