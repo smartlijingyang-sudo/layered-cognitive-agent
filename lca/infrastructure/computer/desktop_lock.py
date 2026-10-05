@@ -8,7 +8,7 @@ from lca.contracts.atoms.ids.ids import utc_now_ms
 from lca.contracts.models.browser.models import DesktopLock
 
 
-class DesktopLockManager:
+class DesktopLockCoordinator:
     """单屏桌面互斥锁管理器（allocateWindow / freeWindow 落地实现）。
 
     不变量：
@@ -101,4 +101,4 @@ class DesktopLockManager:
             return False
 
 
-__all__ = ["DesktopLockManager"]
+__all__ = ["DesktopLockCoordinator"]

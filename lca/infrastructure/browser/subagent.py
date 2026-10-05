@@ -9,7 +9,7 @@ from lca.contracts.models.browser.models import (
     BrowserActionType,
 )
 from lca.contracts.protocols import Tool
-from lca.infrastructure.computer.desktop_lock import DesktopLockManager
+from lca.infrastructure.computer.desktop_lock import DesktopLockCoordinator
 from lca.infrastructure.tools.browser.tools import build_browser_tools
 
 
@@ -24,7 +24,7 @@ class BrowserSubagent:
     def __init__(
         self,
         agent_id: str = "browser_subagent",
-        lock_manager: DesktopLockManager | None = None,
+        lock_manager: DesktopLockCoordinator | None = None,
     ) -> None:
         self.agent_id = agent_id
         self.lock_manager = lock_manager

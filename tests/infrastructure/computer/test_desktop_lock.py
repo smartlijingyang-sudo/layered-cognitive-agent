@@ -1,4 +1,4 @@
-"""Tests for DesktopLockManager (ADR-0248 §5.3 / s13).
+"""Tests for DesktopLockCoordinator (ADR-0248 §5.3 / s13).
 
 Invariants tested:
 - INV-06: 单屏桌面互斥锁（allocateWindow / freeWindow）严格互斥，120s TTL 超时防死锁。
@@ -6,12 +6,12 @@ Invariants tested:
 
 import pytest
 
-from lca.infrastructure.computer.desktop_lock import DesktopLockManager
+from lca.infrastructure.computer.desktop_lock import DesktopLockCoordinator
 
 
 @pytest.mark.asyncio
 async def test_desktop_lock_mutual_exclusion_and_release():
-    lock_mgr = DesktopLockManager(default_ttl_s=120)
+    lock_mgr = DesktopLockCoordinator(default_ttl_s=120)
     assert lock_mgr.is_locked() is False
 
     # 1. 第一个 agent 成功抢锁
@@ -43,7 +43,7 @@ async def test_desktop_lock_mutual_exclusion_and_release():
 @pytest.mark.asyncio
 async def test_desktop_lock_ttl_expiration_prevents_deadlock():
     # 设置 1 秒短 TTL 测试超时防死锁
-    lock_mgr = DesktopLockManager(default_ttl_s=1)
+    lock_mgr = DesktopLockCoordinator(default_ttl_s=1)
     acquired = await lock_mgr.allocate_window(agent_id="sub_crash", session_id="sess_crash")
     assert acquired is True
 

@@ -26,7 +26,7 @@ from lca.contracts.models.vocal.wake import WakeSource
 from lca.domain.routine.repository import JsonRoutineRepository
 from lca.infrastructure.browser.subagent import BrowserSubagent
 from lca.infrastructure.computer.box_sandbox_adapter import LocalBoxAdapter
-from lca.infrastructure.computer.desktop_lock import DesktopLockManager
+from lca.infrastructure.computer.desktop_lock import DesktopLockCoordinator
 from lca.infrastructure.runtime_plane.capability_bindings import (
     BindingsViewBuilder,
     reset_capability_bindings,
@@ -146,7 +146,7 @@ def test_inv_05_browser_subagent_vocal_isolation():
 @pytest.mark.asyncio
 async def test_inv_06_desktop_lock_mutual_exclusion_and_ttl():
     """INV-06: 桌面单屏互斥锁严格互斥与 TTL 防死锁。"""
-    lock_mgr = DesktopLockManager(default_ttl_s=1)
+    lock_mgr = DesktopLockCoordinator(default_ttl_s=1)
 
     # 抢占锁
     assert await lock_mgr.allocate_window("agent_alpha", "sess_1") is True

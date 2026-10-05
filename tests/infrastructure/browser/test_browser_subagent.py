@@ -12,7 +12,7 @@ from lca.contracts.models.browser.models import (
     BrowserActionType,
 )
 from lca.infrastructure.browser.subagent import BrowserSubagent
-from lca.infrastructure.computer.desktop_lock import DesktopLockManager
+from lca.infrastructure.computer.desktop_lock import DesktopLockCoordinator
 
 
 def test_browser_subagent_has_no_vocal_tools():
@@ -29,7 +29,7 @@ def test_browser_subagent_has_no_vocal_tools():
 
 @pytest.mark.asyncio
 async def test_browser_subagent_action_execution_with_desktop_lock():
-    lock_mgr = DesktopLockManager(default_ttl_s=60)
+    lock_mgr = DesktopLockCoordinator(default_ttl_s=60)
     subagent = BrowserSubagent(agent_id="sub_browser_agent", lock_manager=lock_mgr)
 
     action = BrowserAction(
