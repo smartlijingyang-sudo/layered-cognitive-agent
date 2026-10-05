@@ -29,6 +29,7 @@ from typing import Any, cast
 import structlog
 
 from lca.cognition.body.executor.safe_executor import (
+    _elapsed_ms,
     _extract_stdout_chars_total,
     _extract_stdout_head,
 )
@@ -58,12 +59,6 @@ from lca.infrastructure.tool.pipeline import DefaultToolExecutionPipeline
 from lca.infrastructure.tools.tool.invocation_scope import tool_invocation_scope
 
 _log = structlog.get_logger("lca.safe_executor")
-
-_PERF_COUNTER_SCALE = 1000
-
-
-def _elapsed_ms(started: float) -> int:
-    return int((time.perf_counter() - started) * _PERF_COUNTER_SCALE)
 
 
 class PipelineSafeExecutor(SafeExecutor):

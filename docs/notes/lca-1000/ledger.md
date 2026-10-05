@@ -707,3 +707,19 @@
 - 验证结果: ruff check 2 文件首次即过（All checks passed!）；残余引用 git grep terminal_event_seq_from_file -- lca/ tests/ scripts/ = 0 行；import 冒烟（read.runs.__all__ + terminal 模块属性断言符号完全消失）OK；targeted pytest 3 文件（test_read_runs_unified.py / test_runs_sessions_facade_path.py / test_run_isolation.py）：14 passed。
 - commit: 见 git log --grep='第0505轮'（refactor(lca-1000): 第0505轮 删除 terminal_event_seq_from_file 退休 stub（死兼容路径）；未 push）。
 - 备注: 只 add 本轮 3 个文件（代码 2 + ledger.md）；504 轮的台账条目此前未提交，随本次一并提交（均为本 campaign 自有 bookkeeping）；编辑前/后 git status --porcelain 显示并发会话（ralph）未提交改动（docs/notes/audit-2026-10-05.md + ralph/，untracked）与本轮文件无交集，未触碰；ralph 在本轮期间新增了 2 个 commit（ahead 由 64→66），未动；备份 /tmp/bak_0505/（252，2 文件原文件完整备份）。本地写脚本 + stdin 喂远程 python3（断言 old 文本计数==1），一次成功。台账曾因 heredoc 反引号被远程 shell 吃掉导致标识符缺失，已用 stdin-python 模式重写 689-708 行修复。
+
+
+## 第0506轮 (2026-10-06 03:33-03:58 CST)
+- 改了什么: 收敛 `_elapsed_ms` 重复定义（1 文件，+2/-7）：删除 `lca/cognition/body/executor/pipeline_safe_executor.py:62-66` 与 `safe_executor/evidence.py:17-18` 逐字相同的 `_elapsed_ms` + `_PERF_COUNTER_SCALE`（7 行删除），改为从 `safe_executor` 包 import 既有 canonical helper（import 块 +1 行）；4 处调用点（:207/221/239/415）零改动，语义逐字相同。
+- 依据 skill 哪一节: SKILL.md Deletion test（删掉重复定义后复杂度直接消失：canonical 定义在 evidence.py 已存在、被 executor.py 6 处调用 + 包 `__init__` re-export；删除不制造新的跨调用方复杂度，删的是零 leverage 的拷贝）+ DEEPENING.md Seam discipline / Locality（同一 helper 两处定义 = scale factor 漂移风险；收敛到 safe_executor 包单一 SSOT，只改一处）+ LANGUAGE.md Module/Interface/Leverage（helper 的 leverage 来自其 interface，重复定义不增加 leverage，是 shallow 拷贝）。
+- 为什么这是实质改动(非凑数): 消除的是真实的代码重复（两处逐字相同的实现 + 常量），不是注释措辞/空行/标点。证据链：(1) 两处 def 本体逐字相同 `int((time.perf_counter() - started) * 1000)`；(2) pipeline 侧已有从 safe_executor 包 import 私有 helper 的既定模式（`_extract_stdout_chars_total` 等），无新增 import 结构风险；(3) import smoke 断言 `m._elapsed_ms is safe_executor.evidence._elapsed_ms` 通过 + 文件内零残余 `_PERF_COUNTER_SCALE` 引用。
+- 关键设计决策（夜间跳过 grilling，记台账）: 方向是 pipeline 侧删重复、引用 evidence 侧 canonical，而非反向——因为 evidence 侧已被包 `__init__` re-export 并被 executor.py 6 处使用，是既定 SSOT；改 pipeline 侧是单文件改动。evidence.py 头部注释的 "delete-when: pipeline_safe_executor is folded into safe_executor" 计划保持不动（那是更大的折叠，需 grilling）。
+- 候选清单（本轮 explore，逐一验证后取舍）:
+  1. `_elapsed_ms` 重复定义收敛 —— 选中（见上）。
+  2. 全库私有函数死代码扫描（1383 个模块级 `def _*`，git grep 全库引用计数）—— 驳回：抽样验证（`_from_tool_call_json` 等 `_from_*` 簇）均为 dispatch 元组活引用；裸名全库出现次数==1 与私有 def 取交集为 0（各函数名至少在调用处出现），无真死代码。
+  3. 单子模块包 `__init__.py` pass-through 折叠 —— 驳回：约 400 个单子模块包是项目既定的插件包结构，属跨包设计决策，需 grilling，夜间一轮不动。
+  4. 模块级单语句转发函数扫描 —— 仅发现本轮选中的重复（其余为正常小 helper，如 `_catalog_digest` 双实现但签名/语境不同，未深究）。
+  5. 504/505 驳回项沿用（`_ws_placeholder`、failover 4 raises、supervisor waiter、accessors excepts、predicate_evaluator raises、serve.py stubs、plugin.py fail-soft、s3.py PR-10 TODO、delete-when 到期、双 SearchProvider/FileStore Protocol、terminal.py 另 4 个 @deprecated、命名家族、append.py PEP562 等）—— 驳回（语义真实或需 grilling/规模超一轮）。
+- 验证结果: ruff check 改动文件 All checks passed；import 冒烟（`m._elapsed_ms is` canonical + 文件内零残余 `_PERF_COUNTER_SCALE`）OK；targeted pytest 2 文件（tests/cognition/body/test_pipeline_safe_executor_projection.py、test_safe_executor_tool_result_latency.py）：5 passed。
+- commit: refactor(lca-1000): 第0506轮 收敛 _elapsed_ms 重复定义到 safe_executor.evidence（未 push）。
+- 备注: 只 add/commit 本轮 2 个文件（代码 1 + ledger.md），用 `git commit -- <paths>` 指定路径提交，避免带入并发会话（ralph）已 staged 的 2 个测试文件改动；其 staged/untracked（docs/notes/audit-2026-10-05.md、ralph/）全程未触碰。本轮中段曾遇 252 SSH 隧道短暂挂起约 20 秒（一条查询命令 backgrounded 后自动恢复），挂起期间未执行写操作。备份 /tmp/bak_0506/（252，改动前原文件）。教训：heredoc 经 ssh252 双层 shell 会丢格式致锚点匹配失败，改用本地写脚本 + stdin 喂远程 python3，一次成功。
