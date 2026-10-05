@@ -54,7 +54,7 @@
 
 ### 2.1 结构保证
 
-下面四条在模型不遵守 prompt 时仍然成立。只写进 prompt 的句子不算这些语义。
+下面五条在模型不遵守 prompt、或调用方按最省事的方式接线时仍然成立。只写进 prompt 的句子不算这些语义。
 
 | 语义 | 代码结构 |
 |---|---|
@@ -62,6 +62,7 @@
 | 下次触发由服务端计算 | `cron.list` 只给 `next_run_local` 字符串、`schedule_label` 字符串和 `due`。不给 `schedule`、`timezone`、`anchor_at`、`every_seconds`、`at`。见 §5、§10 |
 | 改周期或模型删除要等批准 | 写发生在被挂起的那次工具调用里。审批结果回注之前写函数不被调用。未点选不是「模型记得先别写」。见 §9 |
 | worker 看不见父聊天 | 组装 worker 上下文的函数不接收父 transcript。调用点没有这个参数可传。见 §3.4 |
+| 到点必定起一个属于这次触发的 run | 调度路径不进 inflight 合并，或合并键带上会话。「同一段文字」不足以吞掉一次调度触发。见 §8.1 |
 
 服务端不解析用户原话，也不在 `oneshot` 与周期 `kind` 之间互改。因此「这句话是在说每天还是在说明天」不是结构保证。模型若把「明天 9 点」写成 `daily`，存储会按 `daily` 保存。端到端「每天 9 点提醒我」仍是一次 `cron.add` 就出现卡片，不再要求第二次点选。已经落盘的 `oneshot` 要改成周期时，才由上表第三条挡住。
 
@@ -333,6 +334,24 @@ worker 结束时先追加 run，`outcome` 已定。`receipts` 在投递决定写
 - 运行中的 run 结束后，若槽里有待跑项，立刻起那一次。没有则等待下一次 `due` 或 `upcoming`。
 - `superseded` 不产生 handoff，不重试。
 
+### 8.1 与用户轮重叠
+
+上面的排队槽按 `job_id` 互斥。同一个会话里还可能有用户自己发起的 run，那是另一个所有者，不进这个槽。规则按会话再收一次。
+
+**一个会话同时只有一个活 run。** 到点时先判会话是否空闲。判活分两段：`get_latest_for_topic(chat_id)` 取最近的 `run_id`，再问 run registry 该 run 的 `status` 是否仍在 `pending` 或 `running`。只读第一段会得出错的答案，因为 `lca_running_operations` 没有状态列，行也不删除，最近一行可能属于早已结束的 run。内核重启后 registry 为空，判活结果是空闲，这是对的，那个 run 随进程一起结束了。
+
+会话忙时不起第二个 run，这次 handoff 进该会话的等待位。等待位每会话一个，语义与上面的排队槽一致：新的到点覆盖更早的待投递项，被覆盖的记 `superseded`，回执 `not_sent`，不产生 handoff，不重试。会话空闲后，等待位上的 handoff 起 run。
+
+等待位是进程内的派生态，不是新存储。它的真值是 run 记录里 `receipts` 为空这一条，重启后由下一次 tick 重新导出。§6 已经规定空 `receipts` 读作未决，这里只是给它加一个消费者。
+
+**为什么不允许两个 run 并行同一会话。** 浏览器按 `operationId` 归档消息，`operationId` 就是 `run_id`，而 `topicId` 只在 `agent_runtime_init` 上出现一次，前端没有这个事件的分支。断线重连走 `GET /v1/topics/{topic_id}/running-op`，它返回该 topic 最近一行。第二个 run 插入行之后，重连挂到它上面，用户自己那一轮的流在 UI 里就断了。
+
+**等待有上限。** 上限取 §7 已经算出的那个超时值，即 `min(86400, max(timeout_seconds 或 gap_seconds, gap_seconds))`；`oneshot` 没有自然间隔，上限是 `min(86400, timeout_seconds)`。到期仍未投递的 handoff 记 `not_sent`，run 记录关闭，不再等待。不新增配置项。用户仍能用 `cron.view` 读到这条记录。
+
+**调度触发的 run 不参与 inflight 合并。** 合并键由 `user_text`、`mode`、`attachment_ids`、`agent_id` 组成，不含会话。周期任务的 `user_text` 每次都相同，命中合并时不起新 run，handoff 就此消失，而 run 记录仍被追加成未决。一次调度触发是一条独立事实，带自己的回执，因此它要么绕过合并，要么合并键带上会话。见 §2.1。
+
+本小节不新增 `CronRunOutcome` 成员，不新增事件词表条目，不新增存储。`superseded` 与 `not_sent` 沿用 §6 的定义。
+
 0264 的 `ProactiveJob` 仍按自身的 tick 与裁决。它不进入这个排队槽，也不出现在「即将到来」。
 
 ---
@@ -395,6 +414,7 @@ class CronListItem(BaseModel):  # extra="forbid"
 - 用 exec 死循环代替调度器。
 - 让 cron worker 复制父聊天。那是 §3.2 的 subagent，而且本 ADR 不在本轮实现它。
 - 用 ADR-0264 的 `decide` 在 worker 报告生成之前判定静默。
+- 让调度触发的 run 与用户 run 并行同一会话。浏览器按 `operationId` 归档消息，重连只认该 topic 最近一行，第二个 run 会把用户那一轮的流挤掉。见 §8.1
 
 ---
 
@@ -424,6 +444,9 @@ class CronListItem(BaseModel):  # extra="forbid"
 | worker 超时 | 杀进程，按 §7 重试或 handoff |
 | worker 报告未完成 | `completed`，不重试，handoff |
 | 排队槽被更新的到点替换 | 旧排队项 `superseded`，回执 `not_sent`，无 handoff |
+| 到点时目标会话有活 run | 不起第二个 run。handoff 进该会话的等待位，空闲后起 run。见 §8.1 |
+| 会话等待位被更新的到点覆盖 | 旧 handoff `superseded`，回执 `not_sent`，无 handoff 轮 |
+| 会话一直忙到 §7 的超时上限 | handoff 记 `not_sent`，run 记录关闭，等待位清空 |
 | handoff 轮结束时 `receipts` 仍为空 | 该轮不能标结束。读出来是未决，不是成功 |
 | 持锁进程崩溃 | 按 ADR-0263 stale 收割后，槽里的待跑项可以启动 |
 | `nothing_to_do` 出现在用户提问轮 | 工具错误回注，不静默 |
@@ -437,11 +460,12 @@ class CronListItem(BaseModel):  # extra="forbid"
 还原靠结构和测试。第 1 条到第 4 条按顺序落地，前一条没绿不做下一条。第 0 条只门控 `RoutineSpec` 两个字段的删除，不挡住第 1 条。
 
 0. 全仓检索 `cron_expr` 与 `RoutineSpec` 的 `interval_seconds`。除 `lca/contracts/models/routine/models.py` 的字段定义和直接构造该模型的测试外，没有生产读写，才允许删除这两个字段。检索到其他生产读写，停止删除，字段保持原样。`ProactiveJob.interval_seconds` 不在这次检索的删除范围内。
-1. 四条结构先在代码里成立。测试钉住的是结构。
+1. 五条结构先在代码里成立。测试钉住的是结构。
    - 用户轮的 wire schema 里没有 `lca.nothing_to_do`。
    - `next_run` 无 I/O。时钟由调用方传入。
    - 模型发起的改 schedule、改 timezone、`cron.remove`，审批回注前不调用写函数。
    - 组装 worker 初始上下文的函数参数里没有父 transcript。签名测试拒绝新增这类参数。组装结果等于存储里的 `body` 加上产品上下文，不附加父轮。
+   - 调度触发的 run 不被 inflight 合并吞掉。存在相同 `user_text` 的活 run 时，到点仍产生一个新的 `run_id`，且 run 记录与之一一对应。
 2. 属性测试与契约测试。
    - 任意合法 schedule、任意 aware `now`，`upcoming` 要么为空，要么严格晚于 `now`。同一输入两次结果相同。非法 timezone、用户没有 timezone、naive datetime、落在缺口里的 `at`，都得到类型化拒绝。
    - 春令时缺口日不返回不存在的本地时刻。日任务与周任务取下一周期里真实存在的同一墙钟。秋令时歧义取 `fold=0`。
@@ -455,6 +479,10 @@ class CronListItem(BaseModel):  # extra="forbid"
    - worker 交出「没做完」。不重试。`outcome = completed`。
    - 审批卡片 10 分钟没有点选。定义文件的字节不变。再次 `cron.view` 仍是旧定义。
    - 两个到点同时撞上运行中的 run。旧排队项 `outcome = superseded` 且回执 `not_sent`。无 handoff。运行中的 worker 不被杀。
+   - 到点时目标会话有一个 `running` 的用户 run。不起第二个 run。等待位里有这次 handoff。用户 run 的重连仍指向它自己的 `run_id`。用户 run 结束后 handoff 起 run。
+   - 同一会话两次到点撞上同一个活 run。等待位只留最新一次，旧的记 `superseded` 且回执 `not_sent`。
+   - 会话忙到 §7 的上限。handoff 记 `not_sent`，run 记录关闭，等待位清空。
+   - 周期任务的 `user_text` 与某个活 run 完全相同。到点仍产生一个新 `run_id`，run 记录与之一一对应。
    - `cron.list` 失败。前端显示错误，不显示本地猜测的时间，也不用 `schedule_label` 补一个时间。
 4. 端到端黑盒，周级探针，不作为每次提交的门槛。用户说「每天9点提醒我」。卡片出现，中间没有第二次点选。mock 时钟到 9 点。worker 跑完。handoff 回到父。无异常。父调用 `lca.nothing_to_do`。卡片显示 `silent` 和这次运行时间。
 
