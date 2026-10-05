@@ -68,7 +68,18 @@ _LATCH_FILE = "claim-latch.json"
 
 _ProfileBackfillCallback = Callable[[str, list[MemoryRecord]], Awaitable[None]]
 
-__all__ = ["AssistantMemory"]
+__all__ = ["AssistantMemory", "semantic_candidates"]
+
+
+def semantic_candidates(extra: dict[str, Any]) -> list[dict[str, Any]]:
+    """读取 ADR-0246 结构化候选列表；兼容旧的单候选 ``memory_candidate``。"""
+    candidates = extra.get("memory_candidates")
+    if isinstance(candidates, list):
+        return [c for c in candidates if isinstance(c, dict)]
+    single = extra.get("memory_candidate")
+    if isinstance(single, dict):
+        return [single]
+    return []
 
 
 class AssistantMemory(MemorySystem):
@@ -355,7 +366,7 @@ class AssistantMemory(MemorySystem):
         in ``working.json`` for observability.
         """
         extra = getattr(reflection, "extra", {}) or {}
-        candidates = self._semantic_candidates(extra)
+        candidates = semantic_candidates(extra)
         if candidates:
             for cand in candidates:
                 content = str(cand.get("content") or "").strip()
@@ -451,17 +462,6 @@ class AssistantMemory(MemorySystem):
                 return f"{tool} 工具，产出: {out_snippet}"
             return f"{tool} 工具"
         return "工具交互"
-
-    @staticmethod
-    def _semantic_candidates(extra: dict[str, Any]) -> list[dict[str, Any]]:
-        """读取 ADR-0246 结构化候选列表；兼容旧的单候选 ``memory_candidate``。"""
-        candidates = extra.get("memory_candidates")
-        if isinstance(candidates, list):
-            return [c for c in candidates if isinstance(c, dict)]
-        single = extra.get("memory_candidate")
-        if isinstance(single, dict):
-            return [single]
-        return []
 
     def _append_semantic(
         self,

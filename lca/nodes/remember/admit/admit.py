@@ -34,6 +34,7 @@ from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import
 )
 from lca.contracts.protocols.graph.routing import RoutingDecision
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
+from lca.infrastructure.memory.assistant_memory import semantic_candidates
 from lca.nodes.fast_path import FastPathCounter
 
 
@@ -79,9 +80,9 @@ class RememberAdmitExecutor(FastPathCounter):
 
         # Extract candidates
         procedural_candidate = extra.get("procedural_candidate")
-        semantic_candidates = self._semantic_candidates(extra)
+        candidates = semantic_candidates(extra)
 
-        if procedural_candidate is None and not semantic_candidates:
+        if procedural_candidate is None and not candidates:
             return self._emit_rejection(decision, observation, reflection)
 
         # Authority Check (ADR-0244 §3.3: User > Tool > Model)
@@ -96,21 +97,10 @@ class RememberAdmitExecutor(FastPathCounter):
             )
 
         # Semantic candidates: reject ungrounded model conjectures, keep the rest.
-        admitted = [cand for cand in semantic_candidates if self._is_admissible(cand)]
+        admitted = [cand for cand in candidates if self._is_admissible(cand)]
         if not admitted:
             return self._emit_rejection(decision, observation, reflection)
         return self._emit_admission(decision, observation, reflection, candidate=admitted)
-
-    @staticmethod
-    def _semantic_candidates(extra: dict[str, Any]) -> list[dict[str, Any]]:
-        """读取 ADR-0246 结构化候选列表；兼容旧的单候选 ``memory_candidate``。"""
-        candidates = extra.get("memory_candidates")
-        if isinstance(candidates, list):
-            return [c for c in candidates if isinstance(c, dict)]
-        single = extra.get("memory_candidate")
-        if isinstance(single, dict):
-            return [single]
-        return []
 
     @staticmethod
     def _is_admissible(candidate: dict[str, Any]) -> bool:
