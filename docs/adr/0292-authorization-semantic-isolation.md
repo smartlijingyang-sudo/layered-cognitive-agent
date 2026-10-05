@@ -83,6 +83,7 @@ delegation 信封只传递**用户真实授权及其边界**。子 agent 收到�
 
 - （2026-10-05 21:09 iter-arch 轮更新）：§10（20:25 Athena 按李超授权裁决）修正①触发语义为 grant 缺席触发（§9 来源触发接线为历史实现，`content_origin` 降级为审计元数据）；quality lane grant-absence 拒绝语义实现 + tests lane pin 更新为当前待办（派工见 §10）。本节随落地同步修订，保持状态诚实。
 - （2026-10-05 22:09 iter-arch 轮更新）：§10 grant-absence 实现已落地（21:09 iter-quality 轮 `1ae74a80e`/`be4f52dd1`/`180329612` + merge `7d43981ec`，证据链见 §8；契约 pin 20 激活，worktree 74 passed / main 复验 54 passed）；③ standing 写门执法点收敛（21:47 李超 `dd4821350`：`_BaseAssistantTool.execute` 统一 seam + `is_mutating` 标志，§8③ 同步）。诚实边界：run driver 尚未从 SessionActivation 绑定 ambient TrustEnvelope（§10 假定成立的前提，本轮只补了 seam 未接生产）；未绑定时政策 flag 的特权动作 fail-closed。本节随落地同步修订，保持状态诚实。
+- （2026-10-05 22:09 iter-arch 轮补记，本轮轮中落地）：§10 生产 binder 已落地（22:09 iter-quality 轮 `91a924aba`/`5ebe7426a` + merge `d08d3a355`：`DefaultRuntimeFacade.dispatch_run`/`dispatch_resume` 用 `trust_envelope_scope(activation.trust_envelope)` 包 dispatcher 调用；5 pins，worktree 22 passed / main 复验 22 passed）。上一行"真待办"中的生产接线已关闭。诚实边界：`resolve_activation` 当前恒构造带 `EMPTY_TRUST_ENVELOPE` 的 activation——binder 已接上线但 envelope 内容仍为空，门对政策 flag 的特权动作仍 fail-closed（与未绑定等价）；P3 envelope 富化（PluginOrigin + granted privileges）与 kernel HTTP 远端路径 binder 仍是 lane 外待办。本节随落地同步修订，保持状态诚实。
 
 **裁决**：三项全部批准，按以下决策实施。
 
@@ -142,12 +143,21 @@ delegation 信封只传递**用户真实授权及其边界**。子 agent 收到�
 - `180329612`（tests）：§9 两个 gate pin（origin 触发器，§10 已废止）替换为 3 个 §10 pins——T1 无 grant 被拒（fail-closed，未绑定 envelope）/ control 有 grant 放行走正常审批路由（→`intervene.interrupt`）/ 幻觉授权被拒（`needs_approval=False` + `req.required=True`，不查 `content_origin`）。
 - **验证**：worktree 内 74 passed（契约 pins 20 + intervene/act 25 + hitl e2e 29）；main 合后复验 54 passed；`ruff check lca/` + `ruff format --check` 全净。
 - **诚实边界**：run driver 尚未从 `SessionActivation` 绑定 ambient TrustEnvelope（§10 假定"gate 手里有"，本轮只补了 seam 未接生产；lane 外提案机会）；未绑定时政策 flag 的特权动作 fail-closed；HITL 流程不变。
+run driver 已从 `SessionActivation` 绑定 ambient TrustEnvelope（§10 假定成立；22:09 iter-quality 轮 `91a924aba` 落地，见下补记；HITL 流程不变）。
+
+**§10 生产 binder 落地**（2026-10-05 22:09 iter-quality 轮；merge `d08d3a355`）：
+
+- `91a924aba`（runtime）：`lca/application/runtime/default_facade.py`（+14/−3）——`dispatch_run`/`dispatch_resume` 用 `trust_envelope_scope(activation.trust_envelope)` 包 dispatcher 调用；docstring 注记 §10 语义 + LIFO 不泄漏；分层合规（application→contracts，无 transport import，架构测试仍绿）。
+- `5ebe7426a`（tests）：`tests/application/runtime/test_default_facade_dispatch.py`（+143）钉 5 pins——dispatch 期 envelope 身份同一 / gate 可见真实 grant 集 / resume 路径绑定 / 返回后 scope 复位无泄漏 / 并发 dispatch 各见各的 envelope。
+- **验证**：worktree 内 22 passed（17 存量 + 5 新 pins）；main 合后复验 22 passed；`ruff check` + `ruff format --check` 两文件全净。
+- **诚实边界**：**当前运行时零变化**——`resolve_activation` 恒构造带 `EMPTY_TRUST_ENVELOPE` 的 activation，gate 对其 fail-closed 与 unbound 等价；本轮只把裁决点名的生产 binder 接上线。P3 envelope 富化（PluginOrigin + granted privileges）仍是 lane 外待办；kernel HTTP 远端路径（carrier→coordinator）如需同语义，另起 binder（contextvar 不跨进程），本轮未碰。
 
 **未落地 / 进行中**（诚实边界）：
 - cognition 侧 producer **尚未标记 EXTERNAL**：seam 在位、接线完整，但识别"外部驱动"的生产者逻辑未做——`content_origin` 默认为 None≠EXTERNAL，非 EXTERNAL 决策零触碰，**门当前 inert、不触发**。后续工作：producer 侧 EXTERNAL 标记（lane 外提案机会）。
 - ADR-0292 的"授权语义隔离"本轮运行时接线全部收官；`docs/adr/0255*` 基线禁区本轮零改动。
 - （2026-10-05 21:09 iter-arch 轮更新，§10 设计修正同步）：§10（20:25 裁决）修正①触发语义——门按**特权动作 × TrustEnvelope grant 缺席**触发，不再按来源存在触发；`content_origin`/`origin_trigger_text` 降级为审计元数据（"生产者断层因此不是断层——执法从不依赖生产者"）。上一条"门当前 inert、不触发 / 后续工作 producer 侧 EXTERNAL 标记"为 §10 前的过期表述（§10 明言"保持 inert 是错的——inert 的安全门比没有更糟"，ADR-0291 空心健身函数教训）。§9 来源触发接线证据链（`ca9a07a63` 等）保留为历史记录。**当前真待办**：quality lane 按 §10 实现 gate 拒绝语义（`act.approve.gate` 查 grant；实现未落地——`approve_gate.py` 现无 grant 检查，21:09 arch 轮已实证）；tests lane 更新 pin tests（T1：无 grant 的特权动作被拒；幻觉授权同样被拒）。
 - （2026-10-05 22:09 iter-arch 轮更新）：§10 gate 拒绝语义实现已落地（本轮 §8 新增证据链节；§7 同步）。**当前真待办**：run driver 从 `SessionActivation` 绑定 ambient TrustEnvelope 的生产接线（§10 假定成立的前提；lane 外提案机会）；`docs/adr/0255*` 基线禁区本轮零改动。
+**当前真待办**：§10 生产 binder 已于本轮轮中落地（`91a924aba`/`5ebe7426a`/`d08d3a355`，见上补记）。剩余 lane 外项：P3 envelope 富化（PluginOrigin + granted privileges，使 binder 的 envelope 有真实内容）/ kernel HTTP 远端路径同语义 binder / cognition producer EXTERNAL 标记（§10 后为审计增强项）；`docs/adr/0255*` 基线禁区本轮零改动。
 
 ## 9. 后续接线设计裁决（2026-10-05，Athena 按李超授权裁决）
 
