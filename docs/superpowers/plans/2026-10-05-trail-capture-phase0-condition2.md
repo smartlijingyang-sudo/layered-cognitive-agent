@@ -122,6 +122,8 @@ canonical owner 判定：风格偏好词表归 `contracts/models/memory/episode.
 
 验证：`tests/cognition/memory/test_record_turn_trail.py` 11 条，覆盖判据句写入（含 `还是简洁一点好`、`别那么啰嗦`、`回复请简短` 三条 `govern()` 全部返回 `None` 的句子）、日期来自注入时钟、两次写入是追加不是覆盖、凭证被拒、私人信息照写（钉住写读两侧的分工）、超长截断、home 缺失、空话轮、`state` 为 `None`。`tests/infrastructure/tools/test_memory_search_filters_private.py` 3 条，覆盖索引路径与无索引回退路径都过滤，以及正常记录不被连带吃掉。既有 `tests/infrastructure/memory/test_trail_append_only.py` 三条窄门断言继续通过。
 
+`tests/perceive/test_observe_records_task_episode.py` 另加一条接线锁，断言判据句在 `govern()` 不命中时仍写出流水、且不产 episode。上面那些测试都直接调 `record_turn_trail`，删掉 `observe.py` 里的调用它们全都不会红，这一条会。已实测：把调用换掉后该条失败，恢复后通过。
+
 ### Task 4：`MemoryIndex` 单文档写入与 trail 追加后的增量索引
 
 `ports/memory_index.py` 的 `MemoryIndex` 增加一个单文档写入方法，`adapters/fts.py` 的 `SqliteFtsIndex` 实现它，语义是 upsert 同一 `doc_id`。`build_memory_index` 的全量 `rebuild` 路径保持不变，`run_dream` 继续用它。

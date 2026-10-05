@@ -81,3 +81,33 @@ async def test_observe_skips_episode_when_the_utterance_has_no_template(tmp_path
 
     assert not (home / "memory" / "episodes").exists()
     assert hub.calls == 1
+
+
+@pytest.mark.asyncio
+async def test_observe_writes_the_trail_when_no_template_matches(tmp_path: Path) -> None:
+    """流水是原始证据，与 episode 各自独立门控。
+
+    判据句在 ``govern()`` 返回 None，所以没有 episode；流水照写。删掉
+    ``observe.py`` 里的 ``record_turn_trail`` 调用会让本条变红。
+    """
+    hub = _Hub()
+    home = tmp_path / "asst"
+    executor = PerceiveObserveExecutor()
+    await executor.node_execute(
+        NodeContext(
+            runtime={
+                "perceive_hub": hub,
+                "memory": _Memory(home),
+                "agent_state": _state("还是简洁一点好"),
+            },
+            metadata={},
+            budget=None,
+        ),
+        NodeInput(port_values={}),
+    )
+
+    trails = list((home / "memory").glob("20*.md"))
+    assert len(trails) == 1
+    assert "还是简洁一点好" in trails[0].read_text(encoding="utf-8")
+    assert not (home / "memory" / "episodes").exists()
+    assert hub.calls == 1
