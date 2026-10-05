@@ -123,11 +123,25 @@ class _BaseAssistantTool(Tool):
             return str(exc)
         return None
 
+    is_mutating: ClassVar[bool] = False
+
+    async def execute(self, args: dict[str, Any]) -> Observation:
+        start = time.monotonic()
+        if self.is_mutating:
+            refused = self._check_standing_write_permitted()
+            if refused is not None:
+                return self._fail(start, refused)
+        return await self.execute_tool(args, start)
+
+    async def execute_tool(self, args: dict[str, Any], start: float) -> Observation:
+        raise NotImplementedError
+
 
 class ListAssistantSkillsTool(_BaseAssistantTool):
     """List the skills installed in the bound assistant's Home (read-only)."""
 
     name = _LIST_ASSISTANT_SKILLS_TOOL
+    is_mutating: ClassVar[bool] = False
     effect_kind: ClassVar[Literal["ephemeral", "persistent", "stateful_once"]] = "ephemeral"
     required_grant: ClassVar[str] = "skill.import"
     description = "列出当前助理 Home 已安装的技能（skill_id 列表）。只读，不修改任何配置。"
@@ -136,9 +150,8 @@ class ListAssistantSkillsTool(_BaseAssistantTool):
         "properties": {},
     }
 
-    async def execute(self, args: dict[str, Any]) -> Observation:
+    async def execute_tool(self, args: dict[str, Any], start: float) -> Observation:
         del args
-        start = time.monotonic()
         if self._overlay is None:
             return self._fail(start, "assistant.skill_overlay 能力不可用")
         from lca.infrastructure.tools.assistant.create_skill_tool import (
@@ -170,6 +183,7 @@ class DeleteAssistantSkillTool(_BaseAssistantTool):
     """Delete a skill from the assistant's Home (sensitive, requires confirmation)."""
 
     name = _DELETE_ASSISTANT_SKILL_TOOL
+    is_mutating: ClassVar[bool] = True
     effect_kind: ClassVar[Literal["ephemeral", "persistent", "stateful_once"]] = "persistent"
     required_grant: ClassVar[str] = "skill.import"
     description = (
@@ -189,11 +203,7 @@ class DeleteAssistantSkillTool(_BaseAssistantTool):
         "required": ["skill_id", "confirmed"],
     }
 
-    async def execute(self, args: dict[str, Any]) -> Observation:
-        start = time.monotonic()
-        refused = self._check_standing_write_permitted()
-        if refused is not None:
-            return self._fail(start, refused)
+    async def execute_tool(self, args: dict[str, Any], start: float) -> Observation:
         skill_id = str(args.get("skill_id") or "").strip()
         if not skill_id:
             return self._fail(start, "skill_id 必须为非空字符串")
@@ -220,6 +230,7 @@ class EditAssistantSkillTool(_BaseAssistantTool):
     """Edit a skill in the assistant's Home (COW, non-sensitive)."""
 
     name = _EDIT_ASSISTANT_SKILL_TOOL
+    is_mutating: ClassVar[bool] = True
     effect_kind: ClassVar[Literal["ephemeral", "persistent", "stateful_once"]] = "persistent"
     required_grant: ClassVar[str] = "skill.import"
     description = (
@@ -239,11 +250,7 @@ class EditAssistantSkillTool(_BaseAssistantTool):
         "required": ["skill_id", "skill_md"],
     }
 
-    async def execute(self, args: dict[str, Any]) -> Observation:
-        start = time.monotonic()
-        refused = self._check_standing_write_permitted()
-        if refused is not None:
-            return self._fail(start, refused)
+    async def execute_tool(self, args: dict[str, Any], start: float) -> Observation:
         skill_id = str(args.get("skill_id") or "").strip()
         skill_md = str(args.get("skill_md") or "").strip()
         if not skill_id:
@@ -274,6 +281,7 @@ class UpdateAssistantSoulTool(_BaseAssistantTool):
     """Update the assistant's SOUL.md (safety sections are platform-protected)."""
 
     name = _UPDATE_ASSISTANT_SOUL_TOOL
+    is_mutating: ClassVar[bool] = True
     effect_kind: ClassVar[Literal["ephemeral", "persistent", "stateful_once"]] = "persistent"
     required_grant: ClassVar[str] = "profile.revise"
     description = (
@@ -292,11 +300,7 @@ class UpdateAssistantSoulTool(_BaseAssistantTool):
         "required": ["soul"],
     }
 
-    async def execute(self, args: dict[str, Any]) -> Observation:
-        start = time.monotonic()
-        refused = self._check_standing_write_permitted()
-        if refused is not None:
-            return self._fail(start, refused)
+    async def execute_tool(self, args: dict[str, Any], start: float) -> Observation:
         soul = str(args.get("soul") or "").strip()
         if not soul:
             return self._fail(start, "soul 必须为非空字符串")
@@ -322,6 +326,7 @@ class UpdateAssistantProfileTool(_BaseAssistantTool):
     """Update the assistant's profile.json name/description (non-sensitive)."""
 
     name = _UPDATE_ASSISTANT_PROFILE_TOOL
+    is_mutating: ClassVar[bool] = True
     effect_kind: ClassVar[Literal["ephemeral", "persistent", "stateful_once"]] = "persistent"
     required_grant: ClassVar[str] = "profile.revise"
     description = (
@@ -336,11 +341,7 @@ class UpdateAssistantProfileTool(_BaseAssistantTool):
         },
     }
 
-    async def execute(self, args: dict[str, Any]) -> Observation:
-        start = time.monotonic()
-        refused = self._check_standing_write_permitted()
-        if refused is not None:
-            return self._fail(start, refused)
+    async def execute_tool(self, args: dict[str, Any], start: float) -> Observation:
         name = str(args.get("name") or "").strip()
         description = str(args.get("description") or "").strip()
         if not name and not description:
@@ -370,6 +371,7 @@ class UpdateAssistantGrantsTool(_BaseAssistantTool):
     """Update the assistant's grants.yaml (sensitive, requires confirmation)."""
 
     name = _UPDATE_ASSISTANT_GRANTS_TOOL
+    is_mutating: ClassVar[bool] = True
     effect_kind: ClassVar[Literal["ephemeral", "persistent", "stateful_once"]] = "persistent"
     required_grant: ClassVar[str] = "profile.revise"
     description = (
@@ -389,11 +391,7 @@ class UpdateAssistantGrantsTool(_BaseAssistantTool):
         "required": ["grants_yaml", "confirmed"],
     }
 
-    async def execute(self, args: dict[str, Any]) -> Observation:
-        start = time.monotonic()
-        refused = self._check_standing_write_permitted()
-        if refused is not None:
-            return self._fail(start, refused)
+    async def execute_tool(self, args: dict[str, Any], start: float) -> Observation:
         grants_yaml = str(args.get("grants_yaml") or "").strip()
         if not grants_yaml:
             return self._fail(start, "grants_yaml 必须为非空字符串")
@@ -426,6 +424,7 @@ class UpdateAssistantUserTool(_BaseAssistantTool):
     """
 
     name = _UPDATE_ASSISTANT_USER_TOOL
+    is_mutating: ClassVar[bool] = True
     effect_kind: ClassVar[Literal["ephemeral", "persistent", "stateful_once"]] = "persistent"
     required_grant: ClassVar[str] = "profile.revise"
     description = (
@@ -444,11 +443,7 @@ class UpdateAssistantUserTool(_BaseAssistantTool):
         "required": ["user_md"],
     }
 
-    async def execute(self, args: dict[str, Any]) -> Observation:
-        start = time.monotonic()
-        refused = self._check_standing_write_permitted()
-        if refused is not None:
-            return self._fail(start, refused)
+    async def execute_tool(self, args: dict[str, Any], start: float) -> Observation:
         user_md = str(args.get("user_md") or "").strip()
         if not user_md:
             return self._fail(start, "user_md 必须为非空字符串")
@@ -509,14 +504,15 @@ class ReadAssistantSelfConfigTool(_BaseAssistantTool):
         },
     }
 
+    is_mutating: ClassVar[bool] = False
+
     _DEFAULT_FILES: ClassVar[tuple[str, ...]] = (
         "SOUL.md",
         "USER.md",
         "TOOLS.md",
     )
 
-    async def execute(self, args: dict[str, Any]) -> Observation:
-        start = time.monotonic()
+    async def execute_tool(self, args: dict[str, Any], start: float) -> Observation:
         redacted = args.get("redacted") is True
         requested = args.get("files")
         if requested is None:
@@ -574,6 +570,7 @@ class ListAssistantToolsTool(_BaseAssistantTool):
     """List the assistant's effective tool set: builtin policy + custom tools."""
 
     name = _LIST_ASSISTANT_TOOLS_TOOL
+    is_mutating: ClassVar[bool] = False
     effect_kind: ClassVar[Literal["ephemeral", "persistent", "stateful_once"]] = "ephemeral"
     required_grant: ClassVar[str] = "profile.revise"
     description = (
@@ -584,9 +581,8 @@ class ListAssistantToolsTool(_BaseAssistantTool):
         "properties": {},
     }
 
-    async def execute(self, args: dict[str, Any]) -> Observation:
+    async def execute_tool(self, args: dict[str, Any], start: float) -> Observation:
         del args
-        start = time.monotonic()
         try:
             spec = self._catalog.get(self._assistant_id)
             tools_path = Path(spec.home_path) / "tools.yaml"
@@ -639,6 +635,7 @@ class CreateAssistantToolTool(_BaseAssistantTool):
     """Create a custom tool in the assistant's Home (ADR-0243 D6)."""
 
     name = _CREATE_ASSISTANT_TOOL_TOOL
+    is_mutating: ClassVar[bool] = True
     effect_kind: ClassVar[Literal["ephemeral", "persistent", "stateful_once"]] = "persistent"
     required_grant: ClassVar[str] = "profile.revise"
     description = (
@@ -657,11 +654,7 @@ class CreateAssistantToolTool(_BaseAssistantTool):
         "required": ["tool_json"],
     }
 
-    async def execute(self, args: dict[str, Any]) -> Observation:
-        start = time.monotonic()
-        refused = self._check_standing_write_permitted()
-        if refused is not None:
-            return self._fail(start, refused)
+    async def execute_tool(self, args: dict[str, Any], start: float) -> Observation:
         raw = str(args.get("tool_json") or "").strip()
         if not raw:
             return self._fail(start, "tool_json 必须为非空字符串")
@@ -687,6 +680,7 @@ class UpdateAssistantToolTool(_BaseAssistantTool):
     """Update a custom tool in the assistant's Home (ADR-0243 D6)."""
 
     name = _UPDATE_ASSISTANT_TOOL_TOOL
+    is_mutating: ClassVar[bool] = True
     effect_kind: ClassVar[Literal["ephemeral", "persistent", "stateful_once"]] = "persistent"
     required_grant: ClassVar[str] = "profile.revise"
     description = (
@@ -703,11 +697,7 @@ class UpdateAssistantToolTool(_BaseAssistantTool):
         "required": ["tool_id", "tool_json"],
     }
 
-    async def execute(self, args: dict[str, Any]) -> Observation:
-        start = time.monotonic()
-        refused = self._check_standing_write_permitted()
-        if refused is not None:
-            return self._fail(start, refused)
+    async def execute_tool(self, args: dict[str, Any], start: float) -> Observation:
         tool_id = str(args.get("tool_id") or "").strip()
         raw = str(args.get("tool_json") or "").strip()
         if not tool_id:
@@ -738,6 +728,7 @@ class DeleteAssistantToolTool(_BaseAssistantTool):
     """Delete a custom tool from the assistant's Home (sensitive)."""
 
     name = _DELETE_ASSISTANT_TOOL_TOOL
+    is_mutating: ClassVar[bool] = True
     effect_kind: ClassVar[Literal["ephemeral", "persistent", "stateful_once"]] = "persistent"
     required_grant: ClassVar[str] = "profile.revise"
     description = (
@@ -757,11 +748,7 @@ class DeleteAssistantToolTool(_BaseAssistantTool):
         "required": ["tool_id", "confirmed"],
     }
 
-    async def execute(self, args: dict[str, Any]) -> Observation:
-        start = time.monotonic()
-        refused = self._check_standing_write_permitted()
-        if refused is not None:
-            return self._fail(start, refused)
+    async def execute_tool(self, args: dict[str, Any], start: float) -> Observation:
         tool_id = str(args.get("tool_id") or "").strip()
         if not tool_id:
             return self._fail(start, "tool_id 必须为非空字符串")
