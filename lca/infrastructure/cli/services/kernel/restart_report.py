@@ -539,14 +539,16 @@ def run_restart_report(
     # Compare against ProgramState.RUNNING.value (lowercase, see
     # ``lca/infrastructure/cli/services/kernel/supervisor/types.py``) so this
     # stays in lockstep with the supervisor's enum, not a hand-typed string.
-    try:
-        from lca.infrastructure.cli.services.kernel.supervisor.types import (
-            ProgramState,
-        )
+    # Local import kept lazy as before; the target is an in-repo module
+    # (same kernel tree, stdlib-only import chain, every other consumer
+    # imports it at module level), so a bare import is the honest form:
+    # no ImportError fallback is justified, and the old "running" string
+    # silently duplicated ProgramState.RUNNING.value instead of failing loud.
+    from lca.infrastructure.cli.services.kernel.supervisor.types import (
+        ProgramState,
+    )
 
-        running_value = ProgramState.RUNNING.value
-    except ImportError:  # pragma: no cover — defensive
-        running_value = "running"
+    running_value = ProgramState.RUNNING.value
     if supervisor_state != running_value:
         for phase_name in ("fiber_report", "health_probe"):
             findings.append(

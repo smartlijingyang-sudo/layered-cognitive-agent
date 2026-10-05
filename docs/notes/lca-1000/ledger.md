@@ -572,3 +572,17 @@
 - 验证结果: ruff check 1 文件首次即过（All checks passed!）；targeted pytest `tests/scenario/step/test_step_narrative_writer.py`：25 passed；行为等价 python 断言全绿（`StepNarrativeWriter("")` 早退仍返回 None；方法体内 `except ImportError` 字符串归零、`fold_model_visible(` 调用保留；local import 解析到 canonical 对象）。
 - commit: 见 git log --grep='第0498轮'（refactor(lca-1000): 第0498轮 删除 narrative writer 无依据的 ImportError 防御 guard（fold_source 为 in-repo 模块）；未 push）。
 - 备注: 只 add 本轮 2 个文件（代码 1 + ledger.md）；编辑前 git status --porcelain 干净（并发会话在本轮 explore 期间提交了 2 个 docs commit：0268 ADR + semantic-memory 笔记，98→100 commits；其改动均为 docs/，与本轮代码文件无交集）；备份 /tmp/bak_0498/writer.py（252，原文件完整备份）。本地 heredoc 嵌套引号翻车一次（文件未动），改用本地写脚本 + stdin 喂远程 python3，编辑与验证均一次成功。
+
+## 第0499轮 (2026-10-06 00:03-00:16 CST)
+- 改了什么: 删除 `lca/infrastructure/cli/services/kernel/restart_report.py` 中 `run_restart_report` 内对 in-repo 模块 `supervisor.types.ProgramState` 的无依据 `try/except ImportError` 防御 guard（1 file，9 insertions(+)/7 deletions(-)）：`except ImportError: # pragma: no cover — defensive` 分支（fallback 硬编码 `"running"` 字符串）删除；改写为裸的 local import（保持延迟导入位置不动）+ 4 行注释说明不可达依据。
+- 依据 skill 哪一节: deslop 清单 无依据的防御性 guard + LANGUAGE.md Interface（error mode 是 interface 的一部分：原接口隐含"supervisor.types 不可导入时静默用字面量 'running' 替代"幻影 error mode；删除后 comparison 值唯一真实来源是 `ProgramState.RUNNING.value`，调用方与测试不再被误导）+ SKILL.md Deletion test（删掉 guard 后复杂度直接消失：无调用方需要复刻 fallback，无 N 处复杂度回潮）。
+- 为什么这是实质改动(非凑数): 删除的是可执行的防御分支（含行为后果的兜底值），不是注释措辞。无依据证据链：(1) `types.py` 导入链仅 stdlib（shlex/dataclasses/enum），无可选第三方依赖；(2) restart_report 所在 kernel tree 的每个其他消费者（commands/kernel/supervisor.py、supervisor/results.py/decisions.py/state.py）都对 `ProgramState` 做模块级 import，全库按"恒可导入"对待；(3) tests/ 内无任何用例依赖该 ImportError 路径（`tests/infrastructure/cli/services/kernel/` 无 `except ImportError`，全库 grep 仅生产代码 1 处）；(4) fallback 值恰好是 enum 成员的重复字面量（`RUNNING = "running"`），属手抄 seam 的幻影冗余。
+- 关键设计决策（夜间跳过 grilling，记台账）: 保留 local import 位置（不提至模块级）：该函数文档头声明 restart_report 是"supervising read-only companion"，延迟导入的现有纪律不动；只删 guard，不碰 `supervisor_state != running_value` 比较逻辑。
+- 候选清单（本轮 explore，逐一验证后取舍）：
+  1. 上述 restart_report.py ImportError guard 删除 —— 选中（deslop 无依据 guard；单文件聚焦；deletion test 满分；targeted 测试现成）。
+  2. `lca/plugins/loop/graph/recovery/plugin.py` 整模块删除（delete-when: 2026-10-15）—— 驳回（日期未到；当前 2026-10-06）。
+  3. 全库其余 `except ImportError` 生产代码 —— 驳回：mcp/postgres/browser/fetch/llm_adapter/matplotlib/companion/telemetry_otel/otel_projection/langfuse_projection/composio/fact_scorer 全是真实可选第三方依赖的防御，justify 存在；computer.py:246 显式"kept for boot-time safety" boot 期防御；cli/commands/__init__.py:33,46 插件可选加载。
+  4. AgentState.history 迁移 / _DEFAULT_BOOT_PATH / tail.py:81 —— 驳回（沿用 498 结论：需 grilling 或规模超一轮）。
+- 验证结果: ruff check 1 文件首次即过（All checks passed!）；targeted pytest `tests/infrastructure/cli/test_kernel_restart_report.py`：8 passed；python 断言：文件内 `except ImportError` 归零、`ProgramState.RUNNING.value` 保留、模块导入无异常。
+- commit: refactor(lca-1000): 第0499轮 删除 restart_report 无依据的 ProgramState ImportError 防御 guard（hardcode "running" 兜底）；未 push。
+- 备注: 只 add 本轮 2 个文件（代码 1 + ledger.md）；编辑前 git status --porcelain 有并发会话（ralph/10-round-arch-deepening）未提交改动（docs/plans/task.md、memory/cognition/tools 等），与本轮文件无交集，未触碰；备份 /tmp/bak_0499/restart_report.py（252，原文件完整备份）。编辑经本地写脚本 + stdin 喂远程 python3（先断言 old 文本计数==1），一次成功。
