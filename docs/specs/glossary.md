@@ -320,6 +320,22 @@ IngestCache, LLMResolver, ModeDefinition, ModelDefinition, ParsedMessages
 | **DegradationKind** | 工具失败降级分类 |
 
 
+## ADR-0292 授权语义隔离机制词条（2026-10-05）
+
+> ADR-0292（已 Accepted）C1 落地的新机制词条补录：实现已在
+> `lca/contracts/models/core/execution/external_content.py`、
+> `lca/contracts/runtime/trust.py`、`lca/cognition/body/emit/observation_surface.py`
+> 落盘，词表滞后；定义逐一取自源码 docstring 实证。
+
+| 术语 | 定义 |
+|---|---|
+| **ContentOrigin** | 内容段来源标记（StrEnum：EXTERNAL/INTERNAL，ADR-0292 C1）；EXTERNAL=工具结果/网页抓取/文件读取/子 agent 或 peer 报告——不带指令权 |
+| **fence_external_content** | 把文本包进外部内容围栏的函数；ContentOrigin.EXTERNAL 的模型可见呈现（一源两呈现）；语义标签非安全边界，防不住恶意生产者自伪造标记 |
+| **Observation.content_origin** | Observation 的来源字段，fail-closed 默认 EXTERNAL；鸭子类型旧对象走 getattr 兼容 |
+| **TrustEnvelope** | frozen dataclass：单次 run 的插件来源闭集 + 权限天花板（ADR-0199 §3.4），ADR-0292 的权限唯一来源载体之一 |
+| **observation_content** | 提示词渲染落点：Observation.payload → surface/tool_result 字符串；EXTERNAL payload 围栏、INTERNAL 直通（ADR-0292 C1） |
+
+
 ## 已废弃主名（PR-12 整理）
 
 > 这些术语曾在 codebase 中存在，现已删除 / 改名 / 退役。禁止复活
