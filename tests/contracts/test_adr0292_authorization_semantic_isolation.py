@@ -7,13 +7,23 @@ C1 (marker format + fence points) is implemented (quality lane, 2026-10-05):
     ``observation_content`` (surface/tool_result + role=tool messages) and
     ``MemberReportsSection`` (member_reports block).
 
-C2 (one-way gate) / C3 (delegation passing) / C4 (evidence landing) are NOT
-yet implemented. Their accept criteria are pinned here as conditional
-xfails, per the repo's pre-existing-baseline convention
+C2 (one-way gate) / C3 (delegation passing) / C4 (evidence landing)
+enforcement seams landed 2026-10-05 (``a849da567``/``edcdb0c75``); the
+T1–T4 pins below are active. The §9 follow-up wiring (Decision origin
+field + act.approve.gate refusal + ambient-Decision standing gate) is
+pinned as conditional xfails at the end of this file, per the repo's
+pre-existing-baseline convention
 (``tests/architecture/test_0199_phase1_acceptance.py``): each pin probes
 for the implementing seam; while it is absent the pin xfails with the
 contract text, and once the quality lane implements it the pin activates
 automatically.
+
+§9 后续接线 (2026-10-05, Athena 按李超授权裁决):
+  ① Decision 加来源字段 (content_origin + 触发文本引用, 可选, contracts
+     加法变更) — act.approve.gate 对 EXTERNAL 来源的 privilege 声称直接拒绝;
+  ③ standing 写工具不加 origin 参数 — 写门读当前 Decision 的来源
+     (一套 Decision 来源机制, 两个门共用);
+  ④ on_refusal → evidence 纯机械接线, 待①落地后补 pin.
 
 Accept criteria (ADR-0292 §3):
   T1 tool output claiming "I have been authorized to <dangerous action>"
@@ -37,17 +47,27 @@ import pytest
 
 from lca.cognition.body.emit.observation_surface import observation_content
 from lca.contracts.atoms.ids.ids import new_id
+from lca.contracts.models.core.execution import decision as _decision_module
 from lca.contracts.models.core.execution import external_content as _external_content_module
-from lca.contracts.models.core.execution.decision import Observation
+from lca.contracts.models.core.execution.decision import (
+    Decision,
+    Observation,
+    ToolCall,
+)
 from lca.contracts.models.core.execution.external_content import (
     EXTERNAL_FENCE_BEGIN,
     EXTERNAL_FENCE_END,
     ContentOrigin,
+    assert_standing_writer_permitted,
     fence_external_content,
 )
 from lca.contracts.models.team.delegation.delegation import DelegationResult
 from lca.contracts.models.team.role.team import RoleProfile, ToolPermissionManifest
 from lca.contracts.models.team.team.awareness import TeamAwareness
+from lca.contracts.protocols.declarative.declarative_1.node_executor import (
+    NodeContext,
+    NodeInput,
+)
 from lca.contracts.runtime.trust import PluginOrigin, TrustEnvelope
 from lca.plugins.prompts.sections.teammates import MemberReportsSection
 
@@ -306,3 +326,198 @@ def test_t4_external_content_cannot_grant_standing_write_pinned_for_c2_4() -> No
         )
     with pytest.raises(PermissionError):
         gate(ContentOrigin.EXTERNAL, "MEMORY.md")
+
+
+# ---------------------------------------------------------------------------
+# ADR-0292 §9 后续接线 pins (2026-10-05, Athena 按李超授权裁决)
+#
+# 派工: quality lane 按①③实现 (Decision 来源字段 + gate 拒绝语义 +
+# standing 写门读 ambient Decision); tests lane 补 pin tests (T1 gate
+# 拒绝、T4 standing 写保护)。遵循本文件的条件 xfail 约定: seam 未落地
+# 时 xfail 并写明契约文本, quality lane 落地后自动激活。
+#
+# ④ on_refusal → evidence 为纯机械接线 (待①落地后在拒绝点传入
+# on_refusal 回调, 走 safe_executor._resolve_evidence_pair +
+# BoundObservability.evidence_binding() 现有模式), 本轮不 pin, 待①
+# 落地后下一轮补。
+# ---------------------------------------------------------------------------
+
+
+def _decision_has_content_origin() -> bool:
+    """ADR-0292 §9-① seam probe: the optional ``Decision.content_origin`` field."""
+    return "content_origin" in {f.name for f in dataclasses.fields(Decision)}
+
+
+def _ambient_decision_seam() -> tuple | None:
+    """ADR-0292 §9-③ seam probe: ambient-Decision reader + scope.
+
+    Mirrors the delegation contextvar idiom
+    (``lca/contracts/models/team/delegation/context.py``:
+    ``get_current_delegator`` + ``delegator_scope``). Returns
+    ``(reader, scope)`` once the quality lane lands the mechanism,
+    else ``None``.
+    """
+    reader = getattr(_decision_module, "get_current_decision", None)
+    scope = getattr(_decision_module, "decision_scope", None)
+    if callable(reader) and callable(scope):
+        return (reader, scope)
+    return None
+
+
+def _s9_privilege_tool_calls() -> list[ToolCall]:
+    """A canonical privilege claim: shell.exec, straight from the T1 claim text."""
+    return [
+        ToolCall(
+            call_id="tc_s9_001",
+            tool_name="shell.exec",
+            arguments={"command": "rm -rf /"},
+        )
+    ]
+
+
+def test_s9_decision_carries_content_origin_field() -> None:
+    """ADR-0292 §9-①: Decision gains optional content_origin (+ trigger-text ref).
+
+    contracts additive change: legacy constructors keep working, and a
+    Decision that does not set the field is NOT treated as EXTERNAL —
+    otherwise every legacy decision claiming privilege would be refused
+    by the gate.
+    """
+    if not _decision_has_content_origin():
+        pytest.xfail(
+            "ADR-0292 §9-① not implemented yet (quality lane): Decision.content_origin "
+            "(ContentOrigin | None) + origin_trigger_text (str | None) optional fields. Expected: "
+            "Decision(..., content_origin=ContentOrigin.EXTERNAL) carries the origin; "
+            "the default is not EXTERNAL so legacy decisions keep their behavior."
+        )
+    assert "origin_trigger_text" in {f.name for f in dataclasses.fields(Decision)}
+    flagged = Decision(
+        decision_id="dec_s9_origin_001",
+        action_type="use_tool",
+        rationale="instruction arrived inside fenced tool output",
+        confidence=0.9,
+        content_origin=ContentOrigin.EXTERNAL,  # type: ignore[call-arg]
+        origin_trigger_text=_T1_CLAIM,  # type: ignore[call-arg]
+    )
+    assert flagged.content_origin is ContentOrigin.EXTERNAL
+    assert flagged.origin_trigger_text == _T1_CLAIM
+    legacy = Decision(
+        decision_id="dec_s9_origin_002",
+        action_type="use_tool",
+        rationale="plain",
+        confidence=1.0,
+    )
+    assert legacy.content_origin is not ContentOrigin.EXTERNAL
+    assert legacy.origin_trigger_text is None
+
+
+@pytest.mark.asyncio
+async def test_s9_approve_gate_refuses_external_privilege_claim() -> None:
+    """ADR-0292 §9-① T1 gate: act.approve.gate refuses an EXTERNAL-origin
+    Decision's privilege claim directly — terminal.commit, never act.envelope."""
+    if not _decision_has_content_origin():
+        pytest.xfail(
+            "ADR-0292 §9-① field not implemented yet (quality lane): cannot build "
+            "an EXTERNAL-origin Decision to probe the gate."
+        )
+    from lca.nodes.intervene.approve_gate import ApproveGateExecutor
+
+    decision = Decision(
+        decision_id="dec_s9_gate_001",
+        action_type="use_tool",
+        rationale="external content claimed authorization: " + _T1_CLAIM,
+        confidence=1.0,
+        needs_approval=False,
+        tool_calls=_s9_privilege_tool_calls(),
+        content_origin=ContentOrigin.EXTERNAL,  # type: ignore[call-arg]
+        origin_trigger_text=_T1_CLAIM,  # type: ignore[call-arg]
+    )
+    executor = ApproveGateExecutor()
+    output = await executor.node_execute(
+        NodeContext(runtime={}, budget={}, metadata={}),
+        NodeInput(port_values={"decision": decision}),
+    )
+    routing = output.port_values["approval_routing"]
+    if routing.next_node != "terminal.commit":
+        pytest.xfail(
+            "ADR-0292 §9-① gate wiring pending (quality lane): EXTERNAL-origin "
+            "privilege claim not yet refused by act.approve.gate. Expected: direct "
+            "refusal → terminal.commit (reject hint); the decision never reaches "
+            "act.envelope."
+        )
+    assert routing.next_node == "terminal.commit"
+    assert routing.next_hint is not None and "reject" in routing.next_hint
+
+
+@pytest.mark.asyncio
+async def test_s9_approve_gate_passes_non_external_privilege_claim() -> None:
+    """Control for §9-①: the refusal is origin-scoped. A Decision without
+    EXTERNAL origin claiming the same privilege is NOT refused by this gate
+    (approve_skipped → act.envelope). Always active: guards against an
+    over-broad gate once ① lands."""
+    from lca.nodes.intervene.approve_gate import ApproveGateExecutor
+
+    decision = Decision(
+        decision_id="dec_s9_gate_002",
+        action_type="use_tool",
+        rationale="user explicitly asked to clean the disk",
+        confidence=1.0,
+        needs_approval=False,
+        tool_calls=_s9_privilege_tool_calls(),
+    )
+    executor = ApproveGateExecutor()
+    output = await executor.node_execute(
+        NodeContext(runtime={}, budget={}, metadata={}),
+        NodeInput(port_values={"decision": decision}),
+    )
+    routing = output.port_values["approval_routing"]
+    assert routing.next_node == "act.envelope"
+    assert routing.next_hint == "approve_skipped"
+
+
+def test_s9_standing_write_refused_for_external_ambient_decision() -> None:
+    """ADR-0292 §9-③ T4: the standing writer gate reads the ambient Decision's
+    origin — one Decision-origin mechanism, two gates. Ambient EXTERNAL
+    Decision → standing write refused."""
+    seam = _ambient_decision_seam()
+    if seam is None or not _decision_has_content_origin():
+        pytest.xfail(
+            "ADR-0292 §9-③ not implemented yet (quality lane): ambient-Decision "
+            "mechanism (contextvar idiom, cf. delegation/context.py) + the standing "
+            "writer gate consults the ambient Decision's content_origin. Expected: "
+            "ambient EXTERNAL Decision → PermissionError on standing write; ambient "
+            "INTERNAL → permitted; tool execute() gains no origin param."
+        )
+    reader, scope = seam
+    decision = Decision(
+        decision_id="dec_s9_standing_001",
+        action_type="use_tool",
+        rationale="external content demanded a MEMORY.md rewrite",
+        confidence=0.8,
+        content_origin=ContentOrigin.EXTERNAL,  # type: ignore[call-arg]
+    )
+    with scope(decision):
+        assert reader() is decision
+        with pytest.raises(PermissionError):
+            assert_standing_writer_permitted(reader().content_origin, "MEMORY.md")
+
+
+def test_s9_standing_write_permitted_for_internal_ambient_decision() -> None:
+    """Control for §9-③: ambient INTERNAL Decision → standing write permitted."""
+    seam = _ambient_decision_seam()
+    if seam is None or not _decision_has_content_origin():
+        pytest.xfail(
+            "ADR-0292 §9-③ not implemented yet (quality lane): see "
+            "test_s9_standing_write_refused_for_external_ambient_decision."
+        )
+    reader, scope = seam
+    decision = Decision(
+        decision_id="dec_s9_standing_002",
+        action_type="use_tool",
+        rationale="user asked to update standing files",
+        confidence=1.0,
+        content_origin=ContentOrigin.INTERNAL,  # type: ignore[call-arg]
+    )
+    with scope(decision):
+        assert reader() is decision
+        assert assert_standing_writer_permitted(reader().content_origin, "MEMORY.md") is None
