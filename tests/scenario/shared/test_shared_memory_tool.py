@@ -2,11 +2,7 @@
 
 from __future__ import annotations
 
-import os
-import sys
 import unittest
-
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from lca.cognition.memory.simple.memory import SimpleMemorySystem
 from lca.cognition.memory.team.shared_memory import TeamSharedMemoryStore

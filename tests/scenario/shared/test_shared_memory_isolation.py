@@ -7,11 +7,11 @@
 
 from __future__ import annotations
 
-import os
-import sys
-import unittest
+# Boot-time seam: these tests run a real kernel via run_kernel()
+# (LLM calls go through MockLLMAdapter, no real key needed).
+__keep_llm_key__ = True
 
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+import unittest
 
 from lca.cognition.memory.simple.memory import SimpleMemorySystem
 from lca.cognition.memory.team.shared_memory import TeamSharedMemoryStore
@@ -249,8 +249,8 @@ class TestTeamSharedMemoryInjection(unittest.IsolatedAsyncioTestCase):
             shared_memory_layers=[MemoryLayer.SEMANTIC],
             scope=scope,
         )
-        mem_a = team.members[0].runtime.memory.inner  # type: ignore[attr-defined]
-        mem_b = team.members[1].runtime.memory.inner  # type: ignore[attr-defined]
+        mem_a = team.members[0].runtime.memory
+        mem_b = team.members[1].runtime.memory
         self.assertIsNotNone(mem_a._shared_store)
         mem_a.write_shared_record(
             MemoryLayer.SEMANTIC, _make_semantic_record("orchestrator-shared-fact")
@@ -278,8 +278,8 @@ class TestTeamSharedMemoryInjection(unittest.IsolatedAsyncioTestCase):
             shared_memory_layers=[],
             scope=scope,
         )
-        mem_a = team.members[0].runtime.memory.inner  # type: ignore[attr-defined]
-        mem_b = team.members[1].runtime.memory.inner  # type: ignore[attr-defined]
+        mem_a = team.members[0].runtime.memory
+        mem_b = team.members[1].runtime.memory
         self.assertIsNone(mem_a._shared_store)
         mem_a._private_layers[MemoryLayer.SEMANTIC].append(_make_semantic_record("private-to-a"))
         state_b = await mem_b.perceive(_make_state())

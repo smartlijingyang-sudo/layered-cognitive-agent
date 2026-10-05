@@ -2,11 +2,7 @@
 
 from __future__ import annotations
 
-import os
-import sys
 import unittest
-
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from lca.infrastructure.transport.agent_transport import InternalTransport
 from lca.infrastructure.transport.registry import (

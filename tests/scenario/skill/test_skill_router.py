@@ -2,18 +2,16 @@
 
 from __future__ import annotations
 
-import os
-import sys
 import unittest
-from unittest.mock import AsyncMock, MagicMock
-
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from unittest.mock import MagicMock
 
 from lca.cognition.brain.pipeline.modular_brain import ModularBrain
 from lca.cognition.brain.prompt.skill_router import KeywordSkillRouter, StaticSkillRouter
 from lca.contracts.harness.memory.events import SkillRouted
+from lca.contracts.models.cognition.reasoner_turn import ReasonerTurnRender
 from lca.contracts.models.core.conversation.llm import LLMResponse
 from lca.contracts.models.core.state.state import AgentState, Budget
+from lca.contracts.models.team.role.team import RoleProfile, ToolPermissionManifest
 from lca.plugins.events.publishers._session_publish import (
     reset_publish_session,
     set_publish_session,
@@ -25,6 +23,40 @@ from lca.session.append import Session
 
 def _make_state(task: str) -> AgentState:
     return AgentState(trace_id="test", task=task, budget=Budget())
+
+
+class _StubReasoner:
+    """满足 spine boot-time seam 的最小 reasoner 替身。
+
+    brain.think 现经 run_reasoner_generate_thoughts_with_spine_facts，
+    要求 reasoner 暴露 render_turn/complete_turn/role_profile
+    （ADR-0220 §6.2 P9：generate_thoughts 已移出 reasoner seam）。
+    router 测试不关心 reasoner 行为，只给固定 render（trace=None）
+    与 canned LLMResponse。
+    """
+
+    def __init__(self) -> None:
+        self.role_profile = RoleProfile(
+            role="reasoner",
+            goal="test goal",
+            backstory="test backstory",
+            tool_permission_manifest=ToolPermissionManifest(allowed_tools=[]),
+        )
+
+    def render_turn(self, context, template_selection, role_snapshot):
+        return ReasonerTurnRender(
+            prompt="stub",
+            trace=None,
+            section_count=0,
+            manifest=None,
+            activated_skill_ids=(),
+            section_outputs=None,
+            total_chars=None,
+            variant=None,
+        )
+
+    async def complete_turn(self, state, render, tools):
+        return LLMResponse(text="think")
 
 
 class _SpineSessionBound(unittest.IsolatedAsyncioTestCase):
@@ -92,8 +124,7 @@ class TestSkillRouterIntegration(_SpineSessionBound):
     async def test_router_sets_active_template(self) -> None:
         router = StaticSkillRouter("custom_prompt")
 
-        reasoner = MagicMock()
-        reasoner.generate_thoughts = AsyncMock(return_value=LLMResponse(text="think"))
+        reasoner = _StubReasoner()
         mock_decision = MagicMock()
         mock_decision.rationale = "test"
 
@@ -114,8 +145,7 @@ class TestSkillRouterIntegration(_SpineSessionBound):
 
     async def test_router_requires_explicit_reducer(self) -> None:
         """SkillRouter writes state, so it cannot use a hidden local Reducer."""
-        reasoner = MagicMock()
-        reasoner.generate_thoughts = AsyncMock(return_value=LLMResponse(text="think"))
+        reasoner = _StubReasoner()
         brain = ModularBrain(
             reasoner=reasoner,
             classifier=DefaultDecisionClassifier(),
@@ -127,8 +157,7 @@ class TestSkillRouterIntegration(_SpineSessionBound):
 
     async def test_think_without_router_no_template(self) -> None:
         """无 SkillRouter 时，working_memory 不设 active_template。"""
-        reasoner = MagicMock()
-        reasoner.generate_thoughts = AsyncMock(return_value=LLMResponse(text="think"))
+        reasoner = _StubReasoner()
         mock_decision = MagicMock()
         mock_decision.rationale = "test"
 
@@ -150,8 +179,7 @@ class TestSkillRouterIntegration(_SpineSessionBound):
         """SkillRouter 调用不应增加 budget 计数。"""
         router = StaticSkillRouter("t")
 
-        reasoner = MagicMock()
-        reasoner.generate_thoughts = AsyncMock(return_value=LLMResponse(text="x"))
+        reasoner = _StubReasoner()
         mock_decision = MagicMock()
         mock_decision.rationale = "x"
 

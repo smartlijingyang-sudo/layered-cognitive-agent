@@ -3,11 +3,7 @@
 from __future__ import annotations
 
 import asyncio
-import os
-import sys
 import unittest
-
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from lca.contracts.models.core.execution.decision import Observation
 from lca.contracts.models.core.state.lifecycle import AgentCard
