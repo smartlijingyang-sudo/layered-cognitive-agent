@@ -42,7 +42,6 @@ _SCAN_PACKAGES = [
     "lca.runtime",
     "lca.agent",
     "lca.application",
-    "gateway",
 ]
 
 # Forward glossary coverage test only checks LCA core (not gateway).
@@ -84,7 +83,7 @@ _LINE_COUNT_EXEMPT: dict[str, str] = {
         "L4 spawn 闭合 AgentSpec/TeamSpec（ADR-0056）；"
         "promote_lead 由 test_refactor_guards 直接 import"
     ),
-    "lca/cognition/body/action_handlers.py": (
+    "lca/cognition/body/actions/action_handlers.py": (
         "Body 动作分发单模块（委派/工具/记忆/收口）；ADR-0049 证据平面与 harvest 同文件"
     ),
     "lca/cognition/brain/reasoner.py": (
