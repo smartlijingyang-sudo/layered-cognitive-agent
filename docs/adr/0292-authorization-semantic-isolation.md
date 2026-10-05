@@ -124,3 +124,23 @@ delegation 信封只传递**用户真实授权及其边界**。子 agent 收到�
 
 **未落地 / 进行中**（诚实边界）：
 - 运行时**执行接线**剩余 3 项（seam 在位、行为未接线）：① `act.approve.gate` 在执行外部内容请求的动作前查两拒绝门（**待李超拍板接线点与拒绝语义**：Decision 当前不携带外部内容文本；候选 a) Decision 加 content_origin/触发文本字段（contracts 变更） b) 改在 effect.execute 工具结果入口查；且 gate 四路由无“拒绝执行、继续原任务”对应项）；③ standing 写工具（`self_manage_tools.py`）查 `assert_standing_writer_permitted`（**待李超拍板通道设计**：`execute()` 无 origin 参数；ProvenanceGuard 跟踪的是工具结果来源，不是“是什么指令让模型调了这个工具”——需 decision/turn 上下文携带 instruction source 的通道设计）；④ `on_refusal` → run-trace evidence ledger（ADR-0063/0065）落盘（技术路径已存在；**随①派工**）。② 委派接线已落地（见本节“C3 运行时接线”）。
+
+## 9. 后续接线设计裁决（2026-10-05，Athena 按李超授权裁决）
+
+背景：§6 三项已裁决并部分落地；剩余 3 个运行时接线点的设计方案原待李超拍板，
+李超 2026-10-05 14:27 授权 Athena 代定非重要事项。以下三项全部批准实施。
+
+- ① act.approve.gate 拒绝门接线点：选 **a) Decision 加来源字段**（contracts 加法变更）。
+  第一性原理：gate 要做授权决策，就必须看到 Decision 的来源——这是 C2 本来就要求的
+  （"权限的唯一来源：用户显式授权 + 规则默认"）。候选 b) 只在 effect.execute 工具结果入口查，
+  漏掉网页/文件/子 agent 报告三个外部内容通道，不完整。Decision 新增可选字段
+  （content_origin + 触发文本引用），gate 对 EXTERNAL 来源的 privilege 声称直接拒绝。
+- ③ standing 写工具 instruction-source 通道：**不给工具 execute() 加 origin 参数**。
+  第一性原理：standing 写门（assert_standing_writer_permitted，已落地）要判断的是
+  "是什么指令让模型调了这个工具"——答案就在当前 Decision 的来源字段里（① 落地后自然携带）。
+  一套 Decision 来源机制，两个门共用；逐个工具改签名是 N×M 的表面积浪费。
+- ④ on_refusal → evidence ledger：纯机械接线，无设计分歧。待①落地后，
+  在拒绝点传入 on_refusal 回调，走现有模式（safe_executor._resolve_evidence_pair +
+  BoundObservability.evidence_binding()），与 C4 的"被挡下的攻击即证据"一致。
+- 派工：quality lane 按①③实现（Decision 来源字段 + gate 拒绝语义 + standing 写门读 ambient Decision）；
+  tests lane 补 pin tests（T1 gate 拒绝、T4 standing 写保护）。
