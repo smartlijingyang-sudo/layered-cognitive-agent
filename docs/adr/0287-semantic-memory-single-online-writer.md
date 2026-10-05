@@ -52,7 +52,7 @@ episode 侧的缺口不在开关而在模板。`phase.perceive.observe` 每轮�
   - **载体不能是 0268 CronJob。** `CronJob.execution` 是闭合联合 `AgentExecution | SpaceActionExecution`（`lca/contracts/models/cron/models.py:152`，`extra="forbid"` 于 `:144`），`CronWorkerRunner.execute_job`（`lca/infrastructure/cron/worker_runner.py:98-200`）只能投递聊天卡片或 avatar 产物，无法调用 `run_dream` 这样的 Python 函数；加一种 execution kind 是闭集契约变更，按 AGENTS.md §1 第三行须先有 ADR。
   - **周期 CronJob 本身也不会触发。** `next_run` 以精确到微秒的 `datetime` 相等判 `due`（`lca/domain/cron/next_run.py:81-86` interval、`:90-94` hourly、`:101-106` daily、`:112-118` weekly），守护进程在 `asyncio.sleep` 后采样未对齐的 `datetime.now(UTC)`（`lca/infrastructure/cron/daemon.py:44`、`:106`、`:123`）。实测真实 `CronDaemonService` 配真实墙钟、`tick_interval_s=1`，`every_seconds=5` 的任务 30 秒内触发 0 次，同 store 的 `oneshot` 触发 1 次；宿主机 7 个生产 job 全为 `oneshot`。这是全平台缺陷（用户的周期提醒同样永不触发），须单独对 ADR-0268 §232-233 立项修订，不得并入 Phase 0；现有 cron 测试全部注入恰好落在边界的合成时钟，改语义前须先补能区分新旧行为的测试。
   - **载体也不能是 `{home}/routines/`。** 该目录只被计数（`lca/plugins/domain/assistant/catalog/manifest.py:82`），从不解析；`RoutineSpec` 只有必填 `prompt: str`、无可调用字段（`lca/contracts/models/routine/models.py`）；`RoutineTickDriver` 在 `lca/application/routine/` 外零调用方。ADR-0263 已 Accepted（2026-10-05）但状态行自述「Accepted≠Implemented，C1–C5 实施另行排期」。
-  - 实施计划：[docs/superpowers/plans/2026-10-04-dream-scheduler-phase0.md](../superpowers/plans/2026-10-04-dream-scheduler-phase0.md)（覆盖 Phase 0 的调度条件）。在线残差捕获条件随 Open question 5 裁决归入本提案 Phase 0，尚无实施计划。
+  - 实施计划：条件一见 [docs/superpowers/plans/2026-10-04-dream-scheduler-phase0.md](../superpowers/plans/2026-10-04-dream-scheduler-phase0.md)（载体选型证据与 5 个 TDD 任务），条件二见 [docs/superpowers/plans/2026-10-05-trail-capture-phase0-condition2.md](../superpowers/plans/2026-10-05-trail-capture-phase0-condition2.md)（6 个 TDD 任务，含 D6 前提要求的增量索引与索引检索侧的隐私过滤）。
 - Phase 1：在线 turn 的 spine 不出现 `phase.reflect.memory.extract` 触发的 `adapter.complete`；残差捕获不随蒸馏一起移走；user/model 双源维度占比 17/89 → 0。
 - Phase 2：run 结束后 `claim-latch.json` 不存在；"本轮无写盘 + 含宣称"被拒、"上一轮有写盘 + 本轮无写盘 + 本轮含宣称"被拒；"act 相写盘 + askUserQuestion 暂停 + resume + 含宣称"放行；双 `AssistantMemory` 实例两侧结论一致。
 - Phase 3：工具写入同一事实后离线对账产 NOOP，`semantic.json` 行数与退役行数不增长。Remedy：复现 `run_3a523914cc0a` draft，回复原文不被替换。
@@ -77,6 +77,6 @@ episode 侧的缺口不在开关而在模板。`phase.perceive.observe` 每轮�
 
 - ADR：0249（Accepted，双轨）、0260（C1 / §3 / §6.1 / §6.3）、0268（CronJob 调度载体）、0277（Proposed，§2.3 / 待拍板③⑥⑦）、0254（`TrailWriter` 实现来源；落地归属经 Open question 5 改判本提案 Phase 0）
 - Note：[语义记忆在线单写者与离线对账归位](../notes/proposed/seam/2026-10-04-semantic-memory-single-online-writer.md)（本 ADR 的证据与论证母体）、[surface/assistant_message 由 think.llm.persist 独家写入](../notes/implemented/seam/2026-10-03-assistant-surface-single-producer.md)（同类"单生产者"先例）、[HIL resume 必须重绑 RunAmbit](../notes/implemented/seam/2026-09-05-hil-resume-rebinds-ambit.md)、[act→think re-ask loop guard](../notes/implemented/2026-09-16-act-think-reask-loop-guard.md)
-- Plan：[dream 调度器 Phase 0 实施计划](../superpowers/plans/2026-10-04-dream-scheduler-phase0.md)（载体选型证据与 5 个 TDD 任务）
+- Plan：[dream 调度器 Phase 0 条件一](../superpowers/plans/2026-10-04-dream-scheduler-phase0.md)（载体选型证据与 5 个 TDD 任务）、[在线流水捕获 Phase 0 条件二](../superpowers/plans/2026-10-05-trail-capture-phase0-condition2.md)（6 个 TDD 任务）
 - 待单独立项：`next_run` 微秒相等导致所有周期 cron 永不触发（对 ADR-0268 §232-233）、`govern()` 贪婪捕获加 40 字符截断污染在产身份事实（F4 末段）
 - 证据 run：`run_d30e848f0230`、`run_f4ff17657570`、`run_3a523914cc0a`、`run_5eb9f012455e`、`run_4fcfb6d83c8c`

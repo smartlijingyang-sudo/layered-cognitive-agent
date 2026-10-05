@@ -162,6 +162,7 @@ Phase 3 与守卫 remedy。
 
 ## Related
 
-- ADR：[0249 昼夜双轨记忆固化](../../../adr/0249-cadence-inspired-dual-track-memory-consolidation.md)（Accepted）、[0260 强制检索与写盘铁律](../../../adr/0260-forced-retrieval-and-write-before-claim.md) C1 / §3 / §6.1 / §6.3、[0268 Context Bus、异步执行器与 Cron 投影](../../../adr/0268-context-bus-async-executors-and-cron-projection.md)（Phase 0 调度载体）、[0277 记忆机制的认知重构](../../../adr/0277-cognitive-memory-reconstruction.md) §2.3（Proposed）
+- ADR：[0249 昼夜双轨记忆固化](../../../adr/0249-cadence-inspired-dual-track-memory-consolidation.md)（Accepted）、[0260 强制检索与写盘铁律](../../../adr/0260-forced-retrieval-and-write-before-claim.md) C1 / §3 / §6.1 / §6.3、[0268 Context Bus、异步执行器与 Cron 投影](../../../adr/0268-context-bus-async-executors-and-cron-projection.md)（Phase 0 调度载体）、[0277 记忆机制的认知重构](../../../adr/0277-cognitive-memory-reconstruction.md) §2.3（Proposed）、[0287 语义记忆在线单写者与离线对账归位](../../../adr/0287-semantic-memory-single-online-writer.md)（本 Note 的契约承载体，Proposed）
+- Plan：[Phase 0 条件一，dream 调度器](../../../superpowers/plans/2026-10-04-dream-scheduler-phase0.md)、[Phase 0 条件二，在线流水捕获](../../../superpowers/plans/2026-10-05-trail-capture-phase0-condition2.md)
 - Note：[做梦慢路径消费流水、维护亲近度并产出对齐综述](../../implemented/seam/2026-09-30-dream-slow-path.md)、[surface/assistant_message 由 think.llm.persist 独家写入](../../implemented/seam/2026-10-03-assistant-surface-single-producer.md)（同类缺陷先例，一个事实两个生产者）、[HIL resume 必须重绑 RunAmbit](../../implemented/seam/2026-09-05-hil-resume-rebinds-ambit.md)（轮次边界跨暂停的依据）、[act→think re-ask loop guard](../../implemented/2026-09-16-act-think-reask-loop-guard.md)（remedy 的硬上限）
 - 证据 run：`run_d30e848f0230`、`run_f4ff17657570`、`run_3a523914cc0a`、`run_5eb9f012455e`、`run_4fcfb6d83c8c`
