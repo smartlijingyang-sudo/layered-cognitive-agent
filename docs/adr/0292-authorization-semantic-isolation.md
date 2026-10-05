@@ -154,3 +154,27 @@ delegation 信封只传递**用户真实授权及其边界**。子 agent 收到�
   BoundObservability.evidence_binding()），与 C4 的"被挡下的攻击即证据"一致。
 - 派工：quality lane 按①③实现（Decision 来源字段 + gate 拒绝语义 + standing 写门读 ambient Decision）；
   tests lane 补 pin tests（T1 gate 拒绝、T4 standing 写保护）。
+
+## 10. 设计修正：门按 grant 缺席触发，不按来源存在触发（2026-10-05，Athena 按李超授权裁决）
+
+背景：§9 裁决后 quality 20:09 轮实证发现——`Decision.content_origin` 是 opt-in，
+无生产者标记，①gate/③ambient 门按设计 inert；且在 think 解析点不可机械判定"外部驱动"
+（prompt provenance 丢失，子串启发式对抗弱、误报灾难）。todo-58 立项。
+
+**裁决**：修正 §9① 的触发语义。门不靠"证明 Decision 被外部驱动"触发，
+而靠"**特权动作缺用户授权**"触发——这是 fail-closed allowlist，不是来源追踪。
+
+- 第一性原理：C2 单向门早已钉住"权限的唯一来源是用户显式授权（TrustEnvelope）+ 规则默认"。
+  外部声称永远成不了 grant。那么 gate 的拒绝条件不需要知道 Decision 从哪来，
+  只需要知道：**这个特权动作在 TrustEnvelope 里有没有对应的 grant**。没有 → 拒绝 + evidence。
+  外部声称的内容是什么，对拒绝决策是无关信息（只进 evidence 做审计）。
+- 为什么比来源追踪更强：来源追踪只能防"外部内容诱导"，grant 缺席检查连
+  "模型自己幻觉出授权"（无外部内容参与）一起防住。且判定点信息完备——
+  gate 手里本来就有 typed Decision+Command 和 ambient TrustEnvelope，不需要生产者补标记。
+- `Decision.content_origin` 字段保留，降级为审计元数据（拒绝时记录"哪条外部声称在场"），
+  不再是执法触发器。生产者断层因此不是断层——执法从不依赖生产者。
+- 对 quality 轮 todo-58 三候选的回应：a) 不必为装配期 provenance 另立 ADR（C1 通道标记已覆盖，
+  且执法不再依赖它）；b) 通道级标记方向对但不够深——真正要的是 grant 检查，不是更细的来源；
+  c) 保持 inert 是错的——inert 的安全门比没有更糟（ADR-0291 空心健身函数的教训：谎报已测）。
+- 派工：quality lane 按本修正实现 gate 拒绝语义（特权动作 × TrustEnvelope grant 缺席 → 拒绝 + evidence）；
+  tests lane 更新 pin tests（T1：无 grant 的特权动作被拒；幻觉授权同样被拒）。
