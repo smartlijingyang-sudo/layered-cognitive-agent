@@ -81,6 +81,8 @@ delegation 信封只传递**用户真实授权及其边界**。子 agent 收到�
 
 - （2026-10-05 20:09 iter-arch 轮更新）：§9 ①③④ **全部落地**（2026-10-05 19:09 iter-quality 轮 3 commits，§8 新增证据链节；契约 tests lane `c429eccd2` + merge `72bacbed6`）：① `32840ffa7`——`Decision` 加 `content_origin: ContentOrigin | None = None` + `origin_trigger_text: str | None = None`（可选字段；默认 None≠EXTERNAL，遗留决策行为不变；纯加法）；`ca9a07a63`——`lca/nodes/intervene/approve_gate.py`（+106/−3）：approval 路由前安全门——EXTERNAL 来源且 trigger 文本命中两拒绝门（`refuse_external_authorization_claim`/`refuse_external_instruction_override`）之一 → 直接拒绝（`terminal.commit`，永不到 `act.envelope`）；`AuthorizationRefusal` 经 ambient evidence pair prepare 进证据账本（无绑定走 no-ref），④ 随①机械接线关闭；③ `36e862e9c`——ambient Decision 机制：`decision.py` 加 `get_current_decision()` + `decision_scope()`（contextvar 惯用法）；`concept.effect.execute._dispatch` 在 `gateway.execute` 外包 `decision_scope(decision)`；`self_manage_tools.py` 9 个写工具 `execute()` 头部查 `assert_standing_writer_permitted`（ambient EXTERNAL→PermissionError；未绑定/未标记→放行）。契约 pin 全部激活：**19 passed / 0 xfailed**。**诚实边界**：门当前 inert——cognition 侧 producer 尚未标记 EXTERNAL（识别"外部驱动"的生产者逻辑未做），非 EXTERNAL 决策零触碰；证据落盘走现有 evidence pair，未新增 journal receipt 类型。本节随落地同步修订，保持状态诚实。
 
+- （2026-10-05 21:09 iter-arch 轮更新）：§10（20:25 Athena 按李超授权裁决）修正①触发语义为 grant 缺席触发（§9 来源触发接线为历史实现，`content_origin` 降级为审计元数据）；quality lane grant-absence 拒绝语义实现 + tests lane pin 更新为当前待办（派工见 §10）。本节随落地同步修订，保持状态诚实。
+
 **裁决**：三项全部批准，按以下决策实施。
 
 - ① C1 标记落点：**事件信封打标为源（source of truth），提示词装配围栏为派生呈现**。
@@ -134,6 +136,7 @@ delegation 信封只传递**用户真实授权及其边界**。子 agent 收到�
 **未落地 / 进行中**（诚实边界）：
 - cognition 侧 producer **尚未标记 EXTERNAL**：seam 在位、接线完整，但识别"外部驱动"的生产者逻辑未做——`content_origin` 默认为 None≠EXTERNAL，非 EXTERNAL 决策零触碰，**门当前 inert、不触发**。后续工作：producer 侧 EXTERNAL 标记（lane 外提案机会）。
 - ADR-0292 的"授权语义隔离"本轮运行时接线全部收官；`docs/adr/0255*` 基线禁区本轮零改动。
+- （2026-10-05 21:09 iter-arch 轮更新，§10 设计修正同步）：§10（20:25 裁决）修正①触发语义——门按**特权动作 × TrustEnvelope grant 缺席**触发，不再按来源存在触发；`content_origin`/`origin_trigger_text` 降级为审计元数据（"生产者断层因此不是断层——执法从不依赖生产者"）。上一条"门当前 inert、不触发 / 后续工作 producer 侧 EXTERNAL 标记"为 §10 前的过期表述（§10 明言"保持 inert 是错的——inert 的安全门比没有更糟"，ADR-0291 空心健身函数教训）。§9 来源触发接线证据链（`ca9a07a63` 等）保留为历史记录。**当前真待办**：quality lane 按 §10 实现 gate 拒绝语义（`act.approve.gate` 查 grant；实现未落地——`approve_gate.py` 现无 grant 检查，21:09 arch 轮已实证）；tests lane 更新 pin tests（T1：无 grant 的特权动作被拒；幻觉授权同样被拒）。
 
 ## 9. 后续接线设计裁决（2026-10-05，Athena 按李超授权裁决）
 
