@@ -2,22 +2,75 @@
 
 与 test_architecture_conformance.py（分层维度）并列，
 覆盖"合理性 / 命名 / 目录"维度的微观治理。
+
+ADR-0291 Phase A（2026-10-05，tests lane 一次重写）：
+- 修正 `_PROJECT_ROOT` 指针（原误指 tests/scenario/，致四个测试全部空心）
+  + C2 路径指针自检（TestRepoRootPointer；实测发现 tests/lca/ 真实存在，
+  单 `lca/` 标记会误通过，故要求 pyproject.toml + lca/contracts 双标记）
+- 层 docstring 测试语义重写：`layer*` glob（lca/ 下无此布局，恒空）
+  → 显式五层清单（contracts/infrastructure/cognition/runtime/agent）
+- reverse 扫描包去掉已不存在的 `lca.plugins.loop.phase`
+  → 换现行 `lca.plugins.loop.{control,driver,graph,reducer}`
+- C1 基数门：文件扫描 ≥2500 / 类扫描 ≥700（banned+forward）/
+  reverse 类扫描 ≥1700，0 基数直接 fail（fail-closed）
+- `_LINE_COUNT_EXEMPT` 死键清理：52 → 23（包化搬迁跟随改键、重复登记合并、
+  已删除/已降到限额下/后继不明的条目删除；理由原文保留）
+
+Phase A 落地后 ①③④ 预期红（真实债务信号，钉住即是进步）：
+① 约 130+ 文件超 250 行待 Phase C 豁免审计；③ 约 69 类词根待 Phase B 补词条；
+④ 现役术语缺类待 Phase B 移入「已废弃主名」表。② 按新语义执行。
 """
 
 from __future__ import annotations
 
 import importlib
 import inspect
-import os
 import pkgutil
 import re
 import types
 import unittest
 from pathlib import Path
 
-_PROJECT_ROOT = Path(__file__).resolve().parent.parent
+# ADR-0291 Phase A：修正为仓库根（本文件在 tests/scenario/code/ 下，需上溯四级）。
+_PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent.parent
 _LCA_ROOT = _PROJECT_ROOT / "lca"
 _GLOSSARY_PATH = _PROJECT_ROOT / "docs" / "specs" / "glossary.md"
+
+
+class TestRepoRootPointer(unittest.TestCase):
+    """C2 路径指针自检：仓库根指针必须能命中仓库特征标记。
+
+    指针漂移 = 直接红，不许恒绿/恒 skip。本测试是其他四个测试的
+    fail-closed 前哨：若指针错误，C1 基数门会连带打红。
+
+    注：单 `lca/` 目录不足以做标记 —— tests/lca/ 真实存在（按 lca 包布局
+    镜像的测试目录，git 跟踪中），`_PROJECT_ROOT` 误指 tests/ 时朴素的
+    `lca/` 存在性检查会误通过（2026-10-05 Phase A 实测捕获）。
+    故要求 pyproject.toml 与 lca/contracts 同时存在。
+    """
+
+    def test_repo_root_markers_exist(self) -> None:
+        self.assertTrue(
+            (_PROJECT_ROOT / "pyproject.toml").is_file(),
+            f"_PROJECT_ROOT 指针漂移：{_PROJECT_ROOT} 下找不到 pyproject.toml",
+        )
+        self.assertTrue(
+            (_LCA_ROOT / "contracts").is_dir(),
+            f"_PROJECT_ROOT 指针漂移：{_LCA_ROOT / 'contracts'} 不是目录"
+            "（tests/lca/ 等镜像目录不能冒充仓库根）",
+        )
+
+
+# C1 基数门（ADR-0291 §4）：扫描基数为 0 即 fail，禁止静默 pass/skip。
+# 阈值取 2026-10-05 Phase A 实测略低于实际值（防抖动）：
+#   文件扫描实测 2613 → 门 2500；scan5 类扫描实测 757 → 门 700；
+#   reverse 类扫描实测 1845 → 门 1700。
+# 注：ADR-0291 §5③ 曾建议 800/400；实测 scan5 类仅 757
+# （≥800 会在健康基线上误红），文件实测 2613（≥400 形同虚设），
+# 故按"略低于实际"原则取实测值钉住。
+_MIN_FILE_SCAN_COUNT = 2500
+_MIN_CLASS_SCAN_COUNT = 700
+_MIN_REVERSE_CLASS_SCAN_COUNT = 1700
 
 # ── 命名禁用词 ──────────────────────────────────────────────────────────
 _BANNED_CLASS_PATTERN = re.compile(
@@ -61,165 +114,114 @@ _GLOSSARY_COVERAGE_SCAN_PACKAGES = [
 # ── 文件行数上限 ─────────────────────────────────────────────────────────
 _MAX_FILE_LINES = 250
 
-# 已登记豁免（引用 ADR 或说明原因）
+# 已登记豁免（引用 ADR 或说明原因）。
+# 2026-10-05 Phase A 死键清理（ADR-0291）：52 → 23。
+# - 包化搬迁（<name>.py → <name>/<name>.py）跟随改键，理由原文保留；
+# - 点分隔死键（从未生效）映射到现行路径；
+# - 重复登记合并为一条（cli commands/tools、services/daemon、services/lobehub、
+#   journal/engine/journal_io、journal/engine/engine）；
+# - 删除：模块已删除（phase_graph_compiler、fact_stream、graph_validation、
+#   outcome_projection、phase_governance、event_doc、runtime_exec、
+#   plan_template、command_envelope、compiler、fact_stream_projector、
+#   console_projector、openai_compat、simple_memory、journal_catalog）、
+#   已降到限额下（api/spawn 131、reasoner 237、artifact 150、safe_executor 59、
+#   capability_plan 158、declarative_phase_graph 90、cli/cli 158、
+#   host_runtime user 拆分后各文件均 <250、openai_compat 包化后各文件均 <250）、
+#   后继不明（contracts/protocols/plan.py，原模块消失、无明确后继）。
 _LINE_COUNT_EXEMPT: dict[str, str] = {
-    "lca/harness/profile/resolve.py": (
+    "lca/harness/profile/resolve/resolve.py": (
         "ADR-0061 resolve 阶段：深合并、from_env、DAG、校验集中于单一入口"
+        "（2026-10-05 Phase A：随包化搬迁改键）"
     ),
-    "lca/harness/profile/source.py": (
+    "lca/harness/profile/resolve/source.py": (
         "Profile 输入适配器集中 YAML 来源、补丁来源与语义化配置解析，避免解析规则跨模块泄漏"
+        "（2026-10-05 Phase A：随包化搬迁改键）"
     ),
-    "lca/infrastructure/cli/commands/tools.py": (
-        "CLI 工具子命令集中 registration、provider 装载、CLI 渲染、命令装配（Phase C #5 合并 ops 后）"
+    "lca/infrastructure/cli/commands/runs/tools.py": (
+        "CLI 工具子命令集中 registration、provider 装载、CLI 渲染、命令装配（Phase C #5 合并 ops 后）；"
+        "coding-agent tools CLI 封装（ADR-0065 §六 / PR-9）：9 个只读子命令从旧 cli.py 拆出"
+        "（2026-10-05 Phase A：两条重复登记合并，键随搬迁更新）"
     ),
-    "lca/infrastructure/cli/services/daemon.py": (
-        "Daemon lifecycle 服务集中 dispatch + run loop + shutdown coordination（Phase C #5 合并 ops 后）"
+    "lca/infrastructure/cli/services/daemon/daemon.py": (
+        "Daemon lifecycle 服务集中 dispatch + run loop + shutdown coordination（Phase C #5 合并 ops 后）；"
+        "Daemon 单模块承载 process 管理 + uptime + health"
+        "（2026-10-05 Phase A：两条重复登记合并，键随包化搬迁更新）"
     ),
-    "lca/infrastructure/cli/services/lobehub.py": (
-        "LobeHub streaming adapter 集中 SSE + ChunkBuilder + Encoder 装配（Phase C #5 合并 ops 后）"
-    ),
-    "lca/harness/graph/phase_graph_compiler.py": (
-        "ADR-0075：声明式阶段图编译器集中校验 profile 选定的节点、边、策略与投稿，"
-        "避免由运行时解释器重新引入隐藏流程默认值"
-    ),
-    "lca/application/spawn.py": (
-        "L4 spawn 闭合 AgentSpec/TeamSpec（ADR-0056）；"
-        "promote_lead 由 test_refactor_guards 直接 import"
+    "lca/infrastructure/cli/services/lobehub/lobehub.py": (
+        "LobeHub streaming adapter 集中 SSE + ChunkBuilder + Encoder 装配（Phase C #5 合并 ops 后）；"
+        "LobeHub deploy service 单模块承载 dev/prod/restart/logs/upgrade"
+        "（2026-10-05 Phase A：两条重复登记合并，键随包化搬迁更新）"
     ),
     "lca/cognition/body/actions/action_handlers.py": (
         "Body 动作分发单模块（委派/工具/记忆/收口）；ADR-0049 证据平面与 harvest 同文件"
     ),
-    "lca/cognition/brain/reasoner.py": (
-        "PromptReasoner 单模块承载模板渲染 + LLM 调用 + 流式增量（ADR-0041）；"
-        "ADR-0052 新增 _strip_empty_prompt_fields 用于 solo 裸模型空字段剥离"
-    ),
-    "lca/contracts/models/observability/journal.py": (
+    "lca/contracts/models/observability/journal/journal.py": (
         "Journal 叙事词表单文件（ADR-0037）；ToolInvoked.plugin_state UI 一等字段（ADR-0053）"
+        "（2026-10-05 Phase A：随包化搬迁改键）"
     ),
-    "lca/infrastructure/skills/marketplace.py": (
-        "Skill marketplace 单模块承载发现/加载/注册全链路"
+    "lca/infrastructure/skills/marketplace/marketplace.py": (
+        "Skill marketplace 单模块承载发现/加载/注册全链路（2026-10-05 Phase A：随包化搬迁改键）"
     ),
-    "lca/application/casting.py": ("Team casting 单模块承载角色映射与团队组装"),
-    "lca/infrastructure/sandbox/runtime.py": (
+    "lca/application/authoring/casting.py": (
+        "Team casting 单模块承载角色映射与团队组装"
+        "（2026-10-05 Phase A：lca/application/casting.py → authoring/casting.py，键随路径更新）"
+    ),
+    "lca/infrastructure/sandbox/runtime/runtime.py": (
         "Sandbox Protocol 单模块承载 session/ready/exec 全链路（ADR-0043~0047）"
+        "（2026-10-05 Phase A：随包化搬迁改键）"
     ),
     "lca/infrastructure/observability/journal/engine/engine.py": (
         "Journal RunStore 单模块承载注册表/订阅/写盘/状态机（ADR-0055 + ADR-0037）；"
-        "Phase B 拆分保留单文件以维持 RunStore 内部一致性"
+        "Phase B 拆分保留单文件以维持 RunStore 内部一致性；"
+        "RunStore 单模块承载事件索引 + get/get_event/get_blob/find_terminal（PR2 / PR6 / PR10 集中落地）"
+        "（2026-10-05 Phase A：两条重复登记合并）"
     ),
     "lca/infrastructure/observability/journal/engine/journal_io.py": (
         "Journal IO 单模块承载序列化/反序列化/批量写盘/校验（ADR-0055）；"
-        "序列化与持久化耦合紧密，未拆分"
+        "序列化与持久化耦合紧密，未拆分；"
+        "Journal v2 envelope IO（read / write / disk format；PR-3 + PR-6）"
+        "（2026-10-05 Phase A：两条 journal_io 登记指向同一合并后文件，合并为一条）"
     ),
     "lca/infrastructure/observability/journal/console/projector.py": (
         "Journal ConsoleProjector 集中 console + sequence diagram + table 输出渲染"
-    ),
-    "lca/infrastructure/observability/journal/stream/fact_stream.py": (
-        "Journal FactStreamProjector 单模块承载事实流投影 + 富化 + SSE 帧转换"
     ),
     "lca/contracts/capabilities.py": (
         "L4 组合根 capability 注册中心 — STOP_RULES 由 C6 port 引入（C4 后向兼容 alias），"
         "无法拆到子模块"
     ),
-    "lca/harness/graph/graph_validation.py": (
-        "ADR-0075 声明式阶段图校验集中文件；运行时由 phase_graph_compiler 调用"
-    ),
-    "lca/harness/declarative/execute/outcome_projection.py": (
-        "ADR-0075 outcome projection 中心化（plan_ref × Journal 绑定）"
-    ),
-    "lca/harness/graph/governance/phase_governance.py": ("ADR-0075 phase governance 中心化"),
-    "lca/infrastructure/observability/event_doc.py": (
-        "Observability event_doc 词表 — ADR-0065 L1~L9 不变量清单"
-    ),
-    "lca/infrastructure/computer/runtime_exec.py": (
-        "ComputerRuntime 执行平面单模块：code/shell/background/export + SandboxPolicy 检查"
-    ),
-    "lca/contracts/atoms/plan_template.py": (
-        "PR-12 12 PlanTemplate 标准集数据面 + module-level accessors"
-    ),
-    "lca/contracts/harness/artifact.py": (
-        "PR-8 4 状态机 + CapabilityArtifact + ArtifactController + 8→4 legacy migration"
-    ),
     "lca/contracts/protocols/__init__.py": (
         "contracts/protocols re-export hub（所有 contracts 子模块类型统一导出）"
-    ),
-    "lca/contracts/protocols/act/command_envelope.py": (
-        "PR-7 CommandEnvelope + RunFact + Verdict 5 闸单调聚合数据面"
     ),
     "lca/infrastructure/observability/__init__.py": (
         "observability 模块统一 re-export（journal / evidence / otel）"
     ),
-    "lca/infrastructure/observability/descriptors_data.py": (
+    "lca/infrastructure/observability/events/event/descriptors_data.py": (
         "Journal event descriptor 注册表（ADR-0065 PR-7 source inversion 单一源）"
+        "（2026-10-05 Phase A：随包化搬迁改键）"
     ),
-    "lca/infrastructure/observability/facade.py": (
+    "lca/infrastructure/observability/facade/facade/facade.py": (
         "observability 主 facade（record / record_runtime / observe_operation）"
+        "（2026-10-05 Phase A：随包化搬迁改键）"
     ),
-    "lca/infrastructure/observability/journal/journal_io.py": (
-        "Journal v2 envelope IO（read / write / disk format；PR-3 + PR-6）"
-    ),
-    "lca/cognition/body/safe_executor.py": (
-        "SafeExecutor + 5 阶段管线 + ToolStarted / ToolInvoked audit"
-    ),
-    "lca/runtime/runtime_loop.py": (
+    "lca/runtime/loop/runtime_loop.py": (
         "CognitiveRuntime 单模块承载 v3 6 阶段闭环编排 + 协议边界 record()"
         "（perceive→think→act→reflect→remember→stop，ADR-0002 + PR10 落地）"
+        "（2026-10-05 Phase A：随包化搬迁改键）"
     ),
-    "lca/contracts/protocols/capability_plan.py": (
-        "ADR-0068 CapabilityPlan 数据投影与 11 关系代数集中于 contracts 数据面"
-    ),
-    "lca/contracts/protocols/declarative_phase_graph.py": (
-        "ADR-0075 声明式 phase graph、validator 与 authority 单一数据契约"
-    ),
-    "lca/contracts/protocols/plan.py": (
-        "ADR-0075 CompiledRunPlan 统一 capability、scope 与声明式控制投影数据面"
-    ),
-    "lca/harness/declarative/compile/compiler.py": (
-        "ADR-0075 PlanCompiler 单一编译入口与原生声明式控制投影"
-    ),
-    "lca/harness/graph/execute/interpreter.py": (
-        "ADR-0194 解释边界 shim,延迟导入 PlanInterpreterAdapter"
+    "lca/framework/graph/interpreter.py": (
+        "ADR-0194 解释边界 shim，延迟导入 PlanInterpreterAdapter"
+        "（2026-10-05 Phase A：lca/harness/graph/execute/interpreter.py → "
+        "framework/graph/interpreter.py，键随路径更新）"
     ),
     "lca/loop/driver.py": ("ADR-0075 DeclarativeRuntimeDriver 统一 pause/resume/result 出口"),
-    "lca/infrastructure/observability/journal/engine.py": (
-        "RunStore 单模块承载事件索引 + get/get_event/get_blob/find_terminal"
-        "（PR2 / PR6 / PR10 集中落地）"
-    ),
-    "lca/infrastructure/observability/journal/fact_stream_projector.py": (
-        "FactStreamProjector 单模块承载流式事件到 Journal 转换（ADR-0037）"
-    ),
-    "lca/infrastructure/observability/journal/console_projector.py": (
-        "ConsoleProjector 单模块承载 console 输出（ADR-0037）"
-    ),
-    "lca.infrastructure.cli/cli.py": (
-        "lca-ops CLI 单模块承载 dev/restart/stop/status/heal/provision"
-        "/dump-profile/inspect-tree 全子命令"
-    ),
-    "lca.infrastructure.cli/commands/tools.py": (
-        "coding-agent tools CLI 封装（ADR-0065 §六 / PR-9）：9 个只读子命令从旧 cli.py 拆出"
-    ),
-    "lca.infrastructure.cli/services/lobehub.py": (
-        "LobeHub deploy service 单模块承载 dev/prod/restart/logs/upgrade"
-    ),
-    "lca.infrastructure.cli/services/daemon.py": (
-        "Daemon 单模块承载 process 管理 + uptime + health"
-    ),
-    "lca/infrastructure/openai_compat.py": (
-        "OpenAI compat 单模块承载 chat / completion / embedding 适配"
-    ),
-    "lca/infrastructure/host_runtime/providers/user.py": (
-        "User provider 单模块承载 user runtime 配置 + workspace"
-    ),
-    "lca/cognition/memory/simple_memory.py": (
-        "SimpleMemorySystem 单模块承载四层记忆 + propose/commit/compaction 影子（PR7）"
-    ),
-    "lca/cognition/body/pipeline_safe_executor.py": (
+    "lca/cognition/body/executor/pipeline_safe_executor.py": (
         "PipelineSafeExecutor 单模块承载五阶段管线 + finalize（v3 §9.1/9.2）"
+        "（2026-10-05 Phase A：随包化搬迁改键）"
     ),
-    "lca/contracts/models/observability/journal_catalog.py": (
-        "JOURNAL_EVENT_CLASSES + JournalSchemaMeta 单文件（PR-7 后 EventDescriptor 单一源移到 descriptors_data.py）"
+    "lca/application/api/api.py": (
+        "L4 门面单文件承载 Agent / Team / cast 入口（ADR-0005）"
+        "（2026-10-05 Phase A：随包化搬迁改键）"
     ),
-    "lca/application/api.py": ("L4 门面单文件承载 Agent / Team / cast 入口（ADR-0005）"),
 }
 
 
@@ -260,7 +262,9 @@ def _read_glossary_terms() -> set[str]:
     return terms
 
 
-# 反向校验的扫描范围：术语表覆盖 contracts 与 L0-L4 全部层的类名
+# 反向校验的扫描范围：术语表覆盖 contracts 与 L0-L4 全部层的类名。
+# ADR-0291 Phase A：去掉已不存在的 lca.plugins.loop.phase，
+# 换为现行 lca.plugins.loop 下的 control/driver/graph/reducer 四包。
 _REVERSE_SCAN_PACKAGES = (
     "lca.contracts",
     "lca.infrastructure",
@@ -268,7 +272,10 @@ _REVERSE_SCAN_PACKAGES = (
     "lca.runtime",
     "lca.agent",
     "lca.application",
-    "lca.plugins.loop.phase",
+    "lca.plugins.loop.control",
+    "lca.plugins.loop.driver",
+    "lca.plugins.loop.graph",
+    "lca.plugins.loop.reducer",
 )
 _CAMEL_CASE_TERM = re.compile(r"^[A-Z][A-Za-z0-9]*$")
 _DEPRECATED_SECTION_MARKERS = ("已废弃主名", "禁止复活")
@@ -317,6 +324,12 @@ class TestNoBannedClassNames(unittest.TestCase):
 
     def test_no_banned_class_name_patterns(self) -> None:
         classes = _collect_all_concrete_classes()
+        # C1 基数门：扫描基数异常（包导入失败/指针漂移）时直接红，不许恒绿。
+        self.assertGreaterEqual(
+            len(classes),
+            _MIN_CLASS_SCAN_COUNT,
+            f"类扫描基数 {len(classes)} < {_MIN_CLASS_SCAN_COUNT}：扫描可能空心",
+        )
         offenders: list[str] = []
         for cls_name in sorted(classes):
             if cls_name in _NAME_EXEMPT:
@@ -339,8 +352,15 @@ class TestFileLineCountLimit(unittest.TestCase):
     """单文件不超过 250 行（不含空行和注释），已登记豁免除外。"""
 
     def test_file_line_count_limit(self) -> None:
+        py_files = sorted(_LCA_ROOT.rglob("*.py"))
+        # C1 基数门：rglob 在不存在目录上返回空迭代器（曾致本测试恒绿），直接红。
+        self.assertGreaterEqual(
+            len(py_files),
+            _MIN_FILE_SCAN_COUNT,
+            f"文件扫描基数 {len(py_files)} < {_MIN_FILE_SCAN_COUNT}：扫描可能空心",
+        )
         offenders: list[str] = []
-        for py_file in sorted(_LCA_ROOT.rglob("*.py")):
+        for py_file in py_files:
             rel_path = str(py_file.relative_to(_PROJECT_ROOT))
             lines = py_file.read_text(encoding="utf-8").splitlines()
             code_lines = [
@@ -360,24 +380,28 @@ class TestFileLineCountLimit(unittest.TestCase):
         )
 
 
+# ADR-0291 Phase A：层 docstring 测试语义重写。
+# 原 `layer*/__init__.py` glob 在 lca/ 下恒空（无 layer* 命名目录），
+# 改为显式五层清单 —— contracts → infrastructure → cognition → runtime → agent，
+# 与 test_architecture_conformance.py 的分层维度对齐。
+_LAYER_PACKAGES = ("contracts", "infrastructure", "cognition", "runtime", "agent")
+
+
 class TestLayerInitDocstrings(unittest.TestCase):
     """每个层的 __init__.py 必须有非空 docstring，且各层描述不重复。"""
 
     def test_layer_init_docstrings_non_empty(self) -> None:
-        layer_inits = sorted(_LCA_ROOT.glob("layer*/__init__.py"))
-        layer_inits.append(_LCA_ROOT / "contracts" / "__init__.py")
-        layer_inits.sort()
-
         empty: list[str] = []
         descriptions: list[str] = []
-        for init_file in layer_inits:
+        for layer in _LAYER_PACKAGES:
+            init_file = _LCA_ROOT / layer / "__init__.py"
             rel = str(init_file.relative_to(_PROJECT_ROOT))
-            try:
-                mod = importlib.import_module(
-                    str(init_file.parent.relative_to(_PROJECT_ROOT)).replace(os.sep, ".")
-                )
-            except ImportError:
-                continue
+            # 清单漂移即红：包改名/删除时测试必须显式失败，而非静默跳过。
+            self.assertTrue(
+                init_file.is_file(),
+                f"层清单漂移：{rel} 不存在（_LAYER_PACKAGES 须与 lca/ 实际布局同步）",
+            )
+            mod = importlib.import_module(f"lca.{layer}")
             doc = (mod.__doc__ or "").strip()
             if not doc:
                 empty.append(f"  - {rel}")
@@ -398,12 +422,21 @@ class TestGlossaryTermCoverage(unittest.TestCase):
 
     def test_glossary_term_coverage(self) -> None:
         glossary_terms = _read_glossary_terms()
-        if not glossary_terms:
-            self.skipTest("docs/specs/glossary.md 不存在或为空")
+        # C1/C4：glossary 缺失不再 skip（曾致本测试恒 skip），直接红。
+        self.assertTrue(
+            glossary_terms,
+            f"glossary 为空：{_GLOSSARY_PATH} 不存在或无词条（指针/文件漂移即红）",
+        )
 
         glossary_text = " ".join(glossary_terms).lower()
 
         classes = _collect_all_concrete_classes(_GLOSSARY_COVERAGE_SCAN_PACKAGES)
+        # C1 基数门：扫描基数异常时直接红，不许恒绿。
+        self.assertGreaterEqual(
+            len(classes),
+            _MIN_CLASS_SCAN_COUNT,
+            f"类扫描基数 {len(classes)} < {_MIN_CLASS_SCAN_COUNT}：扫描可能空心",
+        )
         uncovered: set[str] = set()
 
         for cls_name in sorted(classes):
@@ -441,11 +474,14 @@ class TestGlossaryReverseCoverage(unittest.TestCase):
 
     def test_active_glossary_terms_exist_in_code(self) -> None:
         terms = _read_active_glossary_terms()
-        if not terms:
-            self.skipTest("docs/specs/glossary.md 不存在或为空")
+        # C1/C4：glossary 缺失不再 skip（曾致本测试恒 skip），直接红。
+        self.assertTrue(
+            terms,
+            f"现役术语为空：{_GLOSSARY_PATH} 不存在、无词条或「已废弃主名」章节位置漂移",
+        )
 
         # Terms from deleted modules that haven't been moved to the deprecated section yet.
-        # Once the glossary is updated, remove these from the skip list.
+        # Phase B（arch lane）负责将其移入「已废弃主名」表后从此处删除。
         known_deleted_terms = {
             "CandidateEvaluationPipeline",
             "DecisionParser",
@@ -458,6 +494,12 @@ class TestGlossaryReverseCoverage(unittest.TestCase):
         }
 
         class_names = _collect_class_names(_REVERSE_SCAN_PACKAGES)
+        # C1 基数门：扫描基数异常时直接红，不许恒绿。
+        self.assertGreaterEqual(
+            len(class_names),
+            _MIN_REVERSE_CLASS_SCAN_COUNT,
+            f"reverse 类扫描基数 {len(class_names)} < {_MIN_REVERSE_CLASS_SCAN_COUNT}：扫描可能空心",
+        )
         missing = sorted(
             term
             for term in terms
