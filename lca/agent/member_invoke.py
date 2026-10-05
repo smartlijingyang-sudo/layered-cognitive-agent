@@ -7,6 +7,9 @@ Completed）由 transport 唯一通道发射，本模块只标记 member_invoke 
 
 from __future__ import annotations
 
+from lca.contracts.models.core.execution.decision import (
+    strip_external_instructions_from_delegation,
+)
 from lca.contracts.models.core.execution.result import Result
 from lca.contracts.models.core.policy.budget import DEFAULT_DELEGATION_TIMEOUT_S
 from lca.contracts.models.core.state.lifecycle import TaskStatus
@@ -79,7 +82,11 @@ async def invoke_members_sequential(
             last_result.total_steps = total_steps
             return last_result
         if pass_output_as_next_task and last_result.output:
-            current_task = last_result.output
+            # ADR-0292 C3: member reports are external content (C1) — a
+            # "next, do Y" directive smuggled into a report must never be
+            # re-authorized as the next member's task. Strip directive
+            # sentences; informational sentences pass through verbatim.
+            current_task = strip_external_instructions_from_delegation(last_result.output)
             handoff = _workspace_handoff_prefix()
             if handoff:
                 current_task = f"{current_task}\n\n{handoff}"
