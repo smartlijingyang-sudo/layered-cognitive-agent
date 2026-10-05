@@ -10,9 +10,11 @@ import re
 
 from lca.contracts.atoms.enums.enums import MemoryCategory
 from lca.contracts.models.memory.episode import (
+    STYLE_PREFERENCE_DIMENSION,
     EpisodeFact,
     ResidualClass,
     canonical_dedupe_key,
+    matched_style_token,
 )
 
 # 身份模板捕获的是单个名词短语，句子余下的子句是别的事实。贪婪捕获会把它们折进
@@ -22,7 +24,6 @@ _CLAUSE_END = ",，。;；!！?？\n"
 _ROLE = re.compile(rf"我是([^{_CLAUSE_END}]+)")
 _NAME = re.compile(rf"我叫([^{_CLAUSE_END}]+)|叫我([^{_CLAUSE_END}]+)")
 _QUOTES = "\"'「」"
-_VERBOSITY = ("简洁", "啰嗦", "详细")
 _TOKEN = re.compile(r"[A-Za-z0-9_]+")
 
 
@@ -56,15 +57,15 @@ def _match_template(text: str) -> tuple[MemoryCategory, str, str, bool] | None:
                 f"用户身份：{captured}",
                 True,
             )
-    if ("记住" in text or "以后" in text) and any(token in text for token in _VERBOSITY):
-        for token in _VERBOSITY:
-            if token in text:
-                return (
-                    MemoryCategory.PREFERENCE,
-                    "preference:verbosity",
-                    f"用户偏好：{token}",
-                    False,
-                )
+    if "记住" in text or "以后" in text:
+        token = matched_style_token(text)
+        if token is not None:
+            return (
+                MemoryCategory.PREFERENCE,
+                STYLE_PREFERENCE_DIMENSION,
+                f"用户偏好：{token}",
+                False,
+            )
     return None
 
 

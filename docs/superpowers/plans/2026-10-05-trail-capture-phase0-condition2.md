@@ -78,15 +78,21 @@ canonical owner 判定：风格偏好词表归 `contracts/models/memory/episode.
 
 ### Task 1：风格偏好词表与维度映射迁到 contracts
 
-`episode.py` 增加一个纯函数与一个词表常量，形如 `style_preference_dimension(text) -> str | None`，命中风格词时返回 `preference:verbosity`，否则 `None`。词表内容取 `govern.py:25` 现有的 `("简洁", "啰嗦", "详细")`，本任务不拓宽。`govern.py` 删掉私有 `_VERBOSITY`，改为调用该函数，`govern.py:59` 的 `记住|以后` 合取门保持不变。
+状态：已完成。
 
-先写失败测试：`style_preference_dimension("回复请简短")` 当前应返回 `None`（`简短` 不在词表），`style_preference_dimension("还是简洁一点好")` 应返回 `preference:verbosity`。再写实现。
+`episode.py` 增加 `STYLE_PREFERENCE_DIMENSION = "preference:verbosity"`、私有词表 `_STYLE_TOKENS`（内容取 `govern.py` 原有的 `("简洁", "啰嗦", "详细")`，本任务不拓宽）与纯函数 `matched_style_token(text) -> str | None`，返回命中的那个词，无命中返回 `None`。三者都进 `__all__`。
 
-验证：`uv run pytest tests/cognition/memory/test_govern_capture_boundary.py tests/reflect -q --no-cov`，`govern()` 既有行为不变。新增 `tests/contracts/memory/test_style_preference_dimension.py`。
+计划初稿写的是 `style_preference_dimension(text) -> str | None`，实施时改成 `matched_style_token` 加一个维度常量。原因是 `govern()` 的分支要拿命中的词去渲染 `用户偏好：{token}`，只返回维度键不够；而 Task 2 只需要维度键，用 `STYLE_PREFERENCE_DIMENSION` 直接取即可。一个函数加一个常量同时满足两个消费方，比返回二元组或新增一个类型都小。
+
+`govern.py` 删掉私有 `_VERBOSITY`，改为导入这两个名字，`记住|以后` 合取门保持不变。顺带去掉了原分支对词表的两次扫描（先 `any(...)` 再 `for` 找命中项），现在只扫一次。
+
+先写失败测试再写实现。`tests/contracts/memory/test_style_preference_vocabulary.py` 钉住词表命中、非风格文本不命中、多词命中时取词表顺序的第一个、以及 Task 1 不拓宽（`回复请简短` 仍返回 `None`，拓宽属 Task 5）。`tests/cognition/memory/test_govern_style_dimension.py` 是 `govern()` 风格分支的characterization 测试，该分支此前无覆盖，迁移前先确认它 4 条全绿，迁移后仍须全绿。
+
+验证：`uv run pytest tests/contracts/memory tests/cognition/memory tests/reflect -q --no-cov`。`govern()` 既有行为不变。
 
 ### Task 2：`_trail_episode` 对风格偏好发稳定维度键
 
-`dream.py:_trail_episode` 在 `is_preference_statement` 命中后，先问 `style_preference_dimension(entry.content)`；拿到维度键就用它，拿不到才回落 `preference:<摘要>`。`source_trace_id` 保持 `<流水文件名>:<摘要>`，因为同一维度跨天复现要靠不同的 trace 才能把 `recurrence` 累到 2。
+`dream.py:_trail_episode` 在 `is_preference_statement` 命中后，先问 `matched_style_token(entry.content)`；命中就用 `STYLE_PREFERENCE_DIMENSION`，否则回落 `preference:<摘要>`。`source_trace_id` 保持 `<流水文件名>:<摘要>`，因为同一维度跨天复现要靠不同的 trace 才能把 `recurrence` 累到 2。
 
 这一步让同一维度的不同措辞聚进一个 cluster，`_lifecycle` 的 `recurrence >= 2` 分支对流水偏好重新可达，单次误命中不再直接永久提升。
 
@@ -120,7 +126,11 @@ canonical owner 判定：风格偏好词表归 `contracts/models/memory/episode.
 
 `trail.py:18` 的 `_PREFERENCE` 增加无记忆动词的风格偏好形状，目标覆盖判据句「还是简洁一点好」「别那么啰嗦」「回复请简短」「我喜欢简洁的回复」。
 
-拓宽与 Task 2 的稳定维度键绑定，不单独落地。凡命中后能映射到 `style_preference_dimension` 的行才有 authority，映射不到的行走 `trail:<摘要>` 且 `authority=False`，不会提升。这条约束把误报的代价从「永久污染一条语义记录」降到「多一条 ephemeral 流水」。
+拓宽必须与 authority 规则同时定，不能只改词表。`_trail_episode` 今天对任何 `is_preference_statement` 命中都给 `authority=True`，而 `preference:<摘要>` 的键形状让 `recurrence` 恒为 1，所以每次命中都是首次即永久提升，没有复现兜底。Task 2 只给风格类偏好换了稳定维度键，非风格类偏好仍走摘要键，这个暴露在本任务必须一并处理。
+
+两条候选。一是把 authority 收窄到能映射出稳定维度的行，代价是「以后不要用 emoji」这类合法的非风格偏好要凑够两天复现才提升。二是给非风格偏好也建维度分类，代价是引入一套新的维度词表，与 Task 1 收敛词表的方向相反。
+
+倾向第一条。漏提升可恢复，次日复现即提升；误提升不可恢复，带 authority 的语义记录不再被审视，与 `487a9fdff` 修的缺陷同形。两侧不对称，应当偏向可恢复的那一侧。
 
 误报证据要实测，不靠推断。可用语料是 24 个含 `semantic.json` 的助理 home（136 条记录）与 19 个 `conversations/*.jsonl`（76 行），2026-10-05 实测。语料偏小，这一点在测试里显式标注，不夸大为覆盖率证明。测试同时钉正反两侧：四条判据句命中，以及「别删那个文件」「请不要这样」这类一次性指令不命中或不带 authority。
 

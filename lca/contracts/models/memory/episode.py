@@ -71,6 +71,28 @@ def canonical_dedupe_key(dedupe_key: str | None, category: str | None = None) ->
     return key
 
 
+#: 回复风格偏好的维度键。``govern()`` 与 trail 提升共用这一个字面量，
+#: 避免同一语义在两处各写一份。
+STYLE_PREFERENCE_DIMENSION = "preference:verbosity"
+
+#: 风格词表。顺序即优先级，取值确定。拓宽这个词表会同时改变在线模板捕获与
+#: 离线流水提升的覆盖面，两者共用一份，因此只在这里改。
+_STYLE_TOKENS: tuple[str, ...] = ("简洁", "啰嗦", "详细")
+
+
+def matched_style_token(text: str) -> str | None:
+    """Return the first style token present in ``text``, or None.
+
+    Pure and total. Callers that need the dimension key pair this with
+    ``STYLE_PREFERENCE_DIMENSION``; callers that need the matched word for a
+    rendered fact use the return value directly.
+    """
+    for token in _STYLE_TOKENS:
+        if token in text:
+            return token
+    return None
+
+
 def _lifecycle(winner: EpisodeFact, recurrence: int) -> LifecycleState:
     if winner.explicit_user_authority and winner.category in {
         MemoryCategory.IDENTITY,
@@ -118,6 +140,7 @@ def consolidate(episodes: Sequence[EpisodeFact], *, now_ms: int) -> Consolidatio
 
 
 __all__ = [
+    "STYLE_PREFERENCE_DIMENSION",
     "ClusterView",
     "ConsolidationPlan",
     "EpisodeFact",
@@ -125,4 +148,5 @@ __all__ = [
     "ResidualClass",
     "canonical_dedupe_key",
     "consolidate",
+    "matched_style_token",
 ]
