@@ -180,11 +180,6 @@ class DynamicToolBridge:
                 # 优先使用受管公共接口（C4 guardrail）
                 manifest.add_permitted(tool.name)
                 _log.info("dynamic_tool.authorized_safe_executor", tool_name=tool.name)
-            elif hasattr(manifest, "allowed_tools") and tool.name not in manifest.allowed_tools:
-                # COMPAT: 旧 ToolPermissionManifest 实例尚未迁移；只读 tuple 不可变故跳过
-                if isinstance(manifest.allowed_tools, list):
-                    manifest.allowed_tools.append(tool.name)
-                _log.info("dynamic_tool.authorized_safe_executor_compat", tool_name=tool.name)
 
         # Emit audit fact
         try:
@@ -223,11 +218,6 @@ class DynamicToolBridge:
                 # 优先使用受管公共接口（C4 guardrail）
                 manifest.revoke_permitted(tool_name)
                 _log.info("dynamic_tool.revoked_safe_executor", tool_name=tool_name)
-            elif hasattr(manifest, "allowed_tools"):
-                # COMPAT: 旧实例；仅处理 list 类型
-                if isinstance(manifest.allowed_tools, list):
-                    manifest.allowed_tools = [t for t in manifest.allowed_tools if t != tool_name]
-                _log.info("dynamic_tool.revoked_safe_executor_compat", tool_name=tool_name)
 
         # Emit audit fact
         try:

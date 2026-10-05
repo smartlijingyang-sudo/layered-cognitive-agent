@@ -533,3 +533,25 @@
 - 验证结果: ruff check 2 文件首次（isort I001 空行问题一次修复后）即过（All checks passed!）；行为等价 python 断言全绿（两文件导出名字 `is` canonical 对象；旧 shim 路径 `import` 抛 ModuleNotFoundError 确认删除彻底）；全库 grep：`session.event.session`/`session/event/session` 在 lca/ tests/ 的 .py 中 0 残留；targeted pytest（`tests/transport/test_resume_rebinds_ambient.py` + `tests/session/test_session_public_api.py`——直接覆盖 bind/unbind 与两编辑模块）：8 passed，0 failed，无预存失败。
 - commit: 见 git log --grep='第0496轮'（refactor(lca-1000): 第0496轮 删除 session event COMPAT re-export shim，两处导入方直连 lifecycle.bind seam；未 push）。
 - 备注: 只 add 本轮 4 个文件（代码 2 modified + 2 deleted via git rm + ledger.md）；编辑前 git status --porcelain 干净（无并发会话未提交改动）；备份 /tmp/bak_0496/（252，3 文件：session.py/builder.py/event_session.py——首次 cp 因重名冲突漏了 event_session.py，已补）。本地 heredoc 嵌套引号翻车一次（文件未动），改用 muse.write 写脚本 + base64 经 stdin 喂远程 python，稳定。ruff 链式命令一次引号放错跑到本机（`/home/hatch/.local/bin/ruff` 不存在，exit 127），纠正后在 252 重跑通过——两处插曲均未造成文件改动。
+## 第0497轮 (2026-10-05 08:03-08:11 CST)
+- 改了什么: 删除 `lca/infrastructure/tools/dynamic/bridge.py` 中 `register_tool` / `unregister_tool` 的两处死 COMPAT `elif` 分支（10 deletions，1 file）：
+  - register 侧：`elif hasattr(manifest, "allowed_tools") and ...`（COMPAT: 旧 ToolPermissionManifest 实例尚未迁移）整块删除；
+  - unregister 侧：`elif hasattr(manifest, "allowed_tools"):`（COMPAT: 旧实例；仅处理 list 类型）整块删除；
+  - 主路径 `add_permitted` / `revoke_permitted`（C4 guardrail 受管接口）原样保留；`_compat` 后缀日志事件名随分支消失（全库无外部引用）。
+- 依据 skill 哪一节: deslop 清单 死兼容路径（两处分支自带 COMPAT 标记，声明为"旧实例尚未迁移"的过渡代码）+ SKILL.md Deletion test（删掉分支后复杂度直接消失：全库唯一的 `ToolPermissionManifest` 类自带 `add_permitted`/`revoke_permitted`，无任何调用方需要复刻旧分支逻辑——纯防御性 guard，非 pass-through 分担）+ LANGUAGE.md Interface（`add_permitted` docstring 明示"这是 allowed_tools 变更的唯一公共入口；调用方不得直接操作列表"——seam 已收口到受管接口，绕开它的 elif 是 hypothetical 旧实例的残留）。
+- 为什么这是实质改动(非凑数): 删除的是有行为的代码分支（10 行，曾经真实执行过的兼容路径），不是注释措辞调整。证据链：(1) git 历史：`8df289930 fix(review)` 为 code review 的假想"旧实例"担忧加的防御，`53e148dd7` 初始实现时类还没有新方法；(2) 全库唯一的 `ToolPermissionManifest` 定义（`lca/contracts/models/team/role/team.py:29`）自带两方法；(3) 全库无第二个 manifest 类、无 mock 旧实例传给 bridge；(4) 现有测试 `test_dynamic_tool_bridge.py` 零覆盖 COMPAT 分支（DummySafeExecutor 包的也是新类）。死分支满足 deslop"无依据的防御性 guard"+"死兼容路径"双重定义。
+- 关键设计决策（夜间跳过 grilling，记台账）: 只删两处 `elif` 死分支，不动主路径的 `hasattr(manifest, "add_permitted")` duck-typing（`safe_executor: Any` 边界上的合理防御，非 COMPAT）；不动 `ToolPermissionManifest` 类本身；不追删其他 COMPAT（见候选清单驳回项）。
+- 候选清单（本轮 explore，逐一验证后取舍）：
+  1. 上述 bridge.py 两处死 COMPAT 分支删除 —— 选中（旧实例不存在的证据确凿；单文件聚焦；deletion test 满分）。
+  2. `manifest/manifest.py` COMPAT re-export —— 驳回（delete_when 条件未达成：lca/ 内 3 处 importer；且有 importlib lazy-load 真实逻辑，非纯 shim）。
+  3. `spine/spine/enrich.py` COMPAT —— 驳回（lca/ 内 5+ importer；FieldProducer merge + I17 强契约是真实逻辑，非 shim）。
+  4. `classify.py:170 decision_needs_approval` "COMPAT shim" 自称 —— 驳回（deletion test 反向：删函数会把 engine 构造三步分散到 2 个生产调用方，earning its keep；只改 docstring 措辞属凑数）。
+  5. `AgentState.history` property 迁移至 `control_turns` —— 驳回（~30 sites 跨生产+测试，含 `test_architecture_conformance.py` 对 `state.history.append` 模式的语义断言；规模超一轮聚焦，需 grilling，夜间轮不动）。
+  6. `_DEFAULT_BOOT_PATH` —— 驳回（沿用 494 结论：hypothetical seam，需 grilling）。
+  7. `tail.py:81` COMPAT —— 驳回（依赖 ADR-0170 §D3 LiveTail 单身份重构的设计决策，需 grilling）。
+  8. `codecs.py:29,34` / `handlers.py:593` / `evolve.py:325` 的 `delete-when: 2026-12-31` —— 驳回（日期未到）。
+  9. `naming.py:15` 过期 COMPAT 标记 —— 驳回（沿用 496：删一行注释属凑数边界）。
+  10. 命名收敛弧复查（484→496）：exceptions/kernel.log/spine/boot 命名空间 code site 归零 —— 弧线收口，无动作。
+- 验证结果: ruff check 1 文件首次即过（All checks passed!）；targeted pytest `tests/infrastructure/tools/dynamic/test_dynamic_tool_bridge.py`：5 passed（覆盖 register/unregister 主路径行为，删除死分支后行为等价）；python 断言：`COMPAT`/`safe_executor_compat` 字符串在文件内归零、`add_permitted`/`revoke_permitted` 调用各保留 1 处。
+- commit: 见 git log --grep='第0497轮'（refactor(lca-1000): 第0497轮 删除 bridge.py 两处死 COMPAT elif 分支（旧 ToolPermissionManifest 实例防御）；未 push）。
+- 备注: 只 add 本轮 2 个文件（代码 1 + ledger.md）；编辑前 git status --porcelain 干净（无并发会话未提交改动）；备份 /tmp/bak_0497/bridge.py（252，原文件完整备份）。base64+stdin 喂远程 python 编辑路径稳定（先本地断言 old 文本计数再替换，一次成功）。
