@@ -143,7 +143,7 @@ def test_config_defaults_put_the_cadence_in_one_place() -> None:
     config = plugin_module.Config()
 
     assert config.tick_seconds == 300
-    assert config.enabled is True
+    assert config.enabled is False, "ships disabled per the ADR-0254 v3 USER.md conflict"
 
 
 def test_config_rejects_unknown_keys() -> None:
@@ -278,7 +278,7 @@ async def test_setup_injects_the_production_seams(
     catalog = _StubCatalog([_summary(home), _summary(other)])
     ctx = _StubCtx(catalog)
 
-    await plugin_module.setup.setup(ctx, plugin_module.Config(tick_seconds=42))
+    await plugin_module.setup.setup(ctx, plugin_module.Config(tick_seconds=42, enabled=True))
 
     assert captured["tick_seconds"] == 42
     assert captured["lock_dir"] == isolated_lca_home / "locks", (
@@ -320,7 +320,7 @@ async def test_the_registered_dispose_stops_the_background_sweep(
 
     monkeypatch.setattr(plugin_module.asyncio, "create_task", recording_create_task)
 
-    await plugin_module.setup.setup(ctx, plugin_module.Config())
+    await plugin_module.setup.setup(ctx, plugin_module.Config(enabled=True))
 
     assert len(created) == 1, "one background sweep per boot"
     dispose = [fn for fn, label in ctx._fake_runtime.effects if label == DISPOSE_LABEL]
@@ -360,7 +360,7 @@ async def test_setup_rejects_a_capability_that_is_not_a_catalog(
     ctx = _StubCtx(object())
 
     with pytest.raises(TypeError, match=r"assistant\.catalog"):
-        await plugin_module.setup.setup(ctx, plugin_module.Config())
+        await plugin_module.setup.setup(ctx, plugin_module.Config(enabled=True))
 
 
 def test_the_stub_catalog_satisfies_the_runtime_checkable_protocol() -> None:
@@ -389,6 +389,11 @@ def test_the_running_profile_writes_the_cadence_down() -> None:
 
     assert patch["config"]["tick_seconds"] <= 300, (
         "ADR-0287 §4 wants the cadence upper bound in configuration, not in prose"
+    )
+    assert patch["config"]["enabled"] is False, (
+        "the first enabled tick rewrites USER.md in 8 of 578 live homes and one "
+        "loses a payment/account-modification safety constraint that exists in no "
+        "semantic record; ADR-0254 v3 rules a full USER.md rebuild a bug"
     )
 
 

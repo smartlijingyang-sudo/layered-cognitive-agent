@@ -65,7 +65,17 @@ class Config(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     tick_seconds: int = Field(default=300, gt=0)
-    enabled: bool = True
+    # Ships disabled. The first enabled tick rewrites ``USER.md`` in every home
+    # whose rendered profile differs from disk, and a read-only scan of the live
+    # fleet found 8 of 578 homes in that state. One of them carries a hard
+    # safety constraint about payment and account-modification operations that
+    # exists in no semantic record, so the rewrite would drop it. ADR-0254 v3
+    # rules user-domain Markdown an SSOT the system must not rebuild from JSON
+    # and names a full ``USER.md`` rebuild a bug. Enable-when: that conflict is
+    # resolved, either by ``_sync_user_md`` refusing to overwrite content that
+    # is not derivable from semantic records, or by a migration that lifts
+    # hand-written ``USER.md`` content into records before the first pass.
+    enabled: bool = False
 
 
 def _homes(catalog: AssistantCatalog) -> Sequence[Path]:

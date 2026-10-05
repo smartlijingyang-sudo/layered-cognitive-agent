@@ -103,6 +103,11 @@ patch:
   - id: lca-memory-dream-scheduler
     config:
       tick_seconds: 300
+      # Disabled until the ADR-0254 v3 USER.md ownership conflict is resolved.
+      # The first enabled tick rewrites USER.md in 8 of 578 live homes, one of
+      # which loses a payment/account-modification safety constraint that exists
+      # in no semantic record. See the Config docstring in the plugin.
+      enabled: false
   - id: lca-composio-provider
     config:
       api_key:
