@@ -59,8 +59,18 @@ def test_style_preference_uses_the_shared_dimension_key(tmp_path: Path) -> None:
 
 
 def test_non_style_preference_keeps_the_content_digest_key(tmp_path: Path) -> None:
-    """非风格类偏好没有维度可映射，保留摘要键，不被归一波及。"""
-    home = _home_with_trail(tmp_path, "以后不要用 emoji")
+    """非风格类偏好没有维度可映射，保留摘要键，不被归一波及。
+
+    授权收窄之后它首次不再提升，要跨天复现。完整的授权矩阵见
+    ``test_trail_authority_narrowing.py``。
+    """
+    home = tmp_path / "asst"
+    for sub in ("people", "groups", "episodes"):
+        (home / "memory" / sub).mkdir(parents=True)
+    for date in ("2026-10-04", "2026-10-05"):
+        (home / "memory" / f"{date}.md").write_text(
+            f"# {date}\n\n- 以后不要用 emoji\n", encoding="utf-8"
+        )
 
     _dream(home)
 
@@ -81,11 +91,11 @@ def test_non_preference_trail_line_is_not_promoted(tmp_path: Path) -> None:
 
 
 def test_stable_key_does_not_add_recurrence_protection(tmp_path: Path) -> None:
-    """单次提及仍然首次即提升。
+    """显式指令加稳定维度的行仍然首次即提升。
 
     `_lifecycle` 先判 `explicit_user_authority`，命中即 `consolidated_slow`，
-    永远走不到 `recurrence >= 2`。所以维度归一解决的是重复记录，不是误报防护。
-    误报防护属 Task 5 的 authority 规则。
+    走不到 `recurrence >= 2`。授权在 Task 5 收窄到「显式且能映射维度」这一格，
+    本条数据正落在该格，所以维度归一在这里既不提供也不需要复现保护。
     """
     home = _home_with_trail(tmp_path, "以后回复简洁一点")
 

@@ -24,10 +24,17 @@ def test_non_style_text_matches_nothing() -> None:
     assert matched_style_token("") is None
 
 
-def test_task_1_does_not_widen_the_vocabulary() -> None:
-    """拓宽属 Task 5。这里钉住当前边界，让 Task 5 的改动是显式且有测试的。"""
-    assert matched_style_token("回复请简短") is None
+def test_task_5_widened_the_vocabulary_to_the_criterion_sentences() -> None:
+    """Task 1 钉住的边界在 Task 5 显式放宽，`简短` 进词表。"""
+    assert matched_style_token("回复请简短") == "简短"
+    assert matched_style_token("我喜欢简洁的回复") == "简洁"
+
+
+def test_widening_stays_bounded() -> None:
+    """放宽只加了 `简短`。不含风格词的表述仍然不命中。"""
     assert matched_style_token("我喜欢言简意赅的回复") is None
+    assert matched_style_token("说短一点") is None
+    assert matched_style_token("别删那个文件") is None
 
 
 def test_first_vocabulary_entry_wins() -> None:

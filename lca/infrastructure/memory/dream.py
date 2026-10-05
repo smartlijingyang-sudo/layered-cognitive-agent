@@ -39,6 +39,7 @@ from lca.infrastructure.memory.contextfiles.domain.alignment import (
 from lca.infrastructure.memory.contextfiles.domain.layout import layout_for_home
 from lca.infrastructure.memory.contextfiles.domain.trail import (
     TrailEntry,
+    is_explicit_instruction,
     is_preference_statement,
     parse_trail,
 )
@@ -138,12 +139,13 @@ def _trail_facts(home: Path, *, now_ms: int) -> tuple[EpisodeFact, ...]:
 
 def _trail_episode(entry: TrailEntry) -> EpisodeFact:
     digest = sha256_hex(entry.content.encode("utf-8"), length=12)
+    explicit = is_explicit_instruction(entry.content)
+    style = matched_style_token(entry.content)
     if is_preference_statement(entry.content):
         category = MemoryCategory.PREFERENCE
-        authority = True
-        # 风格偏好归到共享维度键，同一维度的不同措辞才聚进一个 cluster。
-        # 摘要键留给无维度可映射的偏好。
-        style = matched_style_token(entry.content)
+        # 授权只给既是显式指令又落到稳定维度的行。authority 在 _lifecycle 里
+        # 先于 recurrence 短路，等于首次即永久提升且之后不再被审视。
+        authority = explicit and style is not None
         raw_key = STYLE_PREFERENCE_DIMENSION if style is not None else f"preference:{digest}"
     else:
         category = MemoryCategory.FACT

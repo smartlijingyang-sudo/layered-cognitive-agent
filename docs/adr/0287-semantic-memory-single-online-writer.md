@@ -37,6 +37,8 @@ episode 侧的缺口不在开关而在模板。`phase.perceive.observe` 每轮�
 
 **D6（产品决策，已裁决 2026-10-05，李超）。** 47 个 extract-only 事实维度的落盘时延从当轮变为下一次 dream pass，是用户可感知的行为变化。裁决：接受该时延，dream 调度周期上界为 24 小时，上界写进调度配置。24 小时正是原提案标注需重评估的「每日一次」档，因此裁决附带一项前提，即关掉间隔期的读路径缺口。缺口在读侧，`memory_search` 的 FTS 索引已覆盖 trail files（`lca/infrastructure/memory/contextfiles/service/indexing.py:34`）但仅由 `run_dream` 重建；让 trail 追加同时增量索引新行，偏好句当轮即可被 ADR-0260 C2 的强制检索命中，且不产生第二个语义写者。增量索引归入 Phase 0 条件二交付物，代价是给 `MemoryIndex`（`lca/infrastructure/memory/contextfiles/ports/memory_index.py:26`，只声明 `rebuild` / `search` / `close`，`SqliteFtsIndex` 为唯一实现）加一个单文档写入方法，属 AGENTS.md §5 的公共签名变更。前提不落地时 D6 回到重评估，Phase 1 不启动。
 
+**D7（流水偏好的授权收窄，已裁决 2026-10-05，李超）。** `_lifecycle` 的 authority 分支先于 recurrence 短路，所以授权等于首次即永久提升且之后不再被审视。捕获面为 Phase 0 条件二放宽之后，授权面必须同时收窄，否则「这段代码很简洁」这类提到风格词却不是指令的句子会永久占据 `preference:verbosity`。裁决取收窄。落地规则比裁决字面更严一格：捕获与授权拆成两个谓词，`is_preference_statement` 为「显式指令或命中风格维度」，授权为两者交集。只按维度判授权会放行风格话题句，形状与 `487a9fdff` 修的缺陷相同。代价是非风格的显式偏好（「以后不要用 emoji」）失去首次即提升，需跨天复现。实测 213 行语料中 72 行被捕获、9 行拿到授权，其中 1 行误报（「用户架构偏好：简洁代码优先」指代码风格），因与真实回复风格偏好共用维度键，会被下一条 upsert 退役，可自愈。风格词表只加了 `简短` 一词，通用祈使词未进 `_PREFERENCE`，因为「别删那个文件」这类会被误判。
+
 ## 3. Alternatives considered（凝练）
 
 - 砍掉 extract：47 个 extract-only 维度直接丢失（其中含无第一人称偏好纠正类隐式事实），不可接受。

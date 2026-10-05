@@ -58,6 +58,8 @@ ADR-0249（Accepted）§0.1 的问题陈述是「在主对话轮次（`reflect/r
 
 两条路线目前都覆盖不到判据句，因此本条件有两项交付物。`govern()` 的 verbosity 规则要求 `记住|以后` 合取（`govern.py:59`）。`is_preference_statement` 依赖的 `_PREFERENCE`（`contextfiles/domain/trail.py:18`）为 `偏好|以后|不要|必须|记住|严禁|回复要|请记`，实测「还是简洁一点好」「别那么啰嗦」「回复请简短」「我喜欢简洁的回复」全部不命中，只有「以后简洁一点」命中。第一项交付物是 `TrailWriter` 的在线调用方，归属见 §Open questions 第 5 项的裁决；第二项是拓宽 `_PREFERENCE` 与 `govern()` 之一的偏好判定。只做第一项，判据仍不达成。
 
+第二项的形状已定，并附带一项授权裁决。捕获与授权拆成两个谓词。`is_preference_statement` 拓宽为「显式指令或命中风格维度」，判据句由此被捕获；授权收窄为两者的交集，只有既是显式指令又能映射到稳定维度的行才首次即提升。拓宽走闭合的风格词表，通用祈使词不进 `_PREFERENCE`，否则「别删那个文件」会被误判为偏好。收窄的代价是非风格的显式偏好失去首次即提升，需跨天复现，裁决接受，理由与实测误报证据见 ADR-0287 §D7 与[条件二实施计划](../../../superpowers/plans/2026-10-05-trail-capture-phase0-condition2.md) Task 5。
+
 Phase 0 未达成时 extract 保持在线，本提案其余部分不启动。
 
 **Phase 1，extract 的 LLM 蒸馏移入离线轨。** 仅在 Phase 0 验收达成后启动。在线保留毫秒级残差门控。47 个 extract-only 维度的落盘时延从本 Phase 起才发生，因此调度必须在本 Phase 之前已经跑稳，退化窗口一天都不开。

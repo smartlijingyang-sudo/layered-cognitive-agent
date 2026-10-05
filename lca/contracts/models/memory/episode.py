@@ -77,7 +77,7 @@ STYLE_PREFERENCE_DIMENSION = "preference:verbosity"
 
 #: 风格词表。顺序即优先级，取值确定。拓宽这个词表会同时改变在线模板捕获与
 #: 离线流水提升的覆盖面，两者共用一份，因此只在这里改。
-_STYLE_TOKENS: tuple[str, ...] = ("简洁", "啰嗦", "详细")
+_STYLE_TOKENS: tuple[str, ...] = ("简洁", "啰嗦", "详细", "简短")
 
 
 def matched_style_token(text: str) -> str | None:

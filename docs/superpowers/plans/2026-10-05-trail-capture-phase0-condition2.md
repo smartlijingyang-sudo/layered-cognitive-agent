@@ -140,19 +140,43 @@ canonical owner 判定：风格偏好词表归 `contracts/models/memory/episode.
 
 验证：`tests/infrastructure/memory/test_trail_index_incremental.py` 5 条，覆盖同 `doc_id` 二次写入不产生重复行、增量文档与全量重建的 `doc_id`/`kind`/`path` 逐字段相同、二次追加替换同一文档、文件缺失返回 `False`、空文件返回 `False` 且不建 db。`tests/infrastructure/tools/test_memory_search_merges_sources.py` 4 条，其中回归锁断言只含流水的索引不藏实时语义记录。`tests/scenario/memory/test_trail_same_turn_reachable.py` 是 D6 前提的跨层场景锁，一轮 `record_turn_trail` 之后当轮 `memory_search` 能命中该行、且既有语义记录仍可命中。三条既有 `test_retrieval_index.py` 与三条 `test_trail_append_only.py` 继续通过。后两条锁都做过拔牙实测，把 `index_trail_file` 调用换成 `pass` 后各自失败。
 
-### Task 5：拓宽 `_PREFERENCE`，带误报证据
+### Task 5：拓宽偏好捕获，收窄偏好授权
 
-`trail.py:18` 的 `_PREFERENCE` 增加无记忆动词的风格偏好形状，目标覆盖判据句「还是简洁一点好」「别那么啰嗦」「回复请简短」「我喜欢简洁的回复」。
+状态：已完成。裁决（2026-10-05，李超）取收窄 authority 那一条。
 
-拓宽必须与 authority 规则同时定，不能只改词表。`_trail_episode` 对任何 `is_preference_statement` 命中都给 `authority=True`，而 `_lifecycle` 的 authority 分支先于 `recurrence` 短路，所以每次命中都是首次即永久提升，与键形状无关。Task 2 给风格类偏好换了稳定维度键，消掉的是重复记录，不是这个暴露；非风格类偏好仍走摘要键，两类的暴露都在本任务处理。
+落地的规则比裁决字面更严一格，理由见下。捕获与授权拆成两个独立谓词，`domain/trail.py` 各出一个。
 
-两条候选。一是把 authority 收窄到能映射出稳定维度的行，代价是「以后不要用 emoji」这类合法的非风格偏好要凑够两天复现才提升。二是给非风格偏好也建维度分类，代价是引入一套新的维度词表，与 Task 1 收敛词表的方向相反。
+- `is_explicit_instruction(content)` 就是原来的 `_PREFERENCE` 匹配（`偏好|以后|不要|必须|记住|严禁|回复要|请记`），改名以说明它现在只承担一件事：判定用户是否下了指令。它是授权的**唯一**依据。
+- `is_preference_statement(content)` 拓宽为「显式指令 **或** 命中风格维度」。判据句「还是简洁一点好」「别那么啰嗦」「回复请简短」「我喜欢简洁的回复」经这一条被捕获，Phase 0 条件二的判据由此达成。
 
-倾向第一条。漏提升可恢复，次日复现即提升；误提升不可恢复，带 authority 的语义记录不再被审视，与 `487a9fdff` 修的缺陷同形。两侧不对称，应当偏向可恢复的那一侧。
+风格词表只加了 `简短` 一个词，没有往 `_PREFERENCE` 里塞 `别`/`请`/`喜欢` 这类通用祈使词。原因是通用祈使词的误报面太大，「别删那个文件」会被判成偏好。拓宽走闭合的风格词表，边界是有界的。
 
-误报证据要实测，不靠推断。可用语料是 24 个含 `semantic.json` 的助理 home（136 条记录）与 19 个 `conversations/*.jsonl`（76 行），2026-10-05 实测。语料偏小，这一点在测试里显式标注，不夸大为覆盖率证明。测试同时钉正反两侧：四条判据句命中，以及「别删那个文件」「请不要这样」这类一次性指令不命中或不带 authority。
+`_trail_episode` 的授权改为 `explicit and style is not None`，即**既是显式指令又能映射到稳定维度**才给 `authority=True`。裁决的字面是「收窄到能映射出稳定维度的行」，只按维度判会把「这段代码很简洁」这类提到风格词但不是指令的句子也永久提升，形状与 `487a9fdff` 修的缺陷相同。与显式性取交集之后这一格被堵住，且它严格窄于裁决要求，不放宽任何已裁决的东西。
 
-验证：新增 `tests/infrastructure/memory/contextfiles/test_preference_detector.py`，正反两侧都有断言。
+四格矩阵。
+
+| 显式指令 | 风格维度 | category | dedupe_key | authority |
+|---|---|---|---|---|
+| 有 | 有 | PREFERENCE | `preference:verbosity` | True，首次即提升 |
+| 有 | 无 | PREFERENCE | `preference:<摘要>` | False，需跨天复现 |
+| 无 | 有 | PREFERENCE | `preference:verbosity` | False，需跨天复现 |
+| 无 | 无 | FACT | `trail:<摘要>` | False |
+
+#### 实测误报证据
+
+语料是 24 个含 `semantic.json` 的助理 home（136 条记录）与 19 个 `conversations/*.jsonl` 的用户话轮，合计 213 行，2026-10-05 实测。语料小，下面是不存在性证明，不是比率。
+
+- `is_preference_statement` 命中 72 行（34%）。
+- 其中会拿到授权的 9 行（4.2%）。9 行全部是真实的回复风格偏好，例如「用户偏好：回复简洁，不啰嗦」「回复偏好：简洁扼要，优先给代码示例与架构图」。
+- 9 行里有 1 行是误报，「用户架构偏好：简洁代码优先」讲的是代码风格不是回复风格。它被收进 `preference:verbosity` 维度，因此下一条真正的回复风格偏好会以同 `dedupe_key` 走 `upsert` 把它退役，是可自愈的，与 `487a9fdff` 那种带授权且不再被审视的形状不同。
+- 收窄挡掉的是真实存在的误报。语料里「请用一句话告诉我现在几点，不要调用任何工具」「请用一句话回答：1加1等于几？不要调用工具」是单次请求指令，旧规则给它们 `authority=True`，会永久固化成一条偏好。
+- 收窄的代价也在语料里可见，63 行失去首次即提升，例如「用户偏好：不要客套话」「技术栈偏好：Rust 和 Go」，这类要跨天复现才提升。这是裁决接受的代价。
+
+#### 后续观察，不在本任务
+
+`preference:verbosity` 这个维度名假定风格词都指回复风格。「简洁代码优先」说明该假定不总成立。要根治需要给维度加一个回复语境限定词，或者把代码风格另立维度。当前由 upsert 退役兜住，先不动。
+
+验证：`tests/infrastructure/memory/test_preference_detector.py` 15 条，覆盖四条判据句被捕获、风格话题单独出现不算显式指令、显式风格指令两轴都命中、既有显式非风格指令语义不变、「别删那个文件」「李雷说项目下周发布」两轴都不命中。`tests/infrastructure/memory/test_trail_authority_narrowing.py` 5 条走 `run_dream` 真实入口，逐格钉住上面的矩阵，含判据句跨天复现才提升、非风格显式偏好跨天复现才提升、两种措辞落进同一维度只产一条记录。Task 1 钉住「不拓宽」的那条测试按本任务改写为钉住拓宽后的边界，Task 2 的非风格偏好测试改为跨天复现。
 
 ### Task 6：Phase 0 条件二端到端验收
 
