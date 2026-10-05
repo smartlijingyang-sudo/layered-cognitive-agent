@@ -613,7 +613,7 @@
 | ARCH-R2-TASK-4-READ-RUNS | Phase 4 - Transport Read Runs 读侧微目录收拢 (INV-ARCH-14) | Completed | 8 个微目录物理删除，平铺为 identity/evidence/live/terminal 4 大深度模块，全量 334 项相关测试全绿 (INV-ARCH-14)，commit 162596bde |
 | ARCH-R2-TASK-5-VERIFY-REGRESSION | Phase 5 - 全链路回归验证、门禁体检与追踪看板闭环 (INV-ARCH-15) | Completed | 全量 49 项跨阶段架构不变量测试 (INV-ARCH-01~14) 100% 通过；ruff check 0 报错；git diff --check 干净；负向边界 100% 遵守 |
 | ARCH-R3-APPLICATION-RUNTIME | Round 3 - Application Runtime Coordinator & Pump 模块加深与微目录收拢 | Completed | 成功收拢 adapters/ 微目录为单一深度模块 adapters.py，coordinator/__init__.py 显式暴露流式原语，INV-ARCH-15/16 守护测试全绿，198 项测试通过，code-reviewer 终审通过 (APPROVED) |
-| ARCH-R4-INFRA-TOOLS | Round 4 - Infrastructure Tools / Assistant Tool Family 声明式派发与能力注册缝隙统一 | Pending | 待执行 |
+| ARCH-R4-INFRA-TOOLS | Round 4 - Infrastructure Tools / Assistant Tool Family 声明式派发与能力注册缝隙统一 | In_Progress | 启动 Research Subagent 深度分析 tools 与 assistant/ 架构收拢点 |
 | ARCH-R5-OBSERVABILITY-SPINE | Round 5 - Infrastructure Observability Spine / Journal 后端与 Sinks 聚合加深 | Pending | 待执行 |
 | ARCH-R6-TRANSPORT-ROUTES | Round 6 - Transport Webserver Routes 分组扁平化与路由注册收拢 | Pending | 待执行 |
 | ARCH-R7-RUNTIME-LOOP | Round 7 - Runtime Loop / Projection / Result Finalizer 冗余状态机与零散桥接深度整合 | Pending | 待执行 |
