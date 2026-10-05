@@ -15,6 +15,7 @@ from lca.cognition.brain.sections.types import (
     render_teammates,
 )
 from lca.contracts.models.cognition.prompt_assembly import SectionOutput
+from lca.contracts.models.core.execution.external_content import fence_external_content
 from lca.contracts.models.core.perceive.perception import ContextManifest
 from lca.contracts.models.core.workspace.activation import ActivatedSkill
 from lca.contracts.models.team.role.team import RoleProfile
@@ -70,10 +71,12 @@ class MemberReportsSection:
         activated_skills: tuple[ActivatedSkill, ...],
     ) -> SectionOutput:
         results = awareness.results if awareness is not None else ()
+        # ADR-0292 C1: 子 agent 报告是外部内容通道 —— 围栏为数据段，
+        # 无指令效力（与 Observation.content_origin 同源的派生呈现）。
         return SectionOutput(
             text=label_line(
                 "MEMBER_REPORTS（你已发起委派的返回，确定性事实，不是历史记录）",
-                render_member_reports(results),
+                fence_external_content(render_member_reports(results)),
             )
         )
 

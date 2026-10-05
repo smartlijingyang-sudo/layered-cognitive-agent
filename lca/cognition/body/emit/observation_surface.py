@@ -5,6 +5,11 @@ The tool result is a *fact* the executing boundary appends once
 OpenAI ``role=tool`` messages the model reads, so the projection here
 decides exactly what the model sees after a tool call.
 
+ADR-0292 C1: external observations are wrapped in the external-content
+fence — the model-visible rendering of ``Observation.content_origin``.
+The fence is derived from the same mark (one source, two renderings);
+internal observations pass through unfenced.
+
 This lives beside the other body emit projections so both consumers share
 one definition:
 
@@ -24,6 +29,10 @@ import json
 from typing import Any
 
 from lca.contracts.models.core.execution.decision import Observation
+from lca.contracts.models.core.execution.external_content import (
+    ContentOrigin,
+    fence_external_content,
+)
 
 
 def observation_content(observation: Observation) -> str:
@@ -33,15 +42,25 @@ def observation_content(observation: Observation) -> str:
     data is ``payload``. Text payloads round-trip as-is; dict/list
     payloads JSON-encode with ``ensure_ascii=False`` so non-ASCII tool
     output stays readable to the model.
+
+    ADR-0292 C1: payloads whose ``content_origin`` is
+    :attr:`ContentOrigin.EXTERNAL` (the fail-closed default) are wrapped
+    in the external-content fence; ``INTERNAL`` payloads pass through
+    unchanged. ``getattr`` keeps duck-typed observations working.
     """
     payload = getattr(observation, "payload", None)
     if payload is None:
-        return ""
-    if isinstance(payload, str):
-        return payload
-    if isinstance(payload, (dict, list, tuple)):
-        return json.dumps(payload, ensure_ascii=False)
-    return str(payload)
+        text = ""
+    elif isinstance(payload, str):
+        text = payload
+    elif isinstance(payload, (dict, list, tuple)):
+        text = json.dumps(payload, ensure_ascii=False)
+    else:
+        text = str(payload)
+    origin = getattr(observation, "content_origin", ContentOrigin.EXTERNAL)
+    if origin is ContentOrigin.EXTERNAL:
+        return fence_external_content(text)
+    return text
 
 
 def observation_error(observation: Observation) -> dict[str, Any] | None:
