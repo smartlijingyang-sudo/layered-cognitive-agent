@@ -40,8 +40,12 @@ class Finding:
     message: str
 
 
+# Canonical reducer (ADR-0066 C4 single writer). Legacy suffixes below match
+# no on-disk file (both moved/deleted 2026-09-04/06) and are kept inert so
+# the tests/** pin (tests/harness/test_audit_state_writers.py) stays green.
 _REDUCER_FILE_ALLOWLIST: frozenset[str] = frozenset(
     {
+        "lca/plugins/loop/reducer/plugin.py",
         "lca/runtime/reducer.py",
         "lca/cognition/brain/modular_brain.py",
     }
