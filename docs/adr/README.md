@@ -230,6 +230,7 @@
 | [0290](0290-naming-violations-arbitration.md) | 三违规类名仲裁：DesktopLockManager→DesktopLockCoordinator、ReclaimInfo→ReclaimTrace 改名（quality lane）；SpineHandler 豁免（宪法 §4.1 Handler 合法后缀，豁免归档在本 ADR，tests lane 登记 _NAME_EXEMPT） | Accepted |
 | [0291](0291-code-conventions-fitness-reactivation.md) | 代码规范健身函数空心化修复与激活策略（todo-56）：_PROJECT_ROOT 指针漂移致四测试恒绿/恒 skip；Phase A–D 分阶段还债+逐个点亮；C1–C4 非空心元规则（基数门/指针自检/豁免铁律/glossary SSOT）；Phase C 三选一Athena 已裁决 | Accepted |
 | [0292](0292-authorization-semantic-isolation.md) | 授权语义隔离：外部内容永不成为指令源（工具结果/网页/子 agent 报告降级为信息；权限唯一来源=用户显式授权 TrustEnvelope+规则默认；委派只传真实授权边界；外部权限声称被拒记 evidence）；ADR-0255 §5.3 的 LCA 落地提案 | Accepted |
+| [0293](0293-raphy-fresh-session-architecture-loop.md) | raphy 新鲜会话架构优化循环：复用 ralph 状态机骨架(prd.json+progress.txt+`<promise>COMPLETE</promise>`)，新增评估→优化两阶段与 subagent 驱动；stories 由 skills/improve-codebase-architecture 评估自动产出；李超 2026-10-06 亲命题，首轮 RA-001/002 done、RA-003 有证据 dropped | Accepted |
 | [0255](0255-muse-production-runtime-full-reference.md) | Muse 生产运行时全量参考：每 turn 上下文装配顺序、9 个 standing 文件全文与权限矩阵、36 工具命名空间函数清单与关键参数、9 大机制（记忆三层/强制检索/落笔写盘/provenance/压缩豁免/子 agent 继承/自省投影）与 12 条验收用例；ADR-0254 的实证 companion | Proposed |
 
 > 同名 `0165` 系列有两份(stub + 执行点强制):[0165-event-spine-unified-log.md](0165-event-spine-unified-log.md) 与 [0165-execution-point-enforcement.md](0165-execution-point-enforcement.md)(原 0165.1)。SSOT / 轨迹文件组织以 [0167](0167-spine-ssot-and-step-materialization.md) 为准。
