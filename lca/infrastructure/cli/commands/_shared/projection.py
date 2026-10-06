@@ -172,10 +172,8 @@ def summarize_outputs(
 ) -> list[str]:
     """One human-readable line per output key.
 
-    Folded out of `debug_graph._summarize_outputs` (2026-10-06, local copy
-    deleted): nested dict gets a key preview, list gets a length,
-    primitives get repr-capped. The original str cap (80) is preserved by
-    passing cap=80 at the debug_graph call site.
+    Mirrors `debug_graph._summarize_outputs` semantics: nested dict gets a
+    key preview, list gets a length, primitives get repr-capped.
     """
     if not isinstance(outputs, dict):
         return []
