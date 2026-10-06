@@ -175,7 +175,9 @@ class TestADR0195Acceptance:
         assert (ROOT / readme).is_file()
 
     def test_seam_tree_anchors_have_readme(self) -> None:
-        for anchor in ("cognitive", "loop", "domain", "composition"):
+        for anchor in ("cognitive", "loop", "domain"):
+            # "composition" removed: lca/plugins/composition/ was intentionally
+            # deleted in 34c71e577 ("delete dead migration subtree")
             assert (PLUGINS / anchor / "README.md").is_file()
 
     def test_loop_driver_and_reducer_migrated(self) -> None:
