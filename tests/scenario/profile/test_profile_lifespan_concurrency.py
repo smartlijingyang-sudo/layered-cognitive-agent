@@ -12,6 +12,12 @@ each app gets its own cordis Context and its own disposal. This file proves:
 
 from __future__ import annotations
 
+# Scripted/mock run: boots the kernel, so it must pass the reasoner
+# fail-loud credential gate (see tests/conftest.py _ensure_no_env).
+# The mock/scripted adapter never touches the network; ambient dummy key is enough.
+__keep_llm_key__ = True
+
+
 import asyncio
 from typing import Any
 
