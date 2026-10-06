@@ -21,7 +21,12 @@ You are an autonomous coding agent. This is a fresh iteration: you have no memor
    ---
    ```
    If you found a reusable pattern, add it to `## Codebase Patterns` at the TOP.
-8. Commit **ALL changes** (code + `raphy/prd.json` + `raphy/progress.txt`) in ONE commit: `feat: [Story ID] - [Story Title]`
+8. Commit **ALL changes** (code + `raphy/prd.json` + `raphy/progress.txt`) in ONE commit: `feat: [Story ID] - [Story Title]`.
+   The commit BODY must carry this story's skill assessment so the "why" travels with the "what":
+   copy the story's row from `raphy/assessment.md` (Problem / Solution / Benefits / Strength)
+   into the body, plus one line on what the implementation actually did vs the assessment
+   (e.g. "assessed 7, converged 9 -- grep found 2 more"). If the story was dropped,
+   the body carries the evidence for dropping.
 9. After committing, `git status --short` must be clean (ignored files fine). If not, commit the rest.
 10. Check the Stop Condition below.
 
