@@ -153,3 +153,43 @@ RA-006（P2 Strong：daemon "单活"不变量无 owner，`_kill_existing` 接缝
 - `@plugin` 动态注册先测发现机制再收敛。
 - 简报路径可能错（`plugins/composition/composer` 实为 `plugins/composer`）：story Files 以实测为准。
 ---
+
+## 2026-10-06 23:54 - RA-004
+- Deleted the `debug_graph._load_events` private fork
+  (lca/infrastructure/cli/commands/observation/debug_graph.py:46-62); both
+  `debug_graph_cmd` and `debug_graph_command` now call the shared
+  `load_spine_events` from `lca/infrastructure/cli/commands/_shared/projection.py`.
+- The shared loader already had the `isinstance(obj, dict)` guard
+  (projection.py:95-96) the fork dropped; path resolution (cwd-relative
+  `traces/`) and fail-soft semantics (missing file / bad JSON -> []) are
+  identical, so the two call sites needed no other change. `import json` stays
+  (json.dumps in render_human/register); `spine_filename_for_run_cwd` import
+  stays (used in the 'no spine at' error message). The fork's "raw JSON dicts,
+  not EventRecord" docstring promise is preserved: the shared loader returns
+  tolerant SpineRow dicts with the same shape tolerance.
+- Fixed `scripts/lca-cli-shape.py` docstring drift: the documented shared-loader
+  API list now includes `load_spine_facts` (SHARED_PROJECTION_NAMES already had it).
+- Tests: `tests/infrastructure/cli/test_debug_graph.py` now imports the shared
+  loader instead of the private function; added regression test
+  `test_debug_graph_skips_non_dict_spine_lines` (spine.jsonl with `42` and
+  `[1, 2]` valid-JSON non-dict lines -> `lca-ops debug-graph` exits 0).
+- Bug evidence: replaying the deleted fork's exact loop against a spine with a
+  `42` line raised `AttributeError: 'int' object has no attribute 'get'` inside
+  build_debug_graph -- the assessment was correct, story not mis-assessed.
+- Verified: `uv run pytest tests/infrastructure/cli/test_debug_graph.py
+  tests/infrastructure/cli/test_projection.py --no-cov -q` -> 15 passed;
+  `uv run ruff check` clean on all touched files; grep 'json.loads' in
+  debug_graph.py -> 0. No contracts import added to CLI surface.
+- Files changed: lca/infrastructure/cli/commands/observation/debug_graph.py,
+  tests/infrastructure/cli/test_debug_graph.py, scripts/lca-cli-shape.py,
+  raphy/prd.json, raphy/progress.txt
+- **Learnings for future iterations:**
+  - When a private fork "looks like" the shared loader, the bug-relevant delta
+    is often a single dropped guard line -- diff the two loops line-by-line
+    before scoping (here the isinstance guard was the entire bug).
+  - The regression test drives the full typer command (CliRunner invoke on
+    `app`), not the loader function -- pins the user-visible contract
+    (exit 0), not the internal seam.
+  - A repo-wide `git grep` for the deleted symbol is the reliable straggler
+    check (here: only the test file; docs/assessment/prose mentions stay).
+---

@@ -8,8 +8,9 @@ free, exit-0-or-1, structured human output). Three checks:
    that defines ``_load_events`` / ``_load_facts`` / ``_read_events_jsonl``
    must either delegate to the public API in
    ``lca.infrastructure.cli.commands._shared.projection`` (any of:
-   ``load_spine_events``, ``filter_by_domain``, ``summarize_outputs``,
-   ``truncate``, ``spine_filename_for_run_cwd``) OR carry a one-line comment
+   ``load_spine_events``, ``load_spine_facts``, ``filter_by_domain``,
+   ``summarize_outputs``, ``truncate``, ``spine_filename_for_run_cwd``)
+   OR carry a one-line comment
    ``# non-shared: ...`` that explains the deviation.
 
    Files in ``SHARED_LOADER_EXEMPT`` (currently ``journal/replay.py`` for

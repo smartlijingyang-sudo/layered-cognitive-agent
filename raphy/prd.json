@@ -70,8 +70,8 @@
         "Do NOT change debug-graph human output; do NOT import contracts into CLI surface code"
       ],
       "priority": 1,
-      "passes": false,
-      "notes": "Source: improve-codebase-architecture skill assessment Round 2 2026-10-06 (Strong, friction walk Q3/Q4). Deletion test: concentrates. Real bug: non-dict line -> AttributeError at ev.get."
+      "passes": true,
+      "notes": "Source: improve-codebase-architecture skill assessment Round 2 2026-10-06 (Strong, friction walk Q3/Q4). Deletion test: concentrates. Real bug: non-dict line -> AttributeError at ev.get. DONE 2026-10-06: deleted _load_events; debug_graph_cmd + debug_graph_command now call shared load_spine_events (identical path resolution + fail-soft semantics; the dropped isinstance(obj, dict) guard restored). test_debug_graph.py imports the shared loader; new regression test test_debug_graph_skips_non_dict_spine_lines pins the crash (spine with '42'/'[1, 2]' lines -> exit 0; replaying the deleted fork's logic raised AttributeError: 'int' object has no attribute 'get', confirming the assessment). 15 tests pass (test_debug_graph + test_projection), ruff clean on all touched files; grep 'json.loads' in debug_graph.py -> 0."
     },
     {
       "id": "RA-005",

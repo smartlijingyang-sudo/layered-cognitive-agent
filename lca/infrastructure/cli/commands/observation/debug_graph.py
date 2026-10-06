@@ -22,6 +22,7 @@ import typer
 
 from lca.infrastructure.cli.commands._shared.projection import (
     _safe_repr,
+    load_spine_events,
     spine_filename_for_run_cwd,
     summarize_outputs,
     truncate,
@@ -35,28 +36,6 @@ _LOG_DEBUG_GRAPH_TAG = "debug-graph"
 # apply_terminal_outcome), so they no longer trigger the marker by name.
 _FAIL_OUTCOMES = {"fail", "failed", "failure", "error", "rejected"}
 _STOP_METHODS: set[str] = set()
-
-
-def _load_events(run_id: str) -> list[dict[str, Any]]:
-    """Read spine.jsonl; missing file returns empty list.
-
-    Kept on raw JSON dicts (not EventRecord) so test fixtures with synthetic
-    execution_points can render — debug-graph is the fallback path that must
-    work even when the spine contains non-whitelisted EPs.
-    """
-    p = spine_filename_for_run_cwd(run_id)
-    if not p.exists():
-        return []
-    out: list[dict[str, Any]] = []
-    for line in p.read_text(encoding="utf-8").splitlines():
-        line = line.strip()
-        if not line:
-            continue
-        try:
-            out.append(json.loads(line))
-        except json.JSONDecodeError:
-            continue
-    return out
 
 
 def _classify_node(end_event: dict[str, Any]) -> tuple[str, str]:
@@ -292,7 +271,7 @@ def register(app: typer.Typer) -> None:
         run_id: str = typer.Argument(..., help="run_id (例: run_xxx)"),
         json_mode: bool = typer.Option(False, "--json", help="JSON 输出,给 agent"),
     ) -> None:
-        events = _load_events(run_id)
+        events = load_spine_events(run_id)
         if not events:
             typer.echo(f"no spine at {spine_filename_for_run_cwd(run_id)}", err=True)
             raise typer.Exit(code=1)
@@ -305,7 +284,7 @@ def register(app: typer.Typer) -> None:
 
 def debug_graph_command(run_id: str, as_json: bool = False) -> None:
     """供顶层 alias (``lca-ops debug-graph``) 复用的实函数。"""
-    events = _load_events(run_id)
+    events = load_spine_events(run_id)
     if not events:
         typer.echo(f"no spine at {spine_filename_for_run_cwd(run_id)}", err=True)
         raise typer.Exit(code=1)
