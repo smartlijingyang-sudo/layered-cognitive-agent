@@ -15,12 +15,11 @@ import time
 from collections.abc import Callable
 from typing import Any
 
-from lca.contracts.atoms.ids.ids import new_id
-from lca.contracts.atoms.semantic.keys import FAILURE_KIND, FAILURE_KIND_VALIDATION
 from lca.contracts.models.assistant.tool_spec import ToolSpec
 from lca.contracts.models.core.execution.decision import Observation
 from lca.contracts.models.core.policy.budget import DEFAULT_TOOL_TIMEOUT_S
 from lca.contracts.protocols import Tool
+from lca.infrastructure.tools._shared import fail_observation
 
 _BUILTIN_PRESET = "builtin_preset"
 _SANDBOX_SCRIPT = "sandbox_script"
@@ -67,14 +66,14 @@ class AssistantCustomTool(Tool):
         start = time.monotonic()
         error = self.validate(args)
         if error is not None:
-            return self._fail(start, error)
+            return fail_observation(start, error)
 
         handler = self._spec.handler
         if handler.kind == _BUILTIN_PRESET:
             return await self._execute_builtin_preset(handler.builtin or "", handler.args, args, start)
         if handler.kind == _SANDBOX_SCRIPT:
-            return self._fail(start, "sandbox_script handler 尚未支持（ADR-0243 后期 PR）")
-        return self._fail(start, f"未知 handler.kind: {handler.kind}")
+            return fail_observation(start, "sandbox_script handler 尚未支持（ADR-0243 后期 PR）")
+        return fail_observation(start, f"未知 handler.kind: {handler.kind}")
 
     async def _execute_builtin_preset(
         self,
@@ -85,23 +84,14 @@ class AssistantCustomTool(Tool):
     ) -> Observation:
         builtin = self._builtin_resolver(builtin_name)
         if builtin is None:
-            return self._fail(start, f"内置工具 {builtin_name!r} 在该 run 中不可用")
+            return fail_observation(start, f"内置工具 {builtin_name!r} 在该 run 中不可用")
         merged: dict[str, Any] = dict(preset_args)
         merged.update(call_args)
         try:
             return await builtin.execute(merged)
         except Exception as exc:  # pragma: no cover — 内置工具自身失败语义
-            return self._fail(start, f"内置工具 {builtin_name!r} 执行失败: {exc}")
+            return fail_observation(start, f"内置工具 {builtin_name!r} 执行失败: {exc}")
 
-    def _fail(self, start: float, message: str) -> Observation:
-        return Observation(
-            observation_id=new_id("obs"),
-            success=False,
-            payload=None,
-            error=message,
-            latency_ms=int((time.monotonic() - start) * 1000),
-            extra={FAILURE_KIND: FAILURE_KIND_VALIDATION},
-        )
 
 
 def custom_tool_from_spec(

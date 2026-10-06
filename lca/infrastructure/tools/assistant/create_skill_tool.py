@@ -10,7 +10,6 @@ from typing import TYPE_CHECKING, Any, ClassVar, Literal
 
 from lca.contracts.atoms.enums.enums import ContentType
 from lca.contracts.atoms.ids.ids import new_id
-from lca.contracts.atoms.semantic.keys import FAILURE_KIND, FAILURE_KIND_VALIDATION
 from lca.contracts.models.core.execution.decision import Observation
 from lca.contracts.models.core.policy.budget import DEFAULT_TOOL_TIMEOUT_S
 from lca.contracts.protocols import Tool
@@ -18,6 +17,7 @@ from lca.contracts.protocols.assistant.skill_overlay import SkillSource
 from lca.infrastructure.observability.facade.run.ambit import current_assistant_id
 from lca.infrastructure.skills.disk.store import sanitize_skill_id
 from lca.infrastructure.skills.frontmatter.frontmatter import skill_title, split_frontmatter
+from lca.infrastructure.tools._shared import fail_observation
 
 if TYPE_CHECKING:
     from lca.contracts.protocols.assistant.skill_overlay import AssistantSkillOverlay
@@ -85,7 +85,7 @@ class AssistantCreateSkillTool(Tool):
         start = time.monotonic()
         error = self.validate(args)
         if error is not None:
-            return self._fail(start, error)
+            return fail_observation(start, error)
 
         skill_md = str(args.get("skill_md") or "").strip()
         sandbox_path = str(args.get("sandbox_path") or "").strip()
@@ -107,18 +107,18 @@ class AssistantCreateSkillTool(Tool):
                 else:
                     resolved = _resolve_workspace_path(sandbox_path)
                     if resolved is None:
-                        return self._fail(start, f"无法解析沙箱路径: {sandbox_path}")
+                        return fail_observation(start, f"无法解析沙箱路径: {sandbox_path}")
                     if resolved.is_dir():
                         shutil.copytree(resolved, staging, dirs_exist_ok=True)
                         if not (staging / "SKILL.md").is_file():
-                            return self._fail(start, f"沙箱目录缺少 SKILL.md: {sandbox_path}")
+                            return fail_observation(start, f"沙箱目录缺少 SKILL.md: {sandbox_path}")
                     elif resolved.is_file():
                         (staging / "SKILL.md").write_text(
                             resolved.read_text(encoding="utf-8"),
                             encoding="utf-8",
                         )
                     else:
-                        return self._fail(start, f"沙箱路径不存在: {sandbox_path}")
+                        return fail_observation(start, f"沙箱路径不存在: {sandbox_path}")
 
                 skill_md = (staging / "SKILL.md").read_text(encoding="utf-8")
                 try:
@@ -127,7 +127,7 @@ class AssistantCreateSkillTool(Tool):
                         explicit_id or skill_title(meta, "assistant-skill")
                     )
                 except ValueError as exc:
-                    return self._fail(start, str(exc))
+                    return fail_observation(start, str(exc))
 
                 if explicit_id:
                     # The installer names the package from SKILL.md frontmatter, so an
@@ -135,7 +135,7 @@ class AssistantCreateSkillTool(Tool):
                     # dropped; refuse instead of installing under a different id.
                     declared_id = sanitize_skill_id(skill_title(meta, "assistant-skill"))
                     if skill_id != declared_id:
-                        return self._fail(
+                        return fail_observation(
                             start,
                             f"skill_id {skill_id!r} 与 SKILL.md frontmatter 的 "
                             f"name {declared_id!r} 不一致 — 二者必须相同",
@@ -147,7 +147,7 @@ class AssistantCreateSkillTool(Tool):
                     actor="agent",
                 )
         except Exception as exc:
-            return self._fail(start, f"安装失败: {exc}")
+            return fail_observation(start, f"安装失败: {exc}")
         finally:
             shutil.rmtree(staging, ignore_errors=True)
 
@@ -169,15 +169,6 @@ class AssistantCreateSkillTool(Tool):
             latency_ms=latency_ms,
         )
 
-    def _fail(self, start: float, message: str) -> Observation:
-        return Observation(
-            observation_id=new_id("obs"),
-            success=False,
-            payload=None,
-            error=message,
-            latency_ms=int((time.monotonic() - start) * 1000),
-            extra={FAILURE_KIND: FAILURE_KIND_VALIDATION},
-        )
 
 
 def _resolve_workspace_path(sandbox_path: str) -> Path | None:

@@ -16,7 +16,6 @@ from typing import Any, ClassVar, Literal
 
 from lca.contracts.atoms.enums.enums import ContentType, MemoryCategory, MemoryLayer
 from lca.contracts.atoms.ids.ids import new_id
-from lca.contracts.atoms.semantic.keys import FAILURE_KIND, FAILURE_KIND_VALIDATION
 from lca.contracts.models.core.conversation.memory import MemoryRecord
 from lca.contracts.models.core.execution.decision import Observation
 from lca.contracts.models.core.policy.budget import DEFAULT_TOOL_TIMEOUT_S
@@ -30,6 +29,7 @@ from lca.infrastructure.memory.contextfiles.service.indexing import search_memor
 from lca.infrastructure.memory.contextfiles.service.people import PeopleDirectory
 from lca.infrastructure.memory.contextfiles.service.sidechat import SideChatDirectory
 from lca.infrastructure.memory.contextfiles.sync import StaleSnapshotOperationError
+from lca.infrastructure.tools._shared import fail_observation
 
 _MEMORY_SEARCH_TOOL = "memory_search"
 _MEMORY_ADD_TOOL = "memory_add"
@@ -90,17 +90,8 @@ class _BaseMemoryTool(Tool):
         if receipt is not None and receipt.ok:
             return None
         detail = receipt.error if receipt is not None and receipt.error else "记忆没有写入"
-        return self._fail(start, detail)
+        return fail_observation(start, detail)
 
-    def _fail(self, start: float, message: str) -> Observation:
-        return Observation(
-            observation_id=new_id("obs"),
-            success=False,
-            payload=None,
-            error=message,
-            latency_ms=int((time.monotonic() - start) * 1000),
-            extra={FAILURE_KIND: FAILURE_KIND_VALIDATION},
-        )
 
 
 class MemorySearchTool(_BaseMemoryTool):
@@ -128,7 +119,7 @@ class MemorySearchTool(_BaseMemoryTool):
         start = time.monotonic()
         query = str(args.get("query") or "").strip()
         if not query:
-            return self._fail(start, "query 必须为非空字符串")
+            return fail_observation(start, "query 必须为非空字符串")
         try:
             limit = max(1, min(50, int(args.get("limit") or 5)))
         except (TypeError, ValueError):
@@ -300,14 +291,14 @@ class MemoryAddTool(_BaseMemoryTool):
         content = str(args.get("content") or "").strip()
         category_raw = str(args.get("category") or "").strip()
         if not content:
-            return self._fail(start, "content 必须为非空字符串")
+            return fail_observation(start, "content 必须为非空字符串")
         branch = str(args.get("branch") or "").strip() or None
         if branch is not None:
             return self._write_branch(start, content, branch)
         try:
             category = MemoryCategory(category_raw)
         except ValueError:
-            return self._fail(
+            return fail_observation(
                 start, f"未知 category={category_raw!r}，必须是 identity/preference/fact"
             )
         dedupe_key = str(args.get("dedupe_key") or "").strip() or None
@@ -324,7 +315,7 @@ class MemoryAddTool(_BaseMemoryTool):
         try:
             persisted = self._memory.upsert(record)
         except (OSError, StaleSnapshotOperationError) as exc:
-            return self._fail(start, f"记忆没有写入: {exc}")
+            return fail_observation(start, f"记忆没有写入: {exc}")
         rejected = self._uncommitted(start)
         if rejected is not None:
             return rejected
@@ -346,9 +337,9 @@ class MemoryAddTool(_BaseMemoryTool):
         try:
             record = self._sidechat_dir.write(branch, content, source="user", trigger="side chat")
         except ValueError as exc:
-            return self._fail(start, str(exc))
+            return fail_observation(start, str(exc))
         except OSError as exc:
-            return self._fail(start, f"分支记忆没有写入: {exc}")
+            return fail_observation(start, f"分支记忆没有写入: {exc}")
         return self._ok(
             start,
             {
@@ -396,14 +387,14 @@ class MemoryUpdateTool(_BaseMemoryTool):
         record_id = str(args.get("record_id") or "").strip()
         content = str(args.get("content") or "").strip()
         if not record_id:
-            return self._fail(start, "record_id 必须为非空字符串")
+            return fail_observation(start, "record_id 必须为非空字符串")
         if not content:
-            return self._fail(start, "content 必须为非空字符串")
+            return fail_observation(start, "content 必须为非空字符串")
         category_raw = str(args.get("category") or "fact").strip()
         try:
             category = MemoryCategory(category_raw)
         except ValueError:
-            return self._fail(start, f"未知 category={category_raw!r}")
+            return fail_observation(start, f"未知 category={category_raw!r}")
         dedupe_key = str(args.get("dedupe_key") or "").strip() or None
         replacement = MemoryRecord(
             record_id=new_id("mem"),
@@ -418,7 +409,7 @@ class MemoryUpdateTool(_BaseMemoryTool):
         try:
             persisted = self._memory.supersede(record_id, replacement)
         except (OSError, StaleSnapshotOperationError) as exc:
-            return self._fail(start, f"记忆没有写入: {exc}")
+            return fail_observation(start, f"记忆没有写入: {exc}")
         rejected = self._uncommitted(start)
         if rejected is not None:
             return rejected
@@ -457,10 +448,10 @@ class MemoryExplainTool(_BaseMemoryTool):
         start = time.monotonic()
         record_id = str(args.get("record_id") or "").strip()
         if not record_id:
-            return self._fail(start, "record_id 必须为非空字符串")
+            return fail_observation(start, "record_id 必须为非空字符串")
         explained = self._memory.explain(record_id)
         if explained is None:
-            return self._fail(start, f"没有记录 {record_id}")
+            return fail_observation(start, f"没有记录 {record_id}")
         return self._ok(
             start,
             {
@@ -501,14 +492,14 @@ class PersonNoteTool(_BaseMemoryTool):
         name = str(args.get("name") or "").strip()
         note = str(args.get("note") or "").strip()
         if not name or not note:
-            return self._fail(start, "name 和 note 都必须为非空字符串")
+            return fail_observation(start, "name 和 note 都必须为非空字符串")
         layout = layout_for_home(self._memory.home_path)
         try:
             page = self._people_dir.upsert(name, note)
         except ValueError as exc:
-            return self._fail(start, str(exc))
+            return fail_observation(start, str(exc))
         except OSError as exc:
-            return self._fail(start, f"人物页没有写入: {exc}")
+            return fail_observation(start, f"人物页没有写入: {exc}")
         return self._ok(
             start,
             {"slug": page.slug, "name": page.name, "path": layout.person_page_path(page.slug)},
@@ -539,14 +530,14 @@ class GroupNoteTool(_BaseMemoryTool):
         name = str(args.get("name") or "").strip()
         note = str(args.get("note") or "").strip()
         if not name or not note:
-            return self._fail(start, "name 和 note 都必须为非空字符串")
+            return fail_observation(start, "name 和 note 都必须为非空字符串")
         layout = layout_for_home(self._memory.home_path)
         try:
             page = self._groups_dir.upsert(name, note)
         except ValueError as exc:
-            return self._fail(start, str(exc))
+            return fail_observation(start, str(exc))
         except OSError as exc:
-            return self._fail(start, f"群体页没有写入: {exc}")
+            return fail_observation(start, f"群体页没有写入: {exc}")
         return self._ok(
             start,
             {"slug": page.slug, "name": page.name, "path": layout.group_page_path(page.slug)},
@@ -579,9 +570,9 @@ class MemoryRemoveTool(_BaseMemoryTool):
         start = time.monotonic()
         record_id = str(args.get("record_id") or "").strip()
         if not record_id:
-            return self._fail(start, "record_id 必须为非空字符串")
+            return fail_observation(start, "record_id 必须为非空字符串")
         if args.get("confirmed") is not True:
-            return self._fail(start, f"删除记忆需要用户确认。{_SENSITIVE_CONFIRMATION_HINT}")
+            return fail_observation(start, f"删除记忆需要用户确认。{_SENSITIVE_CONFIRMATION_HINT}")
         self._memory.remove(record_id)
         await self._memory.refresh_user_profile()
         return self._ok(

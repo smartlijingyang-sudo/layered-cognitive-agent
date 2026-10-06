@@ -15,12 +15,12 @@ from typing import TYPE_CHECKING, Any, ClassVar, Literal
 
 from lca.contracts.atoms.enums.enums import ContentType
 from lca.contracts.atoms.ids.ids import new_id
-from lca.contracts.atoms.semantic.keys import FAILURE_KIND, FAILURE_KIND_VALIDATION
 from lca.contracts.models.core.execution.decision import Observation
 from lca.contracts.models.core.policy.budget import DEFAULT_TOOL_TIMEOUT_S
 from lca.contracts.models.onboarding.naming import NamingCandidate, NamingWidgetPayload
 from lca.contracts.protocols import Tool
 from lca.contracts.protocols.assistant.catalog import ProfilePatch
+from lca.infrastructure.tools._shared import fail_observation
 
 if TYPE_CHECKING:
     from lca.contracts.protocols.assistant.catalog import AssistantCatalog
@@ -80,15 +80,6 @@ class _BaseOnboardingTool(Tool):
             latency_ms=int((time.monotonic() - start) * 1000),
         )
 
-    def _fail(self, start: float, message: str) -> Observation:
-        return Observation(
-            observation_id=new_id("obs"),
-            success=False,
-            payload=None,
-            error=message,
-            latency_ms=int((time.monotonic() - start) * 1000),
-            extra={FAILURE_KIND: FAILURE_KIND_VALIDATION},
-        )
 
 
 class CreateNameWidgetTool(_BaseOnboardingTool):
@@ -114,7 +105,7 @@ class CreateNameWidgetTool(_BaseOnboardingTool):
         start = time.monotonic()
         user_name = str(args.get("user_name") or "").strip()
         if not user_name:
-            return self._fail(start, "user_name 必须为非空字符串")
+            return fail_observation(start, "user_name 必须为非空字符串")
         keep_muse = bool(args.get("keep_muse", False))
 
         user_md = f"# USER.md\n\n- **Name:** {user_name}\n- **Role:** User\n"
@@ -124,7 +115,7 @@ class CreateNameWidgetTool(_BaseOnboardingTool):
             try:
                 self._user_store.update_user_md(self._user_id, user_md, display_name=user_name)
             except Exception as exc:
-                return self._fail(start, f"写入数据库用户画像失败: {exc}")
+                return fail_observation(start, f"写入数据库用户画像失败: {exc}")
 
         # 2. 经 Catalog revise_profile 写入当前助理 Home 的 USER.md (INV-03)
         try:
@@ -134,7 +125,7 @@ class CreateNameWidgetTool(_BaseOnboardingTool):
                 actor="onboarding",
             )
         except Exception as exc:
-            return self._fail(start, f"更新助理 USER.md 失败: {exc}")
+            return fail_observation(start, f"更新助理 USER.md 失败: {exc}")
 
         # 3. 构造起名 Widget
         token = f"widget_name_{uuid.uuid4().hex[:12]}"
@@ -184,7 +175,7 @@ class UpdateIdentityTool(_BaseOnboardingTool):
         start = time.monotonic()
         name = str(args.get("name") or "").strip()
         if not name:
-            return self._fail(start, "name 必须为非空字符串")
+            return fail_observation(start, "name 必须为非空字符串")
         vibe = str(args.get("vibe") or "helpful, sharp, proactive").strip()
         emoji = str(args.get("emoji") or "🦉").strip()
 
@@ -207,14 +198,14 @@ class UpdateIdentityTool(_BaseOnboardingTool):
                 actor="onboarding",
             )
         except Exception as exc:
-            return self._fail(start, f"更新助理身份失败: {exc}")
+            return fail_observation(start, f"更新助理身份失败: {exc}")
 
         # 2. 标记用户 onboarding 状态为 completed (INV-01)
         if self._user_store is not None and self._user_id:
             try:
                 self._user_store.set_onboarding_state(self._user_id, "completed")
             except Exception as exc:
-                return self._fail(start, f"标记 onboarding 完成状态失败: {exc}")
+                return fail_observation(start, f"标记 onboarding 完成状态失败: {exc}")
 
         return self._ok(
             start,

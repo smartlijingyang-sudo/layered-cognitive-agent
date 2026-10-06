@@ -22,7 +22,6 @@ from typing import TYPE_CHECKING, Any, ClassVar, Literal
 
 from lca.contracts.atoms.enums.enums import ContentType
 from lca.contracts.atoms.ids.ids import new_id
-from lca.contracts.atoms.semantic.keys import FAILURE_KIND, FAILURE_KIND_VALIDATION
 from lca.contracts.models.assistant.tool_spec import ToolSpec
 from lca.contracts.models.core.execution.decision import Observation, get_current_decision
 from lca.contracts.models.core.execution.external_content import (
@@ -36,6 +35,7 @@ from lca.infrastructure.assistant.io import load_grants
 from lca.infrastructure.memory.contextfiles.domain.layout import packaged_layout
 from lca.infrastructure.memory.contextfiles.domain.standing import render_injected
 from lca.infrastructure.observability.facade.run.ambit import current_assistant_id
+from lca.infrastructure.tools._shared import fail_observation
 
 if TYPE_CHECKING:
     from lca.contracts.protocols.assistant.catalog import AssistantCatalog
@@ -92,15 +92,6 @@ class _BaseAssistantTool(Tool):
             latency_ms=int((time.monotonic() - start) * 1000),
         )
 
-    def _fail(self, start: float, message: str) -> Observation:
-        return Observation(
-            observation_id=new_id("obs"),
-            success=False,
-            payload=None,
-            error=message,
-            latency_ms=int((time.monotonic() - start) * 1000),
-            extra={FAILURE_KIND: FAILURE_KIND_VALIDATION},
-        )
 
     def _check_standing_write_permitted(self) -> str | None:
         """ADR-0292 section 9 wiring 3: consult the standing-writer gate.
@@ -130,7 +121,7 @@ class _BaseAssistantTool(Tool):
         if self.is_mutating:
             refused = self._check_standing_write_permitted()
             if refused is not None:
-                return self._fail(start, refused)
+                return fail_observation(start, refused)
         return await self.execute_tool(args, start)
 
     async def execute_tool(self, args: dict[str, Any], start: float) -> Observation:
@@ -153,7 +144,7 @@ class ListAssistantSkillsTool(_BaseAssistantTool):
     async def execute_tool(self, args: dict[str, Any], start: float) -> Observation:
         del args
         if self._overlay is None:
-            return self._fail(start, "assistant.skill_overlay 能力不可用")
+            return fail_observation(start, "assistant.skill_overlay 能力不可用")
         from lca.infrastructure.tools.assistant.create_skill_tool import (
             CREATE_ASSISTANT_SKILL_TOOL,
         )
@@ -161,7 +152,7 @@ class ListAssistantSkillsTool(_BaseAssistantTool):
         try:
             receipts = self._overlay.list_installed(self._assistant_id)
         except Exception as exc:
-            return self._fail(start, f"读取技能失败: {exc}")
+            return fail_observation(start, f"读取技能失败: {exc}")
         skills = [
             {"skill_id": r.skill_id, "state": r.artifact_state, "path": r.install_path}
             for r in receipts
@@ -206,16 +197,16 @@ class DeleteAssistantSkillTool(_BaseAssistantTool):
     async def execute_tool(self, args: dict[str, Any], start: float) -> Observation:
         skill_id = str(args.get("skill_id") or "").strip()
         if not skill_id:
-            return self._fail(start, "skill_id 必须为非空字符串")
+            return fail_observation(start, "skill_id 必须为非空字符串")
         if args.get("confirmed") is not True:
-            return self._fail(start, f"删除技能需要用户确认。{_SENSITIVE_CONFIRMATION_HINT}")
+            return fail_observation(start, f"删除技能需要用户确认。{_SENSITIVE_CONFIRMATION_HINT}")
         if self._overlay is None:
-            return self._fail(start, "assistant.skill_overlay 能力不可用")
+            return fail_observation(start, "assistant.skill_overlay 能力不可用")
 
         try:
             await self._overlay.remove(self._assistant_id, skill_id, actor="agent")
         except Exception as exc:
-            return self._fail(start, f"删除技能失败: {exc}")
+            return fail_observation(start, f"删除技能失败: {exc}")
         return self._ok(
             start,
             {
@@ -254,17 +245,17 @@ class EditAssistantSkillTool(_BaseAssistantTool):
         skill_id = str(args.get("skill_id") or "").strip()
         skill_md = str(args.get("skill_md") or "").strip()
         if not skill_id:
-            return self._fail(start, "skill_id 必须为非空字符串")
+            return fail_observation(start, "skill_id 必须为非空字符串")
         if not skill_md:
-            return self._fail(start, "skill_md 必须为非空字符串")
+            return fail_observation(start, "skill_md 必须为非空字符串")
         if self._overlay is None:
-            return self._fail(start, "assistant.skill_overlay 能力不可用")
+            return fail_observation(start, "assistant.skill_overlay 能力不可用")
         try:
             receipt = await self._overlay.edit(
                 self._assistant_id, skill_id, skill_md, actor="agent"
             )
         except Exception as exc:
-            return self._fail(start, f"编辑技能失败: {exc}")
+            return fail_observation(start, f"编辑技能失败: {exc}")
         return self._ok(
             start,
             {
@@ -303,7 +294,7 @@ class UpdateAssistantSoulTool(_BaseAssistantTool):
     async def execute_tool(self, args: dict[str, Any], start: float) -> Observation:
         soul = str(args.get("soul") or "").strip()
         if not soul:
-            return self._fail(start, "soul 必须为非空字符串")
+            return fail_observation(start, "soul 必须为非空字符串")
         try:
             revision = self._catalog.revise_profile(
                 self._assistant_id,
@@ -311,7 +302,7 @@ class UpdateAssistantSoulTool(_BaseAssistantTool):
                 actor="agent",
             )
         except Exception as exc:
-            return self._fail(start, f"更新 SOUL 失败: {exc}")
+            return fail_observation(start, f"更新 SOUL 失败: {exc}")
         return self._ok(
             start,
             {
@@ -345,7 +336,7 @@ class UpdateAssistantProfileTool(_BaseAssistantTool):
         name = str(args.get("name") or "").strip()
         description = str(args.get("description") or "").strip()
         if not name and not description:
-            return self._fail(start, "name 与 description 至少提供一个")
+            return fail_observation(start, "name 与 description 至少提供一个")
         try:
             revision = self._catalog.revise_profile(
                 self._assistant_id,
@@ -356,7 +347,7 @@ class UpdateAssistantProfileTool(_BaseAssistantTool):
                 actor="agent",
             )
         except Exception as exc:
-            return self._fail(start, f"更新 profile 失败: {exc}")
+            return fail_observation(start, f"更新 profile 失败: {exc}")
         return self._ok(
             start,
             {
@@ -394,9 +385,9 @@ class UpdateAssistantGrantsTool(_BaseAssistantTool):
     async def execute_tool(self, args: dict[str, Any], start: float) -> Observation:
         grants_yaml = str(args.get("grants_yaml") or "").strip()
         if not grants_yaml:
-            return self._fail(start, "grants_yaml 必须为非空字符串")
+            return fail_observation(start, "grants_yaml 必须为非空字符串")
         if args.get("confirmed") is not True:
-            return self._fail(start, f"修改授权需要用户确认。{_SENSITIVE_CONFIRMATION_HINT}")
+            return fail_observation(start, f"修改授权需要用户确认。{_SENSITIVE_CONFIRMATION_HINT}")
         try:
             revision = self._catalog.revise_profile(
                 self._assistant_id,
@@ -404,7 +395,7 @@ class UpdateAssistantGrantsTool(_BaseAssistantTool):
                 actor="agent",
             )
         except Exception as exc:
-            return self._fail(start, f"更新 grants 失败: {exc}")
+            return fail_observation(start, f"更新 grants 失败: {exc}")
         return self._ok(
             start,
             {
@@ -446,7 +437,7 @@ class UpdateAssistantUserTool(_BaseAssistantTool):
     async def execute_tool(self, args: dict[str, Any], start: float) -> Observation:
         user_md = str(args.get("user_md") or "").strip()
         if not user_md:
-            return self._fail(start, "user_md 必须为非空字符串")
+            return fail_observation(start, "user_md 必须为非空字符串")
         try:
             revision = self._catalog.revise_profile(
                 self._assistant_id,
@@ -454,7 +445,7 @@ class UpdateAssistantUserTool(_BaseAssistantTool):
                 actor="agent",
             )
         except Exception as exc:
-            return self._fail(start, f"更新 USER.md 失败: {exc}")
+            return fail_observation(start, f"更新 USER.md 失败: {exc}")
         return self._ok(
             start,
             {
@@ -520,18 +511,18 @@ class ReadAssistantSelfConfigTool(_BaseAssistantTool):
         elif isinstance(requested, (list, tuple)) and all(isinstance(n, str) for n in requested):
             names = [n.strip() for n in requested if n.strip()]
             if not names:
-                return self._fail(start, "files 为空列表")
+                return fail_observation(start, "files 为空列表")
         else:
-            return self._fail(start, "files 必须为字符串数组")
+            return fail_observation(start, "files 必须为字符串数组")
         allowed = set(packaged_layout().standing_files)
         unknown = [n for n in names if n not in allowed]
         if unknown:
-            return self._fail(start, f"不在 standing 清单内: {', '.join(unknown)}")
+            return fail_observation(start, f"不在 standing 清单内: {', '.join(unknown)}")
         try:
             spec = self._catalog.get(self._assistant_id)
             home = Path(spec.home_path)
         except Exception as exc:
-            return self._fail(start, f"读取助理配置失败: {exc}")
+            return fail_observation(start, f"读取助理配置失败: {exc}")
         entries: list[dict[str, Any]] = []
         for name in names:
             try:
@@ -612,7 +603,7 @@ class ListAssistantToolsTool(_BaseAssistantTool):
                 name for name in catalog if name not in deny and (not allow or name in allow)
             ]
         except Exception as exc:
-            return self._fail(start, f"读取工具失败: {exc}")
+            return fail_observation(start, f"读取工具失败: {exc}")
         return self._ok(
             start,
             {
@@ -657,14 +648,14 @@ class CreateAssistantToolTool(_BaseAssistantTool):
     async def execute_tool(self, args: dict[str, Any], start: float) -> Observation:
         raw = str(args.get("tool_json") or "").strip()
         if not raw:
-            return self._fail(start, "tool_json 必须为非空字符串")
+            return fail_observation(start, "tool_json 必须为非空字符串")
         if self._tool_overlay is None:
-            return self._fail(start, "assistant.tool_overlay 能力不可用")
+            return fail_observation(start, "assistant.tool_overlay 能力不可用")
         try:
             spec = ToolSpec.model_validate_json(raw)
             receipt = await self._tool_overlay.create(self._assistant_id, spec, actor="agent")
         except Exception as exc:
-            return self._fail(start, f"新增工具失败: {exc}")
+            return fail_observation(start, f"新增工具失败: {exc}")
         return self._ok(
             start,
             {
@@ -701,18 +692,18 @@ class UpdateAssistantToolTool(_BaseAssistantTool):
         tool_id = str(args.get("tool_id") or "").strip()
         raw = str(args.get("tool_json") or "").strip()
         if not tool_id:
-            return self._fail(start, "tool_id 必须为非空字符串")
+            return fail_observation(start, "tool_id 必须为非空字符串")
         if not raw:
-            return self._fail(start, "tool_json 必须为非空字符串")
+            return fail_observation(start, "tool_json 必须为非空字符串")
         if self._tool_overlay is None:
-            return self._fail(start, "assistant.tool_overlay 能力不可用")
+            return fail_observation(start, "assistant.tool_overlay 能力不可用")
         try:
             spec = ToolSpec.model_validate_json(raw)
             receipt = await self._tool_overlay.update(
                 self._assistant_id, tool_id, spec, actor="agent"
             )
         except Exception as exc:
-            return self._fail(start, f"修改工具失败: {exc}")
+            return fail_observation(start, f"修改工具失败: {exc}")
         return self._ok(
             start,
             {
@@ -751,15 +742,15 @@ class DeleteAssistantToolTool(_BaseAssistantTool):
     async def execute_tool(self, args: dict[str, Any], start: float) -> Observation:
         tool_id = str(args.get("tool_id") or "").strip()
         if not tool_id:
-            return self._fail(start, "tool_id 必须为非空字符串")
+            return fail_observation(start, "tool_id 必须为非空字符串")
         if args.get("confirmed") is not True:
-            return self._fail(start, f"删除工具需要用户确认。{_SENSITIVE_CONFIRMATION_HINT}")
+            return fail_observation(start, f"删除工具需要用户确认。{_SENSITIVE_CONFIRMATION_HINT}")
         if self._tool_overlay is None:
-            return self._fail(start, "assistant.tool_overlay 能力不可用")
+            return fail_observation(start, "assistant.tool_overlay 能力不可用")
         try:
             await self._tool_overlay.remove(self._assistant_id, tool_id, actor="agent")
         except Exception as exc:
-            return self._fail(start, f"删除工具失败: {exc}")
+            return fail_observation(start, f"删除工具失败: {exc}")
         return self._ok(
             start,
             {

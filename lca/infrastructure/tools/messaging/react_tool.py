@@ -21,13 +21,13 @@ from pydantic import ValidationError
 
 from lca.contracts.atoms.enums.enums import ContentType
 from lca.contracts.atoms.ids.ids import new_id
-from lca.contracts.atoms.semantic.keys import FAILURE_KIND, FAILURE_KIND_VALIDATION
 from lca.contracts.models.core.execution.decision import Observation
 from lca.contracts.models.core.policy.budget import DEFAULT_TOOL_TIMEOUT_S
 from lca.contracts.models.messaging.reaction import MessageReaction
 from lca.contracts.protocols import Tool
 from lca.infrastructure.messaging.reaction_store import ReactionStore
 from lca.infrastructure.observability.meta_event_emit import emit_reaction_added
+from lca.infrastructure.tools._shared import fail_observation
 
 REACT_TO_MESSAGE_TOOL = "react_to_message"
 
@@ -67,15 +67,6 @@ class ReactToMessageTool(Tool):
             latency_ms=int((time.monotonic() - start) * 1000),
         )
 
-    def _fail(self, start: float, message: str) -> Observation:
-        return Observation(
-            observation_id=new_id("obs"),
-            success=False,
-            payload=None,
-            error=message,
-            latency_ms=int((time.monotonic() - start) * 1000),
-            extra={FAILURE_KIND: FAILURE_KIND_VALIDATION},
-        )
 
     async def execute(self, args: dict[str, Any]) -> Observation:
         start = time.monotonic()
@@ -85,7 +76,7 @@ class ReactToMessageTool(Tool):
         try:
             reaction = MessageReaction(message_id=message_id, emoji=emoji)
         except ValidationError as exc:
-            return self._fail(start, f"reaction 参数非法: {exc.errors()[0]['msg']}")
+            return fail_observation(start, f"reaction 参数非法: {exc.errors()[0]['msg']}")
 
         existing = self._store.list_for(reaction.message_id)
         if any(r.emoji == reaction.emoji and r.actor == reaction.actor for r in existing):

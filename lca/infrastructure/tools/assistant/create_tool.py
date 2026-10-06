@@ -29,10 +29,10 @@ import yaml
 
 from lca.contracts.atoms.enums.enums import ContentType
 from lca.contracts.atoms.ids.ids import new_id
-from lca.contracts.atoms.semantic.keys import FAILURE_KIND, FAILURE_KIND_VALIDATION
 from lca.contracts.models.core.execution.decision import Observation
 from lca.contracts.models.core.policy.budget import DEFAULT_TOOL_TIMEOUT_S
 from lca.contracts.protocols import Tool
+from lca.infrastructure.tools._shared import fail_observation
 from lca.plugins.assistant.home._home_layout import known_template_ids
 
 if TYPE_CHECKING:
@@ -174,7 +174,7 @@ class AssistantCreateTool(Tool):
         start = time.monotonic()
         error = self.validate(args)
         if error is not None:
-            return self._fail(start, error)
+            return fail_observation(start, error)
 
         from lca.contracts.protocols.assistant.catalog import CreateAssistantRequest
 
@@ -208,7 +208,7 @@ class AssistantCreateTool(Tool):
                 )
             )
         except Exception as exc:  # catalog raises typed AssistantCatalogError
-            return self._fail(start, f"创建失败: {exc}")
+            return fail_observation(start, f"创建失败: {exc}")
 
         profile = _read_profile(handle.home_path)
         emoji = str(profile.get("emoji") or "🤖")
@@ -256,15 +256,6 @@ class AssistantCreateTool(Tool):
             latency_ms=latency_ms,
         )
 
-    def _fail(self, start: float, message: str) -> Observation:
-        return Observation(
-            observation_id=new_id("obs"),
-            success=False,
-            payload=None,
-            error=message,
-            latency_ms=int((time.monotonic() - start) * 1000),
-            extra={FAILURE_KIND: FAILURE_KIND_VALIDATION},
-        )
 
 
 def _read_profile(home_path: str) -> dict[str, Any]:

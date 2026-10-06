@@ -12,12 +12,12 @@ from typing import Any, ClassVar, Literal
 
 from lca.contracts.atoms.enums.enums import ContentType
 from lca.contracts.atoms.ids.ids import new_id
-from lca.contracts.atoms.semantic.keys import FAILURE_KIND, FAILURE_KIND_VALIDATION
 from lca.contracts.models.core.execution.decision import Observation
 from lca.contracts.models.core.policy.budget import DEFAULT_TOOL_TIMEOUT_S
 from lca.contracts.protocols import Tool
 from lca.contracts.protocols.assistant.role_resolver import RoleCardResolver
 from lca.contracts.protocols.collaboration.casting.casting import RoleIndexEntry
+from lca.infrastructure.tools._shared import fail_observation
 
 ROLE_CARD_LIST_TOOL = "list_role_cards"
 
@@ -59,9 +59,9 @@ class RoleCardListTool(Tool):
         start = time.monotonic()
         error = self.validate(args)
         if error is not None:
-            return self._fail(start, error)
+            return fail_observation(start, error)
         if self._resolver is None:
-            return self._fail(start, "角色卡库不可用（roles/ 缺失或解析失败）")
+            return fail_observation(start, "角色卡库不可用（roles/ 缺失或解析失败）")
 
         department = str(args.get("department") or "").strip() or None
         keyword = str(args.get("keyword") or "").strip() or None
@@ -99,15 +99,6 @@ class RoleCardListTool(Tool):
             latency_ms=latency_ms,
         )
 
-    def _fail(self, start: float, message: str) -> Observation:
-        return Observation(
-            observation_id=new_id("obs"),
-            success=False,
-            payload=None,
-            error=message,
-            latency_ms=int((time.monotonic() - start) * 1000),
-            extra={FAILURE_KIND: FAILURE_KIND_VALIDATION},
-        )
 
 
 def _role_dict(entry: RoleIndexEntry) -> dict[str, str]:
