@@ -55,3 +55,6 @@ tests/scenario/cordis/.scratch_cordis_creator_real/
 
 # External tool artifact (CopilotKit) - not part of LCA
 .copilotkit/
+
+# Ralph autonomous-loop runtime artifacts (prd.json, progress, prompts)
+ralph/
