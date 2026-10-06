@@ -869,5 +869,30 @@
   10. `_section_output_dicts` ×2（prompt_render/compile.py vs brain/reasoner/reasoner.py，14 行全等）—— defer：真实全等但跨层（nodes↔cognition），canonical 归属与 import 方向需 import-linter 契约核对 + 白天 grilling；下轮候选。
   11. `_decode_json_string_content` vs `_decode_json_string_prefix`、`_ownership_error` ×2、`build_bash_tool`/`build_file_write_tool`、`render_curated_*` ×2、`generate_gmail_skill_content`/`market_auth_setup_hint` —— defer：语义差异未确证，留作后续候选。
 - 验证结果: `~/.local/bin/ruff check` 2 文件 All checks passed；新旧行为等价冒烟 817 组对比 0 差异 + 模块 identity 断言 OK；targeted pytest 3 文件（tests/infrastructure/cli/test_debug_graph.py、test_runs_debug.py、tests/scenario/code/test_code_conventions.py）：22 passed；`lint-imports` exit 1 系**预先存在、与本轮无关**：在未改动的 pristine 树上（git stash 验证）同样 exit 1，卡在 "No matches for ignored import ... lca_kernel" 配置解析、未进入契约分析；本轮未新增模块边（debug_graph→projection 边此前已存在）。`ruff format --check` 本轮新增行干净；文件其余 format diff 为 pre-existing（备份文件同样不通过），未动。
-- commit: <待回填> refactor(lca-1000): 第0514轮 收敛 debug_graph _safe_repr/_truncate 到 _shared/projection（未 push）。
+- commit: c8a3a6741 refactor(lca-1000): 第0514轮 收敛 debug_graph _safe_repr/_truncate 到 _shared/projection（未 push）。
 - 备注: 只 add/commit 本轮 2 文件（代码 1 + ledger.md），`git commit -- <paths>` 显式路径；并发会话已 staged 的 2 个测试文件改动及 untracked（docs/notes/audit-2026-10-05.md、ralph/）全程未触碰；513 轮 hash 回填行（94bc3757d）与"- 更正"附录属本 campaign 自有 bookkeeping，随本次一并提交（沿用 505/510/511/512/513 做法）。备份 /tmp/bak_0514/debug_graph.py（252，改动前原文件）。scan0514.py/patch0514.py/smoke0514.py 留本地 hidden_files/scratch（非仓库文件）。教训：patch 脚本的"检查后替换"顺序 bug（先断言残留后替换导致误报 LEFTOVER 中断）——以后先替换再断言；写文件内容走 stdin/base64 通道，不走命令行内嵌（沿用 512 教训）。
+
+
+## 第0515轮 (2026-10-06 08:03-08:30 CST)
+- 改了什么: 收敛 `lca/nodes/concept/prompt_render/compile.py` 中与 `lca/cognition/brain/reasoner/reasoner.py` 逐字相同的 `_section_output_dicts`（14 行）到 reasoner 的 canonical 实现：删除 compile.py 本地定义，改为 `from lca.cognition.brain.reasoner.reasoner import _section_output_dicts`；同步删除因此闲置的 `_sha256_digest` 与 `typing.Any` 导入。改动 1 文件：+1/-19。
+- 依据 skill 哪一节: SKILL.md Deletion test（删掉 compile.py 的副本后复杂度直接消失：另一副本即共享 canonical；两处 body 逐字相同）+ DEEPENING.md 依赖分类 In-process（纯投影函数、无 I/O，Always deepenable）与 Seam discipline（`_section_output_dicts` 在 reasoner.py:270 的 `__all__` 中已显式 re-export，是模块自己认可的 internal seam；下划线私有、不进 compile.py 的 `__all__`，不外泄；nodes→cognition 是 allowed_dependencies 显式允许的方向，且 nodes 内已有 6+ 处 `from lca.cognition.brain...` 先例）+ LANGUAGE.md Locality/Leverage（compile.py 模块 docstring 自证 sync 负担："section_outputs 用 sha256 派生 content_digest，与 P9 `PromptReasoner.render_turn` 行为一致"）。
+- 为什么这是实质改动(非凑数): 收敛的是真实的非平凡语义重复（14 行：8 字段投影 + content_digest 条件派生规则；body 逐字相同非巧合）。证据链：(1) AST dump 逐字相同（本轮 scan0515.py）；(2) 全库 `_section_output_dicts` 仅此两处；(3) 代码自证 sync 关系：compile.py docstring 明写与 `PromptReasoner.render_turn` 行为一致；(4) reasoner.py 的 `__all__` 已包含 `_section_output_dicts`——canonical 方自己把这个私有名当作可复用 seam。
+- 关键设计决策（夜间跳过 grilling，记台账）: canonical 定在 reasoner 而非 compile——① import 方向：lca.nodes 的 allowed_dependencies 显式包含 lca.cognition，反向（cognition→nodes）不在 cognition 允许列表；② reasoner 是概念所有者（PromptTrace→ReasonerTurnRender 投影是 reasoner render 知识）；③ reasoner.py `__all__` 已 re-export 该名，等于是模块自己宣告的可复用 seam。不新建 `_shared` 模块（沿用 513 做法：已有自然 canonical）。
+- 候选清单（本轮 explore：AST 同体扫描 4846 函数、113 组，逐一取舍）:
+  1. `_section_output_dicts` ×2（compile.py vs reasoner.py，14 行逐字相同）—— 选中。
+  2. `_extract_usage` ×2（chat/_chat_completions.py vs responses/_responses.py）—— 驳回（本轮新判）：归一化假阳性；两处读的 wire 字段不同（prompt_tokens/completion_tokens vs input_tokens/output_tokens），各自绑定 OpenAI 两种 API 的线缆契约，收敛即破坏 seam。
+  3. `_tool_to_spec` ×2（tool_defer/session.py vs nodes/think/history/assemble.py）—— 驳回（本轮新判）：两处 docstring 均明写"kept local on purpose"（infrastructure 不得 import L2 nodes；ADR-0220 分层），刻意镜像，收敛即违反 ADR。
+  4. `_not_implemented` vs `_jobs_not_implemented`（codecs.py 同文件）—— 驳回（本轮新判）：marker 不同（_ASSISTANT_NOT_IMPLEMENTED_MARKER vs _ASSISTANT_JOBS_MARKER）+ 各自 docstring 记录了不同的 delete-when 条件；差异正是负载知识。
+  5. `_scan_python_file` vs `_scan_file`（harness audit）—— 驳回（本轮新判）：真正不同的是 finder 类（_ControlContributionFinder vs _HookAttachFinder）；抽参即 indirection，同 513 commit_*_receipt 判例。
+  6. `assistant_job_item` vs `standing_file_dispatcher` / `rooms_root` vs `room_messages_root`（webserver routes）—— 驳回（本轮新判）：归一化隐藏了方法字面量（PUT/DELETE vs GET/PUT）；dispatch 表即 route 的 interface 知识。
+  7. `closed` vs `orphan_dropped_count` —— 驳回：trivial 单行访问器（docstring 撑起行数），非实质。
+  8. `__init__` 对 / `noop`/`skipped` 对 / `evaluate_and_emit`/`evaluate_budget_and_emit` 等同文件刻意对 —— 驳回（沿用既往判例）。
+  9. user_store.py sqlite/postgres 六组镜像 —— 驳回：两个 Adapter 即真实 seam（沿用 514 search providers 判例）；SQL 方言差异正是 seam 上变化的东西。
+  10. companion client.py/standalone.py 14 组 —— 驳回：沿用 508/509/512（sync/async 桥接刻意镜像）。
+  11. setup 家族 / emit 家族 / node_execute 家族 / parse atoms / contracts protocols stub —— 驳回：沿用 507–514（plugin interface 契约本身 / 事件名字面量必须落在某处 / trivial stub）。
+  12. `_ownership_error` ×2 —— 驳回：沿用 514（各绑定自己模块的 _error/_error_envelope 家族，类型注解不同）。
+  13. `install_ps1`/`install_sh`、`download_runner_bat`/`download_runner_command` —— 驳回：沿用 514（安装脚本 payload 字面量，收敛有损坏风险）。
+  14. `render_curated_*` ×2 / `_decode_json_string_*` / `_validate_contribution` ×2 / `dispatch_run`/`dispatch_resume` 对 —— 驳回：同文件刻意包装对 / 语义差异未确证，defer。
+- 验证结果: `~/.local/bin/ruff check` + `ruff format --check` 全过（中途发现删除本地函数后 `typing.Any` 闲置，已一并移除）；identity 冒烟 `compile._section_output_dicts is reasoner._section_output_dicts` OK；新旧行为等价冒烟 5 traces（空/单节/空文本节/unicode/50 行）全等 + digest 规则断言 OK；targeted pytest tests/concept/test_prompt_render.py：16 passed（覆盖 PromptReasoner.render_turn 与 prompt.trace.compile 两端）。
+- commit: <待回填> refactor(lca-1000): 第0515轮 收敛 prompt_render _section_output_dicts 到 brain reasoner（未 push）。
+- 备注: 只 add/commit 本轮 2 文件（代码 1 + ledger.md），`git commit -- <paths>` 显式路径；并发会话已 staged 的 2 个测试文件改动及 untracked（docs/notes/audit-2026-10-05.md、ralph/）全程未触碰；514 轮 hash 回填行（c8a3a6741）属本 campaign 自有 bookkeeping，随本次一并提交（沿用 505–514 做法）。备份 /tmp/bak_0515_compile.py（252，改动前 compile.py）。scan0515.py/patch0515.py/smoke0515.py 留本地 hidden_files/scratch（非仓库文件）。教训：AST 归一化会吃掉字面量语义——字符串字面量（wire 字段名、HTTP 方法、marker）本身就是负载知识时，同体会是假阳性；patch 脚本的断言要按"修改已应用后"的状态计数（本轮 `_sha256_digest` count 断言位置 bug：内存态已删一处、断言仍按旧态计数）。

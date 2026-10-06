@@ -11,8 +11,8 @@ content_digest,与 P9 ``PromptReasoner.render_turn`` 行为一致。
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any
 
+from lca.cognition.brain.reasoner.reasoner import _section_output_dicts
 from lca.contracts.atoms.control.slot import ControlSlot
 from lca.contracts.atoms.functional.group import FunctionalGroup
 from lca.contracts.atoms.scope.scope import Scope
@@ -26,7 +26,6 @@ from lca.contracts.harness.composition.plugin_contract import (
 )
 from lca.contracts.models.cognition.prompt_assembly import PromptTrace
 from lca.contracts.models.cognition.reasoner_turn import ReasonerTurnRender
-from lca.contracts.observability import sha256_payload_digest as _sha256_digest
 from lca.contracts.protocols.declarative.declarative_1.node_executor import (
     NodeContext,
     NodeInput,
@@ -37,22 +36,6 @@ from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import
     OwnershipDeclaration,
 )
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
-
-
-def _section_output_dicts(trace: PromptTrace) -> tuple[dict[str, Any], ...]:
-    return tuple(
-        {
-            "name": s.name,
-            "kind": s.kind,
-            "optional": s.optional,
-            "used_fallback": s.used_fallback,
-            "skipped_empty": s.skipped_empty,
-            "text_chars": s.text_chars,
-            "text": s.text,
-            "content_digest": _sha256_digest(s.text) if s.text else None,
-        }
-        for s in trace.sections
-    )
 
 
 @dataclass(frozen=True, slots=True)
