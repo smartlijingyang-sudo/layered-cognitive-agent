@@ -208,3 +208,66 @@ RA-006（P2 Strong：daemon "单活"不变量无 owner，`_kill_existing` 接缝
   - Mid-session the main tree gained another worker's uncommitted edit (lca/framework/graph/strategies/gate_chain_strategy.py, 00:32). Committed only my three files by explicit path and left theirs untouched -- deviated from prompt step 9's "commit the rest" because sweeping others' work is forbidden.
 ---
 
+
+## 2026-10-07 01:15 - RA-006 (fresh session)
+- Gave the single-daemon invariant an owner: `DaemonService._kill_existing(pattern,
+  timeout=10.0)` — sudo pkill (PR #40 behavior kept, `Sudo.run` timeout=10) then
+  poll `pid_alive` (service.py primitive) on the pid recorded in connect.pid until
+  dead, bounded by timeout with 0.2s interval. `stop()` and `restart()` both go
+  through it; `restart()` no longer uses `time.sleep(0.5)`.
+- `node.*index.js.*connect` is now module-level `_CONNECT_PROC_PATTERN` in daemon.py
+  (single source; assessment's suggested name landed as-is), used by daemon.py's
+  stop/_spawn and imported by `host_runtime/providers/user_cli.py`
+  start_daemon/stop_daemon (same object; user_cli stop_daemon flow otherwise untouched).
+  Intra-L0 edge, no importlinter contract conflict, no import cycle
+  (daemon.py never imports host_runtime at module level).
+- Files changed: lca/infrastructure/cli/services/daemon/daemon.py,
+  lca/infrastructure/host_runtime/providers/user_cli.py,
+  tests/infrastructure/cli/test_daemon_kill_existing.py (new: restart waits for
+  pid_alive true->false before start; no-pid-file skips wait; pattern identity),
+  tests/infrastructure/cli/test_daemon_stop_uses_sudo.py (extended:
+  sudo.read_text.return_value=None pins the wait-skip), raphy/prd.json,
+  raphy/progress.txt.
+- Tests: `pytest tests/ -k daemon --no-cov -q` -> 14 passed, 1 skipped
+  (reconnect_resilience needs node/npm toolchain, env skip pre-existing);
+  `ruff check` clean on all touched files (one I001 auto-fixed: 2 blank lines
+  collapsed after the import block by the constant insertion).
+- **Learnings for future iterations:**
+  - `_read_user_pid` returns a MagicMock-derived pid under a MagicMock Sudo
+    (`int(MagicMock()) == 1`): tests exercising `stop()` must set
+    `sudo.read_text.return_value` explicitly, or the wait loop runs the full timeout.
+  - ruff isort treats a comment+assignment directly after the import block as part
+    of the block layout — `ruff check --fix` collapses the blank line; check `git
+    diff` after to confirm it only touched whitespace there.
+  - `user_cli.py` had a pre-existing `ruff format` drift (double blank line after
+    module docstring); left untouched to keep the diff minimal — format drift is
+    not this lane's job unless introduced by the change.
+---
+
+## 2026-10-07 02:40 - RA-006 (fresh session: re-assessment + re-apply)
+- Fresh-session re-assessment of the undocumented revert (e63ecee9c): the
+  interrupted rounds revert reason was never recorded. Reviewed 822bbfad0
+  against all 6 acceptance criteria: `_kill_existing(pattern, timeout=10.0)`
+  seam (sudo pkill + poll pid_alive on connect.pid, 0.2s interval,
+  deadline-bounded), stop()/restart() both routed through it, sleep(0.5) gone,
+  `_CONNECT_PROC_PATTERN` shared daemon.py<->user_cli.py (same object,
+  intra-L0, no import cycle since daemon.py never imports host_runtime).
+  All criteria met; tests were green at implementation time. No evidence the
+  story was mis-assessed; no honest drop rationale exists. Verdict: the
+  revert was spurious -> re-apply is recovery, not thrash.
+- Re-applied via `git revert --no-commit e63ecee9c` (byte-identical restore
+  of 822bbfad0: 6 files, diff stat matches exactly), then re-verified on the
+  current tree: `pytest tests/ -k daemon --no-cov -q` -> 15 passed;
+  `ruff check` clean on all touched files. prd.json passes=true, progress
+  RA-006 section restored, this entry appended.
+- **Learnings for future iterations:**
+  - An undocumented revert of a green, criteria-meeting implementation is
+    thrash, not recovery. The recovery rule covers interrupted-round
+    residue, not silently rolling back verified work. If a story looks
+    wrong, produce evidence and set `dropped: true` with reason in notes --
+    never a bare revert + reopen.
+  - Revert-of-revert is the exact tool for restoring a spuriously reverted
+    implementation: verify diff-stat equality against the original commit
+    before committing, and always re-run the story acceptance tests since
+    the tree moved underneath (here: 15 passed vs 14+1skip at original time).
+---

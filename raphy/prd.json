@@ -101,8 +101,8 @@
         "uv run ruff check passes on touched files"
       ],
       "priority": 2,
-      "passes": false,
-      "notes": "Source: improve-codebase-architecture skill assessment Round 2 2026-10-06 (Strong, friction walk Q3/Q4). Deletion test: concentrates - the 'exactly one live daemon' invariant gets an owner instead of relying on sleep timing."
+      "passes": true,
+      "notes": "Source: improve-codebase-architecture skill assessment Round 2 2026-10-06 (Strong, friction walk Q3/Q4). Deletion test: concentrates - the 'exactly one live daemon' invariant gets an owner instead of relying on sleep timing. DONE 2026-10-07: added DaemonService._kill_existing(pattern, timeout=10.0) (sudo pkill via Sudo.run, timeout=10 kept per PR #40; then poll pid_alive from service.py primitives on the pid recorded in connect.pid until dead, bounded by timeout, 0.2s interval); stop() and restart() both go through it; restart() no longer uses time.sleep(0.5). 'node.*index.js.*connect' is now module-level _CONNECT_PROC_PATTERN in daemon.py, shared (same object) by user_cli.py start_daemon/stop_daemon (imported, internal seam; user_cli stop_daemon flow otherwise untouched; intra-L0 edge, no importlinter contract conflict, no import cycle: daemon.py does not import host_runtime at module level). Implementation vs assessment: assessment named the constant _CONNECT_PROC_PATTERN and it landed exactly there; the wait polls the pid-file pid via pid_alive (not pgrep re-check); test_daemon_stop_uses_sudo extended with sudo.read_text.return_value=None (no recorded pid -> wait skipped) per the assessment's 'can extend' note."
     },
     {
       "id": "RA-007",
