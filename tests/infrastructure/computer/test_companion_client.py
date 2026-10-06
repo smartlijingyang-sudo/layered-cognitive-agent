@@ -109,8 +109,17 @@ async def test_companion_file_operations(tmp_path: Path) -> None:
     assert "sample.txt" in res_l["files"]
 
 
-def test_companion_rpc_system_info() -> None:
-    client = CompanionClient(CompanionConfig(device_id="dev-rpc", label="RPC Test"))
+def test_companion_rpc_system_info(tmp_path: Path) -> None:
+    # Isolate from the real ~/.lca/companion_token.json: CompanionClient.__init__
+    # calls config.load_token() when machine_token is empty, which would override
+    # device_id/label with the developer machine's paired identity.
+    client = CompanionClient(
+        CompanionConfig(
+            device_id="dev-rpc",
+            label="RPC Test",
+            token_file=tmp_path / "companion_token.json",
+        )
+    )
     info = client.dispatch_rpc("systemInfo", {})
     assert info["device_id"] == "dev-rpc"
     assert info["label"] == "RPC Test"
