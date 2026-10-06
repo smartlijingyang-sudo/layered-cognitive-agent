@@ -4,6 +4,8 @@
 
 **Proposed — 2026-10-04**
 
+**更新注记（2026-10-06，iter-arch）**：§1.1 的 run-failure writer 路径(`…/handlers/runs/terminal/failure/failure.py`)是 `2edc98c18`(2026-10-04)当时的 stat 快照，落笔时准确；`1997d84ef`(2026-10-05，RunTerminalCoordinator 重构)已将该目录展平为 `terminal/failure.py`(单层)，盘上已无 `failure/` 子目录。按此路径查找请用 `lca/plugins/transport/webserver/handlers/runs/terminal/failure.py`(与 ADR-0122 §5、docs/debug/README.md 一致)。§1.1 正文(`2edc98c18` stat 锚定)保留为 2026-10-04 快照，不改历史。
+
 > **一句话**：`traces/runs/<run_id>/` 目录与其中落盘的 run 产物（spine ledger、exceptions 索引等）现在被钉在 owner-only 权限上（目录 0700 / 文件 0600）——`2edc98c18` 已在实现层落地，本 ADR 把它写成契约，钉住语义、边界与待拍板项。
 
 ## 0. 接任务前 7 问（精简自检）
