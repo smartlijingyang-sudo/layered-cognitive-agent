@@ -13,6 +13,15 @@ from typing import Self
 import yaml
 from pydantic import BaseModel, Field
 
+from lca.infrastructure.host_runtime.config import (
+    KernelServeConfig as _HostKernelServeConfig,
+)
+
+# Default connect token, single-sourced from the host runtime config
+# (lca/infrastructure/host_runtime/config.py :: KernelServeConfig.token).
+# DaemonConfig.token defaults to it so the literal is written exactly once.
+_DEFAULT_CONNECT_TOKEN: str = _HostKernelServeConfig.model_fields["token"].default
+
 
 class KernelServeConfig(BaseModel):
     """LCA kernel serve (Starlette :8765) 网络配置 — ADR-0119 决定 4。
@@ -116,6 +125,15 @@ class DaemonConfig(BaseModel):
     user: str = "sandbox-user"
     workspace: str = "/home/sandbox-user"
     host_config: str = "lca-host.yaml"
+    cli_dir: str = "/opt/lca"
+    token: str = Field(
+        default=_DEFAULT_CONNECT_TOKEN,
+        description=(
+            "Service token the daemon presents when connecting. "
+            "Default is single-sourced from host_runtime KernelServeConfig.token; "
+            "do not duplicate the literal."
+        ),
+    )
 
     def resolve_kernel_serve_url(self, host: str, port: int) -> str:
         """Resolve kernel serve WebSocket URL, defaulting to kernel_serve config."""

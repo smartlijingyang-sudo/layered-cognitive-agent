@@ -271,3 +271,55 @@ RA-006（P2 Strong：daemon "单活"不变量无 owner，`_kill_existing` 接缝
     before committing, and always re-run the story acceptance tests since
     the tree moved underneath (here: 15 passed vs 14+1skip at original time).
 ---
+
+## 2026-10-07 03:38 - RA-007 (fresh session)
+- Extracted `_spawn` shell-script generation into pure
+  `lca/infrastructure/cli/services/daemon/start_script.py::render_start_script(config, gateway_ws_url)`.
+  `DaemonService._spawn` now only writes the rendered output and launches it.
+- `DaemonConfig` gained two fields: `token` (default single-sourced from
+  `host_runtime/config.py:47` `KernelServeConfig.token` via
+  `model_fields["token"].default` — the story text wrongly cited
+  `cli/config/config.py:47`; assessment.md had the right path) and
+  `cli_dir` (default `/opt/lca`); `DaemonService._cli_dir` now reads
+  `config.cli_dir` so `/opt/lca` has one source too.
+- The `--token lca-local-host` literal in daemon.py is gone; all PATH /
+  LCA_PYTHON / PYTHONPATH / cli_js segments derive from `config.cli_dir`.
+- `user_cli.py`'s `_write_start_script` is a *different* template (venv_dir,
+  managed_path, VIRTUAL_ENV, token already from config) — out of scope, untouched.
+- Byte-equivalence verified: captured old `_spawn` output (HEAD worktree, mocked
+  sudo) vs new renderer for default config → byte-identical, 409 bytes.
+- NEW tests `tests/infrastructure/cli/test_daemon_start_script.py` (5): configured
+  token used / literal gone; log path + PATH entries pinned; custom cli_dir/user/
+  workspace respected; default token single-sourced (value + field-default equality);
+  full default script shape characterization.
+- Files changed: lca/infrastructure/cli/config/config.py,
+  lca/infrastructure/cli/services/daemon/daemon.py,
+  lca/infrastructure/cli/services/daemon/start_script.py (new),
+  tests/infrastructure/cli/test_daemon_start_script.py (new),
+  raphy/prd.json, raphy/progress.txt
+- Verified: `pytest tests/ -k daemon --no-cov -q` -> 20 passed (15 existing + 5 new);
+  `ruff check` clean on all 4 touched files (2 initial S105/S106 in the test fixed
+  with `# noqa`, matching repo convention).
+- **Learnings for future iterations:**
+  - Story file/line citations can be wrong (RA-007 cited cli/config.py:47, reality is
+    host_runtime/config.py:47): always re-derive paths with grep before implementing;
+    the assessment.md Phase-3 section had the corrected path.
+  - `model_fields["token"].default` reads another pydantic model's field default
+    without instantiating it — the clean way to single-source a default across
+    modules without moving the original literal.
+  - Byte-equivalence check pattern for template extractions: HEAD worktree +
+    MagicMock sudo + `Path.exists` patched for the pre-check, capture `write_text`
+    args, diff against the new renderer. Proves "behavior unchanged" mechanically.
+  - ruff S105/S106 fires on token-looking literals in tests too; repo convention is
+    `# noqa: S105` with the existing comment style.
+---
+
+## NOTE (residual, NOT committed this round)
+- `lca/framework/graph/strategies/gate_chain_strategy.py` has an uncommitted
+  residual from the 02:00 round (deletes the `_DecisionLike` Protocol, -12/+1).
+  Related tests: 31 passed, 1 failed
+  (`test_every_strategy_module_annotation_resolves`, `NameError: PortRegistry`)
+  — the failure reproduces on clean HEAD, i.e. pre-existing and unrelated.
+  Per the recovery rule (red -> do not touch), the residual stays uncommitted.
+  Next round: re-run the gate_chain tests; only commit as recover if fully green.
+---

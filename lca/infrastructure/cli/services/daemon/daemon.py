@@ -25,6 +25,7 @@ from lca.infrastructure.cli.service.service import (
     http_ready,
     pid_alive,
 )
+from lca.infrastructure.cli.services.daemon.start_script import render_start_script
 from lca.infrastructure.cli.state.state import ChangeReport, StateStore
 from lca.infrastructure.cli.sudo.sudo import Sudo
 
@@ -56,7 +57,7 @@ class DaemonService:
         self._state = StateStore(state_dir)
         self._root = root
         self._sudo = sudo
-        self._cli_dir = Path("/opt/lca")
+        self._cli_dir = Path(self._config.cli_dir)
         self._user_state = Path(f"/home/{self._config.user}/.lca")
 
     @property
@@ -414,19 +415,7 @@ class DaemonService:
             return None
 
         start_script = self._user_state / "start.sh"
-        script_content = f"""#!/bin/sh
-export PATH="/opt/lca/venv/bin:/usr/local/bin:/usr/bin:/bin"
-export LCA_PYTHON="/opt/lca/venv/bin/python3"
-export PYTHONPATH="/opt/lca/python"
-export HOME=/home/{owner}
-cd {self._config.workspace}
-exec node {cli_js} connect \\
-  --gateway {self._kernel_serve_ws_url} \\
-  --workspace {self._config.workspace} \\
-  --token-type serviceToken \\
-  --token lca-local-host \\
-  >> "${{HOME}}/.lca/daemon.log" 2>&1
-"""
+        script_content = render_start_script(self._config, self._kernel_serve_ws_url)
         if not self._sudo.write_text(start_script, script_content, owner=owner):
             return None
         self._sudo.run(["chmod", "755", str(start_script)])

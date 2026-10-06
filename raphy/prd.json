@@ -116,8 +116,8 @@
         "Existing daemon tests pass: uv run pytest tests/ -k 'daemon' --no-cov -q; uv run ruff check passes on touched files"
       ],
       "priority": 5,
-      "passes": false,
-      "notes": "Source: improve-codebase-architecture skill assessment Round 2 2026-10-06 (Worth exploring, friction walk Q4). Deletion test: concentrates. Design choice open: config fields vs template params."
+      "passes": true,
+      "notes": "Source: improve-codebase-architecture skill assessment Round 2 2026-10-06 (Worth exploring, friction walk Q4). Deletion test: concentrates. Design choice open: config fields vs template params. DONE 2026-10-07: extracted pure render_start_script(config, gateway_ws_url) into lca/infrastructure/cli/services/daemon/start_script.py; DaemonService._spawn only writes/launches its output. DaemonConfig gained token (default single-sourced from host_runtime KernelServeConfig.token via model_fields, no literal duplication) and cli_dir (default /opt/lca); DaemonService._cli_dir now reads config.cli_dir. Byte-equivalence verified: new renderer output is byte-identical to the old inline template for default config (409 bytes, captured old _spawn output vs new render). 5 new tests pin token/log-path/PATH-entries, custom paths, single-source default, and the full default script shape. pytest tests/ -k daemon: 20 passed; ruff clean. Assessment delta: story text cited lca/infrastructure/cli/config/config.py:47 as the token single source, but the literal actually lives in lca/infrastructure/host_runtime/config.py:47 (assessment.md RA-007 section had it right); implementation follows the corrected path. Also chose config-fields (not template-params) per the assessment's open design question, and passed gateway_ws_url as an explicit parameter to keep the existing empty-means-derive fallback in _kernel_serve_ws_url untouched."
     },
     {
       "id": "RA-008",
