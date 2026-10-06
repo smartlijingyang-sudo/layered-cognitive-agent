@@ -38,6 +38,12 @@ def _build_context(tmp: Path, source: str) -> object:
 
     class _Ctx:
         @staticmethod
+        def path(rel: str) -> Path:
+            # Mirror the real PatchContext.path() contract (present since
+            # e183bb427; the patch switched to ctx.path(...) in 66ddee108).
+            return src_dir / rel
+
+        @staticmethod
         def read(rel: str) -> str:
             return (src_dir / rel).read_text(encoding="utf-8")
 
