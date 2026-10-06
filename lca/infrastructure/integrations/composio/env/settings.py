@@ -6,7 +6,6 @@ for operator tooling that runs outside the plugin boot path.
 
 from __future__ import annotations
 
-import json
 import os
 
 from lca.infrastructure.integrations.composio.settings.settings import ComposioSettings
@@ -94,13 +93,3 @@ def connection_to_lobehub_plugin(conn: object) -> dict[str, object]:
             },
         },
     }
-
-
-def parse_auth_config_ids(raw: str) -> dict[str, str]:
-    try:
-        data = json.loads(raw)
-    except json.JSONDecodeError:
-        return {}
-    if not isinstance(data, dict):
-        return {}
-    return {str(k): str(v) for k, v in data.items() if v}
