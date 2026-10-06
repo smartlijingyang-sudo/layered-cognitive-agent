@@ -11,6 +11,14 @@ from typing import Any
 
 from lca_kernel.events.session.session import SessionEvent
 
+TURN_ENDED = "turn.ended.v1"
+"""journal 事件类型：turn 结束。
+
+四处 session plugin（projection_cache / session_stats /
+session_turn_control / session_turn_outline）原来各有一份字符级相同的
+私有 ``_TURN_ENDED`` 常量，收敛到此，语义逐字一致。
+"""
+
 
 def require_observer_hook(store: Any) -> Callable[..., Any]:
     """取 ``store.add_observer_hook``；缺失则 ``TypeError`` fail-loud。

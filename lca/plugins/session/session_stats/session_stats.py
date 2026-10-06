@@ -40,7 +40,7 @@ from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import
     OwnershipDeclaration,
 )
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
-from lca.plugins.session._shared import turn_of
+from lca.plugins.session._shared import TURN_ENDED, turn_of
 from lca_kernel.events.session.session import SessionEvent
 
 _log = structlog.get_logger(__name__)
@@ -48,7 +48,6 @@ _log = structlog.get_logger(__name__)
 __all__ = ["Config", "SessionStatsUnit", "setup"]
 
 _TURN_STARTED = "turn.started.v1"
-_TURN_ENDED = "turn.ended.v1"
 _STEP_STARTED = "step.started.v1"
 _MODEL_REQUESTED = "model.requested.v1"
 
@@ -83,7 +82,7 @@ class SessionStatsUnit:
         event_type = event.type
         if event_type == _TURN_STARTED:
             return self._apply_turn_started(state, event)
-        if event_type == _TURN_ENDED:
+        if event_type == TURN_ENDED:
             return self._apply_turn_ended(state, event)
         if event_type == _STEP_STARTED:
             return {**state, "steps": state["steps"] + 1}
