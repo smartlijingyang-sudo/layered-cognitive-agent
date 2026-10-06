@@ -56,8 +56,11 @@ def _schedule_label(job: CronJob) -> str:
     return schedule.kind
 
 
-def _latest_run(runs: list[CronRun]) -> CronRun | None:
-    """取最近一条 run（按 ``finished_at`` 时间戳，空视为最早）。"""
+def latest_run(runs: list[CronRun]) -> CronRun | None:
+    """取最近一条 run（按 ``finished_at`` 时间戳，空视为最早）。
+
+    run 记录按 run_id 字典序落盘，不保证时间有序，不能取 ``runs[-1]``。
+    """
     if not runs:
         return None
     return max(runs, key=lambda r: r.finished_at.timestamp() if r.finished_at else 0.0)
@@ -159,7 +162,7 @@ class CronService:
             # handoff 轮还没做出投递决定（ADR-0268 §6），这种任务必须留在列表
             # 上，否则一次没送达的触发连「未决」都显示不出来就消失了。
             runs = self._store.list_runs(job.id)
-            latest = _latest_run(runs)
+            latest = latest_run(runs)
             if (
                 job.schedule.kind == "oneshot"
                 and latest is not None

@@ -26,8 +26,9 @@ from collections.abc import Callable, Iterable
 from datetime import UTC, datetime
 from typing import Any
 
-from lca.contracts.models.cron.models import CronJob, CronRun
+from lca.contracts.models.cron.models import CronJob
 from lca.domain.cron.next_run import next_run
+from lca.domain.cron.service import latest_run as _latest_run
 from lca.domain.cron.store import CronStore
 
 logger = logging.getLogger(__name__)
@@ -35,16 +36,6 @@ logger = logging.getLogger(__name__)
 _NOTIFICATION_TEXT = "定时换装完成：{body}"
 
 _DEFAULT_CLEANUP_INTERVAL_SECONDS = 3600
-
-
-def _latest_run(runs: list[CronRun]) -> CronRun | None:
-    """取最近一条 run（按 ``finished_at`` 时间戳，空视为最早；ADR-0268）。
-
-    run 记录按 run_id 字典序落盘，不保证时间有序，不能取 ``runs[-1]``。
-    """
-    if not runs:
-        return None
-    return max(runs, key=lambda r: r.finished_at.timestamp() if r.finished_at else 0.0)
 
 
 class AvatarCostumeScheduler:
