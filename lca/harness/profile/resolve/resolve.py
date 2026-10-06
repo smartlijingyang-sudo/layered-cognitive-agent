@@ -276,7 +276,7 @@ def _resolve_plugins(
             )
         module_name = str(module_path)
         plugin_source = source.sources.get(plugin_id, str(source.profile_path))
-        if bool(entry.get("disabled")):
+        if entry.get("disabled"):
             resolved_plugins.append(
                 ResolvedPlugin(
                     id=plugin_id,
