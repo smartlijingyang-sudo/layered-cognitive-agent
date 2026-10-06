@@ -262,7 +262,18 @@ export class GatewayClient extends EventEmitter {
 
   private handleError = (error: Error): void => {
     this.logger.error(`WebSocket error: ${error.message}`);
-    this.emit('error', error);
+    // An EventEmitter 'error' event with no listener throws and crashes the
+    // process. The daemon must survive transient gateway outages (kernel
+    // restarts), so only emit when a consumer explicitly subscribed.
+    if (this.listenerCount('error') > 0) {
+      this.emit('error', error);
+    }
+    // 'close' normally follows 'error' and drives the reconnect. Guard the
+    // error-only path (e.g. DNS failure) so the client still recovers.
+    if (this.autoReconnect && this.status !== 'reconnecting') {
+      this.setStatus('reconnecting');
+      this.scheduleReconnect();
+    }
   };
 
   // ─── Heartbeat ───

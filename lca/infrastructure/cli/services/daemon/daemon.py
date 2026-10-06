@@ -12,7 +12,6 @@ against the last snapshot. ``status`` shows exactly which files changed.
 
 from __future__ import annotations
 
-import contextlib
 import os
 import subprocess
 import time
@@ -115,13 +114,14 @@ class DaemonService:
 
     def stop(self) -> ServiceState:
         """Stop the daemon."""
-        # Kill by user process match
-        with contextlib.suppress(Exception):
-            subprocess.run(
-                ["pkill", "-u", self._config.user, "-f", "node.*index.js.*connect"],
-                capture_output=True,
-                timeout=5,
-            )
+        # Kill by user process match. Must run via sudo: the invoking user
+        # cannot signal sandbox-user's processes, and a silent pkill failure
+        # leaves a stale daemon running after restart (two daemons fight over
+        # the same device id, the old one crashes on gateway outage).
+        self._sudo.run(
+            ["pkill", "-u", self._config.user, "-f", "node.*index.js.*connect"],
+            timeout=10,
+        )
 
         self._sudo.rm(self._user_state / "connect.pid")
 
