@@ -25,7 +25,7 @@ REQUIRED_LCA_TOP = frozenset(
     }
 )
 
-SEAM_TREE_ANCHORS = ("cognitive", "loop", "observability", "transport", "domain", "composition", "meta")
+SEAM_TREE_ANCHORS = ("cognitive", "loop", "observability", "transport", "domain", "meta")  # "composition" removed: lca/plugins/composition/ intentionally deleted in 34c71e577
 
 
 class TestPlatformDirectory:
