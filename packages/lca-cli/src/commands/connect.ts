@@ -65,6 +65,13 @@ export async function connect(options: ConnectOptions): Promise<void> {
     client.sendToolCallResponse(request.requestId, result);
   });
 
+  // A connection error must never crash the daemon. Without a listener,
+  // Node throws on the EventEmitter 'error' event (e.g. ECONNREFUSED while
+  // the kernel restarts), killing sandbox-user and leaving a stale pid.
+  client.on('error', (error) => {
+    console.error(`gateway connection error: ${error.message}`);
+  });
+
   client.on('rpc_request', async (request) => {
     if (request.method === 'systemInfo') {
       const envReport = await checkEnvironment();
