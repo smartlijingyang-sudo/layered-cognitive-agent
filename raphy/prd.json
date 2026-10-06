@@ -52,7 +52,8 @@
       ],
       "priority": 3,
       "passes": false,
-      "notes": "Source: improve-codebase-architecture skill assessment 2026-10-06 (Worth exploring). Weaker than RA-001/RA-002: shared scaffolding but different signatures. Deletion test is marginal."
+      "notes": "Source: improve-codebase-architecture skill assessment 2026-10-06 (Worth exploring). Weaker than RA-001/RA-002: shared scaffolding but different signatures. Deletion test is marginal. DROPPED 2026-10-06 (optimize session): investigated for unification; the three phases need genuinely different seams. pre extracts (provider, model) via _model_identity and calls request_model; post builds usage/content/tool_calls payload and calls complete_model, and carries a behavior-critical docstring (derive_messages double-append warning) that must stay with the phase; fail passes error straight to fail_model. Shared scaffolding is 2 lines of idiom (step = hook._step_counter + deferred import), and the three deferred imports bind DIFFERENT names (request_model/complete_model/fail_model), so not even the import is shared. A unified seam would require getattr string-dispatch or Callable+**kwargs threading, trading explicit type-safe direct calls for indirection: net readability loss, deletion test fails. Phase set is closed (exactly pre/post/fail); no leverage for future phases. Forcing unification would be churn, not improvement.",
+      "dropped": true
     }
   ]
 }

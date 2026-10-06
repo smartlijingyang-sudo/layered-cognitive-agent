@@ -90,3 +90,35 @@ Started: 2026-10-06 (assess session)
   - Mechanical moves (method -> module function, body verbatim) need no new
     behavior-pinning test; the existing suite passing is sufficient evidence.
 ---
+
+## 2026-10-06 21:5x - RA-003 (fresh session) - DROPPED
+- Investigated unifying `_emit_lifecycle_pre/post/fail` in
+  lca/plugins/events/hooks/model_visible/adapter.py behind one dispatch seam.
+  Verdict: **dropped, not forced** — the three phases need genuinely different seams.
+- Evidence:
+  - pre: `(hook, kwargs)` -> `_model_identity(kwargs)` -> `request_model(turn, step, provider, model)`
+  - post: `(hook, response)` -> `_tool_calls_payload` + text/usage extraction ->
+    `complete_model(turn, step, usage, content, tool_calls)`; carries a behavior-critical
+    docstring (appending here duplicates every turn in derive_messages) that must stay
+    with the phase, not a generic seam.
+  - fail: `(hook, error)` -> `fail_model(turn, step, error)` direct passthrough.
+  - Shared scaffolding is 2 lines of idiom (`step = hook._step_counter` + deferred import),
+    and the three deferred imports bind DIFFERENT names — not even the import is shared.
+  - A unified seam would need getattr string-dispatch or Callable+**kwargs threading:
+    explicit, type-safe direct calls traded for indirection. Deletion test fails.
+  - Closed phase set (exactly pre/post/fail); no future-phase leverage.
+- No code changed. Targeted tests: 229 passed, 1 pre-existing unrelated failure
+  (tests/scenario/profile/test_profile_resolve_boot.py — lca_kernel.boot.boot missing
+  attribute, zero tracked modifications in tree, unrelated to model_visible).
+- prd.json: RA-003 `"dropped": true` with reason in notes; `passes` left false per
+  the no-fake-pass rule.
+- **Learnings for future iterations:**
+  - "Same shape" != "same seam": diff the imported names and call signatures before
+    claiming duplication — here the imports differed, which kills the unification case.
+  - A docstring that documents a behavioral trap (double-append) is load-bearing;
+    converging the function would orphan or dilute it. Check for such docstrings
+    before converging.
+  - When the assess session flags a story "worth exploring / droppable", the explore
+    step is real work: investigate, decide, record — dropping with evidence is a
+    completed iteration, not a skipped one.
+---
