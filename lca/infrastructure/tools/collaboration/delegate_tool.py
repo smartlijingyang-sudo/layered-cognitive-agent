@@ -28,6 +28,18 @@ TEAM_CAST_TOOL = "cast_architecture_team"
 PEER_HANDOFF_TOOL = "handoff_to_peer"
 
 
+def _fail_observation(start: float, message: str) -> Observation:
+    """构建参数校验失败的 Observation。注意与 tools._shared.fail_observation 行为不同（payload 形状不同），勿混用。"""
+    latency_ms = int((time.monotonic() - start) * 1000)
+    return Observation(
+        observation_id=new_id("obs"),
+        success=False,
+        payload={"error": message, FAILURE_KIND: FAILURE_KIND_VALIDATION},
+        content_type=ContentType.STRUCTURED,
+        latency_ms=latency_ms,
+    )
+
+
 class TeamCastTool(Tool):
     """将复合任务转交给协同专家团队并发分析并由 Fold 节点产出权威综合结论。"""
 
@@ -75,7 +87,7 @@ class TeamCastTool(Tool):
         start = time.monotonic()
         error = self.validate(args)
         if error is not None:
-            return self._fail(start, error)
+            return _fail_observation(start, error)
 
         objective = str(args["objective"]).strip()
         context_extra = args.get("context_extra")
@@ -120,16 +132,6 @@ class TeamCastTool(Tool):
                 "member_metadata": folded.member_metadata,
                 "selected_peers": list(decision.selected_peers),
             },
-            content_type=ContentType.STRUCTURED,
-            latency_ms=latency_ms,
-        )
-
-    def _fail(self, start: float, message: str) -> Observation:
-        latency_ms = int((time.monotonic() - start) * 1000)
-        return Observation(
-            observation_id=new_id("obs"),
-            success=False,
-            payload={"error": message, FAILURE_KIND: FAILURE_KIND_VALIDATION},
             content_type=ContentType.STRUCTURED,
             latency_ms=latency_ms,
         )
@@ -179,7 +181,7 @@ class HandoffToPeerTool(Tool):
         start = time.monotonic()
         error = self.validate(args)
         if error is not None:
-            return self._fail(start, error)
+            return _fail_observation(start, error)
 
         peer_id = str(args["peer_id"]).strip()
         objective = str(args["objective"]).strip()
@@ -206,16 +208,6 @@ class HandoffToPeerTool(Tool):
                 "objective": envelope.objective,
                 "status_message": f"已成功转交任务信封至专家 [{peer_id}]，专家将在独立沙箱中分析。",
             },
-            content_type=ContentType.STRUCTURED,
-            latency_ms=latency_ms,
-        )
-
-    def _fail(self, start: float, message: str) -> Observation:
-        latency_ms = int((time.monotonic() - start) * 1000)
-        return Observation(
-            observation_id=new_id("obs"),
-            success=False,
-            payload={"error": message, FAILURE_KIND: FAILURE_KIND_VALIDATION},
             content_type=ContentType.STRUCTURED,
             latency_ms=latency_ms,
         )

@@ -35,8 +35,8 @@
         "uv run ruff check passes on the touched file"
       ],
       "priority": 2,
-      "passes": false,
-      "notes": "Source: improve-codebase-architecture skill assessment 2026-10-06 (Strong). Deletion test: yes - the two methods are character-identical. Twin of ba2ad56c6 (different Observation shape - do not conflate)."
+      "passes": true,
+      "notes": "Source: improve-codebase-architecture skill assessment 2026-10-06 (Strong). Deletion test: yes - the two methods are character-identical. Twin of ba2ad56c6 (different Observation shape - do not conflate). DONE 2026-10-06: extracted module-level _fail_observation(start, message); both classes call it; both def _fail methods deleted. 150 tests pass, ruff clean."
     },
     {
       "id": "RA-003",

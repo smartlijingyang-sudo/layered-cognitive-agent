@@ -68,3 +68,25 @@ Started: 2026-10-06 (assess session)
     string is the observable contract — no test asserted on logger names here, but check
     before assuming.
 ---
+
+## 2026-10-06 21:49 - RA-002 (fresh session)
+- Converged two character-identical `_fail` methods in
+  lca/infrastructure/tools/collaboration/delegate_tool.py into one module-level
+  helper `_fail_observation(start, message)`. Both TeamCastTool and
+  HandoffToPeerTool call sites redirected; both `def _fail` methods deleted
+  (grep confirms only the helper definition remains).
+- Helper docstring explicitly warns it is NOT behavior-identical to
+  tools._shared.fail_observation (different payload shape) to prevent future
+  conflation — the assess session's key gotcha for this story.
+- Files changed: lca/infrastructure/tools/collaboration/delegate_tool.py
+  (+12/-22), raphy/prd.json, raphy/progress.txt
+- Verified: `uv run pytest tests/infrastructure/tools/ --no-cov -q` -> 150 passed;
+  `uv run ruff check` clean on the touched file. Observation payload shape
+  unchanged (method body moved verbatim).
+- **Learnings for future iterations:**
+  - When a story's grep criterion uses a substring pattern (`def _fail`), the new
+    helper name (`_fail_observation`) will still match it — verify with the full
+    line context, not just the count.
+  - Mechanical moves (method -> module function, body verbatim) need no new
+    behavior-pinning test; the existing suite passing is sufficient evidence.
+---
