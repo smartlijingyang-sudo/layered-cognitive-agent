@@ -43,6 +43,7 @@ from lca.plugins.assistant.events._events import (
     AssistantProfileRevisedEventPayload,
     AssistantSkillActivatedEventPayload,
     AssistantSkillInstalledEventPayload,
+    emit_assistant_ep_or_log,
 )
 from lca.plugins.assistant.home._home_layout import (
     DEFAULT_TEMPLATE_ID,
@@ -461,36 +462,15 @@ class _AssistantSkillOverlayImpl(AssistantSkillOverlay):
 
     def _emit_installed(self, payload: AssistantSkillInstalledEventPayload) -> None:
         """发 ``assistant.skill.installed`` EP;无 emitter 时仅 log(单元测试路径)。"""
-        if self._emit is None:
-            log.info(
-                "assistant.skill_overlay.ep.no_emitter",
-                ep=ASSISTANT_SKILL_INSTALLED,
-                payload=payload.to_dict(),
-            )
-            return
-        self._emit(ASSISTANT_SKILL_INSTALLED, payload.to_dict())
+        emit_assistant_ep_or_log(self._emit, "assistant.skill_overlay", ASSISTANT_SKILL_INSTALLED, payload.to_dict())
 
     def _emit_profile_revised(self, payload: AssistantProfileRevisedEventPayload) -> None:
         """发 ``assistant.profile.revised`` EP（删除 skill 的配置变更）；无 emitter 时仅 log。"""
-        if self._emit is None:
-            log.info(
-                "assistant.skill_overlay.ep.no_emitter",
-                ep=ASSISTANT_PROFILE_REVISED,
-                payload=payload.to_dict(),
-            )
-            return
-        self._emit(ASSISTANT_PROFILE_REVISED, payload.to_dict())
+        emit_assistant_ep_or_log(self._emit, "assistant.skill_overlay", ASSISTANT_PROFILE_REVISED, payload.to_dict())
 
     def _emit_activated(self, payload: AssistantSkillActivatedEventPayload) -> None:
         """发 ``assistant.skill.activated`` EP;无 emitter 时仅 log(单元测试路径)。"""
-        if self._emit is None:
-            log.info(
-                "assistant.skill_overlay.ep.no_emitter",
-                ep=ASSISTANT_SKILL_ACTIVATED,
-                payload=payload.to_dict(),
-            )
-            return
-        self._emit(ASSISTANT_SKILL_ACTIVATED, payload.to_dict())
+        emit_assistant_ep_or_log(self._emit, "assistant.skill_overlay", ASSISTANT_SKILL_ACTIVATED, payload.to_dict())
 
 
 # 用于测试在不接 ctx 时直接构造

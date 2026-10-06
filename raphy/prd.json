@@ -19,8 +19,8 @@
         "Do NOT change event names, payload shapes, or the None-emitter fallback semantics"
       ],
       "priority": 1,
-      "passes": false,
-      "notes": "Source: improve-codebase-architecture skill assessment 2026-10-06 (Strong). Deletion test: yes. Follows the established 'converge N identical X' pattern (git: ba2ad56c6, 2a2059cca). Layering note: verify the import direction for the shared helper creates no new plugin->plugin cycle; prefer the domain catalog module if both overlays already depend on it."
+      "passes": true,
+      "notes": "Source: improve-codebase-architecture skill assessment 2026-10-06 (Strong). Deletion test: yes. Follows the established 'converge N identical X' pattern (git: ba2ad56c6, 2a2059cca). Layering note: verify the import direction for the shared helper creates no new plugin->plugin cycle; prefer the domain catalog module if both overlays already depend on it. DONE 2026-10-06: converged 9 (not 7) no-emitter-fallback methods into lca/plugins/assistant/events/_events.py::emit_assistant_ep_or_log — story listed 7, but evolve._emit and jobs._emit were the same seam (criterion 5 demanded a single call site repo-wide). Zero new import edges: all 5 files already imported from _events."
     },
     {
       "id": "RA-002",
@@ -35,8 +35,8 @@
         "uv run ruff check passes on the touched file"
       ],
       "priority": 2,
-      "passes": false,
-      "notes": "Source: improve-codebase-architecture skill assessment 2026-10-06 (Strong). Deletion test: yes - the two methods are character-identical. Twin of ba2ad56c6 (different Observation shape - do not conflate)."
+      "passes": true,
+      "notes": "Source: improve-codebase-architecture skill assessment 2026-10-06 (Strong). Deletion test: yes - the two methods are character-identical. Twin of ba2ad56c6 (different Observation shape - do not conflate). DONE 2026-10-06: extracted module-level _fail_observation(start, message); both classes call it; both def _fail methods deleted. 150 tests pass, ruff clean."
     },
     {
       "id": "RA-003",
@@ -52,7 +52,8 @@
       ],
       "priority": 3,
       "passes": false,
-      "notes": "Source: improve-codebase-architecture skill assessment 2026-10-06 (Worth exploring). Weaker than RA-001/RA-002: shared scaffolding but different signatures. Deletion test is marginal."
+      "notes": "Source: improve-codebase-architecture skill assessment 2026-10-06 (Worth exploring). Weaker than RA-001/RA-002: shared scaffolding but different signatures. Deletion test is marginal. DROPPED 2026-10-06 (optimize session): investigated for unification; the three phases need genuinely different seams. pre extracts (provider, model) via _model_identity and calls request_model; post builds usage/content/tool_calls payload and calls complete_model, and carries a behavior-critical docstring (derive_messages double-append warning) that must stay with the phase; fail passes error straight to fail_model. Shared scaffolding is 2 lines of idiom (step = hook._step_counter + deferred import), and the three deferred imports bind DIFFERENT names (request_model/complete_model/fail_model), so not even the import is shared. A unified seam would require getattr string-dispatch or Callable+**kwargs threading, trading explicit type-safe direct calls for indirection: net readability loss, deletion test fails. Phase set is closed (exactly pre/post/fail); no leverage for future phases. Forcing unification would be churn, not improvement.",
+      "dropped": true
     }
   ]
 }

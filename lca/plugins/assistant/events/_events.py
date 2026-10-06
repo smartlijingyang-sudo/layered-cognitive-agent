@@ -11,9 +11,11 @@ procedure 草稿正文进 spine（ADR-0187 §3 D2 末段 + D9）。
 
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from typing import Any
+
+import structlog
 
 from lca.contracts.observability.closure.assistant_ep_closure import ASSISTANT_REQUIRED_FIELDS
 
@@ -27,8 +29,12 @@ __all__ = [
     "AssistantSkillEvolvedPromotedEventPayload",
     "AssistantSkillEvolvedProposedEventPayload",
     "AssistantSkillInstalledEventPayload",
+    "emit_assistant_ep_or_log",
     "emit_fact_event",
 ]
+
+
+log = structlog.get_logger(__name__)
 
 
 def _validate_required_fields(payload: Any, class_name: str) -> None:
@@ -358,3 +364,26 @@ def emit_fact_event(event: str, payload: Mapping[str, Any]) -> Any:
         payload=dict(payload),
         producer=type(None),
     )
+
+def emit_assistant_ep_or_log(
+    emit_fn: Callable[[str, Mapping[str, Any]], Any] | None,
+    scope: str,
+    event: str,
+    payload: Mapping[str, Any],
+) -> None:
+    """Assistant EP 无 emitter fallback 接缝（单元测试路径）。
+
+    九个调用点各自定义了字节级相同的 fallback（domain/catalog 的
+    ``_emit_created`` / ``_emit_bootstrap_completed`` /
+    ``_emit_profile_revised``、tool/overlay 的 ``_emit_profile_revised``、
+    skill/overlay 的 ``_emit_installed`` / ``_emit_profile_revised`` /
+    ``_emit_activated``、evolve 的 ``_emit``、jobs 的 ``_emit``）；收敛到此，
+    行为完全一致。调用方的 log scope（``assistant.catalog`` /
+    ``assistant.tool_overlay`` / ``assistant.skill_overlay`` /
+    ``assistant.evolve`` / ``assistant.jobs``）作为参数传入，发射的
+    ``<scope>.ep.no_emitter`` 事件字符串不变。
+    """
+    if emit_fn is None:
+        log.info(f"{scope}.ep.no_emitter", ep=event, payload=dict(payload))
+        return
+    emit_fn(event, dict(payload))

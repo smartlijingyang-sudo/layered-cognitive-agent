@@ -49,6 +49,7 @@ from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import
 from lca.harness.plugin_api import EffectClass, PluginContext, PluginKind, plugin
 from lca.plugins.assistant.events._events import (
     AssistantProfileRevisedEventPayload,
+    emit_assistant_ep_or_log,
     emit_fact_event,
 )
 from lca.plugins.assistant.home._home_layout import (
@@ -310,14 +311,7 @@ class _AssistantToolOverlayImpl(AssistantToolOverlay):
         return new_manifest
 
     def _emit_profile_revised(self, payload: AssistantProfileRevisedEventPayload) -> None:
-        if self._emit is None:
-            log.info(
-                "assistant.tool_overlay.ep.no_emitter",
-                ep=ASSISTANT_PROFILE_REVISED,
-                payload=payload.to_dict(),
-            )
-            return
-        self._emit(ASSISTANT_PROFILE_REVISED, payload.to_dict())
+        emit_assistant_ep_or_log(self._emit, "assistant.tool_overlay", ASSISTANT_PROFILE_REVISED, payload.to_dict())
 
 
 # ── Plugin manifest ───────────────────────────────────────────────────

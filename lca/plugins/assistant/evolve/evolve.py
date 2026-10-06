@@ -75,6 +75,7 @@ from lca.harness.plugin_api import EffectClass, PluginContext, PluginKind, plugi
 from lca.plugins.assistant.events._events import (
     AssistantSkillEvolvedPromotedEventPayload,
     AssistantSkillEvolvedProposedEventPayload,
+    emit_assistant_ep_or_log,
     emit_fact_event,
 )
 from lca.plugins.assistant.home._home_layout import (
@@ -439,10 +440,7 @@ class _AssistantEvolveImpl(AssistantEvolve, SkillAcquirer):
 
     def _emit(self, event: str, payload: Mapping[str, Any]) -> None:
         """发 EP；无 emitter 时仅 log（单元测试路径）。"""
-        if self._emit_fn is None:
-            log.info("assistant.evolve.ep.no_emitter", ep=event, payload=dict(payload))
-            return
-        self._emit_fn(event, dict(payload))
+        emit_assistant_ep_or_log(self._emit_fn, "assistant.evolve", event, payload)
 
 
 # ── helpers ──────────────────────────────────────────────────────────

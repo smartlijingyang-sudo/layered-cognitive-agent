@@ -32,3 +32,93 @@ Started: 2026-10-06 (assess session)
 - When converging, always diff the supposedly-identical bodies field by field first (RA-002 vs `tools._shared.fail_observation` looked the same until the Observation kwargs were compared).
 - The `## Codebase Patterns` section above is the shared memory; add genuinely reusable idioms only.
 ---
+
+## 2026-10-06 21:5x - RA-001 (fresh session)
+- Converged 9 no-emitter-fallback `_emit` methods into one shared seam
+  `lca/plugins/assistant/events/_events.py::emit_assistant_ep_or_log(emit_fn, scope, event, payload)`.
+  Story listed 7 (domain/catalog x3, tool/overlay x1, skill/overlay x3); evolve._emit and
+  jobs._emit were the same seam shape (event+Mapping instead of payload.to_dict()) and
+  criterion 5 demanded a single `ep.no_emitter` call site repo-wide, so all 9 now delegate.
+- Seam home chosen: `_events.py` — all 5 caller files already imported from it, zero new
+  import edges, no plugin->plugin cycle. Follows the `emit_fact_event` convergence idiom
+  (2a2059cca) in the same module, including the Chinese docstring style.
+- Per-caller log scope preserved as a parameter: assistant.catalog / assistant.tool_overlay /
+  assistant.skill_overlay / assistant.evolve / assistant.jobs — emitted `<scope>.ep.no_emitter`
+  event string unchanged. `payload.to_dict()` still passed by the 7 typed-payload callers;
+  evolve/jobs pass their Mapping through (seam does `dict(payload)` internally, identical).
+- Removed now-unused `import structlog` + module logger from domain/catalog/events.py
+  (ruff --fix added the blank line); other 4 files still use their loggers elsewhere.
+- Files changed: lca/plugins/assistant/events/_events.py (+seam),
+  lca/plugins/domain/assistant/catalog/events.py, lca/plugins/assistant/tool/overlay.py,
+  lca/plugins/assistant/skill/overlay/overlay.py, lca/plugins/assistant/evolve/evolve.py,
+  lca/plugins/assistant/jobs/jobs.py, raphy/prd.json, raphy/progress.txt
+- Verified: grep `ep.no_emitter` -> single code call site (in the seam); zero remaining
+  inline `if self._emit[(_fn)] is None` blocks in converged files.
+- Tests: 237 passed (test_catalog/test_tool_overlay/test_skill_overlay/test_evolve/test_jobs
+  + 3 architecture invariant suites + deploy/test_lca_assistant_events), `uv run ruff check`
+  clean on all 6 touched files.
+- **Learnings for future iterations:**
+  - When a story says "N identical X", grep the whole repo for the pattern string before
+    scoping — the assess session found 7, the seam string `ep.no_emitter` revealed 2 more
+    (evolve/jobs) that criterion 5 required converging anyway.
+  - Seam-signature trick: take the already-normalized form (`Mapping` payload dict) as the
+    parameter, not the pre-normalization object — lets typed-payload and dict callers share
+    one seam without overloads.
+  - structlog logger name moves with the log call into the seam module; only the event
+    string is the observable contract — no test asserted on logger names here, but check
+    before assuming.
+---
+
+## 2026-10-06 21:49 - RA-002 (fresh session)
+- Converged two character-identical `_fail` methods in
+  lca/infrastructure/tools/collaboration/delegate_tool.py into one module-level
+  helper `_fail_observation(start, message)`. Both TeamCastTool and
+  HandoffToPeerTool call sites redirected; both `def _fail` methods deleted
+  (grep confirms only the helper definition remains).
+- Helper docstring explicitly warns it is NOT behavior-identical to
+  tools._shared.fail_observation (different payload shape) to prevent future
+  conflation — the assess session's key gotcha for this story.
+- Files changed: lca/infrastructure/tools/collaboration/delegate_tool.py
+  (+12/-22), raphy/prd.json, raphy/progress.txt
+- Verified: `uv run pytest tests/infrastructure/tools/ --no-cov -q` -> 150 passed;
+  `uv run ruff check` clean on the touched file. Observation payload shape
+  unchanged (method body moved verbatim).
+- **Learnings for future iterations:**
+  - When a story's grep criterion uses a substring pattern (`def _fail`), the new
+    helper name (`_fail_observation`) will still match it — verify with the full
+    line context, not just the count.
+  - Mechanical moves (method -> module function, body verbatim) need no new
+    behavior-pinning test; the existing suite passing is sufficient evidence.
+---
+
+## 2026-10-06 21:5x - RA-003 (fresh session) - DROPPED
+- Investigated unifying `_emit_lifecycle_pre/post/fail` in
+  lca/plugins/events/hooks/model_visible/adapter.py behind one dispatch seam.
+  Verdict: **dropped, not forced** — the three phases need genuinely different seams.
+- Evidence:
+  - pre: `(hook, kwargs)` -> `_model_identity(kwargs)` -> `request_model(turn, step, provider, model)`
+  - post: `(hook, response)` -> `_tool_calls_payload` + text/usage extraction ->
+    `complete_model(turn, step, usage, content, tool_calls)`; carries a behavior-critical
+    docstring (appending here duplicates every turn in derive_messages) that must stay
+    with the phase, not a generic seam.
+  - fail: `(hook, error)` -> `fail_model(turn, step, error)` direct passthrough.
+  - Shared scaffolding is 2 lines of idiom (`step = hook._step_counter` + deferred import),
+    and the three deferred imports bind DIFFERENT names — not even the import is shared.
+  - A unified seam would need getattr string-dispatch or Callable+**kwargs threading:
+    explicit, type-safe direct calls traded for indirection. Deletion test fails.
+  - Closed phase set (exactly pre/post/fail); no future-phase leverage.
+- No code changed. Targeted tests: 229 passed, 1 pre-existing unrelated failure
+  (tests/scenario/profile/test_profile_resolve_boot.py — lca_kernel.boot.boot missing
+  attribute, zero tracked modifications in tree, unrelated to model_visible).
+- prd.json: RA-003 `"dropped": true` with reason in notes; `passes` left false per
+  the no-fake-pass rule.
+- **Learnings for future iterations:**
+  - "Same shape" != "same seam": diff the imported names and call signatures before
+    claiming duplication — here the imports differed, which kills the unification case.
+  - A docstring that documents a behavioral trap (double-append) is load-bearing;
+    converging the function would orphan or dilute it. Check for such docstrings
+    before converging.
+  - When the assess session flags a story "worth exploring / droppable", the explore
+    step is real work: investigate, decide, record — dropping with evidence is a
+    completed iteration, not a skipped one.
+---
