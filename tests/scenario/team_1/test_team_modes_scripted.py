@@ -43,12 +43,6 @@ from tests.harness.modes import ALL_MODES, scripted_llm_for_mode
 from tests.harness.report import format_case_digest
 from tests.harness.runner import run_mode
 from tests.harness.scripted_llm import ScriptedLLMAdapter, multi_delegate, respond
-from tests.harness.trace_assert import (
-    assert_must_include_spans,
-    assert_parent_chain_walkable,
-    assert_shared_trace_id,
-    assert_trace_expect,
-)
 from tests.support.session_gate_helpers import bound_session
 from tests.support.strategy_registry import build_strategy_registry
 
@@ -59,36 +53,8 @@ async def _boot_default_ctx_for_module() -> None:
     await ensure_default_ctx()
 
 
-# team 模式（board 治理探针）的期望
-MODE_EXPECT: dict[str, dict] = {
-    "team": {
-        "result": {"status": "completed"},
-        "trace": {
-            "must_include_spans": [
-                SpanName.RUN_TEAM.value,
-                SpanName.DELEGATION.value,
-                SpanName.TRANSPORT_REQUEST.value,
-                SpanName.LLM_CHAT.value,
-            ],
-            "parent_root": SpanName.RUN_TEAM.value,
-            "parent_leaf": SpanName.LLM_CHAT.value,
-        },
-        "invariants": ["team_root", "board_consults_members", "lead_transport_chain"],
-    },
-}
-
-
 def _llm_for_mode(mode: str) -> ScriptedLLMAdapter:
     return scripted_llm_for_mode(mode)
-
-
-def _assert_mode(mode: str, outcome) -> None:
-    assert_trace_expect(
-        outcome.bundle,
-        outcome.result,
-        MODE_EXPECT[mode],
-        case=f"mode={mode}",
-    )
 
 
 def _journal_event_types(col: InMemoryObservability) -> list[type]:
@@ -96,62 +62,89 @@ def _journal_event_types(col: InMemoryObservability) -> list[type]:
     return [type(stamped.event) for stamped in col.store.events]
 
 
+def _journal_order(col: InMemoryObservability) -> list[str]:
+    """Journal-as-Truth (ADR-0037): 链路断言走 journal 事件发射顺序。"""
+    return [type(stamped.event).__name__ for stamped in col.store.events]
+
+
 @pytest.mark.asyncio
 @pytest.mark.parametrize("mode", ALL_MODES)
 async def test_mode_happy_path_scripted(mode: str) -> None:
-    """team 模式 happy path：结构 + 链路；失败时 digest 在 AssertionError 里。"""
-    outcome = await run_mode(mode, _llm_for_mode(mode), objective=f"probe {mode}")
-    _assert_mode(mode, outcome)
+    """team 模式 happy path：结构 + 链路；失败时 digest 在 AssertionError 里。
+
+    ADR-0037 迁移：run.team/delegation/llm.chat 等语义 span 已退役，
+    改断 journal 事件（2026-10-07 probe 实证：board 探针发射
+    TeamRunStarted(mandate=board, lead_role=Lead, members=(Alice, Bob))
+    → AgentRunStarted(Lead) → AgentRunFinished → TeamRunFinished）。
+    """
+    llm = _llm_for_mode(mode)
+    with bound_session(f"mode-{mode}-happy"):
+        outcome = await run_mode(mode, llm, objective=f"probe {mode}")
+    assert outcome.result.status == "completed", format_case_digest(
+        outcome.bundle, title=mode, result=outcome.result
+    )
+    types = _journal_event_types(outcome.collector)
+    assert TeamRunStarted in types and TeamRunFinished in types, types
+    assert AgentRunStarted in types and AgentRunFinished in types, types
+    started = [
+        e.event for e in outcome.collector.store.events if isinstance(e.event, TeamRunStarted)
+    ]
+    assert len(started) == 1, types  # team_root：单容器开闭
+    card = started[0]
+    assert card.mandate == "board" and card.lead_role == "Lead", card
+    assert set(card.members) == {"Alice", "Bob"}, card  # board 收口名单
+    order = _journal_order(outcome.collector)
+    assert order.index("TeamRunStarted") < order.index("AgentRunStarted"), order
+    assert order.index("AgentRunFinished") < order.index("TeamRunFinished"), order
+    # board 首轮短路仍以一次 Lead LLM turn 收口（见 tests/harness/modes.py 注释）
+    assert len(llm.calls) >= 1, "scripted LLM adapter was never invoked"
 
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("mode", ALL_MODES)
 async def test_mode_chain_visible(mode: str) -> None:
-    """team 模式额外确认：run.team→llm 可走通且 digest 字段齐全。"""
-    outcome = await run_mode(mode, _llm_for_mode(mode), objective=f"chain {mode}")
+    """team 模式额外确认：team 容器 → agent run → LLM 链路可走通且 digest 字段齐全。
+
+    ADR-0037 迁移：span_hist/paths 等 span 拓扑断言退役；链路改断
+    journal 发射顺序 + scripted adapter 的真实调用记录。
+    """
+    llm = _llm_for_mode(mode)
+    with bound_session(f"mode-{mode}-chain"):
+        outcome = await run_mode(mode, llm, objective=f"chain {mode}")
     digest = format_case_digest(outcome.bundle, title=mode, result=outcome.result)
-    assert "span_hist:" in digest
-    assert "paths:" in digest
-    assert "TRACE" in digest or "--- TRACE" in digest
-    assert outcome.bundle.has_path_to(SpanName.RUN_TEAM.value, SpanName.LLM_CHAT.value), digest
+    assert f"=== {mode} ===" in digest
+    assert "result.status=" in digest
+    assert "TRACE" in digest
+    order = _journal_order(outcome.collector)
+    assert order.index("TeamRunStarted") < order.index("AgentRunStarted"), digest
+    assert order.index("AgentRunStarted") < order.index("TeamRunFinished"), digest
+    assert len(llm.calls) >= 1, digest  # 链路末端：LLM 真实被调用
 
 
 @pytest.mark.asyncio
 async def test_team_parent_chain_to_member_llm() -> None:
-    outcome = await run_mode("team", _llm_for_mode("team"), objective="team chain probe")
-    assert_must_include_spans(
-        outcome.bundle,
-        [
-            SpanName.RUN_TEAM.value,
-            SpanName.DELEGATION.value,
-            SpanName.TRANSPORT_REQUEST.value,
-            SpanName.TRANSPORT_RESPONSE.value,
-            SpanName.RUN_AGENT.value,
-            SpanName.LLM_CHAT.value,
-        ],
-        result=outcome.result,
+    """Lead 链路：team 容器 → Lead agent run → LLM 调用。
+
+    ADR-0037 迁移：旧断言要 run.team→transport→run.agent(成员)→llm.chat 的
+    span 父子链；board 探针当前只发射 Lead 的 agent run（成员经 board 流程
+    内联收口，见 modes.py 注释与 2026-10-07 probe 实证），journal 链路为
+    TeamRunStarted → AgentRunStarted(Lead) → AgentRunFinished → TeamRunFinished。
+    """
+    llm = _llm_for_mode("team")
+    with bound_session("team-chain-probe"):
+        outcome = await run_mode("team", llm, objective="team chain probe")
+    events = outcome.collector.store.events
+    started = [e.event for e in events if isinstance(e.event, TeamRunStarted)]
+    assert len(started) == 1 and started[0].lead_role == "Lead", _journal_event_types(
+        outcome.collector
     )
-    assert_parent_chain_walkable(
-        outcome.bundle,
-        SpanName.RUN_TEAM.value,
-        SpanName.TRANSPORT_REQUEST.value,
-        result=outcome.result,
-    )
-    assert_parent_chain_walkable(
-        outcome.bundle,
-        SpanName.RUN_TEAM.value,
-        SpanName.LLM_CHAT.value,
-        result=outcome.result,
-    )
-    assert_shared_trace_id(outcome.bundle, outcome.result)
-    roles = {
-        s.attributes.get("agent_role")
-        for s in outcome.bundle.by_name(SpanName.RUN_AGENT.value)
-        if s.attributes.get("agent_role")
-    }
-    assert "Lead" in roles and len(roles) >= 2, format_case_digest(
-        outcome.bundle, title="team roles", result=outcome.result
-    )
+    agent_starts = [e.event for e in events if isinstance(e.event, AgentRunStarted)]
+    roles = {e.agent_role for e in agent_starts}
+    assert roles == {"Lead"}, roles
+    order = [type(e.event).__name__ for e in events]
+    assert order.index("TeamRunStarted") < order.index("AgentRunStarted"), order
+    assert order.index("AgentRunFinished") < order.index("TeamRunFinished"), order
+    assert len(llm.calls) >= 1, "scripted LLM adapter was never invoked"
 
 
 # ── Edge case tests（直接构造 team，不依赖 mode catalog） ─────────────
