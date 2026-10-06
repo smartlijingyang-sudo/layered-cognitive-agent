@@ -39,6 +39,8 @@ Agent 的 LLM 用脚本化 ``SequenceScriptedLLM``：按调用次序返回硬编
 
 from __future__ import annotations
 
+__keep_llm_key__ = True  # booted runs need a dummy credential for the reasoner fail-loud gate (see tests/conftest.py)
+
 import asyncio
 import csv
 import json
@@ -213,9 +215,14 @@ def factory():
 
 
 @contextmanager
-def bind_journal():
+def bind_journal(*, session_id: str = "cordis-creator-real"):
+    # todo-38 made facade.record() fail-loud without a bound Session;
+    # production binds it via the Session runtime, so the scenario must
+    # bind one explicitly (same pattern as the sibling cordis scenarios).
+    from tests.support.session_gate_helpers import bound_session
+
     journal = MemoryJournal()
-    with bind_backends(BoundObservability(journal=journal)):
+    with bound_session(session_id), bind_backends(BoundObservability(journal=journal)):
         yield journal
 
 
@@ -451,6 +458,11 @@ def _wrap_plugin_as_tool(*, name: str, instance: Any, meta: dict[str, Any]) -> A
                 return self._name
 
             description: ClassVar[str] = plugin_description
+            # ADR-0256 fail-fast: ToolsService.register rejects tools
+            # without a declared namespace. A creator-authored plugin has
+            # no factory-declared namespace; 'ext' (external extension)
+            # is the closest of the 9 taxonomy domains.
+            namespace: ClassVar[str] = "ext"
             parameters: ClassVar[dict[str, Any]] = {
                 "type": "object",
                 "properties": {

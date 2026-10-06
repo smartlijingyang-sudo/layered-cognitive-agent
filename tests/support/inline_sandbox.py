@@ -106,10 +106,16 @@ class InlineSandbox:
         del timeout_s
         from lca.infrastructure.computer.guest import build_shell_script
 
-        return await self.run(
-            build_shell_script(command=command),
-            invocation_id=str(kwargs.get("invocation_id", "") or ""),
-        )
+        script = build_shell_script(command=command)
+        invocation_id = str(kwargs.get("invocation_id", "") or "")
+        session_id = str(kwargs.get("session_id", "") or "")
+        if session_id:
+            # Real adapters execute terminal commands inside the backend
+            # session (RunBoundSandboxRuntime always passes session_id);
+            # route through the session VFS so per-session staged files
+            # and execute()/run_terminal() share filesystem state.
+            return await self.run_in_session(session_id, script, invocation_id=invocation_id)
+        return await self.run(script, invocation_id=invocation_id)
 
     def _exec(self, code: str, vfs: dict[str, bytes], invocation_id: str) -> SandboxResult:
         emitter = SandboxStreamEmitter(invocation_id)
