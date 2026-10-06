@@ -87,16 +87,16 @@ def filter_tools_by_assistant(
     kept: list[Tool] = []
     for tool in tools:
         keys = _tool_matching_names(tool)
-        if bool(keys & deny):
+        if keys & deny:
             continue
         required_grant = _required_grant(tool)
         if required_grant:
             if required_grant in grants:
                 kept.append(tool)
             continue
-        if not allow or bool(keys & allow):
+        if not allow or keys & allow:
             kept.append(tool)
-        elif bool(keys & _VOCAL_SYSTEM_TOOLS):
+        elif keys & _VOCAL_SYSTEM_TOOLS:
             # 声带系统工具始终保留（gated 唯一发声通道，见模块 docstring）。
             kept.append(tool)
     return tuple(kept)

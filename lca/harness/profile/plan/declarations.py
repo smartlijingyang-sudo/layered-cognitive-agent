@@ -88,7 +88,7 @@ def flatten_keys(mapping: dict[str, Any], prefix: str = "") -> list[str]:
 def expand_entry_environment(entries: list[dict[str, Any]], env: Mapping[str, str]) -> None:
     """Resolve enabled declaration environment references in place."""
     for entry in entries:
-        if bool(entry.get("disabled")):
+        if entry.get("disabled"):
             continue
         plugin_id = str(entry.get("id") or "")
         raw_config = entry.get("config") or {}
