@@ -47,7 +47,7 @@ from lca.contracts.protocols.session.telemetry.telemetry import (
     TelemetryRecord,
 )
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
-from lca.plugins.session._shared import require_observer_hook
+from lca.plugins.session._shared import require_observer_hook, session_id_of
 from lca_kernel.events.session.session import SessionEvent
 
 _log = structlog.get_logger(__name__)
@@ -166,7 +166,7 @@ class SessionTelemetryCapture:
         释放到日志尾。单条失败 contained，不打断同一次重放的其余记录。
         游标推进到本次处理末尾，重复调用幂等。返回释放到后端的记录数。
         """
-        session_id = _session_id(session)
+        session_id = session_id_of(session)
         with self._lock:
             cursor = self._cursors.get(session_id, _CURSOR_INIT)
         delivered = 0
@@ -217,7 +217,7 @@ class SessionTelemetryCapture:
             return cast("Callable[[], None]", session.observe(_feedback_observer))
 
         def _observer(sess: Any, event: SessionEvent) -> None:
-            self._contain(lambda: self._release(_session_id(sess), event))
+            self._contain(lambda: self._release(session_id_of(sess), event))
 
         return cast("Callable[[], None]", session.observe(_observer))
 
@@ -338,14 +338,6 @@ class SessionTelemetryCapture:
         return self._deliver(record)
 
 
-def _session_id(session: Any) -> str:
-    """从 Session 实例取 id；缺 id 属性时回退 ``"unknown"``。"""
-    sid = getattr(session, "id", None)
-    if isinstance(sid, str) and sid:
-        return sid
-    return "unknown"
-
-
 @plugin(
     id="lca.plugins.session.telemetry_capture",
     provides=["session.telemetry"],
@@ -423,7 +415,7 @@ def _seed_telemetry_cursor(capture: SessionTelemetryCapture, session: Any) -> No
     seed_length = getattr(header, "seed_length", None)
     if not isinstance(seed_length, int) or seed_length <= 0:
         return
-    capture.reset_handoff_cursor(_session_id(session), through_seq=seed_length - 1)
+    capture.reset_handoff_cursor(session_id_of(session), through_seq=seed_length - 1)
 
 
 def _attach_to_store(store: Any, capture: SessionTelemetryCapture) -> None:

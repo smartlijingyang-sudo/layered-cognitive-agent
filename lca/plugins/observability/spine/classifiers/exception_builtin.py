@@ -60,6 +60,7 @@ from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import
     OwnershipDeclaration,
 )
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
+from lca.plugins.observability.spine.classifiers._shared import current_exception_of
 
 # ── builtin exception map ───────────────────────────────────────────
 #
@@ -266,7 +267,7 @@ class ExceptionBuiltinClassifier:
         if phase != "exception":
             return {}
 
-        exc = _current_exception(ctx)
+        exc = current_exception_of(ctx)
         if exc is None:
             return {}
 
@@ -288,23 +289,6 @@ class ExceptionBuiltinClassifier:
             "edge_case_id": edge_case_id,
             "exception_class": exc_type.__name__,
         }
-
-
-def _current_exception(ctx: Any) -> BaseException | None:
-    """Return ``ctx.current_exception`` if available, else ``None``.
-
-    The ``FieldProducer`` Protocol types ``ctx`` as ``Any``; the spine
-    contract (ADR-0165 / ADR-0165.1 §7.5.2) is that producers read
-    ``ctx.current_exception`` during the ``"exception"`` phase. Tests
-    and stubs may pass any object exposing the attribute; production
-    wiring via ``wrap_instrument`` sets it before the producer runs.
-    """
-    if ctx is None:
-        return None
-    current = getattr(ctx, "current_exception", None)
-    if isinstance(current, BaseException):
-        return current
-    return None
 
 
 @plugin(

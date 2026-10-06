@@ -37,6 +37,9 @@ from lca.infrastructure.observability.backends.run_locator_fs import (
 from lca.infrastructure.observability.journal.step.narrative_writer import (
     StepNarrativeWriter,
 )
+from lca.infrastructure.observability.journal.step.narrative_writer.sections import (
+    _format_duration,
+)
 from lca.infrastructure.observability.journal.step.reader import read_step_document
 
 _OUTCOME_ICON: dict[str | None, str] = {
@@ -47,17 +50,6 @@ _OUTCOME_ICON: dict[str | None, str] = {
 }
 
 _DEFAULT_TRACES_ROOT = Path("traces")  # CLI 默认 traces 根目录
-
-
-def _format_duration(duration_ms: int | None) -> str:
-    if duration_ms is None:
-        return "—"
-    if duration_ms < 1000:
-        return f"{duration_ms}ms"
-    seconds = duration_ms / 1000
-    if seconds < 60:
-        return f"{seconds:.1f}s"
-    return f"{seconds / 60:.1f}m"
 
 
 def _summarize_step_one_line(step: JournalStep) -> str:
