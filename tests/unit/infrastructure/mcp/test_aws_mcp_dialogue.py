@@ -1,5 +1,10 @@
 """Test verifying Agent boots with AWS MCP and executes AWS MCP tools in dialogue loop."""
 
+# Scripted/mock run: boots the kernel, so it must pass the reasoner
+# fail-loud credential gate (see tests/conftest.py _ensure_no_env).
+# The mock/scripted adapter never touches the network; ambient dummy key is enough.
+__keep_llm_key__ = True
+
 from typing import ClassVar
 from unittest.mock import AsyncMock, MagicMock
 

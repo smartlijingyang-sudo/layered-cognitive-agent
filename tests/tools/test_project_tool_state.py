@@ -10,6 +10,11 @@ from typing import Any
 
 import pytest
 
+# Import sandbox_contracts to populate dynamic-tool contracts (runCommand,
+# executeCode, ...). Importing the module registers them in REGISTRY as a
+# side effect; without it get_contract() returns None and every per-tool
+# projection degrades to {}.
+import lca.infrastructure.tools.contract.sandbox.contracts  # noqa: F401
 from lca.contracts.models.core.execution.decision import Observation
 from lca.contracts.models.observability.journal.journal import ToolInvoked
 from lca.infrastructure.tools.contract import (
