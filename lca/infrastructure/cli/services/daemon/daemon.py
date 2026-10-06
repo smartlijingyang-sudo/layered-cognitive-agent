@@ -28,12 +28,6 @@ from lca.infrastructure.cli.service.service import (
 from lca.infrastructure.cli.state.state import ChangeReport, StateStore
 from lca.infrastructure.cli.sudo.sudo import Sudo
 
-# pkill/pgrep match pattern for the sandbox-user connect daemon node process.
-# Single source shared by DaemonService and
-# host_runtime.providers.user_cli.CLIProvider (start_daemon/stop_daemon);
-# a change to the daemon command line only needs one edit.
-_CONNECT_PROC_PATTERN = "node.*index.js.*connect"
-
 
 class DaemonService:
     """Sandbox-user CLI daemon.
@@ -118,40 +112,25 @@ class DaemonService:
 
         return ServiceState(status=ServiceStatus.STOPPED, detail="process died")
 
-    def _kill_existing(self, pattern: str, timeout: float = 10.0) -> None:
-        """Kill existing daemon processes matching ``pattern``, then wait until gone.
-
-        Owns the "exactly one live daemon" invariant: a bare pkill is racy —
-        the old process may still be shutting down when start() spawns the new
-        one, and two daemons fight over the same device id (the PR #40 crash).
-        pkill still goes through sudo (PR #40 behavior kept): the invoking user
-        cannot signal sandbox-user's processes, and a silent pkill failure
-        leaves a stale daemon running.
-        """
-        pid = self._read_user_pid()
-        self._sudo.run(
-            ["pkill", "-u", self._config.user, "-f", pattern],
-            timeout=10,
-        )
-        if pid is None:
-            return
-        deadline = time.monotonic() + timeout
-        while pid_alive(pid):
-            if time.monotonic() >= deadline:
-                break
-            time.sleep(0.2)
-
     def stop(self) -> ServiceState:
         """Stop the daemon."""
-        self._kill_existing(_CONNECT_PROC_PATTERN)
+        # Kill by user process match. Must run via sudo: the invoking user
+        # cannot signal sandbox-user's processes, and a silent pkill failure
+        # leaves a stale daemon running after restart (two daemons fight over
+        # the same device id, the old one crashes on gateway outage).
+        self._sudo.run(
+            ["pkill", "-u", self._config.user, "-f", "node.*index.js.*connect"],
+            timeout=10,
+        )
 
         self._sudo.rm(self._user_state / "connect.pid")
 
         return ServiceState(status=ServiceStatus.STOPPED)
 
     def restart(self) -> ServiceState:
-        """Restart the daemon, confirming the old process is dead before spawning."""
+        """Restart the daemon."""
         self.stop()
+        time.sleep(0.5)
         return self.start()
 
     # ── Setup ─────────────────────────────────────────────────────────
@@ -441,7 +420,7 @@ exec node {cli_js} connect \\
 
         time.sleep(1)
         pid_result = subprocess.run(
-            ["pgrep", "-u", owner, "-f", _CONNECT_PROC_PATTERN],
+            ["pgrep", "-u", owner, "-f", "node.*index.js.*connect"],
             capture_output=True,
             text=True,
             timeout=5,

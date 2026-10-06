@@ -10,7 +10,6 @@ import tempfile
 import time
 from pathlib import Path
 
-from lca.infrastructure.cli.services.daemon.daemon import _CONNECT_PROC_PATTERN
 from lca.infrastructure.host_runtime.config import HostRuntimeConfig, UserConfig
 from lca.infrastructure.host_runtime.providers import CheckResult, Provider, StatusReport
 
@@ -80,7 +79,7 @@ class CLIProvider(Provider):
         self.run_sudo(["chown", f"{self.user.name}:{self.user.name}", str(log_file)])
         self._launch_daemon(start_script)
         time.sleep(3)
-        result = self.run(["pgrep", "-u", self.user.name, "-f", _CONNECT_PROC_PATTERN])
+        result = self.run(["pgrep", "-u", self.user.name, "-f", "node.*index.js.*connect"])
         if result.returncode != 0 or not result.stdout.strip():
             return False
         pid = int(result.stdout.strip().split("\n")[-1])
@@ -92,7 +91,7 @@ class CLIProvider(Provider):
         """Stop the user's connect daemon and remove its pid file."""
         if not self.user:
             return True
-        self.run(["pkill", "-u", self.user.name, "-f", _CONNECT_PROC_PATTERN])
+        self.run(["pkill", "-u", self.user.name, "-f", "node.*index.js.*connect"])
         pid_file = Path(self.user.state_dir) / "connect.pid"
         if pid_file.is_file():
             self.run_sudo(["rm", "-f", str(pid_file)])
