@@ -1,7 +1,12 @@
-"""Team mode scripted 测试（ADR-0052）：team 模式跑通 + trace 断言。
+"""Team mode scripted 测试（ADR-0052）：team 模式跑通 + trace/journal 断言。
 
 个体协作策略（pipeline/debate/fan_out 等）的测试走 edge case 测试和
 tests/fixtures/team_scenarios/*.yaml + tests/support/scenario_loader.py。
+
+ADR-0037 迁移中：run.team/run.agent/delegation/llm.chat 等 span 已退役，
+edge case 测试改断 journal 事件（TeamRunStarted/Finished、AgentRunStarted/Finished、
+DelegationIssued），断言前必须用 bound_session 绑定 publish Session
+（否则 record() 静默跳过）。transport.request/response 等机制平面 span 仍在。
 """
 
 from __future__ import annotations
@@ -12,6 +17,13 @@ import pytest
 
 from lca.application.api.api import Agent, Team, TeamLead, ensure_default_ctx
 from lca.contracts.atoms.telemetry.telemetry import SpanName
+from lca.contracts.models.observability.journal.journal import (
+    AgentRunFinished,
+    AgentRunStarted,
+    DelegationIssued,
+    TeamRunFinished,
+    TeamRunStarted,
+)
 from lca.contracts.models.team.team.coordination import (
     STRATEGY_KEY_DEBATE,
     STRATEGY_KEY_FAN_OUT,
@@ -77,6 +89,11 @@ def _assert_mode(mode: str, outcome) -> None:
         MODE_EXPECT[mode],
         case=f"mode={mode}",
     )
+
+
+def _journal_event_types(col: InMemoryObservability) -> list[type]:
+    """Journal-as-Truth (ADR-0037): span 拓扑已退役，断言走 journal 事件类型。"""
+    return [type(stamped.event) for stamped in col.store.events]
 
 
 @pytest.mark.asyncio
@@ -146,9 +163,13 @@ async def test_edge_single_member_pipeline() -> None:
     llm = ScriptedLLMAdapter({"Only": [respond("one")]})
     agent = Agent(role="Only", goal="g", backstory="b", tools=[], llm=llm, observability=col)
     team = Team(members=[agent], coordination=Pipeline(), observability=col)
-    result = await team.run("solo pipeline")
+    # ADR-0037: run.team/delegation span 退役 → 断言 journal 事件；record() 需 bound publish Session。
+    with bound_session("team-pipeline-edge"):
+        result = await team.run("solo pipeline")
     assert result.status == "completed", format_case_digest(col.bundle(), result=result)
-    assert SpanName.DELEGATION.value in col.bundle().names()
+    types = _journal_event_types(col)
+    assert TeamRunStarted in types and TeamRunFinished in types, types
+    assert DelegationIssued in types, types
 
 
 @pytest.mark.asyncio
@@ -157,9 +178,12 @@ async def test_edge_fan_out_one_member() -> None:
     llm = ScriptedLLMAdapter({"Only": [respond("one")]})
     agent = Agent(role="Only", goal="g", backstory="b", tools=[], llm=llm, observability=col)
     team = Team(members=[agent], coordination=FanOut(), observability=col)
-    result = await team.run("fanout1")
+    with bound_session("team-fanout-edge"):
+        result = await team.run("fanout1")
     assert result.status == "completed", format_case_digest(col.bundle(), result=result)
-    assert SpanName.DELEGATION.value in col.bundle().names()
+    types = _journal_event_types(col)
+    assert TeamRunStarted in types and TeamRunFinished in types, types
+    assert DelegationIssued in types, types
 
 
 @pytest.mark.asyncio
@@ -171,10 +195,11 @@ async def test_edge_peer_relay_first_wins() -> None:
     a = Agent(role="Alice", goal="g", backstory="b", tools=[], llm=llm, observability=col)
     b = Agent(role="Bob", goal="g", backstory="b", tools=[], llm=llm, observability=col)
     team = Team(members=[a, b], coordination=PeerRelay(), observability=col)
-    result = await team.run("relay")
+    with bound_session("team-relay-edge"):
+        result = await team.run("relay")
     assert result.status == "completed", format_case_digest(col.bundle(), result=result)
-    invokes = col.bundle().by_name(SpanName.DELEGATION.value)
-    assert len(invokes) >= 1, format_case_digest(col.bundle(), result=result)
+    issued = [t for t in _journal_event_types(col) if t is DelegationIssued]
+    assert len(issued) >= 1, _journal_event_types(col)
 
 
 @pytest.mark.asyncio
@@ -207,11 +232,12 @@ async def test_edge_budget_exhaustion() -> None:
         max_steps=0,
         observability=col,
     )
-    result = await agent.run("budget edge")
+    with bound_session("agent-budget-edge"):
+        result = await agent.run("budget edge")
     assert result is not None
-    assert SpanName.RUN_AGENT.value in col.bundle().names(), format_case_digest(
-        col.bundle(), result=result
-    )
+    # ADR-0037: run.agent span 退役 → 断言 journal；预算耗尽仍应先发射 RunStarted。
+    types = _journal_event_types(col)
+    assert AgentRunStarted in types, types
 
 
 @pytest.mark.asyncio
@@ -241,15 +267,20 @@ async def test_orchestration_registry_completeness() -> None:
 
 
 @pytest.mark.asyncio
-async def test_llm_chat_span_emitted() -> None:
+async def test_llm_adapter_invoked() -> None:
+    """ADR-0037 迁移：llm.chat/loop.phase.think span 已退役。
+
+    原断言意图是"agent 跑起来确实调了 LLM"——现在用更直接的证据：
+    scripted adapter 的调用记录 + agent run 的 journal 起止事件。
+    """
     col = InMemoryObservability()
     llm = ScriptedLLMAdapter({"Solo": [respond("hi")]})
     agent = Agent(role="Solo", goal="g", backstory="b", tools=[], llm=llm, observability=col)
-    await agent.run("hello")
-    names = col.bundle().names()
-    assert SpanName.LLM_CHAT.value in names and SpanName.LOOP_PHASE_THINK.value in names, (
-        format_case_digest(col.bundle())
-    )
+    with bound_session("agent-llm-edge"):
+        await agent.run("hello")
+    assert len(llm.calls) >= 1, "scripted LLM adapter was never invoked"
+    types = _journal_event_types(col)
+    assert AgentRunStarted in types and AgentRunFinished in types, types
 
 
 @pytest.mark.asyncio
