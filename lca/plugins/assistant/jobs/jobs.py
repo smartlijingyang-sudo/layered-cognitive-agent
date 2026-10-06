@@ -73,6 +73,7 @@ from lca.harness.plugin_api import EffectClass, PluginContext, PluginKind, plugi
 from lca.plugins.assistant.events._events import (
     AssistantJobFiredEventPayload,
     AssistantJobRegisteredEventPayload,
+    emit_assistant_ep_or_log,
     emit_fact_event,
 )
 from lca.plugins.assistant.home._home_layout import load_manifest
@@ -298,10 +299,7 @@ class _AssistantJobsImpl(AssistantJobs):
 
     def _emit(self, event: str, payload: Mapping[str, Any]) -> None:
         """发 EP；无 emitter 时仅 log（单元测试路径）。"""
-        if self._emit_fn is None:
-            log.info("assistant.jobs.ep.no_emitter", ep=event, payload=dict(payload))
-            return
-        self._emit_fn(event, dict(payload))
+        emit_assistant_ep_or_log(self._emit_fn, "assistant.jobs", event, payload)
 
 
 # ── helpers ──────────────────────────────────────────────────────────

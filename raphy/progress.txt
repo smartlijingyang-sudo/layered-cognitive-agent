@@ -32,3 +32,39 @@ Started: 2026-10-06 (assess session)
 - When converging, always diff the supposedly-identical bodies field by field first (RA-002 vs `tools._shared.fail_observation` looked the same until the Observation kwargs were compared).
 - The `## Codebase Patterns` section above is the shared memory; add genuinely reusable idioms only.
 ---
+
+## 2026-10-06 21:5x - RA-001 (fresh session)
+- Converged 9 no-emitter-fallback `_emit` methods into one shared seam
+  `lca/plugins/assistant/events/_events.py::emit_assistant_ep_or_log(emit_fn, scope, event, payload)`.
+  Story listed 7 (domain/catalog x3, tool/overlay x1, skill/overlay x3); evolve._emit and
+  jobs._emit were the same seam shape (event+Mapping instead of payload.to_dict()) and
+  criterion 5 demanded a single `ep.no_emitter` call site repo-wide, so all 9 now delegate.
+- Seam home chosen: `_events.py` — all 5 caller files already imported from it, zero new
+  import edges, no plugin->plugin cycle. Follows the `emit_fact_event` convergence idiom
+  (2a2059cca) in the same module, including the Chinese docstring style.
+- Per-caller log scope preserved as a parameter: assistant.catalog / assistant.tool_overlay /
+  assistant.skill_overlay / assistant.evolve / assistant.jobs — emitted `<scope>.ep.no_emitter`
+  event string unchanged. `payload.to_dict()` still passed by the 7 typed-payload callers;
+  evolve/jobs pass their Mapping through (seam does `dict(payload)` internally, identical).
+- Removed now-unused `import structlog` + module logger from domain/catalog/events.py
+  (ruff --fix added the blank line); other 4 files still use their loggers elsewhere.
+- Files changed: lca/plugins/assistant/events/_events.py (+seam),
+  lca/plugins/domain/assistant/catalog/events.py, lca/plugins/assistant/tool/overlay.py,
+  lca/plugins/assistant/skill/overlay/overlay.py, lca/plugins/assistant/evolve/evolve.py,
+  lca/plugins/assistant/jobs/jobs.py, raphy/prd.json, raphy/progress.txt
+- Verified: grep `ep.no_emitter` -> single code call site (in the seam); zero remaining
+  inline `if self._emit[(_fn)] is None` blocks in converged files.
+- Tests: 237 passed (test_catalog/test_tool_overlay/test_skill_overlay/test_evolve/test_jobs
+  + 3 architecture invariant suites + deploy/test_lca_assistant_events), `uv run ruff check`
+  clean on all 6 touched files.
+- **Learnings for future iterations:**
+  - When a story says "N identical X", grep the whole repo for the pattern string before
+    scoping — the assess session found 7, the seam string `ep.no_emitter` revealed 2 more
+    (evolve/jobs) that criterion 5 required converging anyway.
+  - Seam-signature trick: take the already-normalized form (`Mapping` payload dict) as the
+    parameter, not the pre-normalization object — lets typed-payload and dict callers share
+    one seam without overloads.
+  - structlog logger name moves with the log call into the seam module; only the event
+    string is the observable contract — no test asserted on logger names here, but check
+    before assuming.
+---

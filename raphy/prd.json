@@ -19,8 +19,8 @@
         "Do NOT change event names, payload shapes, or the None-emitter fallback semantics"
       ],
       "priority": 1,
-      "passes": false,
-      "notes": "Source: improve-codebase-architecture skill assessment 2026-10-06 (Strong). Deletion test: yes. Follows the established 'converge N identical X' pattern (git: ba2ad56c6, 2a2059cca). Layering note: verify the import direction for the shared helper creates no new plugin->plugin cycle; prefer the domain catalog module if both overlays already depend on it."
+      "passes": true,
+      "notes": "Source: improve-codebase-architecture skill assessment 2026-10-06 (Strong). Deletion test: yes. Follows the established 'converge N identical X' pattern (git: ba2ad56c6, 2a2059cca). Layering note: verify the import direction for the shared helper creates no new plugin->plugin cycle; prefer the domain catalog module if both overlays already depend on it. DONE 2026-10-06: converged 9 (not 7) no-emitter-fallback methods into lca/plugins/assistant/events/_events.py::emit_assistant_ep_or_log — story listed 7, but evolve._emit and jobs._emit were the same seam (criterion 5 demanded a single call site repo-wide). Zero new import edges: all 5 files already imported from _events."
     },
     {
       "id": "RA-002",
