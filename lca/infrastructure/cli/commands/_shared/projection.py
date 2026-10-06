@@ -20,6 +20,24 @@ _DEFAULT_TRACES_ROOT = Path("traces")
 
 # Mirror DEBUG_RUN_META_FAMILIES from contracts/observability/event/meta_event_taxonomy
 # so we do not import from contracts into CLI surface code.
+#
+# This is the module's SINGLE domain-prefix table: the old _EP_PREFIX_FAMILIES
+# split (observation/diagnosis/graph with pure-startswith semantics) is folded
+# in here -- "graph" is defined exactly once.
+#
+# Single match semantic: substring (`p in execution_point`), NOT pure
+# startswith. Chosen because:
+# 1. It reproduces contracts' debug_run_family_for_key exactly
+#    (any(raw_key.startswith(p) or p in raw_key ...), which collapses to
+#    `p in raw_key`). The mirror rule's whole point is that CLI classification
+#    agrees with contracts classification; a different semantic here would
+#    make the mirror lie.
+# 2. It is load-bearing, not sloppy: production execution_points are
+#    "spine."-prefixed ("spine.body.tool.execute.start",
+#    "spine.cognition.prompt_assembler.assemble.end",
+#    "spine.phase_graph.node.start"). Pure startswith would silently drop all
+#    of them from their domains -- filter_by_domain("graph") would count zero
+#    on a real run while load_spine_facts(("graph",)) disagreed with it.
 _DOMAIN_PREFIXES: dict[str, tuple[str, ...]] = {
     "session": ("turn.", "step.started", "step.ended", "message.accepted", "session.created"),
     "llm": ("llm.", "model.", "thinking.", "step.thinking"),
@@ -42,7 +60,18 @@ _DOMAIN_PREFIXES: dict[str, tuple[str, ...]] = {
     "graph": ("phase_graph.",),
     "phase": ("phase.",),
     "kernel": ("kernel.", "agent_loop.", "lifecycle.", "runtime.", "transport."),
+    "observation": ("observation.",),
+    "diagnosis": ("diagnosis.",),
 }
+
+
+def _matches_domain(execution_point: str, prefixes: tuple[str, ...]) -> bool:
+    """The module's single domain-match semantic: substring match.
+
+    `ep.startswith(p)` implies `p in ep`, so the old
+    `ep.startswith(p) or p in ep` disjunction collapses to `p in ep`.
+    """
+    return any(p in execution_point for p in prefixes)
 
 
 class SpineRow(TypedDict, total=False):
@@ -112,25 +141,8 @@ def filter_by_domain(
     return [
         e
         for e in events
-        if any(
-            str(e.get("execution_point", "")).startswith(p)
-            or p in str(e.get("execution_point", ""))
-            for p in prefixes
-        )
+        if _matches_domain(str(e.get("execution_point", "")), prefixes)
     ]
-
-
-# EP-prefix families for the unified domain projection. Unlike _DOMAIN_PREFIXES
-# (keyed on DEBUG_RUN_META_FAMILIES with substring semantics), these families
-# match by pure startswith on execution_point -- the exact semantics the
-# observation CLI modules hand-rolled in their private _load_facts loops.
-# This function is the delete-when target of the SHARED_LOADER_EXEMPT entries
-# in scripts/lca-cli-shape.py.
-_EP_PREFIX_FAMILIES: dict[str, tuple[str, ...]] = {
-    "observation": ("observation.",),
-    "diagnosis": ("diagnosis.",),
-    "graph": ("phase_graph.",),
-}
 
 
 def load_spine_facts(
@@ -139,23 +151,27 @@ def load_spine_facts(
     *,
     traces_root: Path | None = None,
 ) -> list[SpineRow]:
-    """Read the spine ledger and keep rows in the named EP-prefix families.
+    """Read the spine ledger and keep rows in the named domain-prefix families.
 
     Fail-soft like load_spine_events (missing file / bad JSON -> []).
     Unknown family names raise ValueError; known families are the keys of
-    the module's EP-prefix family map.
+    the module's single domain-prefix table. Match semantic is the module's
+    `_matches_domain` (substring), shared with `filter_by_domain` so both
+    functions never disagree on the same run.
+    This function is the delete-when target of the SHARED_LOADER_EXEMPT
+    entries in scripts/lca-cli-shape.py.
     """
     try:
-        prefixes = tuple(p for f in families for p in _EP_PREFIX_FAMILIES[f])
+        prefixes = tuple(p for f in families for p in _DOMAIN_PREFIXES[f])
     except KeyError as exc:
         raise ValueError(
         f"unknown spine fact family {exc.args[0]!r}; "
-        f"known: {sorted(_EP_PREFIX_FAMILIES)}"
+        f"known: {sorted(_DOMAIN_PREFIXES)}"
         ) from exc
     return [
         e
         for e in load_spine_events(run_id, traces_root)
-        if str(e.get("execution_point") or "").startswith(prefixes)
+        if _matches_domain(str(e.get("execution_point") or ""), prefixes)
     ]
 
 

@@ -2,6 +2,7 @@
 Started: 2026-10-06 (assess session)
 
 ## Codebase Patterns
+- Semantic-change safety: before trusting caller tests to pin a semantic, corpus-diff the REAL production literals (contracts event tables, kernel payload maps) old-vs-new. Test fixtures may use legacy shapes that pass under both semantics and give false confidence (RA-005: debug tests used unprefixed eps, production emits spine.-prefixed).
 - The codebase has an established "converge N identical X into one shared Y" idiom (git: ba2ad56c6 converged 8 `_fail` builders into `tools._shared.fail_observation`; 2a2059cca converged 5 `_emit` closures into `events.emit_fact_event`; 9fecd23a0 deduped `_latest_run` into `domain.latest_run`). New convergence stories should follow this exact shape: extract, delegate, grep-verify single call site, pin behavior with tests.
 - Assistant event emitters use a no-emitter-fallback seam: `if self._emit is None: log.info('<scope>.ep.no_emitter', ...)` else `self._emit(EVENT, payload.to_dict())`. The log scope string differs per caller (assistant.catalog / assistant.tool_overlay / assistant.skill_overlay) and must be preserved as a parameter, not hardcoded, when converging.
 - `tools._shared.fail_observation` is NOT behavior-identical to the `_fail` methods in `delegate_tool.py` (different Observation construction: payload=None/error=/extra= vs payload dict). Do not conflate them.
@@ -193,3 +194,17 @@ RA-006（P2 Strong：daemon "单活"不变量无 owner，`_kill_existing` 接缝
   - A repo-wide `git grep` for the deleted symbol is the reliable straggler
     check (here: only the test file; docs/assessment/prose mentions stay).
 ---
+## 2026-10-07 00:40 - RA-005 (fresh session)
+- Unified the two domain-prefix tables in `lca/infrastructure/cli/commands/_shared/projection.py` into one `_DOMAIN_PREFIXES` table (13 families; "graph" now defined once) with one match seam `_matches_domain` (substring). Deleted `_EP_PREFIX_FAMILIES`.
+- Semantic chosen: substring, NOT pure startswith -- documented in the module with two reasons: (1) it reproduces contracts' `debug_run_family_for_key` exactly, keeping the mirror rule honest (CLI classification agrees with contracts classification; no contracts import per the deliberate rule); (2) production execution_points are "spine."-prefixed ("spine.body.tool.execute.start", "spine.cognition.prompt_assembler.assemble.end", "spine.phase_graph.node.start") -- pure startswith would silently drop them all from their domains.
+- Real disagreement fixed (not theoretical): `load_spine_facts(("graph",))` used startswith and missed "spine.phase_graph.*" events that `filter_by_domain("graph")` (substring) counted on the same run; both now share `_matches_domain` and agree by construction.
+- `filter_by_domain` behavior unchanged (criterion 4): debug caller tests (test_runs_debug.py, test_runs_debug_health.py) green before and after the change -- no behavior change to record. The story's hinted direction (switch filter_by_domain to startswith) was rejected on evidence: it would zero out domain counts on real "spine."-prefixed data.
+- Files changed: lca/infrastructure/cli/commands/_shared/projection.py, raphy/prd.json, raphy/progress.txt
+- Verified: grep `_EP_PREFIX_FAMILIES` -> only the historical comment mention remains; production-ep spot check via import: spine.body.tool.execute.start->tool, spine.cognition.prompt_assembler.assemble.end->prompt, spine.phase_graph.node.start->graph.
+- Tests: 36 passed (test_projection.py + test_runs_debug.py + test_runs_debug_health.py + test_run_replay_graph_timeline.py + test_trace_show_graph_facts.py, LLM_API_KEY=dummy, --no-cov -q); `uv run ruff check` clean on projection.py.
+- **Learnings for future iterations:**
+  - When a story says "change X's semantics, run the caller's tests to confirm no change", first check whether the tests CAN detect the change: the debug tests used legacy unprefixed eps ("phase_graph.node.start") while production emits "spine."-prefixed ones, so they passed under both semantics. Corpus-diffing real execution_point literals (contracts/event.py + lca_kernel payload maps) old-vs-new caught what the tests could not.
+  - `ep.startswith(p) or p in ep` collapses to `p in ep` -- the startswith disjunct is dead code. The same redundancy lives in contracts' debug_run_family_for_key; the CLI mirror copied it faithfully.
+  - Mid-session the main tree gained another worker's uncommitted edit (lca/framework/graph/strategies/gate_chain_strategy.py, 00:32). Committed only my three files by explicit path and left theirs untouched -- deviated from prompt step 9's "commit the rest" because sweeping others' work is forbidden.
+---
+

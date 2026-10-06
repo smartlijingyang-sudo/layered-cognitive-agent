@@ -85,7 +85,7 @@
         "uv run pytest tests/infrastructure/cli/test_projection.py --no-cov -q passes; uv run ruff check passes on the touched file"
       ],
       "priority": 4,
-      "passes": false,
+      "passes": true,
       "notes": "Source: improve-codebase-architecture skill assessment Round 2 2026-10-06 (Worth exploring, friction walk Q4). Deletion test: concentrates. The contracts-constant alternative was rejected: importing contracts into CLI surface contradicts the module's own documented rule."
     },
     {
