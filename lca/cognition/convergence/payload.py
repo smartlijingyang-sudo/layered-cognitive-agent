@@ -3,11 +3,16 @@
 from __future__ import annotations
 
 from lca.cognition.convergence.constants import MIN_SUBSTANTIVE_STDOUT_CHARS
+from lca.contracts.atoms.enums.enums import ActionType
 from lca.contracts.atoms.semantic.cli_diagnostic import is_cli_diagnostic_output
 from lca.contracts.models.core.execution.decision import Observation
 
 _STDOUT_KEYS = ("output", "stdout", "content", "text")
 _FILE_KEYS = ("files_created", "files")
+
+
+def _is_use_tool(action_type: object) -> bool:
+    return action_type == ActionType.USE_TOOL or action_type == "use_tool"
 
 
 def payload_stdout(payload: object | None, *, limit: int = 4000) -> str:
