@@ -24,7 +24,9 @@ from lca.contracts.models.team.delegation.delegation import find_result
 def cached_delegation_observation(spec: DelegationSpec, state: AgentState) -> Observation | None:
     """幂等短路：回报记录中已有成功返回的 ``(target_role, subtask)`` 直接复用。
 
-    命中时发 ``team.delegation.cache_hit`` v2 Event；不产生 transport 往返。
+    命中时发 ``team.delegation.cache_hit`` v2 Event，同时 record journal
+    ``DelegationCacheHit``（ADR-0037 Stage 6：delegate.cache_hit 词表改判
+    EVENT，由 journal 事件承载）；不产生 transport 往返。
     语义保守：仅拦字面重复，改写措辞的新问题不受影响。
     """
     awareness = state.team_awareness
@@ -45,6 +47,28 @@ def cached_delegation_observation(spec: DelegationSpec, state: AgentState) -> Ob
         step=state.step,
         state=state,
     )
+    # journal 真值：幂等短路是协作叙事的一等公民事件，与 spine fact 同点发射。
+    # 热路径 cheap 检查（todo-38，2026-10-05 裁决）：无可写 journal 的 raw
+    # Session 时跳过，不抛 RuntimeError（record 内部 resolve_raw_session
+    # 为 None 即 fail-loud；v2 事件面的 FakeSession 不满足 journal 写面）。
+    from lca.infrastructure.session.bindings import (
+        active_publish_session,
+        resolve_raw_session,
+    )
+
+    if resolve_raw_session(active_publish_session()) is not None:
+        from lca.contracts.models.observability.journal.journal import (
+            DelegationCacheHit,
+        )
+        from lca.infrastructure.observability import record
+
+        record(
+            DelegationCacheHit(
+                callee_role=hit.target_role,
+                subtask_preview=spec.subtask,
+                step=state.step,
+            )
+        )
     observation = Observation(
         observation_id=new_id("obs"),
         success=True,
