@@ -4,18 +4,14 @@ from __future__ import annotations
 
 from lca.cognition.convergence.material import artifact_count
 from lca.cognition.convergence.payload import (
+    _is_use_tool,
     turn_has_delivery_signal,
 )
 from lca.cognition.convergence.predicates import delivery_satisfied
 from lca.cognition.convergence.producer_tools import is_producer_tool
-from lca.contracts.atoms.enums.enums import ActionType
 from lca.contracts.models.core.policy.convergence import DeliveryEvidence
 from lca.contracts.models.core.state.state import AgentState
 from lca.infrastructure.session.context.turn_control_reader import control_turns
-
-
-def _is_use_tool(action_type: object) -> bool:
-    return action_type == ActionType.USE_TOOL or action_type == "use_tool"
 
 
 def _producer_success_count(state: AgentState) -> int:

@@ -5,12 +5,12 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from lca.cognition.convergence.payload import (
+    _is_use_tool,
     merge_files_created,
     observation_files_created,
     payload_stdout,
     turn_has_delivery_signal,
 )
-from lca.contracts.atoms.enums.enums import ActionType
 from lca.contracts.models.core.perceive.projection import current_manifest_from_state
 from lca.contracts.models.core.state.state import AgentState
 from lca.infrastructure.session.context.turn_control_reader import control_turns
@@ -53,10 +53,6 @@ def artifact_count(state: AgentState) -> int:
         if item.kind == "workspace_artifacts" and isinstance(item.payload, list):
             return len([a for a in item.payload if isinstance(a, dict)])
     return 0
-
-
-def _is_use_tool(action_type: object) -> bool:
-    return action_type == ActionType.USE_TOOL or action_type == "use_tool"
 
 
 def collect_delivery_material(state: AgentState) -> DeliveryMaterial:
