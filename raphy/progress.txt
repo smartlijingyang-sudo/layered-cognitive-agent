@@ -122,3 +122,34 @@ Started: 2026-10-06 (assess session)
     step is real work: investigate, decide, record — dropping with evidence is a
     completed iteration, not a skipped one.
 ---
+
+---
+
+## 2026-10-06 23:3x - ASSESS Round 2 (fresh session, hardened prompt 9d379ffe2)
+
+**背景：** 用户 23:02 质疑首轮评估太浅 → `raphy-assess.md` 硬化（强制 friction walk 5 问必答、self-grilling、
+diversity quota）。23:00 轮开跑时旧 prompt 已被主 agent 换成新版（commit 直接落在
+`raphy/arch-20261006-2301` 分支上）；本轮评估零产物提交过，直接按新 prompt 做深挖（= 用户要的"重跑深挖"，
+一次迭代、一次提交，不做两次）。
+
+**Skill:** `skills/improve-codebase-architecture/SKILL.md`（Explore + Present；helper skills 不存在，按 prompt 内嵌词汇表执行）。
+
+**Scoping (YAGNI):** `git log --oneline -40 --name-only -- lca/` 热点计数。排除 ralph Round 2 领地
+（`tools/assistant/memory_tools.py`="MemoryTools directory seam"、`webserver/read/runs/`="Read Runs micro-dirs"、
+`memory/contextfiles/`="ContextFiles shims"）、`lca/cognition/memory/` 冻结（AP-01）、首轮已收敛的
+`plugins/assistant/*`。三区并行精读：composer（`lca/plugins/composer/`）、CLI 投影
+（`_shared/projection.py` + `observation/debug_graph.py`）、daemon（`cli/services/daemon/daemon.py`）。
+
+**Stories written:** RA-004（P1 Strong：删 `debug_graph._load_events` 私有复刻——丢 `isinstance` 守卫的真 bug）、
+RA-006（P2 Strong：daemon "单活"不变量无 owner，`_kill_existing` 接缝）、RA-008（P3 Strong：
+三 provider 壳表驱动，先测 `@plugin` 发现机制）、RA-005（P4 Worth exploring：projection 两张域表统一，
+**禁 import contracts**）、RA-007（P5 Worth exploring：`_spawn` 脚本模板泄漏）、RA-009（P6 Worth exploring：
+`llm._inner` 接缝硬化，含 spike）。Diversity quota：5/6 来自 friction walk，仅 RA-008 为 duplication 类。
+
+**Learnings for future iterations:**
+- CLI surface 不 import contracts 是刻意规则（projection.py:22-23 注释）：看到"镜像"先读注释。
+- 共享接缝的私有复刻会静默腐烂（丢守卫）；import 名门限的治理脚本看不见它。
+- "sleep(0.5) restart" = 不变量无 owner 的症状：给不变量找家，不调大 sleep。
+- `@plugin` 动态注册先测发现机制再收敛。
+- 简报路径可能错（`plugins/composition/composer` 实为 `plugins/composer`）：story Files 以实测为准。
+---

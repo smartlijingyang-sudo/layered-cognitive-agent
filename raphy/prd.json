@@ -1,7 +1,7 @@
 {
   "project": "LCA Raphy Architecture Optimization",
-  "branchName": "raphy/arch-optimize",
-  "description": "Continuous architecture deepening for the LCA cognitive-agent codebase via the raphy fresh-session loop. Round 1 (this assessment, 2026-10-06): converge duplicated emit/fail builder seams identified by the improve-codebase-architecture skill Explore phase. Out of scope: areas covered by ralph Round 2 (DecisionGates, Ingest pipeline, ContextFiles shims, Read Runs micro-dirs) and lca/cognition/memory/ (frozen per Round 2 AP-01).",
+  "branchName": "raphy/arch-20261006-2301",
+  "description": "Continuous architecture deepening for the LCA cognitive-agent codebase via the raphy fresh-session loop. Round 1 (2026-10-06, old prompt): RA-001/RA-002 converged, RA-003 dropped with evidence. Round 2 (2026-10-06, hardened prompt 9d379ffe2 after user challenged shallow assessment): mandatory friction walk over composer / CLI projection / daemon; RA-004..RA-009 below. Out of scope: ralph Round 2 areas (DecisionGates, Ingest, ContextFiles shims, Read Runs micro-dirs, MemoryTools directory seam) and lca/cognition/memory/ (frozen per Round 2 AP-01). CLI surface must not import from contracts (deliberate rule, projection.py:22-23).",
   "userStories": [
     {
       "id": "RA-001",
@@ -54,6 +54,100 @@
       "passes": false,
       "notes": "Source: improve-codebase-architecture skill assessment 2026-10-06 (Worth exploring). Weaker than RA-001/RA-002: shared scaffolding but different signatures. Deletion test is marginal. DROPPED 2026-10-06 (optimize session): investigated for unification; the three phases need genuinely different seams. pre extracts (provider, model) via _model_identity and calls request_model; post builds usage/content/tool_calls payload and calls complete_model, and carries a behavior-critical docstring (derive_messages double-append warning) that must stay with the phase; fail passes error straight to fail_model. Shared scaffolding is 2 lines of idiom (step = hook._step_counter + deferred import), and the three deferred imports bind DIFFERENT names (request_model/complete_model/fail_model), so not even the import is shared. A unified seam would require getattr string-dispatch or Callable+**kwargs threading, trading explicit type-safe direct calls for indirection: net readability loss, deletion test fails. Phase set is closed (exactly pre/post/fail); no leverage for future phases. Forcing unification would be churn, not improvement.",
       "dropped": true
+    },
+    {
+      "id": "RA-004",
+      "title": "Delete debug_graph._load_events private fork; delegate to shared load_spine_events",
+      "description": "As an LCA maintainer, I want debug_graph to use the shared spine JSONL loader instead of its private fork, so the isinstance(obj, dict) guard and fail-soft parsing semantics live in exactly one place and the fallback debug command is no more fragile than the main path.",
+      "acceptanceCriteria": [
+        "debug_graph._load_events (lca/infrastructure/cli/commands/observation/debug_graph.py:46-62) is deleted; build_debug_graph calls load_spine_events from lca/infrastructure/cli/commands/_shared/projection.py",
+        "No remaining private JSONL parse loop in debug_graph.py (grep for 'json.loads' in the file returns 0 outside the shared import)",
+        "tests/infrastructure/cli/test_debug_graph.py no longer imports the private _load_events (uses the shared loader)",
+        "NEW regression test: spine.jsonl containing a valid-JSON non-dict line (e.g. '42') -> debug-graph command exits 0 (pins the AttributeError crash this story fixes)",
+        "Existing tests pass: uv run pytest tests/infrastructure/cli/test_debug_graph.py tests/infrastructure/cli/test_projection.py --no-cov -q",
+        "uv run ruff check passes on touched files",
+        "lca-cli-shape.py docstring drift fixed: documented API list includes load_spine_facts (already in SHARED_PROJECTION_NAMES)",
+        "Do NOT change debug-graph human output; do NOT import contracts into CLI surface code"
+      ],
+      "priority": 1,
+      "passes": false,
+      "notes": "Source: improve-codebase-architecture skill assessment Round 2 2026-10-06 (Strong, friction walk Q3/Q4). Deletion test: concentrates. Real bug: non-dict line -> AttributeError at ev.get."
+    },
+    {
+      "id": "RA-005",
+      "title": "Unify the two domain-prefix tables in CLI projection.py into one table, one match semantic",
+      "description": "As an LCA maintainer, I want the execution_point->domain mapping in projection.py to live in one table with one match semantic, so filter_by_domain and load_spine_facts never disagree on the same run.",
+      "acceptanceCriteria": [
+        "lca/infrastructure/cli/commands/_shared/projection.py has exactly one domain-prefix table (remove the _DOMAIN_PREFIXES vs _EP_PREFIX_FAMILIES split); 'graph' family defined once",
+        "One match semantic chosen and documented in the module (note which one and why; the mirror comment explaining 'so we do not import from contracts into CLI surface code' is kept)",
+        "Do NOT import from contracts (deliberate design rule, projection.py:22-23) - unify inside the module",
+        "Before changing filter_by_domain semantics, run the tests of its caller runs/debug.py (llm/tool/graph/phase counting at debug.py:157) and confirm no behavior change, or record the deliberate change",
+        "uv run pytest tests/infrastructure/cli/test_projection.py --no-cov -q passes; uv run ruff check passes on the touched file"
+      ],
+      "priority": 4,
+      "passes": false,
+      "notes": "Source: improve-codebase-architecture skill assessment Round 2 2026-10-06 (Worth exploring, friction walk Q4). Deletion test: concentrates. The contracts-constant alternative was rejected: importing contracts into CLI surface contradicts the module's own documented rule."
+    },
+    {
+      "id": "RA-006",
+      "title": "Give the single-daemon invariant an owner: _kill_existing seam with wait-for-exit",
+      "description": "As an LCA operator, I want daemon restart to kill the old process and confirm it is dead before spawning, so the double-daemon device-id fight fixed by PR #40 cannot recur through the restart path.",
+      "acceptanceCriteria": [
+        "A _kill_existing(pattern, timeout) seam exists in lca/infrastructure/cli/services/daemon/daemon.py: pkill via Sudo.run (PR #40 behavior kept) + poll pid_alive until the process is gone (leverage lca/infrastructure/cli/service/service.py primitives)",
+        "stop() and restart() both go through _kill_existing; restart() no longer uses time.sleep(0.5)",
+        "The process match string 'node.*index.js.*connect' is a single module-level constant shared by daemon.py (:122, :423) and lca/infrastructure/host_runtime/providers/user_cli.py (:82, :94); user_cli.py's own stop_daemon flow is otherwise untouched",
+        "NEW test: restart with pid_alive flipping true->false (mock sequence) calls start() only after death is confirmed",
+        "Existing tests pass: uv run pytest tests/ -k 'daemon' --no-cov -q (incl. test_daemon_stop_uses_sudo)",
+        "uv run ruff check passes on touched files"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": "Source: improve-codebase-architecture skill assessment Round 2 2026-10-06 (Strong, friction walk Q3/Q4). Deletion test: concentrates - the 'exactly one live daemon' invariant gets an owner instead of relying on sleep timing."
+    },
+    {
+      "id": "RA-007",
+      "title": "Extract _spawn shell-script generation into a pure render_start_script(config)",
+      "description": "As an LCA maintainer, I want the daemon start script rendered by a pure, testable function from DaemonConfig, so credential/path literals stop leaking across the Python/shell seam and the script content becomes unit-testable.",
+      "acceptanceCriteria": [
+        "A pure function render_start_script(config) -> str exists (new module or daemon.py); DaemonService._spawn only writes/launches its output",
+        "Token and paths come from DaemonConfig (token default 'lca-local-host' keeps its single source in lca/infrastructure/cli/config/config.py:47); the '--token lca-local-host' literal in daemon.py:406 is gone",
+        "NEW test pins rendered script content: contains configured token, log path, PATH entries (script shape becomes testable for the first time)",
+        "Generated script behavior unchanged (same env, same log redirection, same /opt/lca target)",
+        "Existing daemon tests pass: uv run pytest tests/ -k 'daemon' --no-cov -q; uv run ruff check passes on touched files"
+      ],
+      "priority": 5,
+      "passes": false,
+      "notes": "Source: improve-codebase-architecture skill assessment Round 2 2026-10-06 (Worth exploring, friction walk Q4). Deletion test: concentrates. Design choice open: config fields vs template params."
+    },
+    {
+      "id": "RA-008",
+      "title": "Converge the three composer provider registration shells via a table-driven factory (test discovery first)",
+      "description": "As an LCA maintainer, I want the three near-identical composer provider shells generated from one table, so adding a fourth phase composer does not copy another 66-line file.",
+      "acceptanceCriteria": [
+        "FIRST: a test proving the @plugin discovery mechanism picks up dynamically generated registrations (acceptance gate - if it fails, fall back to a _register_composer_plugin(...) factory called 3 times)",
+        "lca/plugins/composer/think/brain_provider.py, lca/plugins/composer/perceive/provider.py, lca/plugins/composer/act/body_provider.py converge: one table [('lca-plan-brain-composer','composer.brain','plugin.serve',BrainComposer), ...] drives the three registrations; per-provider differences (plugin id, provides key, authority grant - perceive uses context.read, composer class) are table data",
+        "No information lost: observability descriptors remain id-derived; authority grants preserved per provider",
+        "NEW test: setup() provides the correct composer instance per plugin id (currently untested - only bundle registration items are tested)",
+        "Existing tests pass: uv run pytest tests/composer/ --no-cov -q; uv run ruff check passes on touched files"
+      ],
+      "priority": 3,
+      "passes": false,
+      "notes": "Source: improve-codebase-architecture skill assessment Round 2 2026-10-06 (Strong, friction walk Q2). Deletion test: concentrates - ~130 lines of boilerplate eliminated. Duplication-class story (1 of 6; diversity quota satisfied by the other five)."
+    },
+    {
+      "id": "RA-009",
+      "title": "Harden the composer/observability seam: replace llm._inner private access and the deferred import (spike included)",
+      "description": "As an LCA maintainer, I want composer to talk to the observability adapter and the model-visible hook through contractual seams instead of private attribute access and deferred imports, so adapter refactors stop silently breaking idempotent LLM wrapping.",
+      "acceptanceCriteria": [
+        "SPIKE (part of this story): read lca/infrastructure/observability/adapters TelemetryLLMAdapter and decide the public unwrap primitive; document why composer<->events has an import cycle",
+        "brain.py:65 no longer reads TelemetryLLMAdapter._inner (uses the new public primitive); instrument_llm idempotency preserved (existing test_hook_resolution_path.py passes)",
+        "brain.py:74 deferred import of lca.plugins.events.hooks.model_visible.adapter replaced by a contracts-level protocol or a documented, tested seam (no bare private cross-module access)",
+        "uv run pytest tests/ -k 'hook_resolution or brain' --no-cov -q passes; uv run ruff check passes on touched files",
+        "If the spike shows the cycle cannot be broken without a larger refactor, record the evidence and mark dropped with reason (like RA-003) instead of forcing it"
+      ],
+      "priority": 6,
+      "passes": false,
+      "notes": "Source: improve-codebase-architecture skill assessment Round 2 2026-10-06 (Worth exploring, friction walk Q4). Solution undetermined this round - the spike is load-bearing."
     }
   ]
 }
