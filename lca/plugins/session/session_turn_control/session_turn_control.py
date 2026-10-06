@@ -21,11 +21,11 @@ from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import
 )
 from lca.contracts.protocols.session.control_state import ControlState, ControlTurn
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
+from lca.plugins.session._shared import TURN_ENDED
 from lca_kernel.events.session.session import SessionEvent
 
 __all__ = ["Config", "TurnControlUnit", "setup"]
 
-_TURN_ENDED = "turn.ended.v1"
 _TURN_CONTROL = "turn.control.v1"
 _REDUCER_APPLY = "spine.runtime.reducer.apply"
 
@@ -61,7 +61,7 @@ class TurnControlUnit:
                 "last_action_type": payload.get("action_type"),
                 "last_tool_name": payload.get("tool_name"),
             }
-        if event.type == _TURN_ENDED:
+        if event.type == TURN_ENDED:
             turn = event.data.get("turn")
             if isinstance(turn, int) and not isinstance(turn, bool):
                 turns = [*state["turns"], {"turn": turn, "reason": event.data.get("reason")}]

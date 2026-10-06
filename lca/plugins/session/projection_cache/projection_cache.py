@@ -48,7 +48,7 @@ from lca.contracts.protocols.session.projection.unit import (
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 from lca.infrastructure.persistence.atomic_json_sink import AtomicJsonFileSink, AtomicJsonSnapshot
 from lca.infrastructure.persistence.write_behind import WriteBehindBuffer
-from lca.plugins.session._shared import require_observer_hook, session_id_of
+from lca.plugins.session._shared import TURN_ENDED, require_observer_hook, session_id_of
 from lca_kernel.events.session.session import SessionEvent
 
 if TYPE_CHECKING:
@@ -60,7 +60,6 @@ __all__ = ["Config", "ProjectionCache", "setup"]
 
 _FILE_SUFFIX = ".projcache.json"
 _CACHE_ROOT_DEFAULT = "traces/projcache"
-_TURN_ENDED = "turn.ended.v1"
 
 
 class Config(BaseModel):
@@ -82,7 +81,7 @@ class _CacheObserver:
         self._cache = cache
 
     def __call__(self, session: Any, event: SessionEvent) -> None:
-        if event.type == _TURN_ENDED:
+        if event.type == TURN_ENDED:
             self._cache.save(session)
 
 
