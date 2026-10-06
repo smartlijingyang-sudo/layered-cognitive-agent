@@ -48,7 +48,7 @@ from lca.contracts.protocols.session.projection.unit import (
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 from lca.infrastructure.persistence.atomic_json_sink import AtomicJsonFileSink, AtomicJsonSnapshot
 from lca.infrastructure.persistence.write_behind import WriteBehindBuffer
-from lca.plugins.session._shared import require_observer_hook
+from lca.plugins.session._shared import require_observer_hook, session_id_of
 from lca_kernel.events.session.session import SessionEvent
 
 if TYPE_CHECKING:
@@ -131,7 +131,7 @@ class ProjectionCache:
         ``turn.ended.v1`` enqueue 检查点；``Session.flush()`` 显式 drain。
         返回合并的幂等取消函数。
         """
-        session_id = _session_id(session)
+        session_id = session_id_of(session)
         if session_id != "unknown":
             self._tracked[session_id] = session
         observe_cancel = session.observe(_CacheObserver(self))
@@ -160,7 +160,7 @@ class ProjectionCache:
         fail-soft：checkpoint 取切或 enqueue 失败只记结构化日志，永不抛；
         返回是否成功入队（落盘由 write-behind 异步完成）。
         """
-        session_id = _session_id(session)
+        session_id = session_id_of(session)
         try:
             rows = self._registry.checkpoint(session)
             payload = {
@@ -229,7 +229,7 @@ class ProjectionCache:
         全量重折**）；重折仍失败是单元自身错误，向上 fail-loud。
         """
         events = session.snapshot_events()
-        session_id = _session_id(session)
+        session_id = session_id_of(session)
         rows = self.load(session_id) or {}
         try:
             result = self._registry.restore(rows, events, session.header)
@@ -279,18 +279,6 @@ class ProjectionCache:
         if expected is None or version != expected:
             return None
         return ProjectionCheckpoint(version=version, seq=seq, state=value["state"])
-
-
-def _session_id(session: Any) -> str:
-    """从 Session 实例派生 session id；缺 ``.id`` 回退 ``"unknown"``。
-
-    Session 协议保证 :attr:`Session.id` 权威（与 ``persistence_jsonl``
-    的 Session 实例权威规则一致）。
-    """
-    sid = getattr(session, "id", None)
-    if isinstance(sid, str) and sid:
-        return sid
-    return "unknown"
 
 
 def _attach_to_store(store: Any, cache: ProjectionCache) -> None:

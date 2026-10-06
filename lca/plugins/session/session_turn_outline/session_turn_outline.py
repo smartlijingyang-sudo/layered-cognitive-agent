@@ -43,6 +43,7 @@ from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import
     OwnershipDeclaration,
 )
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
+from lca.plugins.session._shared import turn_of
 from lca_kernel.events.session.session import SessionEvent
 
 _log = structlog.get_logger(__name__)
@@ -56,14 +57,6 @@ _ROLE_USER = "user"
 
 PROMPT_PREVIEW_LIMIT = 80
 """prompt 预览预算：一条 rail 卡片行，超长截断并附省略号。"""
-
-
-def _turn_of(event: SessionEvent) -> int | None:
-    """事件 payload 的非负整数 ``turn``；缺失 / 非法返回 ``None``。"""
-    turn = event.data.get("turn")
-    if isinstance(turn, int) and not isinstance(turn, bool) and turn >= 0:
-        return turn
-    return None
 
 
 def _preview(text: str, limit: int) -> str:
@@ -116,7 +109,7 @@ class TurnOutlineUnit:
     # ── 内部 ────────────────────────────────────────────────────────
 
     def _apply_turn_started(self, state: dict[str, Any], event: SessionEvent) -> dict[str, Any]:
-        turn = _turn_of(event)
+        turn = turn_of(event)
         if turn is None:
             return state
         turns = state["turns"]
@@ -144,7 +137,7 @@ class TurnOutlineUnit:
         return {"turns": [*turns[:-1], {**last, "prompt_preview": prompt}]}
 
     def _apply_turn_ended(self, state: dict[str, Any], event: SessionEvent) -> dict[str, Any]:
-        turn = _turn_of(event)
+        turn = turn_of(event)
         if turn is None:
             return state
         turns = state["turns"]

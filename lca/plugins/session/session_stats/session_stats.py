@@ -40,6 +40,7 @@ from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import
     OwnershipDeclaration,
 )
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
+from lca.plugins.session._shared import turn_of
 from lca_kernel.events.session.session import SessionEvent
 
 _log = structlog.get_logger(__name__)
@@ -50,14 +51,6 @@ _TURN_STARTED = "turn.started.v1"
 _TURN_ENDED = "turn.ended.v1"
 _STEP_STARTED = "step.started.v1"
 _MODEL_REQUESTED = "model.requested.v1"
-
-
-def _turn_of(event: SessionEvent) -> int | None:
-    """事件 payload 的非负整数 ``turn``；缺失 / 非法返回 ``None``。"""
-    turn = event.data.get("turn")
-    if isinstance(turn, int) and not isinstance(turn, bool) and turn >= 0:
-        return turn
-    return None
 
 
 class SessionStatsUnit:
@@ -111,12 +104,12 @@ class SessionStatsUnit:
     # ── 内部 ────────────────────────────────────────────────────────
 
     def _apply_turn_started(self, state: dict[str, Any], event: SessionEvent) -> dict[str, Any]:
-        turn = _turn_of(event)
+        turn = turn_of(event)
         open_turn = {"turn": turn, "start_time": event.time} if turn is not None else None
         return {**state, "turns": state["turns"] + 1, "open_turn": open_turn}
 
     def _apply_turn_ended(self, state: dict[str, Any], event: SessionEvent) -> dict[str, Any]:
-        turn = _turn_of(event)
+        turn = turn_of(event)
         next_state = {**state, "last_turn_end_seq": event.seq}
         open_turn = state["open_turn"]
         if turn is not None and isinstance(open_turn, dict) and open_turn["turn"] == turn:
