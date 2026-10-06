@@ -41,6 +41,7 @@ from lca.contracts.protocols.session.projection.unit import (
     ProjectionUnit,
 )
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
+from lca.plugins.session._shared import require_observer_hook
 from lca_kernel.events.session.session import SessionEvent, SessionHeader
 
 _log = structlog.get_logger(__name__)
@@ -398,8 +399,5 @@ def _attach_to_store(store: Any, registry: ProjectionRegistry) -> None:
     """
     for session in getattr(store, "list", lambda: ())():
         _try_attach(registry, session)
-    hook = getattr(store, "add_observer_hook", None)
-    if not callable(hook):
-        msg = f"SessionStore 必须提供 add_observer_hook;got {type(store).__name__} without it"
-        raise TypeError(msg)
+    hook = require_observer_hook(store)
     hook(lambda session: _try_attach(registry, session))

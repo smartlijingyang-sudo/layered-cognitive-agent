@@ -32,6 +32,7 @@ from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import
     OwnershipDeclaration,
 )
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
+from lca.plugins.session._shared import require_observer_hook
 
 _log = structlog.get_logger(__name__)
 
@@ -241,10 +242,7 @@ class SessionTitleService:
         """挂到 SessionStore:活 Session 逐个挂入 + ``add_observer_hook`` 接管未来
         ``create``/``restore``(抄 ``persistence_jsonl._attach_to_store``;store 缺钩子
         抛 ``TypeError`` fail-loud,单个 Session 挂入失败 contained)。"""
-        hook = getattr(store, "add_observer_hook", None)
-        if not callable(hook):
-            msg = f"SessionStore 必须提供 add_observer_hook;got {type(store).__name__} without it"
-            raise TypeError(msg)
+        hook = require_observer_hook(store)
         for session in getattr(store, "list", lambda: ())():
             self._attach_session(session)
         cancel = hook(self._attach_session)

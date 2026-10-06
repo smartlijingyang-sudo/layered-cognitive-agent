@@ -19,6 +19,7 @@ from typing import Any
 import structlog
 
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
+from lca.plugins.session._shared import require_observer_hook
 from lca.plugins.session.runtime.spine.event_projection import session_event_to_event_record
 from lca_kernel.events.session.session import SessionEvent, SessionProtocol
 
@@ -90,10 +91,7 @@ def register_spine_anomaly_to_store(store: Any, detector: Any) -> None:
 
     for session in getattr(store, "list", lambda: ())():
         _attach(session)
-    hook = getattr(store, "add_observer_hook", None)
-    if not callable(hook):
-        msg = f"SessionStore 必须提供 add_observer_hook;got {type(store).__name__} without it"
-        raise TypeError(msg)
+    hook = require_observer_hook(store)
     hook(_attach)
 
 
