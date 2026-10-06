@@ -370,3 +370,35 @@ RA-006（P2 Strong：daemon "单活"不变量无 owner，`_kill_existing` 接缝
   - Booted-kernel tests need `LLM_API_KEY=dummy` in env or they fail with the
     fail-loud credentials error -- not a regression signal.
 ---
+
+## 2026-10-07 04:30 - RA-009 (fresh session)
+
+- Hardened the composer/observability seam in `lca/plugins/composer/think/brain.py`:
+  `instrument_llm` now reads the public `TelemetryLLMAdapter.inner` property instead
+  of the private `._inner` attribute (line 65), and the deferred local import of
+  `ModelVisibleHookAdapter` became a top-level import with a comment documenting
+  the spike finding.
+- SPIKE (load-bearing part of the story): the assessment assumed a composer<->events
+  import cycle was real ("延迟 import 事出有因"). Verified empirically it does NOT
+  exist: `model_visible.adapter` imports only contracts-level modules, and the
+  `lca/plugins/events` package `__init__` is docstring-only, so a top-level import
+  in brain.py loads cleanly (`import lca.plugins.composer.think.brain` green).
+  The deferred import was defensive history, not a cycle-avoidance necessity.
+- Behavior unchanged: layering (ModelVisibleHookAdapter → TelemetryLLMAdapter → inner)
+  and the idempotent re-wrap semantics of `instrument_llm` are preserved; the seam
+  is now contractual (public property + top-level import) instead of private access
+  + function-local import.
+- Files changed: `lca/plugins/composer/think/brain.py`, `raphy/prd.json`, `raphy/progress.txt`
+- Verified: no remaining `_inner` reads in brain.py; single top-level
+  `ModelVisibleHookAdapter` import; `uv run pytest tests/ -k 'hook_resolution or brain'`
+  → 77 passed (1 failure in test_brain_prompt_catalog_capability.py is pre-existing
+  red at HEAD, verified in an isolated worktree, unrelated to this change);
+  `uv run ruff check` on the touched file passes.
+- **Learnings for future iterations:**
+  - Assessment guesses about import cycles must be verified by actually moving the
+    import, not trusted: RA-009's "cycle is real" constraint was disproven by the spike.
+  - Public unwrap primitives may already exist (`.inner` property on both
+    TelemetryLLMAdapter and handles adapters) — grep for them before designing a new one.
+  - When a failing acceptance-criteria test is suspected pre-existing, verify with a
+    detached worktree at HEAD, not by reasoning about it.
+---

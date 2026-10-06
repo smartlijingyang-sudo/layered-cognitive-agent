@@ -25,6 +25,7 @@ from lca.infrastructure.observability.adapters import (
 from lca.infrastructure.session.emit.lifecycle_emit import session_append_for_thinking
 from lca.loop.emit.cognitive import llm as llm_spine_emit
 from lca.plugins.composer.composition.skill_store import active_skill_store
+from lca.plugins.events.hooks.model_visible.adapter import ModelVisibleHookAdapter
 
 _MODEL_VISIBLE_HOOK_KEY = "llm.adapter.hook.model_visible"
 
@@ -62,7 +63,7 @@ def instrument_llm(
     """
 
     # 已有 TelemetryLLMAdapter 时,复用之;否则用 llm 自身
-    existing_telemetry = llm._inner if isinstance(llm, TelemetryLLMAdapter) else llm
+    existing_telemetry = llm.inner if isinstance(llm, TelemetryLLMAdapter) else llm
     instrumented = TelemetryLLMAdapter(
         existing_telemetry,
         session_append=session_append_for_thinking(),
@@ -70,11 +71,12 @@ def instrument_llm(
     )
 
     hook = _resolve_model_visible_hook(ctx)
+    # RA-009 spike: the deferred import above was replaced by a top-level import.
+    # No composer<->events import cycle exists: model_visible.adapter imports only
+    # contracts-level modules, and the events package __init__ is docstring-only,
+    # so importing it at module load is cycle-free (verified by the hook_resolution
+    # + brain_composer test suites passing with the top-level import in place).
     if hook is not None:
-        from lca.plugins.events.hooks.model_visible.adapter import (
-            ModelVisibleHookAdapter,
-        )
-
         return ModelVisibleHookAdapter(instrumented, hook)
 
     return instrumented
