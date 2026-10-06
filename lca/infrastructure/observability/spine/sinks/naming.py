@@ -67,7 +67,7 @@ def kernel_log_filename(run_id: str) -> str:
 
     kernel.log 位于 per-run 目录内(``<run_dir>/kernel.log``),run 归属
     由目录表达,文件名本身不携带 run_id。唯一写者是失败兜底
-    ``record_run_failure``(``lca/plugins/transport/webserver/handlers/runs/terminal/failure/failure.py``):
+    ``record_run_failure``(``lca/plugins/transport/webserver/handlers/runs/terminal/failure.py``):
     仅当 run 收尾路径本身失败时追加一行;多数 run 无此文件。
 
     >>> kernel_log_filename("run_abc")
