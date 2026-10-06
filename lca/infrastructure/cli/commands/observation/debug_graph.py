@@ -23,6 +23,7 @@ import typer
 from lca.infrastructure.cli.commands._shared.projection import (
     _safe_repr,
     spine_filename_for_run_cwd,
+    summarize_outputs,
     truncate,
 )
 
@@ -66,35 +67,6 @@ def _classify_node(end_event: dict[str, Any]) -> tuple[str, str]:
     if outcome in _FAIL_OUTCOMES or error:
         return "✗", error or outcome
     return "✓", ""
-
-
-def _summarize_outputs(outputs: dict[str, Any]) -> list[str]:
-    """每个 out key 一行可读摘要(节点真实产出物)。"""
-    if not isinstance(outputs, dict):
-        return []
-    lines: list[str] = []
-    for k, v in outputs.items():
-        if isinstance(v, dict):
-            sub_keys = list(v.keys())[:4]
-            sample = []
-            for sk in sub_keys:
-                sv = v.get(sk)
-                if isinstance(sv, (str, int, float, bool)):
-                    sample.append(f"{sk}={_safe_repr(sv, 40)}")
-                elif isinstance(sv, list):
-                    sample.append(f"{sk}=list[{len(sv)}]")
-                elif isinstance(sv, dict):
-                    sample.append(f"{sk}=dict[{len(sv)}]")
-                else:
-                    sample.append(f"{sk}={_safe_repr(sv, 30)}")
-            lines.append(f"    out.{k} {{ {', '.join(sample)} }}")
-        elif isinstance(v, list):
-            lines.append(f"    out.{k} = list[{len(v)}]")
-        elif isinstance(v, str):
-            lines.append(f"    out.{k} = {_safe_repr(v, 80)}")
-        else:
-            lines.append(f"    out.{k} = {_safe_repr(v, 60)}")
-    return lines
 
 
 def _summarize_response(response: dict[str, Any]) -> list[str]:
@@ -273,7 +245,8 @@ def render_human(report: dict[str, Any], run_id: str) -> str:
         if not n["outputs"]:
             continue
         out.append(f"  {n['node_id']}  in_keys={n['input_keys']}")
-        for line in _summarize_outputs(n["outputs"]):
+        # cap=80 保留原本地实现对 str 的截断上限（projection 默认 cap=120）
+        for line in summarize_outputs(n["outputs"], cap=80):
             out.append(line)
         # tool_calls 单列
         for tc in n.get("tool_calls") or []:
