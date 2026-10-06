@@ -23,9 +23,10 @@ isinstance 验证。
 
 from __future__ import annotations
 
-from typing import Any, Protocol, runtime_checkable
+from typing import TYPE_CHECKING, Any, Protocol, runtime_checkable
 
-from lca.infrastructure.observability.spine.event.record import EventRecord
+if TYPE_CHECKING:
+    from lca.infrastructure.observability.spine.event.record import EventRecord
 
 # ── 主链五面 ──────────────────────────────────────────────────────
 

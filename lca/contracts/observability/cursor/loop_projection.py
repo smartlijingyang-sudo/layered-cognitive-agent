@@ -7,10 +7,12 @@ Loop 维度可插拔投影契约;与 ADR-0063 session 维度 ProjectionDefinitio
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Protocol, runtime_checkable
+from typing import TYPE_CHECKING, Any, Protocol, runtime_checkable
 
 from lca.contracts.observability.cursor.loop_cursor import CursorSnapshot
-from lca.infrastructure.observability.spine.event.record import EventRecord
+
+if TYPE_CHECKING:
+    from lca.infrastructure.observability.spine.event.record import EventRecord
 
 
 @dataclass(frozen=True)
