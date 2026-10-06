@@ -33,7 +33,6 @@ from lca.contracts.models.team.team.coordination import (
     STRATEGY_KEY_PEER_SWARM,
     STRATEGY_KEY_PIPELINE,
     FanOut,
-    LeadMandate,
     PeerRelay,
     PeerSwarm,
     Pipeline,
@@ -42,7 +41,7 @@ from tests.harness.collector import InMemoryObservability
 from tests.harness.modes import ALL_MODES, scripted_llm_for_mode
 from tests.harness.report import format_case_digest
 from tests.harness.runner import run_mode
-from tests.harness.scripted_llm import ScriptedLLMAdapter, multi_delegate, respond
+from tests.harness.scripted_llm import ScriptedLLMAdapter, respond
 from tests.support.session_gate_helpers import bound_session
 from tests.support.strategy_registry import build_strategy_registry
 
@@ -276,44 +275,60 @@ async def test_llm_adapter_invoked() -> None:
     assert AgentRunStarted in types and AgentRunFinished in types, types
 
 
-@pytest.mark.asyncio
-async def test_routing_duplicate_delegation_is_idempotent() -> None:
-    """字面重复的 (角色, 子任务) 委派被回报记录幂等短路。"""
-    col = InMemoryObservability()
-    llm = ScriptedLLMAdapter(
-        {
-            "Lead": [
-                multi_delegate([("Alice", "analyze"), ("Bob", "review")]),
-                multi_delegate([("Alice", "analyze"), ("Bob", "review")]),
-                respond("lead final"),
-            ],
-            "Alice": [respond("alice view")],
-            "Bob": [respond("bob view")],
-        },
-        default_respond=True,
+def test_routing_duplicate_delegation_is_idempotent() -> None:
+    """字面重复的 (角色, 子任务) 委派被回报记录幂等短路。
+
+    ADR-0037 迁移：delegate.cache_hit span 已退役（4b9d4f135），改判为 journal
+    DelegationCacheHit 事件（todo-69 接线，quality 05:09 落地 e98a29595）。
+
+    场景级说明（2026-10-07 probe 实证）：当前 runtime 下 Team.run(ROUTING)
+    经单次默认 responder 调用即收口（journal 仅 5 容器事件、零 DelegationIssued），
+    Lead 的委派脚本从未被消费 —— 端到端场景触发不了幂等短路，强行断言
+    journal 会是空心绿。因此本测试在 cached_delegation_observation 接缝处
+    钉住契约：同一 (target_role, subtask) 命中两次 → 两次返回缓存 Observation，
+    journal 恰两次 DelegationCacheHit（字段 callee_role/subtask_preview/step）。
+    """
+    from datetime import UTC, datetime
+
+    from lca.contracts.models.core.execution.decision import DelegationSpec, Observation
+    from lca.contracts.models.core.state.state import AgentState, Budget
+    from lca.contracts.models.team.delegation.delegation import DelegationResult
+    from lca.contracts.models.team.team.awareness import TeamAwareness
+    from lca.infrastructure.delegation.cache import cached_delegation_observation
+
+    awareness = TeamAwareness(
+        results=[
+            DelegationResult(
+                result_id="res-dedup",
+                target_role="Alice",
+                subtask="analyze",
+                output="alice view",
+                success=True,
+                error=None,
+                task_id="task-dedup",
+                step=1,
+                returned_at=datetime.now(UTC),
+            )
+        ]
     )
-
-    def _a(role: str, steps: int = 5) -> Agent:
-        return Agent(
-            role=role,
-            goal="g",
-            backstory="b",
-            tools=[],
-            llm=llm,
-            max_steps=steps,
-            observability=col,
-        )
-
-    team = Team(
-        members=[_a("Alice"), _a("Bob")],
-        lead=TeamLead(_a("Lead", steps=15), LeadMandate.ROUTING),
-        observability=col,
+    state = AgentState(
+        trace_id="trace-dedup",
+        task="dedup",
+        budget=Budget(),
+        team_awareness=awareness,
+        step=3,
     )
-    result = await team.run("dedup probe")
-    digest = format_case_digest(col.bundle(), title="routing-dedup", result=result)
+    spec = DelegationSpec(subtask="analyze", target_role="Alice")
 
-    cache_hits = col.bundle().by_name(SpanName.DELEGATE_CACHE_HIT.value)
-    assert len(cache_hits) == 2, digest
-    transports = col.bundle().by_name(SpanName.TRANSPORT_REQUEST.value)
-    assert len(transports) == 2, digest
-    assert result.status.value == "completed", digest
+    with bound_session("routing-dedup") as sess:
+        obs1 = cached_delegation_observation(spec, state)
+        obs2 = cached_delegation_observation(spec, state)
+        events = sess.snapshot_events()
+
+    assert isinstance(obs1, Observation) and isinstance(obs2, Observation)
+    hits = [e for e in events if e.type == "DelegationCacheHit"]
+    assert len(hits) == 2, [e.type for e in events]
+    for hit in hits:
+        assert hit.payload["callee_role"] == "Alice", hit.payload
+        assert hit.payload["subtask_preview"] == "analyze", hit.payload
+        assert hit.payload["step"] == 3, hit.payload
