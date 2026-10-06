@@ -48,6 +48,7 @@ from lca.contracts.protocols.session.projection.unit import (
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 from lca.infrastructure.persistence.atomic_json_sink import AtomicJsonFileSink, AtomicJsonSnapshot
 from lca.infrastructure.persistence.write_behind import WriteBehindBuffer
+from lca.plugins.session._shared import require_observer_hook
 from lca_kernel.events.session.session import SessionEvent
 
 if TYPE_CHECKING:
@@ -310,10 +311,7 @@ def _attach_to_store(store: Any, cache: ProjectionCache) -> None:
                 session_id=getattr(session, "id", None),
                 exc_info=True,
             )
-    hook = getattr(store, "add_observer_hook", None)
-    if not callable(hook):
-        msg = f"SessionStore 必须提供 add_observer_hook;got {type(store).__name__} without it"
-        raise TypeError(msg)
+    hook = require_observer_hook(store)
 
     def _on_create(session: Any) -> None:
         try:

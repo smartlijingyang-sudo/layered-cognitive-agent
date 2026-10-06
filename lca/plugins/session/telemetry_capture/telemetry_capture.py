@@ -47,6 +47,7 @@ from lca.contracts.protocols.session.telemetry.telemetry import (
     TelemetryRecord,
 )
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
+from lca.plugins.session._shared import require_observer_hook
 from lca_kernel.events.session.session import SessionEvent
 
 _log = structlog.get_logger(__name__)
@@ -433,10 +434,7 @@ def _attach_to_store(store: Any, capture: SessionTelemetryCapture) -> None:
     """
     for session in getattr(store, "list", lambda: ())():
         _observe_contained(capture, session)
-    hook = getattr(store, "add_observer_hook", None)
-    if not callable(hook):
-        msg = f"SessionStore 必须提供 add_observer_hook;got {type(store).__name__} without it"
-        raise TypeError(msg)
+    hook = require_observer_hook(store)
     cancel = hook(lambda session: _observe_contained(capture, session))
     if callable(cancel):
         capture._store_hooks.append(cast("Callable[[], None]", cancel))
