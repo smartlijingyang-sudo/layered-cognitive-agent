@@ -2,9 +2,6 @@
 
 from __future__ import annotations
 
-from collections.abc import Mapping
-from typing import Any
-
 from pydantic import BaseModel, ConfigDict
 
 from lca.contracts.atoms.functional.group import FunctionalGroup
@@ -27,6 +24,7 @@ from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import
     OwnershipDeclaration,
 )
 from lca.harness.plugin_api import EffectClass, PluginContext, PluginKind, plugin
+from lca.plugins.assistant.events._events import emit_fact_event
 from lca.plugins.assistant.skill.overlay.overlay import _AssistantSkillOverlayImpl
 
 
@@ -91,17 +89,6 @@ async def setup(ctx: PluginContext, config: Config) -> None:
             f"得到 {type(catalog).__name__}"
         )
 
-    def _emit(event: str, payload: Mapping[str, Any]) -> Any:
-        from lca.infrastructure.observability.domain_event_publish import (
-            publish_structural_event,
-        )
 
-        return publish_structural_event(
-            execution_point=event,
-            channel="fact",
-            payload=dict(payload),
-            producer=type(None),
-        )
-
-    overlay = _AssistantSkillOverlayImpl(catalog=catalog, event_emitter=_emit)
+    overlay = _AssistantSkillOverlayImpl(catalog=catalog, event_emitter=emit_fact_event)
     ctx.provide(ASSISTANT_SKILL_OVERLAY.key, overlay)

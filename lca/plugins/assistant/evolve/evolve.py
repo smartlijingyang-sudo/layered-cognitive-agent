@@ -75,6 +75,7 @@ from lca.harness.plugin_api import EffectClass, PluginContext, PluginKind, plugi
 from lca.plugins.assistant.events._events import (
     AssistantSkillEvolvedPromotedEventPayload,
     AssistantSkillEvolvedProposedEventPayload,
+    emit_fact_event,
 )
 from lca.plugins.assistant.home._home_layout import (
     build_manifest,
@@ -547,21 +548,10 @@ async def setup(ctx: PluginContext, config: Config) -> None:
             f"得到 {type(catalog).__name__}"
         )
 
-    def _emit(event: str, payload: Mapping[str, Any]) -> Any:
-        from lca.infrastructure.observability.domain_event_publish import (
-            publish_structural_event,
-        )
-
-        return publish_structural_event(
-            execution_point=event,
-            channel="fact",
-            payload=dict(payload),
-            producer=type(None),
-        )
 
     impl = _AssistantEvolveImpl(
         catalog=catalog,
-        event_emitter=_emit,
+        event_emitter=emit_fact_event,
         min_confidence=config.min_confidence,
         min_evidence=config.min_evidence,
         draft_confidence=config.draft_confidence,

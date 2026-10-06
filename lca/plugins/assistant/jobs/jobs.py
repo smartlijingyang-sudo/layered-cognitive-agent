@@ -73,6 +73,7 @@ from lca.harness.plugin_api import EffectClass, PluginContext, PluginKind, plugi
 from lca.plugins.assistant.events._events import (
     AssistantJobFiredEventPayload,
     AssistantJobRegisteredEventPayload,
+    emit_fact_event,
 )
 from lca.plugins.assistant.home._home_layout import load_manifest
 
@@ -380,23 +381,12 @@ async def setup(ctx: PluginContext, config: Config) -> None:
             f" ContinuousControlPlaneFactory,得到 {type(factory).__name__}"
         )
 
-    def _emit(event: str, payload: Mapping[str, Any]) -> Any:
-        from lca.infrastructure.observability.domain_event_publish import (
-            publish_structural_event,
-        )
-
-        return publish_structural_event(
-            execution_point=event,
-            channel="fact",
-            payload=dict(payload),
-            producer=type(None),
-        )
 
     impl = _AssistantJobsImpl(
         catalog=catalog,
         control_plane_factory=factory,
         session_profile=config.session_profile,
-        event_emitter=_emit,
+        event_emitter=emit_fact_event,
     )
     ctx.provide(ASSISTANT_JOBS.key, impl)
 

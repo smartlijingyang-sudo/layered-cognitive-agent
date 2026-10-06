@@ -28,7 +28,6 @@
 
 from __future__ import annotations
 
-from collections.abc import Mapping
 from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -52,6 +51,7 @@ from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import
     OwnershipDeclaration,
 )
 from lca.harness.plugin_api import EffectClass, PluginContext, PluginKind, plugin
+from lca.plugins.assistant.events._events import emit_fact_event
 from lca.plugins.assistant.home._home_layout import (
     AssistantAlreadyExistsError,
     AssistantCatalogError,
@@ -132,23 +132,12 @@ async def setup(ctx: PluginContext, config: Config) -> None:
 
     root = expand_user_path(config.assistants_root)
 
-    def _emit(event: str, payload: Mapping[str, Any]) -> Any:
-        from lca.infrastructure.observability.domain_event_publish import (
-            publish_structural_event,
-        )
-
-        return publish_structural_event(
-            execution_point=event,
-            channel="fact",
-            payload=dict(payload),
-            producer=type(None),
-        )
 
     from lca.infrastructure.skills.disk.store import DiskSkillPackageStore
 
     catalog = _AssistantCatalogImpl(
         root=root,
-        event_emitter=_emit,
+        event_emitter=emit_fact_event,
         role_resolver=_try_build_role_resolver(),
         global_skills_store=DiskSkillPackageStore(),
         user_store=ctx.soft_get("assistant.ownership"),

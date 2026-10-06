@@ -11,6 +11,7 @@ procedure 草稿正文进 spine（ADR-0187 §3 D2 末段 + D9）。
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Any
 
@@ -26,6 +27,7 @@ __all__ = [
     "AssistantSkillEvolvedPromotedEventPayload",
     "AssistantSkillEvolvedProposedEventPayload",
     "AssistantSkillInstalledEventPayload",
+    "emit_fact_event",
 ]
 
 
@@ -336,3 +338,23 @@ class AssistantSkillActivatedEventPayload:
         if self.activated_at:
             payload["activated_at"] = self.activated_at
         return payload
+
+
+def emit_fact_event(event: str, payload: Mapping[str, Any]) -> Any:
+    """Assistant-domain plugin setup() default EP emitter (channel="fact").
+
+    Five setup()s each defined a byte-identical local closure (tool/overlay,
+    skill/overlay, evolve, jobs, domain/catalog); converged here with
+    identical behavior. The domain_event_publish import stays lazy so plugin
+    discovery does not pull in infrastructure at import time.
+    """
+    from lca.infrastructure.observability.domain_event_publish import (
+        publish_structural_event,
+    )
+
+    return publish_structural_event(
+        execution_point=event,
+        channel="fact",
+        payload=dict(payload),
+        producer=type(None),
+    )
