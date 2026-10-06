@@ -63,14 +63,23 @@ class TestRunTerminalOutputHarvest(unittest.IsolatedAsyncioTestCase):
         chart = next(f for f in again.generated_files if f.name == "chart.png")
         self.assertEqual(chart.data, b"\x89PNG-v2-changed")
 
-    async def test_harvest_outputs_false_skips(self) -> None:
+    async def test_harvest_outputs_false_skips_delta(self) -> None:
+        # harvest_outputs=False skips the runtime delta/fingerprint
+        # bookkeeping only: adapters self-collect on every command
+        # (onlyboxes _exec_terminal/_collect_outputs, local _exec_shell),
+        # so the raw result still carries the file. The staged file must
+        # therefore surface as NEW on the next harvest instead of being
+        # consumed by the flagged call. (The old `== ()` expectation only
+        # held while InlineSandbox.run_terminal was session-blind.)
         await self._stage_output("secret.bin", b"no-auto")
-        result = await self.runtime.run_terminal(
+        await self.runtime.run_terminal(
             "echo skip",
             invocation_id="t1",
             harvest_outputs=False,
         )
-        self.assertEqual(result.generated_files, ())
+        later = await self.runtime.run_terminal("echo again", invocation_id="t2")
+        names = [f.name for f in later.generated_files]
+        self.assertIn("secret.bin", names)
 
     async def test_execute_fingerprint_suppresses_later_terminal_dup(self) -> None:
         # execute_code path remembers fingerprints
