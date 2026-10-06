@@ -47,7 +47,7 @@ _DIR_WRITERS = [
     "infrastructure/observability/spine/sinks/file_sink.py",
     "infrastructure/persistence/run_buffer_registry.py",
     "plugins/observability/run/ledger_seam.py",
-    "plugins/transport/webserver/handlers/runs/terminal/failure/failure.py",
+    "plugins/transport/webserver/handlers/runs/terminal/failure.py",
 ]
 
 # Every writer scanned for bare mkdir/open, with the expected discipline.
