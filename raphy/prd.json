@@ -131,8 +131,8 @@
         "Existing tests pass: uv run pytest tests/composer/ --no-cov -q; uv run ruff check passes on touched files"
       ],
       "priority": 3,
-      "passes": false,
-      "notes": "Source: improve-codebase-architecture skill assessment Round 2 2026-10-06 (Strong, friction walk Q2). Deletion test: concentrates - ~130 lines of boilerplate eliminated. Duplication-class story (1 of 6; diversity quota satisfied by the other five)."
+      "passes": true,
+      "notes": "Source: improve-codebase-architecture skill assessment Round 2 2026-10-06 (Strong, friction walk Q2). Deletion test: concentrates - ~130 lines of boilerplate eliminated. Duplication-class story (1 of 6; diversity quota satisfied by the other five). Implemented 2026-10-07: gate probe proved single-module loop generation is NOT picked up by profile resolve (module.setup is one attribute per module) -> used the story fallback: _register_composer_plugin(...) factory called once per provider module."
     },
     {
       "id": "RA-009",

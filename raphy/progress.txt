@@ -7,7 +7,8 @@ Started: 2026-10-06 (assess session)
 - Assistant event emitters use a no-emitter-fallback seam: `if self._emit is None: log.info('<scope>.ep.no_emitter', ...)` else `self._emit(EVENT, payload.to_dict())`. The log scope string differs per caller (assistant.catalog / assistant.tool_overlay / assistant.skill_overlay) and must be preserved as a parameter, not hardcoded, when converging.
 - `tools._shared.fail_observation` is NOT behavior-identical to the `_fail` methods in `delegate_tool.py` (different Observation construction: payload=None/error=/extra= vs payload dict). Do not conflate them.
 - Round 2 (ralph) owns: DecisionGates flattening, Ingest pipeline, ContextFiles shims, Read Runs micro-dirs, full regression. `lca/cognition/memory/` is frozen per Round 2 AP-01. Raphy stories must not touch these.
-- Test commands: `uv run pytest <path> --no-cov -q`; lint: `uv run ruff check` on touched files. Branch for this work: `raphy/arch-optimize` (created from main by the first optimize iteration).
+- Test commands: `uv run pytest <path> --no-cov -q`; lint: `uv run ruff check` on touched files.
+- `@plugin` discovery is per-module-single-setup (`profile/resolve/resolve.py` reads `getattr(module, "setup", None)` and id-checks it against the bundle entry): a table-driven loop inside ONE module cannot expose N registrations -- only the last survives. Converge plugin shells via a factory called once per thin module, never via a loop in one module. Gate-probe the discovery mechanism before choosing the shape (RA-008). Branch for this work: `raphy/arch-optimize` (created from main by the first optimize iteration).
 
 ---
 
@@ -322,4 +323,50 @@ RA-006（P2 Strong：daemon "单活"不变量无 owner，`_kill_existing` 接缝
   — the failure reproduces on clean HEAD, i.e. pre-existing and unrelated.
   Per the recovery rule (red -> do not touch), the residual stays uncommitted.
   Next round: re-run the gate_chain tests; only commit as recover if fully green.
+---
+
+## 2026-10-07 03:30 - RA-008 (fresh session)
+- Converged the three near-identical composer provider shells
+  (think/brain_provider.py, perceive/provider.py, act/body_provider.py) into
+  one factory: `lca/plugins/composer/_provider_factory.py::_register_composer_plugin`
+  called once per provider module. Each thin module is now ~15 lines:
+  module docstring + factory call with (plane_key, plane_noun, interface,
+  grants, composer_cls) data + `__all__`.
+- GATE PROBE first (acceptance criterion 1): built a throwaway module with a
+  table-driven loop generating three `@plugin` registrations; profile resolve
+  (`lca/harness/profile/resolve/resolve.py:294-298`) does
+  `getattr(module, "setup", None)` -- ONE attribute per module, and then
+  requires `definition.spec.id == bundle entry id`. Result: only the LAST
+  loop iteration is discoverable; 2 of 3 bundle entries would fail the id
+  check. Gate FAILED as the story anticipated -> used the story's own
+  fallback shape (factory called 3 times, one thin module per provider).
+- Parity verified mechanically: extracted PluginDefinition for all three
+  providers from the pre-change tree and the post-change tree and compared
+  field by field (id, provides, description, authority grants, observability
+  descriptors, ownership reads/emits, Config/setup docstrings) -- IDENTICAL.
+- New tests `tests/composer/test_composer_provider_factory.py` (4 tests):
+  discovery yields original ids/provides keys; setup() provides the correct
+  composer instance per plugin id (the previously untested blind spot);
+  observability descriptors stay id-derived; authority grants preserved per
+  provider (perceive keeps context.read).
+- Files changed: lca/plugins/composer/_provider_factory.py (new),
+  lca/plugins/composer/think/brain_provider.py,
+  lca/plugins/composer/perceive/provider.py,
+  lca/plugins/composer/act/body_provider.py,
+  tests/composer/test_composer_provider_factory.py (new),
+  raphy/prd.json, raphy/progress.txt
+- Tests: `LLM_API_KEY=dummy uv run pytest tests/composer/ --no-cov -q` ->
+  68 passed (incl. booted web-profile tests exercising the bundle end to
+  end); `uv run ruff check` + `ruff format --check` clean on all touched
+  files (one TC002 fix: cordis import moved to TYPE_CHECKING).
+- **Learnings for future iterations:**
+  - `@plugin` discovery is per-module-single-setup: never converge N plugin
+    shells into one module + loop; the factory-per-thin-module shape is the
+    ceiling. Gate-probe the discovery mechanism BEFORE choosing the shape.
+  - The story said "three" shells but a FOURTH sibling exists
+    (collaboration/team_provider.py); it takes `TeamComposer(PlanBoundAgentAssembler())`
+    and implements `TeamGraphComposer`, so it is out of this story's scope --
+    left untouched. Always grep for siblings, then decide scope explicitly.
+  - Booted-kernel tests need `LLM_API_KEY=dummy` in env or they fail with the
+    fail-loud credentials error -- not a regression signal.
 ---
