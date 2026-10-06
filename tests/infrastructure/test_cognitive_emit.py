@@ -105,8 +105,6 @@ def test_emit_gate_decided_noop_when_session_unbound() -> None:
     )
 
 
-
-
 def test_emit_context_manifested_for_state_serializes_items() -> None:
     session = Session("manifest_items")
     token = set_publish_session(session)
@@ -131,8 +129,6 @@ def test_emit_context_manifested_for_state_serializes_items() -> None:
         assert folded.items[0].provenance == "repeat_tool_call"
     finally:
         reset_publish_session(token)
-
-
 
 
 @pytest.mark.asyncio
@@ -225,7 +221,7 @@ async def test_run_reasoner_generate_thoughts_emits_prompt_assembler_eps() -> No
         """Adapt PromptReasoner to the spine seam duck-typed contract.
 
         run_reasoner_generate_thoughts_with_spine_facts requires a
-        role_profile attribute plus complete_turn(state, render);
+        role_profile attribute plus complete_turn(state, render, tools);
         PromptReasoner itself keeps no role state (SRP) and takes
         per-turn tools explicitly, so the test supplies both here.
         """
@@ -237,9 +233,10 @@ async def test_run_reasoner_generate_thoughts_emits_prompt_assembler_eps() -> No
             tool_permission_manifest=ToolPermissionManifest(allowed_tools=[]),
         )
 
-        async def complete_turn(self, state: AgentState, render: object) -> LLMResponse:
-            return await super().complete_turn(state, render, tools=())
-
+        async def complete_turn(
+            self, state: AgentState, render: object, tools: object = ()
+        ) -> LLMResponse:
+            return await super().complete_turn(state, render, tools)
 
     session = Session("reasoner_spine")
     token = set_publish_session(session)

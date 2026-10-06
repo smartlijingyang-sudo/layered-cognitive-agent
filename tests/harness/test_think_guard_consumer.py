@@ -72,7 +72,7 @@ class _FakeReasoner(Reasoner):
         )
 
     async def complete_turn(
-        self, state: AgentState, render: object, **kwargs: object
+        self, state: AgentState, render: object, tools: object = None, **kwargs: object
     ) -> LLMResponse:
         return LLMResponse(
             text=self.response_text,
