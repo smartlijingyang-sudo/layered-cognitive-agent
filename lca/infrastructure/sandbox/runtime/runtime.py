@@ -115,7 +115,13 @@ class RunBoundSandboxRuntime(SandboxRuntime):
         return self._ready
 
     async def ensure_ready(self, explicit_ids: list[str] | None = None) -> SandboxExecResult | None:
-        """Mount attachments, verify guest paths, auto-inspect. Returns error result on failure."""
+        """Mount attachments, verify guest paths, auto-inspect. Returns error result on failure.
+
+        The output baseline runs only on the first successful call (or after
+        ``destroy`` resets readiness): files staged or produced mid-run must
+        stay visible to harvest deltas, not be absorbed into the baseline.
+        """
+        first_setup = not self._ready
         self._mount_files = load_mount_files(
             self._store,
             explicit_ids,
@@ -168,7 +174,8 @@ class RunBoundSandboxRuntime(SandboxRuntime):
             )
 
         self._ready = True
-        await self._baseline_outputs()
+        if first_setup:
+            await self._baseline_outputs()
         return None
 
     async def _stage_files(self, files: Mapping[str, bytes | str]) -> SandboxResult | None:
