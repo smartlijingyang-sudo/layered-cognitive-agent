@@ -1,0 +1,58 @@
+{
+  "project": "LCA Raphy Architecture Optimization",
+  "branchName": "raphy/arch-optimize",
+  "description": "Continuous architecture deepening for the LCA cognitive-agent codebase via the raphy fresh-session loop. Round 1 (this assessment, 2026-10-06): converge duplicated emit/fail builder seams identified by the improve-codebase-architecture skill Explore phase. Out of scope: areas covered by ralph Round 2 (DecisionGates, Ingest pipeline, ContextFiles shims, Read Runs micro-dirs) and lca/cognition/memory/ (frozen per Round 2 AP-01).",
+  "userStories": [
+    {
+      "id": "RA-001",
+      "title": "Converge duplicated _emit_* no-emitter-fallback methods into a shared assistant event seam",
+      "description": "As an LCA maintainer, I want the identical no-emitter-fallback logic in the assistant event emitters converged into one shared seam, so a change to the fallback behavior (log shape, None-emitter handling) is made in one place.",
+      "acceptanceCriteria": [
+        "A single shared helper exists (suggested: lca/plugins/domain/assistant/catalog/events.py or a new lca/plugins/assistant/_shared.py) implementing the seam: if emit fn is None -> log.info('<scope>.ep.no_emitter', ep=<EVENT>, payload=payload.to_dict()); else emit_fn(<EVENT>, payload.to_dict())",
+        "lca/plugins/domain/assistant/catalog/events.py _emit_created, _emit_bootstrap_completed, _emit_profile_revised all delegate to the shared helper; no inline if-self._emit-is-None blocks remain",
+        "lca/plugins/assistant/tool/overlay.py _emit_profile_revised delegates to the shared helper",
+        "lca/plugins/assistant/skill/overlay/overlay.py _emit_installed, _emit_profile_revised, _emit_activated all delegate to the shared helper",
+        "A repo-wide grep for 'ep.no_emitter' shows the fallback log call site exists exactly once (in the shared helper)",
+        "Behavior preserved: log scope strings per caller (assistant.catalog / assistant.tool_overlay / assistant.skill_overlay) still emitted; payload.to_dict() still passed",
+        "Relevant tests pass: uv run pytest tests/ -k 'assistant' --no-cov -q (or the narrower tests covering these three modules)",
+        "uv run ruff check passes on all touched files",
+        "Do NOT change event names, payload shapes, or the None-emitter fallback semantics"
+      ],
+      "priority": 1,
+      "passes": false,
+      "notes": "Source: improve-codebase-architecture skill assessment 2026-10-06 (Strong). Deletion test: yes. Follows the established 'converge N identical X' pattern (git: ba2ad56c6, 2a2059cca). Layering note: verify the import direction for the shared helper creates no new plugin->plugin cycle; prefer the domain catalog module if both overlays already depend on it."
+    },
+    {
+      "id": "RA-002",
+      "title": "Converge two identical _fail methods in delegate_tool.py into a module-level helper",
+      "description": "As an LCA maintainer, I want the two literally identical _fail methods in lca/infrastructure/tools/collaboration/delegate_tool.py converged into one module-level helper, so the validation-failure Observation construction lives in one place.",
+      "acceptanceCriteria": [
+        "A module-level helper (e.g. _fail_observation(start: float, message: str) -> Observation) exists in lca/infrastructure/tools/collaboration/delegate_tool.py with the exact current body (payload={'error': message, FAILURE_KIND: FAILURE_KIND_VALIDATION}, success=False, ContentType.STRUCTURED)",
+        "Both tool classes (owners of the current duplicate _fail methods) call the helper; grep -c 'def _fail' on the file returns 0",
+        "Do NOT reuse tools._shared.fail_observation: it constructs Observation differently (payload=None, error=, extra=); swapping would change behavior",
+        "Behavior preserved: identical Observation fields as before (verified by existing tests or a new unit test pinning the payload shape)",
+        "uv run pytest tests/infrastructure/tools/ --no-cov -q passes",
+        "uv run ruff check passes on the touched file"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": "Source: improve-codebase-architecture skill assessment 2026-10-06 (Strong). Deletion test: yes - the two methods are character-identical. Twin of ba2ad56c6 (different Observation shape - do not conflate)."
+    },
+    {
+      "id": "RA-003",
+      "title": "Unify _emit_lifecycle_pre/post/fail in model_visible adapter behind one dispatch seam",
+      "description": "As an LCA maintainer, I want the three _emit_lifecycle_* functions in lca/plugins/events/hooks/model_visible/adapter.py unified behind a single dispatch seam, so the step-counter extraction and lifecycle_emit import pattern is not repeated per phase.",
+      "acceptanceCriteria": [
+        "A single seam exists in lca/plugins/events/hooks/model_visible/adapter.py; _emit_lifecycle_pre/post/fail become thin wrappers or call sites of it",
+        "The repeated 'step = hook._step_counter' and deferred lifecycle_emit import pattern appears once",
+        "Behavior preserved: same lifecycle_emit calls (request_model / complete_model / fail_model) with identical arguments",
+        "uv run pytest tests/ -k 'model_visible or lifecycle' --no-cov -q passes",
+        "uv run ruff check passes on the touched file",
+        "If the three phases turn out to need genuinely different seams, mark this story dropped with the reason instead of forcing unification"
+      ],
+      "priority": 3,
+      "passes": false,
+      "notes": "Source: improve-codebase-architecture skill assessment 2026-10-06 (Worth exploring). Weaker than RA-001/RA-002: shared scaffolding but different signatures. Deletion test is marginal."
+    }
+  ]
+}

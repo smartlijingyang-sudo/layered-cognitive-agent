@@ -1,0 +1,34 @@
+# Raphy Progress Log
+Started: 2026-10-06 (assess session)
+
+## Codebase Patterns
+- The codebase has an established "converge N identical X into one shared Y" idiom (git: ba2ad56c6 converged 8 `_fail` builders into `tools._shared.fail_observation`; 2a2059cca converged 5 `_emit` closures into `events.emit_fact_event`; 9fecd23a0 deduped `_latest_run` into `domain.latest_run`). New convergence stories should follow this exact shape: extract, delegate, grep-verify single call site, pin behavior with tests.
+- Assistant event emitters use a no-emitter-fallback seam: `if self._emit is None: log.info('<scope>.ep.no_emitter', ...)` else `self._emit(EVENT, payload.to_dict())`. The log scope string differs per caller (assistant.catalog / assistant.tool_overlay / assistant.skill_overlay) and must be preserved as a parameter, not hardcoded, when converging.
+- `tools._shared.fail_observation` is NOT behavior-identical to the `_fail` methods in `delegate_tool.py` (different Observation construction: payload=None/error=/extra= vs payload dict). Do not conflate them.
+- Round 2 (ralph) owns: DecisionGates flattening, Ingest pipeline, ContextFiles shims, Read Runs micro-dirs, full regression. `lca/cognition/memory/` is frozen per Round 2 AP-01. Raphy stories must not touch these.
+- Test commands: `uv run pytest <path> --no-cov -q`; lint: `uv run ruff check` on touched files. Branch for this work: `raphy/arch-optimize` (created from main by the first optimize iteration).
+
+---
+
+## 2026-10-06 - ASSESS (fresh session)
+
+**Skill used:** `skills/improve-codebase-architecture/SKILL.md` (Explore + Present phases).
+
+**Scoping (YAGNI):** Walked `git log --oneline` back ~40 commits (all 2026-10-06). Hot spots: test pinning across `tests/` (guard branches, fake alignment), `lca/infrastructure/assistant/` + `lca/infrastructure/tools/` convergence refactors, `lca/contracts/observability/cursor/`, `lca/plugins/transport/webserver/`, cron dedupe. Read `CONTEXT.md` domain glossary before judging. Avoided ralph Round 2 areas.
+
+**Candidates presented:**
+
+| Files | Problem | Solution | Benefits | Strength |
+|---|---|---|---|---|
+| `lca/plugins/domain/assistant/catalog/events.py`, `lca/plugins/assistant/tool/overlay.py`, `lca/plugins/assistant/skill/overlay/overlay.py` | 7 `_emit_*` methods share an identical no-emitter-fallback seam (None check + log.info + emit); fallback logic edited in 3 files today means 3 edits | Extract one shared seam taking the log scope as a parameter; all 7 delegate to it | Locality: fallback behavior lives in one module; leverage: future event types get the seam for free; testable through the single seam | **Strong** |
+| `lca/infrastructure/tools/collaboration/delegate_tool.py` (L127, L213) | Two character-identical `_fail(self, start, message)` methods in two tool classes of the same module | Extract module-level `_fail_observation(start, message)`; both classes call it | Locality: Observation construction in one place; matches the ba2ad56c6 idiom | **Strong** |
+| `lca/plugins/events/hooks/model_visible/adapter.py` (`_emit_lifecycle_pre/post/fail`) | Three functions repeat `step = hook._step_counter` + deferred `lifecycle_emit` import + single call | Unify behind one dispatch seam | Less duplication than it looks (different signatures/targets); only if the unified seam is genuinely simpler | **Worth exploring** |
+
+**Top recommendation:** RA-001 first. It is the largest instance of the codebase's own convergence idiom (7 methods, 3 files, one seam), passes the deletion test cleanly, and its acceptance criteria are mechanically verifiable (grep for single `ep.no_emitter` call site). RA-002 is the same idiom at smaller scale. RA-003 is the weakest — flagged as droppable if the seam doesn't simplify.
+
+**Stories written to `raphy/prd.json`:** RA-001 (P1), RA-002 (P2), RA-003 (P3). All `passes: false`. Branch: `raphy/arch-optimize`.
+
+**Learnings for future iterations:**
+- When converging, always diff the supposedly-identical bodies field by field first (RA-002 vs `tools._shared.fail_observation` looked the same until the Observation kwargs were compared).
+- The `## Codebase Patterns` section above is the shared memory; add genuinely reusable idioms only.
+---
