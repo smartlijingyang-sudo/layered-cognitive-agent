@@ -175,7 +175,7 @@ class SimpleBody(Body):
            ``decision.tool_calls`` BEFORE any tool runs. The assistant
            row must be in the journal before the next LLM call sees the
            history (persist-before-execute).
-        2. If step 1 raises (e.g. ``Session.append`` fails), return a
+        2. If step 1 raises (e.g. session persistence fails), return a
            single ``EffectReceipt(FAILED, error_code="session_persistence_failed")``
            per call and no tool runs.
         3. For each call: execute via :class:`SafeExecutor`, then persist
