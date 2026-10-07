@@ -123,19 +123,16 @@ async def setup(ctx: PluginContext, config: _Config) -> None:
        composer ``instrument_llm(llm, ctx=...)`` 软查该键,把
        :class:`ModelVisibleHookAdapter` 挂到 LLM adapter 装饰器链最外层。
     """
-    from lca_kernel.events.bus.bus import EnvelopeBus
-
     ctx.provide("event.bus.publisher.model_visible", ModelVisiblePublisher)
 
     # 实例化 hook 并 provide 给 composer 装配。publish 不经 bus:hook 内部
-    # 走 publish_via_session → Session.append(ADR-0186);bus 仅为
-    # ModelVisibleHook 构造形参(鉴权 registry 仍由 EnvelopeBus 进程单例承载)。
-    bus: Any = EnvelopeBus.default()
-    hook = _build_hook(bus=bus)
+    # 走 publish_via_session → Session.append(ADR-0186);鉴权 registry 由
+    # Session 投递入口经进程单例读取(manifest requires=["event.bus"])。
+    hook = _build_hook()
     ctx.provide("llm.adapter.hook.model_visible", hook)
 
 
-def _build_hook(*, bus: Any) -> Any:
+def _build_hook() -> Any:
     """构造 :class:`ModelVisibleHook`(函数内 lazy import 避免环)。
 
     spec section H ContextVar deletion: hook no longer carries
@@ -144,7 +141,7 @@ def _build_hook(*, bus: Any) -> Any:
     """
     from lca.plugins.events.hooks.model_visible.hook import ModelVisibleHook
 
-    return ModelVisibleHook(bus=bus)
+    return ModelVisibleHook()
 
 
 __all__ = ["ModelVisiblePublisher", "setup"]

@@ -279,20 +279,27 @@ class EnvelopeBus(Generic[P]):
     def delivery_snapshot(self) -> dict[str, dict[str, int]]:
         """按 category 的投递计数器快照(ADR-0184 D2)。
 
-        EnvelopeBus 层基线:仅 ``published`` 计数(S3 入队一次);持久化 / 派发
-        / dropped 由 EventBus 子类 _dispatch_sinks + _fanout 路径填充。
+        返回 ``{category: {"published":…, "persisted":…, "delivered":…,
+        "dropped":…}}`` 的拷贝:只含发生过 publish 的 category;调用方可
+        自由读取聚合,写回不影响计数器。所有权:返回值归调用方。
+        ``published`` 在 publish 入口累加;``persisted`` / ``delivered`` /
+        ``dropped`` 由 _dispatch_sinks + _fanout 投递路径填充。
+        ``dropped`` 定义 = 事件未落盘,或零派发且注册表为该 category
+        声明了订阅者。
         """
         return {category: dict(counts) for category, counts in self._delivery_counts.items()}
 
     def configure_delivery_policy(self, *, strict: bool) -> None:
-        """设置零落盘投递策略(ADR-0184 D4);PR-1 仅保存,真正生效需
-        EventBus 子类的 _dispatch_sinks 实现,本 EnvelopeBus 基类不直接
-        跑 dispatcher。
+        """设置零落盘投递策略(ADR-0184 D4),立即对后续 publish 生效。
+
+        ``strict=True``:持久 category 零挂载 sink 抛 :class:`EventNoSinkError`;
+        ``strict=False``:降级为 ``dropped`` 计数 + error 日志。
         """
         self._delivery_policy = DeliveryPolicy(strict=strict)
 
     @property
     def delivery_policy(self) -> DeliveryPolicy:
+        """当前投递策略(只读)。"""
         return self._delivery_policy
 
     # ── 内部 helpers ────────────────────────────────────────────────────
@@ -580,35 +587,10 @@ class EventBus(EnvelopeBus[P]):
                         )
                     )
 
-    # ── 投递回执 / 计数器(ADR-0184 D2/D4)────────────────────────────────
-
-    def delivery_snapshot(self) -> dict[str, dict[str, int]]:
-        """按 category 的投递计数器快照(ADR-0184 D2)。
-
-        返回 ``{category: {"published":…, "persisted":…, "delivered":…,
-        "dropped":…}}`` 的拷贝:只含发生过 publish 的 category;调用方可
-        自由读取聚合,写回不影响计数器。所有权:返回值归调用方。
-        ``dropped`` 定义 = 事件未落盘,或零派发且注册表为该 category
-        声明了订阅者。
-        """
-        return {category: dict(counts) for category, counts in self._delivery_counts.items()}
-
-    def configure_delivery_policy(self, *, strict: bool) -> None:
-        """设置零落盘投递策略(ADR-0184 D4),立即对后续 publish 生效。
-
-        ``strict=True``:持久 category 零挂载 sink 抛 :class:`EventNoSinkError`;
-        ``strict=False``:降级为 ``dropped`` 计数 + error 日志(迁移窗口)。
-        """
-        self._delivery_policy = DeliveryPolicy(strict=strict)
-
-    @property
-    def delivery_policy(self) -> DeliveryPolicy:
-        """当前投递策略(只读)。"""
-        return self._delivery_policy
-
     # ── 内部 ──────────────────────────────────────────────────────────────
     # _new_delivery_counts / _is_persistent_category / _resolve_trace_id /
-    # _coerce_category / _coerce_producer / registry 全部继承自 EnvelopeBus
+    # _coerce_category / _coerce_producer / registry / delivery_snapshot /
+    # configure_delivery_policy / delivery_policy 全部继承自 EnvelopeBus
     # (基类实现已涵盖);EventBus 仅保留自己独有的 hook / sink / fanout 相关
     # helper。
 

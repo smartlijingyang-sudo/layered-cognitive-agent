@@ -33,15 +33,16 @@ def hook(bound_session: Any, bus: Any) -> Any:
 
     bus 形参来自上层 conftest 的测试 catalog bus;本 fixture 将其
     set_default(鉴权走 EventBus.default().registry),teardown 时复位单例。
+    hook 自身不持有 bus。
     """
     EventBus.set_default(bus)
     try:
-        yield _build_hook_fixture(bus)
+        yield _build_hook_fixture()
     finally:
         EventBus.reset_singleton()
 
 
-def _build_hook_fixture(bus: Any) -> Any:
+def _build_hook_fixture() -> Any:
     """单实例 :class:`ModelVisibleHook` + state state (cursor / prompt 显式传入)。
 
     spec section H: hook 构造不再接 ``cursor_provider`` / ``prompt_ctx_getter``
@@ -78,7 +79,7 @@ def _build_hook_fixture(bus: Any) -> Any:
             self._snapshot.step_index += 1
             self._snapshot.step_id = step_id
 
-    h = ModelVisibleHook(bus=bus)
+    h = ModelVisibleHook()
 
     def make_prompt(template_id: str, text: str) -> Any:
         return CurrentReasonerPrompt(
@@ -500,7 +501,7 @@ def test_adapter_pre_post_share_step_identity(bound_session: Any, bus: Any) -> N
         system_prompt_text="sys",
     )
     EventBus.set_default(bus)
-    hook = ModelVisibleHook(bus=bus)
+    hook = ModelVisibleHook()
 
     class _Inner:
         async def complete(self, prompt_text: str, **kwargs: Any) -> LLMResponse:
@@ -542,8 +543,8 @@ def test_setup_provides_marker_and_hook() -> None:
     """``setup()`` 注册 marker class 与 :class:`ModelVisibleHook` 实例到 ctx。
 
     注:``@plugin`` 装饰把 :func:`setup` 包成 ``CordisPlugin`` 对象,实际
-    函数经 ``plugin.setup`` 拿到;EventBus.default() 走进程单例,本测试
-    仅断言 marker class 注入 + hook 提供 + setup 签名(防声明漂移)。
+    函数经 ``plugin.setup`` 拿到。本测试仅断言 marker class 注入 + hook
+    提供 + setup 签名(防声明漂移)。
     """
     from lca.plugins.events.publishers.model_visible.publisher import (
         ModelVisiblePublisher,
@@ -584,6 +585,49 @@ def test_setup_provides_marker_and_hook() -> None:
     sig = inspect.signature(setup_fn)
     assert "ctx" in sig.parameters
     assert "config" in sig.parameters
+
+
+def test_hook_holds_no_bus_and_setup_never_requests_singleton(monkeypatch: Any) -> None:
+    """``ModelVisibleHook`` 不持有总线;``setup()`` 不索取进程单例。
+
+    守护点:若 ``setup()`` 索取进程单例,在未 boot 的进程里共享槽会被填成
+    一个没有 ``subscribe`` / ``mount_sink`` 的实例,后续 ``EventBus.default()``
+    拿到同一个空壳,publish 静默零投递。鉴权 registry 由 Session 投递入口
+    读取,plugin setup 无需持有总线。
+    """
+    from lca.plugins.events.hooks.model_visible.hook import ModelVisibleHook
+    from lca.plugins.events.publishers.model_visible.publisher import (
+        setup as plugin_setup,
+    )
+    from lca_kernel.events.bus import bus as bus_module
+
+    assert not hasattr(ModelVisibleHook(), "_bus"), "hook 不应持有总线引用"
+
+    requested: list[str] = []
+    monkeypatch.setattr(
+        bus_module.EnvelopeBus,
+        "default",
+        classmethod(lambda cls: requested.append(cls.__name__)),
+    )
+
+    captured: dict[str, Any] = {}
+
+    class _Ctx:
+        def provide(self, key: Any, value: Any, **_kwargs: Any) -> None:
+            captured[str(key)] = value
+
+    from pydantic import BaseModel
+
+    class _EmptyConfig(BaseModel):
+        model_config = {"extra": "forbid"}
+
+    import asyncio
+
+    setup_fn = getattr(plugin_setup, "setup", plugin_setup)
+    asyncio.run(setup_fn(_Ctx(), _EmptyConfig()))
+
+    assert requested == [], "setup() 不得索取进程单例;单例装配是 lca.events.bus manifest 的职责"
+    assert isinstance(captured["llm.adapter.hook.model_visible"], ModelVisibleHook)
 
 
 def test_plugin_decorator_metadata() -> None:

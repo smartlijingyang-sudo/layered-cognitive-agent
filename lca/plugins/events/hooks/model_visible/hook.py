@@ -54,7 +54,7 @@ from lca_kernel.events.payloads.model_visible import (
 )
 
 if TYPE_CHECKING:
-    from lca_kernel.events.bus.bus import EnvelopeBus, EventRef
+    from lca_kernel.events.bus.bus import EventRef
 
 _log = logging.getLogger(__name__)
 
@@ -150,12 +150,7 @@ class ModelVisibleHook:
       （不参与本 PR 的实际数据流;PR-3 不挂载到 bus pipeline,仅占位）。
     """
 
-    def __init__(
-        self,
-        *,
-        bus: EnvelopeBus[Any],
-    ) -> None:
-        self._bus = bus
+    def __init__(self) -> None:
         # spec section H ContextVar deletion: cursor + system_prompt_text
         # are explicit args on capture_pre_llm; no ContextVar-backed providers.
         self._last_headers: dict[tuple[str, str], EpochHeader] = {}

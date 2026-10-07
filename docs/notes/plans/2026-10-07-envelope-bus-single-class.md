@@ -125,7 +125,7 @@ S1 的空壳路径无任何用例触达。违反 [AGENTS.md §1.5 规则 6](../.
 
 **验收**：
 1. `grep -n '_bus' lca/plugins/events/hooks/model_visible/hook.py` 零命中
-2. `git grep -n 'EnvelopeBus.default()' -- 'lca/plugins/**'` 零命中
+2. `git grep -n 'EnvelopeBus.default()' -- 'lca/plugins/events/**'` 零命中。[`query_endpoints.py:614`](../../../lca/plugins/transport/webserver/handlers/runs/api/query_endpoints.py) 是 `/health` 的真实消费方，保留；PR-2 单类收口后它成为唯一正确的调用形态
 3. `configure_delivery_policy` / `delivery_policy` / `delivery_snapshot` 在 `bus.py` 各只剩一处 `def`
 4. `pytest tests/lca_kernel/events/ tests/plugins/events/publishers/model_visible/ --no-cov` 零失败（基线 252 passed + 16 passed）
 5. 新增回归测试：`ModelVisibleHook()` 无参可构造，且 `capture_pre_llm` 行为与去参前逐字段相同
@@ -202,6 +202,7 @@ S1 的空壳路径无任何用例触达。违反 [AGENTS.md §1.5 规则 6](../.
 | `python scripts/check_package_contracts.py` | exit 1，60 issues / 82 packages |
 | `python scripts/check_protocol_impl.py` | exit 1，42 issues |
 | `python scripts/check_no_any.py` | exit 1（无汇总计数，验收逐条 diff 输出） |
+| `pytest tests/scenario/code/test_code_conventions.py::TestFileLineCountLimit --no-cov` | 1 failed（基线提交 `81221a945` 上即失败：`lca/infrastructure/observability/loop_cursor/projection/host.py` 258 行有效代码 > 阈值 250）。与本计划无关，不修 |
 | `python scripts/verify_md_links.py` | exit 1，123 broken links |
 | `python scripts/verify_doc_budgets.py` | exit 1，2 documents over budget |
 | `python scripts/check_doc_layering.py` | exit 1 |
