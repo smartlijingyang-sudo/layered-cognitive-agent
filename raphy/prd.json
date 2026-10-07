@@ -316,9 +316,9 @@
         "New test pins the decided behavior (recovery miss); tests/plugins/assistant/test_jobs.py green; ruff check clean"
       ],
       "priority": 1,
-      "passes": false,
+      "passes": true,
       "branchName": "raphy/arch-20261007-2315",
-      "notes": "Strength: Worth exploring. Area B friction walk (assistant jobs plugin), fail-closed gap class. Evidence: jobs.py fire() line ~`message=registered_item.message if registered_item is not None else \"\"`; plane.get is a Protocol returning WorkItem | None, so the empty-message branch is contractually reachable; a locally-registered job implies submit() succeeded, so a None recovery means the queue lost the item — firing then runs the job with an empty prompt while still emitting assistant.job.fired. Constraint: the documented fail-closed design of the jobs plugin (ADR-0187 §3 D10); cross-process recovery via deterministic work_id must keep working."
+      "notes": "Strength: Worth exploring. Area B friction walk (assistant jobs plugin), fail-closed gap class. Evidence: jobs.py fire() line ~`message=registered_item.message if registered_item is not None else \"\"`; plane.get is a Protocol returning WorkItem | None, so the empty-message branch is contractually reachable; a locally-registered job implies submit() succeeded, so a None recovery means the queue lost the item — firing then runs the job with an empty prompt while still emitting assistant.job.fired. Constraint: the documented fail-closed design of the jobs plugin (ADR-0187 §3 D10); cross-process recovery via deterministic work_id must keep working. Probe(2026-10-07 optimize 轮): 真实 0093 实现 SqliteWorkQueue.get 只是按 work_id 的 SELECT；queue.py 无 DELETE/purge/retention 行删除路径——submit 成功后同进程 get 按确定性 work_id 必命中，None-after-submit 在设计的 0093 生命周期内不可达（评估'contractually reachable'的假设被证据证伪）。唯一可达路径是 database_path 配置漂移或外部删库；跨进程恢复(registration=None+queue 命中)属设计路径，不受影响。判决：删掉 else-\"\"fallback，recovery-miss 分支 log.error + 抛 JobNotRegisteredError(fail-loud)；schedule 恢复与跨进程恢复逻辑原样保留。新增test_fire_rejects_when_0093_queue_lost_registered_item 钉住拒收行为。"
     },
     {
       "id": "RA-022",

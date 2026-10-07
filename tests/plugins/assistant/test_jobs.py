@@ -320,6 +320,19 @@ class TestFire:
         handle = second_process.fire(assistant_id, "daily_brief")
         assert handle.status == WorkStatus.PENDING.value
 
+    def test_fire_rejects_when_0093_queue_lost_registered_item(
+        self,
+        jobs: AssistantJobsImpl,
+        factory: _FakeFactory,
+        assistant_id: str,
+        job_spec: JobSpec,
+    ) -> None:
+        """恢复失败 fail-loud：登记存在但 0093 队列丢失 item ⇒ 拒收，绝不发空 prompt（RA-021）。"""
+        jobs.register(assistant_id, job_spec)
+        factory.plane.items.clear()  # 模拟 database_path 漂移 / 外部删库
+        with pytest.raises(JobNotRegisteredError, match="WorkItem 丢失"):
+            jobs.fire(assistant_id, "daily_brief")
+
 
 # ── list_jobs ────────────────────────────────────────────────────────
 

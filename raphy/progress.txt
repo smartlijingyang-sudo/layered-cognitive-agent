@@ -492,3 +492,29 @@
   - projection_cache 的 `_on_create` 与 loop 体是 ritual 内部的第二层重复
     （同文件两份拷贝）：收敛 ritual 时顺手把同文件内重复一起收掉，不算
     scope creep。
+
+## 2026-10-07 23:15+ - RA-021（Round 6 optimize）
+
+- 实现：`AssistantJobs.fire` 恢复失败分支 fail-loud 收敛（`lca/plugins/assistant/jobs/jobs.py`）
+  - Probe 结论：真实 0093 `SqliteWorkQueue.get` 只是按 work_id 的 SELECT；`queue.py`
+    无 DELETE/purge/retention 行删除路径 → submit 成功后 get 必命中，
+    None-after-submit 在设计的 0093 生命周期内不可达（评估"contractually
+    reachable"的假设被证据证伪）。
+  - 删掉 `message=registered_item.message if registered_item is not None else ""`
+    的静默空 prompt fallback；新增 recovery-miss 分支：log.error + 抛
+    `JobNotRegisteredError`（database_path 漂移 / 外部删库的唯一可达场景 fail-loud
+    拒收）。跨进程恢复（registration=None + queue 命中）与 schedule 恢复逻辑原样保留；
+    fire docstring 补一行 recovery-miss fail-loud 说明。
+- 测试：`tests/plugins/assistant/test_jobs.py` 新增
+  `test_fire_rejects_when_0093_queue_lost_registered_item`（登记存在、队列丢失 ⇒
+  拒收、绝不发空 prompt）；全文件绿；ruff check 绿。
+- Files changed: `lca/plugins/assistant/jobs/jobs.py`、`tests/plugins/assistant/test_jobs.py`、
+  `raphy/prd.json`（RA-021 passes=true，notes 记录 probe 结果与评估差异）、
+  `raphy/progress.txt`（本节）。
+- **Learnings for future iterations:**
+  - Probe Protocol 的 `-> X | None` 返回时先读真实实现：0093 的 `get` 是"SELECT or
+    None"式纯读探针、无行删除路径 → None-after-submit 不可达可证伪，不要停留在
+    "contractually reachable"的合约推理上。
+  - 跨进程恢复设计的每个分支单独判定可达性：registration=None+命中是设计路径，
+    registration!=None+丢失才是 fail-loud 目标——两种 None 不可混为一谈。
+---

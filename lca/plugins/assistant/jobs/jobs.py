@@ -199,7 +199,8 @@ class _AssistantJobsImpl(AssistantJobs):
         """人工投递一次 ``actor="manual"`` Trigger 进 0093；发 fired EP。
 
         投递的 WorkItem message 复用注册时登记的 job prompt（从 0093 队列
-        按确定性 work_id 恢复，跨进程重启不丢）。
+        按确定性 work_id 恢复，跨进程重启不丢）。本进程登记存在但 0093 队列
+        丢失 item（recovery-miss）⇒ fail-loud 拒收，绝不发空 prompt（RA-021）。
         """
         plane = self._require_factory("fire").create()
         spec = self._catalog.get(assistant_id)
@@ -212,6 +213,20 @@ class _AssistantJobsImpl(AssistantJobs):
         if registration is not None and registration.status == "disabled":
             raise JobNotRegisteredError(
                 f"assistant={assistant_id!r} job={job_id!r} 处于 disabled,拒收投递"
+            )
+        if registered_item is None:
+            # 恢复失败（recovery-miss）：本进程登记存在，但 0093 队列丢失了对应
+            # WorkItem。真实 0093 实现（SqliteWorkQueue）无行删除路径（无
+            # purge/retention），submit 后 get 按确定性 work_id 必命中；走到这里
+            # 意味着 database_path 配置漂移或外部删库。fail-loud 拒收：绝不投递
+            # 空 prompt 的 WorkItem（RA-021）。
+            log.error(
+                "assistant.jobs.fire recovery-miss: registered work item lost from 0093 queue",
+                assistant_id=assistant_id,
+                job_id=job_id,
+            )
+            raise JobNotRegisteredError(
+                f"assistant={assistant_id!r} job={job_id!r} 的 0093 WorkItem 丢失,拒收投递"
             )
 
         trigger = Trigger(
@@ -226,15 +241,14 @@ class _AssistantJobsImpl(AssistantJobs):
             "job_id": job_id,
             "kind": "assistant.job.fire",
         }
-        if registered_item is not None:
-            registered_schedule = registered_item.options.get("schedule")
-            if isinstance(registered_schedule, str):
-                options["schedule"] = registered_schedule
+        registered_schedule = registered_item.options.get("schedule")
+        if isinstance(registered_schedule, str):
+            options["schedule"] = registered_schedule
         item = WorkItem(
             work_id=f"assistant-fire-{assistant_id}-{job_id}-{trigger.trigger_id}",
             trigger=trigger,
             profile=self._session_profile,
-            message=registered_item.message if registered_item is not None else "",
+            message=registered_item.message,
             options=options,
             grant=_assistant_grants(Path(spec.home_path)),
         )
