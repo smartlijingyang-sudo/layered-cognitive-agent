@@ -1033,3 +1033,28 @@
 - 验证结果: 无代码改动，无需验证门。扫描脚本全部 exit 0（ast0522/dead0522/dead0522b/sndb0522 确定性重跑）。
 - commit: 无代码 commit；本台账单独 docs commit（沿用 0521/0522/0523 `docs(lca-1000): 第NNNN轮台账` 模式）。
 - 备注: 只 commit docs/notes/lca-1000/ledger.md（`git add` + `git commit -- <path>` 显式路径）；开工前工作区干净（main，ahead 31，未 push，no-push 规则在）。扫描输出存 252 /tmp（ast0524_out.txt、dead0524_out.txt、dead0524b_out.txt、sndb0524_out.txt）。教训：ast0522.py 输出 hash 是 `h[:10]`（10 字符）而非 12 字符，grep 提取模式写错会导致空集合误判 diff——以后提取组键用 `^G ` 行全行比对或 awk 取第 3 列；/tmp/h0522.txt 是旧归一化基线，不要再用。
+
+## 第0525辱 (2026-10-08 04:33-04:45 CST)
+- 摾璚仆佡: 无代瑁曹�Q�Ｆ朮Kɠ�x+�X��[�ik�Z��ik�Z��iȞh�NK�>Z��K�>Y��[ق�.h��{h�&&���ϢK��z�i��x�G&�f��6��֗N(
+b΂���e畁？
+- BF W&�
+?���%M--lh�j��ih~iَK�niَih~X�ni�Nj��j��j��ihr�.h��{h�&&���Ϣ�FV�6WBFW7B�2���uTtR��B�{z�z��{z�z-�y�7��懷��轖遇 衲捭岹�丸���懷��时Ｗ��懷��瀆文衆瀆Ｗ��懷��瀆怕目Ｗ��懷��瀆恹锦)+DEEPENING.md Seam discipline…-�{��g�R���'�Z����n��n���褋��h(��Ϧ7�2��W�΋
+����Ƀ��S��S�R���7�j��G�����'��S��?�?�Z��C����?�Z�����F�Jk�V�F�d�����啨�������������ѽ�����������ѕ�}ͅ��}���ɥ��ѕ́����Ʌ�а��������̈́݉���̈́��r�����Ro���卙喋利瑮瑮命�F��S���S����v�����滚r�����v��"O�F��G�旖�7����羉７裁－／在４在匚���廩��羉釛�%�毉文该实短不 lig㢻㢄��g*9c.�(l{�#���収��Z:�K�>9�N:/~Yʎ�nY)��h~Yʎ�h~Z���ɮ�寺k�p媉：���咘龊���9��.h�>:(NX[�e(��.z(�Y�����Yʎ���h�h�.{�&�/h{�#�f���k�Yϼ�Ɗ_�R������7�����咮６仆／�S��Y��~g��[�Z�J���?��N|�����n�k�Y*�8�{�%�h~Y*����j(�j/��ȞY�[���_)�j[Nj��ih~��^Y��[���[��[���_~X�[[~X��X����}�c��mm�b�Y�r���#�ޯ��g*9b*�/�z+���}�h��d��/�z,���N[�>[�!��%;寿迟唥５�R���;�j8v'�YʾYJ^�������%���g*�e){�#�g*;�%�寺k�p戓価７�f�'�j��%�~销蟹诉�g*:o����g�{�%�g*:／削�����_����j/����{�n�+i:e&�体对体Ｙ(的杞仆佡: (鑆�&�����[�n���'�����k��䷞�����2�3说糢幦���#9o��/d��"y��ykgyo ;�.y��.#yod�b�{�#9.&�.���+���y/d���ykgx₋HT���9�n��n8�"9cz/�H\�9cnVz 券2023-基体（/tmp/ast0523.txw�yo���&e��m9�fyo�H:(l��l�����y仆佣��Z��bf[�Ӛ�g��ă��˚6�����Լ��̃>殠�Yʎy�Nh۞���Z�������_�"������(��ȸ�������.Z�j�(�X�X�(��x��XZ�X�.���h�.K���(��x����'�籸會�
+4��_��>�*?e�zd�<�����<��>+Ix�ⵗ��o��_�+���>d겣�>���e�B��⶗�
+�㼏�
+�权Ｆ官权，����i�>������ii;gi;gi
+yn�e�9k��.*�.(��%ފ�奤흤흤)建喔寿个���⯾�]�.ZZN��N��B�[��YiNZ��K��yn �.&��%8糾�j�v{������[�j�剙nh[NjY�[��.h�
+
+## 第0525轮 (2026-10-08 04:33-04:45 CST)
+- 改了什么: 无代码改动。**本轮未发现新的实质机会**（依据 body 规则 4：不硬凑 trivial commit）。
+- 依据 skill 哪一节: SKILL.md Deletion test + LANGUAGE.md（load-bearing knowledge / interface 即 test surface / Two adapters = real seam）+ DEEPENING.md Seam discipline——见候选清单的驳回依据。
+- 关键设计决策（夜间跳过 grilling，记台账）: 并发会话新鲜 diff（2cd26e703 merge @04:12：3a7bc323a restore else in otel_safe_attributes + b8f6ca904 64 行回归 pin 测试）是明确的回归修复 + 契约锁定，不 re-litigate 并发会话的新鲜工作（沿用 0522 RA 判例）。
+- 候选清单（本轮 explore：AST 同体扫描 8397 函数/243 组 + dead-code 候选名集合 + 真死 17 候选 + 同名异体扫描 + deslop 清单 + 并发会话新鲜 diff 复查）:
+  1. AST 243 组 —— 组 hash 集合与 0523 基线（/tmp/ast0523.txt）逐成员一致，零新组（0522/0523 已逐组人工裁决）。
+  2. dead 候选 —— 集合与 0524 逐成员一致；唯一漂移为 policy.py#117/133/156 行号 +1，系 3a7bc323a +1 行所致，非新候选；真死 17 与 0522/0523/0524 裁决一致。
+  3. sndb —— 唯一漂移为 policy.py#124→125 行号（同因，sig 2938e087 不变），无新可疑对。
+  4. 并发会话：b8f6ca904 新增测试文件 noqa=0、无 except Exception；fresh diff 无新 noqa/except；3a7bc323a 是 e51902b07 RET505 回归的正当还原——不动。
+  5. deslop：TODO/FIXME/HACK/XXX 仅既往裁决项（expander.py 中文示例 XXX、s3.py ADR-0167 PR-10 占位、check_protocol_schema_version.py TODO(adr-0096)、测试标记 todo-38/28/29、langfuse/compact_summary 语义）；`except Exception` 在 lca/ 仍为 440 处，与 0524 数量一致，无新增；叙事性注释无新增。
+- 验证结果: 无代码改动，无需验证门。扫描脚本全部 exit 0（ast0522/dead0522/dead0522b/sndb0522 确定性重跑）；开工/收工工作区干净（main，nothing to commit，ahead 35，未 push，no-push 规则在）。
+- commit: 无代码 commit；本台账单独 docs commit（沿用 0521/0522/0523/0524 `docs(lca-1000): 第NNNN轮台账` 模式）。
+- 备注: 只 commit docs/notes/lca-1000/ledger.md（`git add` + `git commit -- <path>` 显式路径）；扫描输出存 252 /tmp（ast0525_out.txt、dead0525_out.txt、dead0525b_out.txt、sndb0525_out.txt、ast0525_groups.txt）。教训：沿用 0521/0522 经验——ssh252 heredoc 会被外层吃掉、scp 被 MOTD banner 挡，台账文本经 base64 编码走 stdin 管道追加，避免引号转义坑。
