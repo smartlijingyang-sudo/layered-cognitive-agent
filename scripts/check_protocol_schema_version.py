@@ -19,11 +19,11 @@ from pathlib import Path
 REPO = Path(__file__).resolve().parent.parent
 ROOT = REPO / "lca" / "infrastructure" / "observability"
 
-# journal_io.py still writes JournalRecord.data via dataclasses.replace after
+# engine/journal_io.py still writes JournalRecord.data via dataclasses.replace after
 # Task 3's EnvelopeV2 overlay (disk jsonl still uses ADR-0065 `data`).
 # TODO(adr-0096): remove once write-path payload rename (data → payload) lands.
 ALLOWLIST = {
-    "lca/infrastructure/observability/journal/journal_io.py",  # MVA-1 Task 3 overlay
+    "lca/infrastructure/observability/journal/engine/journal_io.py",  # MVA-1 Task 3 overlay
 }
 
 
