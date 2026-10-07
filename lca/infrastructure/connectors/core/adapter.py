@@ -46,7 +46,7 @@ def format_connection_not_active_observation(
     # intent 为空即无凭据，标签不带任何 URL（旧分支不可达，已删除）。
     widget = format_connector_auth_widget(
         app_name=app_label,
-        intent_id=intent_id if intent_id else None,
+        intent_id=intent_id or None,
         connection_id=connection_id,
     )
     text = (

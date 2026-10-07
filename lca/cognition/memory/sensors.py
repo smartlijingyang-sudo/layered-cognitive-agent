@@ -371,5 +371,5 @@ class MemorySensorRegistry:
                 key=lambda p: p.confidence,
                 reverse=True,
             )
-            out[name] = alive if alive else norc
+            out[name] = alive or norc
         return out

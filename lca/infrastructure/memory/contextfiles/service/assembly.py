@@ -129,7 +129,7 @@ def refresh_standing_backstory(
         protected_files=layout.protected_files,
         protected_budget_chars=layout.protected_budget_chars,
     )
-    return refreshed if refreshed else fallback
+    return refreshed or fallback
 
 
 __all__ = [

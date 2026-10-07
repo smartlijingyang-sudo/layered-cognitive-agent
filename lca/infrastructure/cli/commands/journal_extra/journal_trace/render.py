@@ -48,7 +48,7 @@ def _format_source_column(row: TraceRow) -> str:
 
 def _format_column(value: str, fallback: str = "-") -> str:
     """Return ``value`` when truthy, else ``fallback``. Used by frame / locals."""
-    return value if value else fallback
+    return value or fallback
 
 
 def _row_iter_to_table(rows: Iterable[TraceRow], *, with_locals: bool) -> str:

@@ -60,7 +60,7 @@ class SourceVerifier:
 
     def verify(self, answer: str, registry: SourceRegistry) -> VerifyDecision:
         mode = self._policy.mode
-        if mode == VerifyMode.OFF or not answer.strip() or len(registry) == 0:
+        if mode == VerifyMode.OFF or not answer.strip() or not registry:
             return VerifyDecision(decision="pass", verdicts=(), mode=mode)
 
         verdicts: list[SourceClaimVerdict] = []

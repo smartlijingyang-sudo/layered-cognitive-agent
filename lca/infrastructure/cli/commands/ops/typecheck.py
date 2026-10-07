@@ -236,7 +236,7 @@ def register(app: typer.Typer) -> None:
         if mypy_only and pyright_only:
             raise typer.BadParameter("Choose at most one of --mypy-only / --pyright-only")
 
-        targets = paths if paths else _DEFAULT_PATHS
+        targets = paths or _DEFAULT_PATHS
         repo_root = resolve_repo_root()
         exit_code, results = run_typecheck(
             targets,

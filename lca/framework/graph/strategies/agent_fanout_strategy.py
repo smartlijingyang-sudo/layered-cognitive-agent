@@ -64,7 +64,7 @@ class AgentFanoutStrategy(NodeStrategy):
         if self.client is None:
             raise RuntimeError("AgentFanoutStrategy.execute called without client")
         targets = context.node_config.get("targets") or ()
-        if not isinstance(targets, (list, tuple)) or len(targets) == 0:
+        if not isinstance(targets, (list, tuple)) or not targets:
             raise RuntimeError(
                 f"AgentFanoutStrategy at {context.node_id!r}: "
                 f"node_config['targets'] must be a non-empty sequence"
