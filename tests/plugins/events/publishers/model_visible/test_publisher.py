@@ -654,3 +654,77 @@ def bus_count_published(bus: EnvelopeBus[Any]) -> int:
     """
     snap = bus.delivery_snapshot()
     return sum(c.get("published", 0) for c in snap.values())
+
+
+# ── 回归锁(2bb3ceefc): reason 派生保真 ─────────────────────────────────
+
+
+def test_capture_pre_llm_initial_reason_pinned(hook: Any, monkeypatch: Any) -> None:
+    """回归锁(2bb3ceefc):首次 publish 的 payload reason 必须为 ``initial``。
+
+    原 ``test_capture_pre_llm_initial_then_change`` 只断言了 ref 非空、
+    没钉住 reason——e51902b07 的误判（dedent 后 ``reason = "change"``
+    无条件覆盖）从它眼皮底下溜过去。本用例用记录型 spy 钉住 payload。
+    """
+    recorded: list[Any] = []
+
+    import lca.plugins.events.publishers._session_publish as session_publish
+
+    original = session_publish.publish_via_session
+
+    def spy(payload: Any, producer: Any) -> Any:
+        recorded.append(payload)
+        return original(payload, producer=producer)
+
+    monkeypatch.setattr(
+        session_publish, "publish_via_session", spy
+    )
+    hook.state["cursor"] = hook.StubCursor("run-init-pin")
+    hook.state["prompt"] = hook.make_prompt("t1", "first")
+
+    ref = hook.hook.capture_pre_llm(
+        run_id="run-init-pin",
+        incarnation=1,
+        kwargs={"tools": [], "messages": []},
+        system_prompt_text=hook.state["prompt"].system_prompt_text,
+    )
+
+    assert ref is not None
+    assert len(recorded) == 1
+    assert recorded[0].reason == "initial"
+
+
+def test_capture_pre_llm_resume_reason_not_overwritten(
+    hook: Any, monkeypatch: Any
+) -> None:
+    """回归锁(2bb3ceefc):``mark_resume`` 标记的 step → reason 必须为 ``resume``。
+
+    e51902b07 的误判把 dedent 的 ``reason = "change"`` 无条件执行,
+    resume 标记的请求被错误记成 change；本用例钉住 resume 路由。
+    """
+    recorded: list[Any] = []
+
+    import lca.plugins.events.publishers._session_publish as session_publish
+
+    original = session_publish.publish_via_session
+
+    def spy(payload: Any, producer: Any) -> Any:
+        recorded.append(payload)
+        return original(payload, producer=producer)
+
+    monkeypatch.setattr(session_publish, "publish_via_session", spy)
+    hook.state["cursor"] = hook.StubCursor("run-resume-pin")
+    hook.state["prompt"] = hook.make_prompt("t1", "resumed system")
+    # 新 hook 的第一步派生为 step-001（见 step_id_for 计数器语义）。
+    hook.hook.mark_resume("run-resume-pin", "step-001")
+
+    ref = hook.hook.capture_pre_llm(
+        run_id="run-resume-pin",
+        incarnation=1,
+        kwargs={"tools": [], "messages": []},
+        system_prompt_text=hook.state["prompt"].system_prompt_text,
+    )
+
+    assert ref is not None
+    assert len(recorded) == 1
+    assert recorded[0].reason == "resume"
