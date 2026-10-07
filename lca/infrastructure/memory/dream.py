@@ -174,7 +174,7 @@ def _refresh_relationships(home: Path, facts: Sequence[EpisodeFact]) -> tuple[in
 
     layout = layout_for_home(home)
     store = DiskFileStore(home)
-    corpus = "\n".join([fact.content for fact in facts])
+    corpus = "\n".join(fact.content for fact in facts)
     people = PeopleDirectory(store, layout=layout)
     groups = GroupsDirectory(store, layout=layout)
     people_indexed = 0

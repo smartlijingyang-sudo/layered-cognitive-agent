@@ -366,8 +366,6 @@ def _coerce_decision_path(value: object) -> SelectorDecisionPath:
         return "team_awareness_routing"
     if value == "profile_default":
         return "profile_default"
-    if value == "legacy":
-        return "legacy"
     return "legacy"
 
 
