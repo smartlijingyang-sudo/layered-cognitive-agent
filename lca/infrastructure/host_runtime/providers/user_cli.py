@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import subprocess
 import tempfile
+from collections.abc import Callable
 from pathlib import Path
 from urllib.parse import urlsplit
 
@@ -53,6 +54,33 @@ def _daemon_service_for(config: HostRuntimeConfig, user: UserConfig) -> DaemonSe
         root=Path.cwd(),
         sudo=Sudo(Path(".lobehub-stack/sudo.pass")),
     )
+
+
+def _stage_privileged_file(
+    run_sudo: Callable[[list[str]], object],
+    content: str,
+    dest: Path,
+    *,
+    owner: str | None = None,
+    mode: str | None = None,
+) -> None:
+    """Stage a privileged file via tempfile + sudo cp, then apply owner/mode (RA-015).
+
+    The tempfile -> sudo cp -> unlink -> chmod/chown ceremony lives exactly
+    here -- the unlink discipline is a security surface (the staging tempfile
+    never stays on disk). Future hardening (backup-before-write, post-write
+    verify) is a one-place edit. ``run_sudo`` is injected (``Provider.run_sudo``
+    in production) so tests can pin the call sequence with a fake.
+    """
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".sh", delete=False) as file:
+        file.write(content)
+        file.flush()
+        run_sudo(["cp", file.name, str(dest)])
+        if owner is not None:
+            run_sudo(["chown", owner, str(dest)])
+        if mode is not None:
+            run_sudo(["chmod", mode, str(dest)])
+        Path(file.name).unlink(missing_ok=True)
 
 
 class CLIProvider(Provider):
@@ -162,12 +190,7 @@ class CLIProvider(Provider):
         if wrapper_destination.is_file():
             return
         wrapper = f'#!/usr/bin/env bash\nexec node "{self._cli_js}" "$@"\n'
-        with tempfile.NamedTemporaryFile(mode="w", suffix=".sh", delete=False) as file:
-            file.write(wrapper)
-            file.flush()
-            self.run_sudo(["cp", file.name, str(wrapper_destination)])
-            self.run_sudo(["chmod", "+x", str(wrapper_destination)])
-            Path(file.name).unlink(missing_ok=True)
+        _stage_privileged_file(self.run_sudo, wrapper, wrapper_destination, mode="+x")
 
     def _report_daemon_status(self, report: StatusReport) -> None:
         if self.user is None:

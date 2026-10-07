@@ -235,8 +235,8 @@
         "Optional extension (not required): converge the 3 bash echo-write sites (shared.py x2, user_cli.py x1) if they fit the same seam honestly"
       ],
       "priority": 2,
-      "passes": false,
-      "notes": "Source: raphy assess Round 4 2026-10-07 (Worth exploring, duplication scan). The round's single duplication-class story per diversity quota; follows the codebase's established 'converge N identical X' idiom. New test should pin the call sequence with a fake run_sudo since CLIProvider currently has no tests."
+      "passes": true,
+      "notes": "Implemented 2026-10-07 17:30: extracted module-private _stage_privileged_file(run_sudo, content, dest, *, owner=None, mode=None) in lca/infrastructure/host_runtime/providers/user_cli.py; _ensure_wrapper delegates to it. The tempfile -> sudo cp -> unlink -> chmod/chown sequence now appears exactly once (in the helper). 4 new tests in tests/infrastructure/host_runtime/test_stage_privileged_file.py pin the call sequence with a fake run_sudo (incl. unlink discipline and _ensure_wrapper delegation + skip-if-exists); 14/14 tests green in tests/infrastructure/host_runtime/, ruff check green. Difference vs assessment: RA-015 was assessed against TWO call sites (_ensure_wrapper + _write_start_script), but RA-014 (same branch, earlier round) already deleted _write_start_script and moved the start-script privileged write onto the Sudo.write_text seam in DaemonService -- so the helper launches with a single caller. Signature gains a leading run_sudo param (story suggested (content, dest, *, owner, mode)) so the fake can be injected and the sequence pinned; keyword args unchanged. The 3 bash echo-write sites were assessed as a different mechanism (no tempfile staging) and left alone per the optional-extension note."
     }
   ]
 }

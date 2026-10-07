@@ -238,3 +238,25 @@
     收敛故事必须同步更新该测试——测试是契约，不是化石。
 
 ---
+## 2026-10-07 17:35 - RA-015
+
+- 在 `lca/infrastructure/host_runtime/providers/user_cli.py` 新增模块私有 seam
+  `_stage_privileged_file(run_sudo, content, dest, *, owner=None, mode=None)`：
+  tempfile → sudo cp → unlink → chmod/chown 仪式只存在于此一处；
+  `_ensure_wrapper` 改走该 seam（行为不变：cp → chmod +x → unlink，无 chown）。
+- 新增 `tests/infrastructure/host_runtime/test_stage_privileged_file.py`
+  （4 个测试）：fake run_sudo 钉住调用序列（owner+mode / 均缺省两分支）、
+  断言 staging tempfile 已被 unlink（unlink 纪律）、`_ensure_wrapper` 委托 +
+  已存在时跳过。
+- 测试：`tests/infrastructure/host_runtime/` 14/14 全绿；`ruff check` 两文件全绿。
+- **Learnings for future iterations:**
+  - 评估时认定的"两处重复"可能被同一分支的前序 story 先行消灭（RA-014 删了
+    `_write_start_script`）：optimize 开工前先 `git show` 确认重复仍存在，别
+    机械执行 story 字面要求；剩余的单仪式仍值得命名成 seam。
+  - 仪式类收敛的 seam 签名首参接可调用对象（`run_sudo` 注入）而非 self 方法：
+    测试可零依赖钉住序列，且与 codebase 的 fake-injection 惯例一致
+    （RA-014 的 daemon fake 同款）。
+  - 本仓库 ruff isort 把 `from collections.abc import Callable` 排在
+    `import subprocess/tempfile` 之后——按 ruff --fix 为准，别手排。
+---
+
