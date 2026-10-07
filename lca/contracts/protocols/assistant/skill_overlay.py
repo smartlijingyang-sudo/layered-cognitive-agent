@@ -64,9 +64,8 @@ class SkillSource:
         if self.url.strip():
             if not self.url.startswith(("http://", "https://")):
                 raise ValueError(f"SkillSource.url 必为 http(s):// 前缀,得到 {self.url!r}")
-        else:
-            if not self.local_path.startswith("/"):
-                raise ValueError(f"SkillSource.local_path 必为绝对路径,得到 {self.local_path!r}")
+        elif not self.local_path.startswith("/"):
+            raise ValueError(f"SkillSource.local_path 必为绝对路径,得到 {self.local_path!r}")
 
     @property
     def reference(self) -> str:
