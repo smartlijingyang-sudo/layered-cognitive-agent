@@ -275,7 +275,7 @@
         "Behavior preserved for all current call shapes; tests/infrastructure/tool_defer/ all green; ruff check clean"
       ],
       "priority": 3,
-      "passes": false,
+      "passes": true,
       "branchName": "raphy/arch-20261007-2005"
     }
   ]

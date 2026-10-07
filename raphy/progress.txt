@@ -359,3 +359,39 @@
     层向检查（`lca/session` 从不 import `lca/runtime`）决定常量只能住在
     session 包内或更底层。
 ---
+
+## 2026-10-07 21:55 - RA-018
+
+- `ToolSearchTool.execute()` 与 `validate()` 的两套参数分类收敛为模块私有
+  `_classify_args(args) -> _ArgShape`（frozen dataclass，`has_namespace` /
+  `has_namespaces` / `has_query`），两处共用 validate 的严格口径（验收 1）。
+- **评估假设被 probe 证伪**：评估称"execute 的宽松分支实际不可达"，实测
+  `execute({"namespaces": [], "query": "b_one"})` 在旧代码下走宽松分支返回空成功
+  （observation_id `tool_search:`），query 被静默吞掉——RA-009/RA-012 同款纪律，
+  以 probe 证据为准。收敛到严格口径后该形状走 query 路径；这是"空 list 遮蔽
+  有效参数"小 bug 族的修复（`{"namespace": "web", "namespaces": []}` 同理旧代码
+  会吞掉 namespace），commit body 已如实记录该行为 delta。
+- 新增 2 测试：`test_classify_args_strict_reading`（分类器直接单测：空串/空
+  list/空白 query 视为未提供；非法形状不算提供）、
+  `test_execute_empty_namespaces_does_not_shadow_query`（回归测试：空
+  namespaces 不再遮蔽 query，`observation_id == "tool_search:query"` 且零
+  namespace 被加载）。
+- Files changed:
+  - `lca/infrastructure/tool_defer/tool_search.py`（`_ArgShape` + `_classify_args` +
+    两处调用点）
+  - `tests/infrastructure/tool_defer/test_tool_search.py`（2 新增）
+  - `raphy/prd.json`（RA-018 passes=true，1 行 diff）、`raphy/progress.txt`
+- 测试：`tests/infrastructure/tool_defer/` 66 passed（含 2 新增，验收 2）；
+  `ruff check` touched 文件全过。注：`ruff format --check tool_search.py`
+  仍 dirty 系 HEAD 遗留（已验证 HEAD 版同样 dirty）；本轮只把自己新增的
+  3 个 hunks 按 format 收敛，旧 `return _error(` 保持原样，diff 最小。
+- **Learnings for future iterations:**
+  - "口径不一致"类收敛开工前必须 probe 多参数组合的边界：单看 validate 先拦
+    就断言"宽松分支不可达"是错的——`{"namespaces": [], "query": "x"}` 这种
+    validate 能过的组合才是真相。probe 脚本 30 秒，结论写进 commit。
+  - prd.json 经 RA-016 的 `json.dumps(indent=2)` 重排后是 2 空格基准缩进、
+    story 块 4 空格；末 story 块结尾是 `\n    }` 不是 `\n    },`——文本编辑
+    先 `tail` 看清块边界再下锚。
+  - `ruff format` 整文件重排时会碰 HEAD 遗留 dirty 行：先用
+    `git show HEAD:path | ruff format --check -` 确认遗留，再只收敛自己的 hunks。
+---

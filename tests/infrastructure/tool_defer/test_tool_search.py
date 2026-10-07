@@ -13,6 +13,7 @@ from lca.infrastructure.tool_defer.session import (
 )
 from lca.infrastructure.tool_defer.tool_search import (
     ToolSearchTool,
+    _classify_args,
     tool_search_factory,
 )
 
@@ -117,3 +118,34 @@ def test_implements_tool_protocol() -> None:
 def test_factory_returns_tool_instance() -> None:
     tool = tool_search_factory(object())
     assert isinstance(tool, ToolSearchTool)
+
+
+def test_classify_args_strict_reading() -> None:
+    # 空字符串 / 空 list / 空白 query 一律视为"未提供"（严格口径）
+    shape = _classify_args({"namespace": "", "namespaces": [], "query": "  "})
+    assert shape == _classify_args({})
+    assert not shape.has_namespace
+    assert not shape.has_namespaces
+    assert not shape.has_query
+
+    shape = _classify_args({"namespace": "web", "namespaces": ["a"], "query": "q"})
+    assert shape.has_namespace
+    assert shape.has_namespaces
+    assert shape.has_query
+
+    # 非法形状不算提供
+    assert not _classify_args({"namespace": 42}).has_namespace
+    assert not _classify_args({"namespaces": "web"}).has_namespaces
+
+
+async def test_execute_empty_namespaces_does_not_shadow_query() -> None:
+    # 收敛到严格口径后：空 namespaces 不再遮蔽有效的 query（旧宽松口径下
+    # query 会被静默吞掉，返回空成功）。
+    session, token = _bound_session()
+    try:
+        obs = await ToolSearchTool().execute({"namespaces": [], "query": "b_one"})
+    finally:
+        reset_current_defer_session(token)
+    assert obs.success is True
+    assert obs.observation_id == "tool_search:query"
+    assert session.loaded_namespaces == frozenset()
