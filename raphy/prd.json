@@ -1,6 +1,6 @@
 {
   "project": "LCA Raphy Architecture Optimization",
-  "branchName": "raphy/arch-20261007-0930",
+  "branchName": "raphy/arch-20261007-1630",
   "description": "Continuous architecture deepening for the LCA cognitive-agent codebase via the raphy fresh-session loop. Round 1 (2026-10-06, old prompt): RA-001/RA-002 converged, RA-003 dropped with evidence. Round 2 (2026-10-06, hardened prompt): RA-004..RA-009 all done (merged to main 2026-10-07, merge 1b1526a94). Round 3 (2026-10-07, hardened prompt): friction walk over session plugins, loop_cursor, delegation/body executor; RA-010..RA-013 below. Out of scope: ralph Round 2 areas (DecisionGates, Ingest, ContextFiles shims, Read Runs micro-dirs, MemoryTools directory seam), lca/cognition/memory/ (frozen per Round 2 AP-01), CLI surface must not import contracts (deliberate rule), gate_chain_strategy.py (hands-off: another party's uncommitted work + pre-existing red test).",
   "userStories": [
     {
@@ -208,6 +208,35 @@
       "priority": 4,
       "passes": true,
       "notes": "Source: raphy assess Round 3 2026-10-07 (Worth exploring, friction walk C-Q5 + duplication scan). The round's single duplication-class story per diversity quota; follows the codebase's established 'converge N identical X' idiom (RA-001/RA-002). | Implemented 2026-10-07: added module-level _receipt(call, outcome, idempotency_key, error_code=None) in lca/cognition/body/executor/simple_body.py; provider='body.dispatch_tool_calls' and invocation_id=call.call_id now appear exactly once each inside the receipt-construction cluster (both live in the helper). Assessment said 4 constructions, grep found 5 (the persist_assistant list-comprehension site was missed) -- all 5 converged. idempotency_key shapes preserved verbatim (':persist_assistant', ':persist_result', bare call_id x3); success site passes no error_code (None default == omitted per EffectReceipt). The other invocation_id=call.call_id occurrence in the file is safe_executor.execute's kwarg, not a receipt. Tests: pytest -k 'dispatch_tool_calls or simple_body' 23 passed; ruff check + ruff format clean."
+    },
+    {
+      "id": "RA-014",
+      "title": "Unify the two connect-daemon lifecycles: CLIProvider delegates to DaemonService",
+      "description": "As an LCA maintainer, I want one canonical owner for the sandbox-user connect daemon lifecycle, so the RA-006 single-instance invariant and future daemon behavior changes apply to both the lca-ops path and the host_runtime provisioning path, and the private cross-seam import disappears.",
+      "acceptanceCriteria": [
+        "CLIProvider no longer manages daemon lifecycle itself: start_daemon/stop_daemon delegate to an explicit daemon-lifecycle seam owned by lca/infrastructure/cli/services/daemon/daemon.py (DaemonService); CLIProvider keeps only CLI artifact deployment (provision/status/heal of deployables)",
+        "The private cross-seam import of _CONNECT_PROC_PATTERN in lca/infrastructure/host_runtime/providers/user_cli.py is gone (constant de-privatized into a shared/public surface or moved behind an explicit seam)",
+        "CLIProvider._pid_alive is deleted; the shared lca/infrastructure/cli/service/service.py::pid_alive is used instead",
+        "kernel_serve reachability converges on one seam (http_ready); the curl -sf subprocess probe in user_cli.py is gone",
+        "Behavior preserved: HostEnvironment.provision()/destroy() external behavior unchanged; uv run pytest tests/infrastructure/cli/ -k 'daemon' --no-cov -q passes (test_daemon_kill_existing, test_daemon_stop_uses_sudo, test_daemon_start_script); uv run ruff check passes on touched files"
+      ],
+      "priority": 1,
+      "passes": false,
+      "notes": "Source: raphy assess Round 4 2026-10-07 (Strong, friction walk A). Two live lifecycle implementations for the same daemon process (node dist/index.js connect): DaemonService via lca-ops ServiceRegistry (owns RA-006 _kill_existing seam + 3 test groups) vs CLIProvider.start/stop_daemon via HostEnvironment (zero tests, private _pid_alive replica, curl probe). ADR-0119 decision 4 (services managed by lca-ops) supports consolidation. CLIProvider has no tests, so refactoring carries no pinned-behavior risk."
+    },
+    {
+      "id": "RA-015",
+      "title": "Converge the two privileged-file staging rituals in CLIProvider behind one seam",
+      "description": "As an LCA maintainer, I want the tempfile-write -> sudo cp -> unlink -> chmod/chown ceremony in CLIProvider to live in one helper, so future changes to privileged file staging (backup-before-write, post-write verify) are a one-place edit.",
+      "acceptanceCriteria": [
+        "A small module-private helper (e.g. _stage_privileged_file(content, dest, *, owner=None, mode=None)) exists in lca/infrastructure/host_runtime/providers/user_cli.py; _ensure_wrapper and _write_start_script both delegate to it",
+        "The tempfile -> run_sudo(cp) -> unlink -> chmod/chown sequence appears exactly once (in the helper)",
+        "Behavior preserved: wrapper and start.sh content, ownership, and modes unchanged; uv run ruff check passes on the touched file",
+        "Optional extension (not required): converge the 3 bash echo-write sites (shared.py x2, user_cli.py x1) if they fit the same seam honestly"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": "Source: raphy assess Round 4 2026-10-07 (Worth exploring, duplication scan). The round's single duplication-class story per diversity quota; follows the codebase's established 'converge N identical X' idiom. New test should pin the call sequence with a fake run_sudo since CLIProvider currently has no tests."
     }
   ]
 }
