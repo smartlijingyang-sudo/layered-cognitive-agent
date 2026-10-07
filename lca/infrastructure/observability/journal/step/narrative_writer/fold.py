@@ -97,11 +97,10 @@ def _render_skills_activated(fold: FoldedModelVisible | None) -> list[str]:
     if activated:
         for sid in activated:
             lines.append(f"- `{sid}`")
+    elif catalog_count:
+        lines.append("- _(无匹配 / SkillRouter 已启用但本 step 未选中)_")
     else:
-        if catalog_count:
-            lines.append("- _(无匹配 / SkillRouter 已启用但本 step 未选中)_")
-        else:
-            lines.append("- _(SkillRouter 已启用,catalog 空)_")
+        lines.append("- _(SkillRouter 已启用,catalog 空)_")
     return lines
 
 

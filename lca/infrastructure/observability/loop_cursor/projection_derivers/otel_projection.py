@@ -98,13 +98,12 @@ class OtelProjection:
                     "closed": False,
                 }
             )
-        else:
-            # 非 span EP:把 record 追加到最近 span 的 events
-            if spans:
-                spans[-1] = {
-                    **spans[-1],
-                    "events": [*spans[-1].get("events", []), _event_descriptor(record)],
-                }
+        # 非 span EP:把 record 追加到最近 span 的 events
+        elif spans:
+            spans[-1] = {
+                **spans[-1],
+                "events": [*spans[-1].get("events", []), _event_descriptor(record)],
+            }
 
         return {"spans": spans, "sdk_available": sdk_available}
 

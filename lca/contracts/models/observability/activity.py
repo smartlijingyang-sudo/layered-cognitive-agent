@@ -532,23 +532,22 @@ def parse_step_evidence(
                     "language": "bash",
                 }
             )
-    else:
-        if stdout.strip():
-            lang = "python" if any(k in cmd or k in tool_name for k in ("py", "python")) else "bash"
-            if "soul" in lowered_name or "self_config" in lowered_name or "markdown" in stdout:
-                lang = "markdown"
-            label = (
-                "提取到的自治配置"
-                if "soul" in lowered_name or "self_config" in lowered_name
-                else f"提取到的代码内容 ({len(stdout.splitlines())} 行)"
-            )
-            code_snippets.append(
-                {
-                    "label": label,
-                    "code": stdout[:3000],
-                    "language": lang,
-                }
-            )
+    elif stdout.strip():
+        lang = "python" if any(k in cmd or k in tool_name for k in ("py", "python")) else "bash"
+        if "soul" in lowered_name or "self_config" in lowered_name or "markdown" in stdout:
+            lang = "markdown"
+        label = (
+            "提取到的自治配置"
+            if "soul" in lowered_name or "self_config" in lowered_name
+            else f"提取到的代码内容 ({len(stdout.splitlines())} 行)"
+        )
+        code_snippets.append(
+            {
+                "label": label,
+                "code": stdout[:3000],
+                "language": lang,
+            }
+        )
 
     if stderr.strip():
         code_snippets.append(
