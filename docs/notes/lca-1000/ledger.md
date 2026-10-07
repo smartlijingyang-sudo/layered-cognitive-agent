@@ -974,3 +974,18 @@
 - 验证结果: `~/.local/bin/ruff check` 3 文件 All checks passed；`ruff format --check`：新模块 clean，两调度器与 pristine 一致（proactive 的 2 处 deviation 为 pristine 既有，刻意未动）；import 冒烟：4 条 `STALE_ABSOLUTE_CAP_S` 公共路径 identity 一致（同一对象），值为 5400；targeted pytest 2 文件（tests/integration/proactive/test_pipeline.py、tests/scenario/test_cron_full_lifecycle_invariants.py）：17 passed；行为 smoke（/tmp/smoke0520.py）：stale 收割 OK（warn 事件名 `cron.lock_stale_reaped` 不变）、unlink 注入 OSError 时返回 False（无 RecursionError）、双实例竞争 OK。
 - commit: 8308bd07f refactor(lca-1000): 第0520轮 收敛双调度器文件锁到共享 SchedulerFileLock（未 push）。
 - 备注: 只 add/commit 本轮 3 文件，`git commit -- <paths>` 显式路径；并发会话在本轮期间提交了它的 7 文件改动（main 快进 1 commit，ahead 16→17），其文件全程未触碰；开工/收工时工作区干净。备份 /tmp/bak_0520/{proactive_scheduler,cron_scheduler}.py（252，改动前原文件）。scan0520.py/dead0520.py/patch0520.py/smoke0520.py/sndb0520.py 在 252 /tmp；patch0520.py、scheduler_file_lock_0520.py、smoke0520.py、sndb0520.py、h0520.txt 另存本地 hidden_files/scratch。教训：ssh252 heredoc 会被外层吃掉——脚本走文件管道；`ruff format` 先对 pristine 跑 `--check`，确认 deviation 是否既有再决定动不动；`python3 /tmp/x.py` 的 sys.path[0] 是 /tmp 而非 cwd，跑 repo 脚本要加 PYTHONPATH。
+
+
+## 第0521轮 (2026-10-08 01:33-01:50 CST)
+- 改了什么: 无代码改动。**本轮未发现新的实质机会**（依据 body 规则 4：不硬凑 trivial commit）。
+- 依据 skill 哪一节: SKILL.md Deletion test + LANGUAGE.md（load-bearing knowledge / interface 即 test surface）+ DEEPENING.md Seam discipline——见候选清单的驳回依据。
+- 关键设计决策（夜间跳过 grilling，记台账）: 最大 AST 组（emit ×16）首次完整裁决，驳回——函数即 seam（`_EP_DISPATCH: dict[str, Any]` 以事件名为键、函数为值，被 `lca/loop/emit/node_emitter.py:39` 的 graph driver 消费；删后复杂度回到 dispatch 表/graph 声明处，deletion test 通过）；event name + actor default 是负载知识（沿用 514）；收敛为工厂函数即纯 indirection（沿用 513 commit_*_receipt 判例）；docstring 即 interface。裁决已记 backlog.md（B-091），后轮免复查。
+- 候选清单（本轮 explore：AST 同体扫描重跑 4831 函数/107 组 + dead-code 扫描 2336 私有定义/18 候选 + 同名异体扫描 290 组 + deslop 清单）:
+  1. `emit_*_for_state` ×16（cognitive_emit/step_events.py/reflection_events.py/tool_events.py，AST 组 c9315990f4e0，238 行）—— 驳回（见上）。
+  2. AST 107 组 —— hash 集合与 0520（h0520.txt）逐成员一致，无新组。
+  3. dead 18 候选 —— 与 0520 逐成员一致（`_RoleConfig` 明确保留意图、`_static_protocol_check` 静态锚点、其余 pydantic/typer 框架调用假阳性），沿用既往驳回。
+  4. 同名异体 290 组 —— 与 0520 数量一致，未发现新可疑对。
+  5. deslop：TODO/FIXME/HACK grep 全为裁决引用（todo-38/28/29）、CLI help 示例（run_xxx）、语义词（"TODOs preserved" docstring），无可行动项；"自承 dead" 注释全为 dead lock/dead letter/deadline 语义词，非死代码；unused-import 抑制两处均有明确依据（contracts/observability/core/ports.py:64 runtime_checkable、`provider.py:367` IDE consumers），不动；`except Exception` 抽查（scoring.py:421 shadow 可观测性降级、daytime.py:74 火与忘记录回 False 契约）—— 均为有依据的设计，不动。
+- 验证结果: 无代码改动，无需验证门。扫描脚本 3 个全部 exit 0；开工/收工工作区干净（main，nothing to commit）。
+- commit: 无代码 commit；本台账单独 docs commit（沿用 0520 `docs(lca-1000): 第0520轮台账` 模式）。
+- 备注: 只 commit docs/notes/lca-1000/ledger.md（`git commit -- <path>` 显式路径）；并发会话在 01:16 落了 e51902b07（redundant else 清理），其文件全程未触碰；本轮扫描（01:35）已覆盖该提交，无新组。教训：ssh252 的每条外层输出都带分支 banner 与 MOTD，管道/重定向时先用 grep/wc 确认 payload；scan 输出跨机器比对前先提取 group hash 集合再 diff（行号/行文漂移误报）。
