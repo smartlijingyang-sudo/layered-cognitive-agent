@@ -163,7 +163,7 @@ def _read_spine_events(path: Path) -> list[SpineEvent]:
                 continue
             try:
                 rec = json.loads(stripped)
-            except (json.JSONDecodeError, ValueError):
+            except ValueError:
                 continue
             if not isinstance(rec, dict):
                 continue
