@@ -23,6 +23,37 @@
 
 ---
 
+## Round 5 — assess (2026-10-07 20:05, branch raphy/arch-20261007-2005)
+
+- 按硬化版 `raphy-assess.md` 执行：读 `skills/improve-codebase-architecture/SKILL.md`；
+  friction walk 精读三区（source_verify / tool_defer / lca/session，5 问必答）；
+  duplication 副扫描；self-grilling 写进 assessment.md；diversity quota 满足
+  （2 friction + 1 duplication）。
+- 热点来源：`git log -80` 非测试生产文件（`lca/session/catalog.py`、
+  `lca/infrastructure/source_verify/*`、`lca/infrastructure/tool_defer/*`）；
+  daemon/loop_cursor/delegation cache 等领地按禁区避开。
+- 产出 3 个 stories（`passes: false`），续号 RA-016~018：
+  - RA-016（P1, Worth exploring）：source_verify 字面量文法（`_LITERAL` + `_extract_literals`）
+    是 verifier.py 的模块私有物——实际决定 verdict 却无具名接缝、无独立 test surface →
+    收敛为 SourceVerifier 可注入的 seam（默认=现有正则文法）。
+  - RA-017（P2, Worth exploring）：`known_session_event_types()` 是 4 个派生词表 +
+    1 个手工字面量 `"surface/developer_message"` 的并集 → DSH surface 词表具名常量化，
+    catalog 零手工字面量、纯派生。
+  - RA-018（P3, Worth exploring）：`ToolSearchTool.execute` 与 `validate` 各实现一遍
+    参数分类且口径不一致 → 收敛为单个 `_classify_args` helper。
+- 区 B（tool_defer）5 文件精读后判定无 friction：defer 编排是文档化的刻意设计；
+  `_tool_to_spec` 复刻有"infrastructure must not import L2 nodes"注释背书；
+  fail-soft/fail-fast 双轨有 ADR-0256 B2 背书；8+ 测试文件钉住。
+- 丢弃（有证据）：source_verify 5 模块分离（刻意设计）、policy.py（earns-existence）、
+  `ensure_registry` monkey-patch（刻意 fail-soft）、`derive_messages` 函数级 import
+  （防循环刻意）、append 4 遍树遍历（2026-09-16 postmortem 刻意性能取舍）。
+- Observation（不开 story）：`verify_final_answer` 尚无生产调用方（采集已接
+  `execute.py:271`，校验未接）——接线 gap，optimize 轮可顺手确认。
+- 本轮未跑测试（assess 轮只做评估；optimize 轮按各 story 验收标准跑）。
+- Commit：`chore: [raphy] assess - 3 architecture candidates`（未 push）。
+
+---
+
 ## Round 3 — assess (2026-10-07 09:30, branch raphy/arch-20261007-0930)
 
 - 按硬化版 `raphy-assess.md` 执行：读 `skills/improve-codebase-architecture/SKILL.md`；
@@ -260,3 +291,107 @@
     `import subprocess/tempfile` 之后——按 ruff --fix 为准，别手排。
 ---
 
+
+## 2026-10-07 21:22 - RA-016
+
+- `SourceVerifier` 新增可注入接缝 `LiteralExtractor` Protocol（构造参数
+  `literal_extractor`，默认 `default_literal_extractor`）；`_judge_claim`
+  改经 `self._literal_extractor(claim)` 拿字面量，不再调模块私有的
+  `_extract_literals`（验收 1）。
+- `_extract_literals` 按评估改名为具名导出的 `default_literal_extractor`
+  （包 `__init__` 新增导出 `LiteralExtractor` / `default_literal_extractor`，
+  `__all__` 同步）；`_LITERAL` 正则随默认实现走，字节等价，判决语义不变
+  （ADR-0255 §4.8 hallucination 判决 intact，验收 2）。
+- 新增 4 个测试：中文日期形态（`2026年10月1日`/`2026-10-01`）、
+  4 字符标识符边界（`abcd` 抽取 / `abc` 不抽取）、注入固定抽取器证明
+  `_judge_claim` 走接缝、默认实现流水线语义不变——文法单测无需构建
+  SourceRegistry（验收 3）。
+- Files changed:
+  - `lca/infrastructure/source_verify/verifier.py`
+    （Protocol + 默认实现 + 构造注入 + 调用点）
+  - `lca/infrastructure/source_verify/__init__.py`（导出）
+  - `tests/infrastructure/source_verify/test_source_verify.py`（4 新增）
+  - `raphy/prd.json`（RA-016 passes=true）、`raphy/progress.txt`
+- 测试：`tests/infrastructure/source_verify/` 17 passed（含 4 新增，验收 4）；
+  `ruff check` + `ruff format --check` touched 文件全过。
+- **Learnings for future iterations:**
+  - 远端 shell 的 `$HOME` 是 `/home/lichao` 不是 `/home/hatch`：ssh252 里 `~`
+    展开到 lichao，绝对路径写 `/home/lichao/...`；此前用 `/home/hatch/...`
+    读 prd.json 报 FileNotFoundError 白查了几分钟。
+  - ruff format 要求顶层 class 前两个空行：Protocol 类紧跟 `_log = ...`
+    只空一行会被 reformat——seam 类定义时一次写对两个空行。
+---
+
+## 2026-10-07 21:38 - RA-017
+
+- 新模块 `lca/session/surface_types.py`：`DEVELOPER_MESSAGE_TYPE =
+  "surface/developer_message"` + `DSH_SURFACE_EVENT_TYPES` frozenset——DSH 对齐
+  session surface 词表的 single source（ADR-0268 §6）。家选在 session 包内而非
+  run_session_writer：`lca/session` 从不 import `lca/runtime`（反向已有
+  runtime→session 边），放 writer 会造成包级双向依赖；也不放 fold 词表旁
+  （那是 spine category 词表，与 session event type 是两个命名空间）。
+- `lca/session/catalog.py`：`types.add("surface/developer_message")` 手写字面量删除，
+  改 `types.update(DSH_SURFACE_EVENT_TYPES)`；`known_session_event_types()` 现为
+  纯具名词表并集（验收 1/2）。
+- `lca/runtime/session/run_session_writer.py`：生产者侧两处字面量
+  （`_surface_event_to_message` 的 type 比对、`append_developer_message` 的
+  session.append）改用同一常量——新增 DSH surface 类型时只改 surface_types.py
+  一处，生产者与读路径闭集自动跟随。
+- 新增 2 测试：`test_known_types_is_pure_registered_vocabulary_union`
+  （闭集 == 五个具名词表并集，钉住"零手工字面量"）、
+  `test_dsh_surface_vocabulary_is_single_sourced`（writer 与 catalog 共用同一
+  常量对象）；`known_session_event_types()` 返回集合不变（验收 3）。
+- Files changed:
+  - `lca/session/surface_types.py`（新增）
+  - `lca/session/catalog.py`（import + 并集）
+  - `lca/runtime/session/run_session_writer.py`（生产者两处改用常量）
+  - `tests/observability/session/test_known_types_fail_closed.py`（2 新增）
+  - `raphy/prd.json`（RA-017 passes=true，文本级编辑排版零变化）、`raphy/progress.txt`
+- 测试：两验收文件 14 passed（含 2 新增）；`ruff check` touched 文件全过。
+  注：`ruff format --check run_session_writer.py` 仍 dirty，但系 HEAD 遗留（已验证
+  HEAD 版同样 dirty）；本轮把 format 顺手改的两处无关 hunk 已还原，diff 只含
+  story 改动。
+- **Learnings for future iterations:**
+  - prd.json 是 1 空格缩进：RA-016 用 `json.dumps(indent=2)` 整文件重排制造了
+    280 行噪音 diff——后续改 prd.json 一律文本级精准编辑（RA-017 已验证排版零变化）。
+  - "放在其它 surface 词汇旁"要先看命名空间：fold 的 SURFACE_EVENT_TYPES 是
+    spine category 闭集，session event type 是另一套——并列放一起是错的家；
+    层向检查（`lca/session` 从不 import `lca/runtime`）决定常量只能住在
+    session 包内或更底层。
+---
+
+## 2026-10-07 21:55 - RA-018
+
+- `ToolSearchTool.execute()` 与 `validate()` 的两套参数分类收敛为模块私有
+  `_classify_args(args) -> _ArgShape`（frozen dataclass，`has_namespace` /
+  `has_namespaces` / `has_query`），两处共用 validate 的严格口径（验收 1）。
+- **评估假设被 probe 证伪**：评估称"execute 的宽松分支实际不可达"，实测
+  `execute({"namespaces": [], "query": "b_one"})` 在旧代码下走宽松分支返回空成功
+  （observation_id `tool_search:`），query 被静默吞掉——RA-009/RA-012 同款纪律，
+  以 probe 证据为准。收敛到严格口径后该形状走 query 路径；这是"空 list 遮蔽
+  有效参数"小 bug 族的修复（`{"namespace": "web", "namespaces": []}` 同理旧代码
+  会吞掉 namespace），commit body 已如实记录该行为 delta。
+- 新增 2 测试：`test_classify_args_strict_reading`（分类器直接单测：空串/空
+  list/空白 query 视为未提供；非法形状不算提供）、
+  `test_execute_empty_namespaces_does_not_shadow_query`（回归测试：空
+  namespaces 不再遮蔽 query，`observation_id == "tool_search:query"` 且零
+  namespace 被加载）。
+- Files changed:
+  - `lca/infrastructure/tool_defer/tool_search.py`（`_ArgShape` + `_classify_args` +
+    两处调用点）
+  - `tests/infrastructure/tool_defer/test_tool_search.py`（2 新增）
+  - `raphy/prd.json`（RA-018 passes=true，1 行 diff）、`raphy/progress.txt`
+- 测试：`tests/infrastructure/tool_defer/` 66 passed（含 2 新增，验收 2）；
+  `ruff check` touched 文件全过。注：`ruff format --check tool_search.py`
+  仍 dirty 系 HEAD 遗留（已验证 HEAD 版同样 dirty）；本轮只把自己新增的
+  3 个 hunks 按 format 收敛，旧 `return _error(` 保持原样，diff 最小。
+- **Learnings for future iterations:**
+  - "口径不一致"类收敛开工前必须 probe 多参数组合的边界：单看 validate 先拦
+    就断言"宽松分支不可达"是错的——`{"namespaces": [], "query": "x"}` 这种
+    validate 能过的组合才是真相。probe 脚本 30 秒，结论写进 commit。
+  - prd.json 经 RA-016 的 `json.dumps(indent=2)` 重排后是 2 空格基准缩进、
+    story 块 4 空格；末 story 块结尾是 `\n    }` 不是 `\n    },`——文本编辑
+    先 `tail` 看清块边界再下锚。
+  - `ruff format` 整文件重排时会碰 HEAD 遗留 dirty 行：先用
+    `git show HEAD:path | ruff format --check -` 确认遗留，再只收敛自己的 hunks。
+---

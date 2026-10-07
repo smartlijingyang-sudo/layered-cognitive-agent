@@ -1,6 +1,6 @@
 {
   "project": "LCA Raphy Architecture Optimization",
-  "branchName": "raphy/arch-20261007-1630",
+  "branchName": "raphy/arch-20261007-2005",
   "description": "Continuous architecture deepening for the LCA cognitive-agent codebase via the raphy fresh-session loop. Round 1 (2026-10-06, old prompt): RA-001/RA-002 converged, RA-003 dropped with evidence. Round 2 (2026-10-06, hardened prompt): RA-004..RA-009 all done (merged to main 2026-10-07, merge 1b1526a94). Round 3 (2026-10-07, hardened prompt): friction walk over session plugins, loop_cursor, delegation/body executor; RA-010..RA-013 below. Out of scope: ralph Round 2 areas (DecisionGates, Ingest, ContextFiles shims, Read Runs micro-dirs, MemoryTools directory seam), lca/cognition/memory/ (frozen per Round 2 AP-01), CLI surface must not import contracts (deliberate rule), gate_chain_strategy.py (hands-off: another party's uncommitted work + pre-existing red test).",
   "userStories": [
     {
@@ -237,6 +237,46 @@
       "priority": 2,
       "passes": true,
       "notes": "Implemented 2026-10-07 17:30: extracted module-private _stage_privileged_file(run_sudo, content, dest, *, owner=None, mode=None) in lca/infrastructure/host_runtime/providers/user_cli.py; _ensure_wrapper delegates to it. The tempfile -> sudo cp -> unlink -> chmod/chown sequence now appears exactly once (in the helper). 4 new tests in tests/infrastructure/host_runtime/test_stage_privileged_file.py pin the call sequence with a fake run_sudo (incl. unlink discipline and _ensure_wrapper delegation + skip-if-exists); 14/14 tests green in tests/infrastructure/host_runtime/, ruff check green. Difference vs assessment: RA-015 was assessed against TWO call sites (_ensure_wrapper + _write_start_script), but RA-014 (same branch, earlier round) already deleted _write_start_script and moved the start-script privileged write onto the Sudo.write_text seam in DaemonService -- so the helper launches with a single caller. Signature gains a leading run_sudo param (story suggested (content, dest, *, owner, mode)) so the fake can be injected and the sequence pinned; keyword args unchanged. The 3 bash echo-write sites were assessed as a different mechanism (no tempfile staging) and left alone per the optional-extension note."
+    },
+    {
+      "id": "RA-016",
+      "title": "Give the source_verify literal grammar its own seam on SourceVerifier",
+      "description": "As an LCA maintainer, I want the literal-extraction grammar (which literals count as verifiable) to be an injectable seam on SourceVerifier instead of a module-private regex, so grammar evolution and grammar tests do not require touching verdict logic.",
+      "acceptanceCriteria": [
+        "A named seam (e.g. LiteralExtractor protocol or constructor-injected callable) exists for literal extraction; SourceVerifier._judge_claim uses it instead of the module-private _extract_literals",
+        "Default implementation preserves the current _LITERAL grammar exactly (verdict semantics unchanged; ADR-0255 4.8 hallucination verdicts intact)",
+        "The grammar is unit-testable without building a SourceRegistry (direct tests on the extractor, e.g. Chinese date forms, 4-char identifier boundary)",
+        "tests/infrastructure/source_verify/ all green; ruff check clean on touched files"
+      ],
+      "priority": 1,
+      "passes": true,
+      "branchName": "raphy/arch-20261007-2005",
+      "notes": "2026-10-07 21:20 done"
+    },
+    {
+      "id": "RA-017",
+      "title": "Derive the session event-type closure fully; drop the hand-written DSH literal",
+      "description": "As an LCA maintainer, I want known_session_event_types() to union only registered vocabularies, so the fail-closed read path never depends on a human remembering to edit catalog.py when the DSH surface vocabulary grows.",
+      "acceptanceCriteria": [
+        "The DSH surface vocabulary (currently the hand-written \"surface/developer_message\") lives in one named constant (single source) next to the other surface vocabularies",
+        "lca/session/catalog.py contains no hand-written event-type literals; known_session_event_types() is a pure union of registered vocabularies",
+        "known_session_event_types() return set unchanged; tests/observability/session/test_known_types_fail_closed.py and tests/session/test_session_public_api.py green; ruff check clean"
+      ],
+      "priority": 2,
+      "passes": true,
+      "branchName": "raphy/arch-20261007-2005"
+    },
+    {
+      "id": "RA-018",
+      "title": "Converge ToolSearchTool arg classification into one helper",
+      "description": "As an LCA maintainer, I want ToolSearchTool.execute() and validate() to share one argument classifier, so the parameter-shape truth lives in one place and the two slightly different classifiers cannot drift.",
+      "acceptanceCriteria": [
+        "One module-private helper (e.g. _classify_args) classifies namespace/namespaces/query presence; both execute() and validate() use it with one consistent (strict)口径",
+        "Behavior preserved for all current call shapes; tests/infrastructure/tool_defer/ all green; ruff check clean"
+      ],
+      "priority": 3,
+      "passes": true,
+      "branchName": "raphy/arch-20261007-2005"
     }
   ]
 }

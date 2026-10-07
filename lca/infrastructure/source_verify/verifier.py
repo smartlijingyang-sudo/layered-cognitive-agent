@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import logging
 import re
+from typing import Protocol
 
 from lca.contracts.models.cognition.source_verify import (
     ClaimVerdict,
@@ -32,6 +33,18 @@ from lca.infrastructure.source_verify.registry import SourceRegistry
 
 _log = logging.getLogger("lca.source_verify")
 
+
+class LiteralExtractor(Protocol):
+    """字面量抽取接缝 —— 决定哪些字面量算作"可核验"字面量的文法.
+
+    默认实现是 ``default_literal_extractor``（现有 ``_LITERAL`` 正则文法）.
+    调用方可注入自己的文法（中文日期形态、新标识符形状……）, 而无需改动
+    verdict 判定逻辑.
+    """
+
+    def __call__(self, claim: str) -> tuple[str, ...]: ...
+
+
 _LITERAL = re.compile(
     r"\d{4}[-/年]\d{1,2}[-/月]\d{1,2}日?"  # 日期 2026-10-01 / 2026年10月1日
     r"|\d+(?:\.\d+)?%?"  # 数字（含百分比）
@@ -39,7 +52,12 @@ _LITERAL = re.compile(
 )
 
 
-def _extract_literals(claim: str) -> tuple[str, ...]:
+def default_literal_extractor(claim: str) -> tuple[str, ...]:
+    """默认字面量文法: 与旧模块私有实现字节等价.
+
+    判决语义不变（ADR-0255 §4.8 的指称幻觉判定 intact）. 单独具名导出,
+    使文法可直接单测, 无需构建 SourceRegistry.
+    """
     seen: list[str] = []
     for m in _LITERAL.finditer(claim):
         lit = m.group(0)
@@ -51,8 +69,13 @@ def _extract_literals(claim: str) -> tuple[str, ...]:
 class SourceVerifier:
     """对最终答案做来源感知校验."""
 
-    def __init__(self, policy: VerifyPolicy | None = None) -> None:
+    def __init__(
+        self,
+        policy: VerifyPolicy | None = None,
+        literal_extractor: LiteralExtractor | None = None,
+    ) -> None:
         self._policy = policy or VerifyPolicy.default()
+        self._literal_extractor = literal_extractor or default_literal_extractor
 
     @property
     def policy(self) -> VerifyPolicy:
@@ -100,7 +123,7 @@ class SourceVerifier:
                 reason=f"引用的来源不存在: {cited_id}（指称幻觉）",
             )
         _, content = hit
-        literals = _extract_literals(claim)
+        literals = self._literal_extractor(claim)
         missing = [lit for lit in literals if lit not in content]
         if not missing:
             return SourceClaimVerdict(

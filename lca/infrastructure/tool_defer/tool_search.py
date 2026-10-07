@@ -7,6 +7,7 @@ kept eager by ``DeferPolicy`` so the loader is always injectable.
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from typing import Any, ClassVar
 
 from lca.contracts.atoms.semantic.keys import FAILURE_KIND, FAILURE_KIND_VALIDATION
@@ -25,6 +26,32 @@ def _error(message: str) -> Observation:
         payload={"error": message},
         error=message,
         extra={FAILURE_KIND: FAILURE_KIND_VALIDATION},
+    )
+
+
+@dataclass(frozen=True, slots=True)
+class _ArgShape:
+    """namespace / namespaces / query 存在性分类（validate 的严格口径）。
+
+    execute() 与 validate() 共用的单点真值：空字符串 / 空 list /
+    空白 query 一律视为"未提供"。
+    """
+
+    has_namespace: bool
+    has_namespaces: bool
+    has_query: bool
+
+
+def _classify_args(args: dict[str, Any]) -> _ArgShape:
+    """统一的参数形状分类器：两处调用点共用同一口径。"""
+    return _ArgShape(
+        has_namespace=("namespace" in args and isinstance(args["namespace"], str) and bool(args["namespace"])),
+        has_namespaces=(
+            "namespaces" in args
+            and isinstance(args["namespaces"], list)
+            and bool(args["namespaces"])
+        ),
+        has_query=("query" in args and isinstance(args["query"], str) and bool(args["query"].strip())),
     )
 
 
@@ -94,16 +121,8 @@ class ToolSearchTool(Tool):
         session = current_defer_session()
         if session is None:
             return _error("tool_search: no defer session bound to this run")
-        has_nss = "namespaces" in args and isinstance(args["namespaces"], list)
-        has_ns = (
-            "namespace" in args
-            and isinstance(args["namespace"], str)
-            and bool(args["namespace"])
-        )
-        has_query = (
-            "query" in args and isinstance(args["query"], str) and bool(args["query"].strip())
-        )
-        if has_nss:
+        shape = _classify_args(args)
+        if shape.has_namespaces:
             try:
                 payload = session.load_namespaces(args["namespaces"])
             except KeyError as exc:
@@ -113,7 +132,7 @@ class ToolSearchTool(Tool):
                 success=True,
                 payload=payload,
             )
-        if has_ns:
+        if shape.has_namespace:
             try:
                 payload = session.load_namespace(args["namespace"])
             except KeyError as exc:
@@ -123,7 +142,7 @@ class ToolSearchTool(Tool):
                 success=True,
                 payload=payload,
             )
-        if has_query:
+        if shape.has_query:
             hits = session.search_catalog(args["query"])
             return Observation(
                 observation_id="tool_search:query",
@@ -135,25 +154,17 @@ class ToolSearchTool(Tool):
         )
 
     def validate(self, args: dict[str, Any]) -> str | None:
-        has_ns = (
-            "namespace" in args and isinstance(args["namespace"], str) and bool(args["namespace"])
-        )
-        has_query = (
-            "query" in args and isinstance(args["query"], str) and bool(args["query"].strip())
-        )
-        has_nss = (
-            "namespaces" in args
-            and isinstance(args["namespaces"], list)
-            and bool(args["namespaces"])
-        )
-        if not has_ns and not has_nss and not has_query:
+        shape = _classify_args(args)
+        if not shape.has_namespace and not shape.has_namespaces and not shape.has_query:
             return (
                 "One of 'namespace' (str), 'namespaces' (list[str]) "
                 "or 'query' (str) must be provided"
             )
-        if has_ns and not isinstance(args["namespace"], str):
+        if shape.has_namespace and not isinstance(args["namespace"], str):
             return "'namespace' must be a non-empty string"
-        if has_nss and not all(isinstance(x, str) and bool(x) for x in args["namespaces"]):
+        if shape.has_namespaces and not all(
+            isinstance(x, str) and bool(x) for x in args["namespaces"]
+        ):
             return "'namespaces' must be a list of non-empty strings"
         return None
 

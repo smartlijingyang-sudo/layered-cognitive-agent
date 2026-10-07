@@ -24,6 +24,7 @@ from lca.contracts.models.session.tool_call import ToolCall
 from lca.contracts.models.session.tool_error import ToolError
 from lca.contracts.protocols.session.run_session_writer import RunSessionWriterProtocol
 from lca.session.lifecycle.bind import _event_ref_from_session
+from lca.session.surface_types import DEVELOPER_MESSAGE_TYPE
 from lca_kernel.events.fold.inputs import SURFACE_TOOL_RESULT_TYPE
 from lca_kernel.events.session.session import SessionEvent, SessionProtocol
 
@@ -84,7 +85,7 @@ def _surface_event_to_message(event: Any) -> Message:
             tool_call_id=event.data.get("tool_call_id"),
         )
         return msg
-    if event.type == "surface/developer_message":
+    if event.type == DEVELOPER_MESSAGE_TYPE:
         # ADR-0268 §6：cron handoff 作为 developer 消息注入父轮。
         return Message(role="developer", content=event.data.get("content"))
     # Other surface event types (extensions) fall through with role=event.type
@@ -239,7 +240,7 @@ class RunSessionWriter(RunSessionWriterProtocol):
         """
         session = self._require_session()
         event = session.append(
-            "surface/developer_message",
+            DEVELOPER_MESSAGE_TYPE,
             {
                 "message_id": message_id,
                 "content": content,

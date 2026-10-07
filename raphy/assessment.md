@@ -1,178 +1,219 @@
-# Raphy Assessment — Round 4 (2026-10-07 16:30, branch `raphy/arch-20261007-1630`)
+# Raphy Assessment — Round 5 (2026-10-07 20:05, branch `raphy/arch-20261007-2005`)
 
-ASSESS ONLY. 本轮按硬化版 `raphy-assess.md` 执行：读
-`skills/improve-codebase-architecture/SKILL.md` → git log 热点定域 →
-三区 friction walk（5 问必答，端到端精读非 grep）→ duplication 副扫描 →
-self-grilling → stories 入 prd.json。
+ASSESS ONLY. 本轮按硬化版 `raphy-assess.md` 执行：读 `skills/improve-codebase-architecture/SKILL.md`
+→ git log 热点定域 → 三区 friction walk（5 问必答，端到端精读非 grep）→ duplication 副扫描
+→ self-grilling → stories 入 prd.json（`userStories` 键，RA-016 起编号）。
 
 ## Scope（YAGNI）
 
-`git log --oneline -60` 热点（排除 raphy/ralph 与 iter style 扫荡）：
-- `lca/infrastructure/host_runtime/providers/user_cli.py` ×3（CLI 部署 + per-user daemon）
-- `lca/infrastructure/observability/journal/step/narrative_writer/*`（fold.py 216 行新动）
-- `lca/harness/profile/plan/declarations.py` ×2（但已废弃 → ADR-0115，转看同包 projection.py）
-- `scripts/snapshot_capability_tree.py` + `tests/architecture/test_capability_snapshot.py`
-  （snapshot scanner，上一轮刚加 `_register_composer_plugin` 识别 ——
-  读后判定为工具脚本+快照测试，属一次性胶水，无模块可深挖，丢弃）
+`git log --oneline -80` 热点（排除已做故事领地 + iter style 扫荡 + 纯测试文件）：
+- `lca/infrastructure/host_runtime/providers/user_cli.py` ×6 → RA-014/015 已做，避开
+- `lca/infrastructure/cli/services/daemon/daemon.py` ×5 → RA-014 已做，避开
+- `lca/infrastructure/observability/loop_cursor/...` → RA-010/011 已做，避开
+- `lca/infrastructure/delegation/cache.py` ×2 → RA-012 已做，避开
+- `tests/scenario/*` 大量测试文件（scenario 族测试活跃，但 lca/ 生产侧无对应热点 → 测试侧热）
+- 剩余生产代码热点：`lca/session/catalog.py`（session 事件类型闭集）、
+  `lca/infrastructure/source_verify/*`（2026-10-02 落地，README 明确列了"后续（未做）"）、
+  `lca/infrastructure/tool_defer/*`（2026-10-01 落地）
 
-禁区遵守（`raphy/progress.txt` 顶部 `## Codebase Patterns`）：
-ralph Round 2 领地、lca-1000 领地、iter lanes 的 DelegationCacheHit 接线区、
-`gate_chain_strategy.py`（绝不动），全部避开。
+禁区遵守（`raphy/progress.txt` 顶部 `## Codebase Patterns`）：ralph Round 2 领地、
+lca-1000 领地（`contracts/event.py` PILOT + `plugins/transport/webserver/`）、
+iter lanes 的 DelegationCacheHit 接线区、`gate_chain_strategy.py`（绝不动）、
+`lca/cognition/memory/`、MemoryTools（`infrastructure/tools/assistant/`）。
+三区全部避开。
 
-选定三区：**A. `lca/infrastructure/host_runtime/`**
-（providers + environment）、**B. `journal/step/narrative_writer/`**、
-**C. `lca/harness/profile/plan/`**。
+选定三区：**A. `lca/infrastructure/source_verify/`**（verifier/claims/policy/registry/__init__ 全文）、
+**B. `lca/infrastructure/tool_defer/`**（session/policy/tool_search/__init__ 全文）、
+**C. `lca/session/`**（__init__/append/catalog/fold 全文；lifecycle 只读目录清单与导出表，
+bind/checkpoint/recovery/repair 是各自独立的生命周期 concern，不重复精读）。
 
 ## Friction walk
 
-### 区 A — host_runtime（精读：providers/__init__.py、shared.py、user_cli.py、environment.py、cli/services/daemon/daemon.py:1-150、cli/services/__init__.py:25-48、cli/service/service.py:184-196）
+### 区 A — source_verify（ProvenanceGuard 思想落地）
 
 **Q1. 理解一个概念要在多少小模块间跳？**
-理解"connect daemon 的生命周期"要在三处跳：`CLIProvider.start_daemon/stop_daemon`
-（host_runtime/providers/user_cli.py）、`DaemonService.start/stop`
-（cli/services/daemon/daemon.py）、`HostEnvironment.provision/destroy`
-（environment.py 74 行又各自 `CLIProvider(self.config, user)` 一份实例）。
-同一进程（`node dist/index.js connect`）的两套生命周期实现，
-只靠一句注释（daemon.py:33-36 "Single source shared by …"）和
-一个**私有**常量 import 维系关系。
+理解"一条断言的裁决"要跳 verifier.py（`_judge_claim`）+ claims.py（切分/引用提取）+
+registry.py（登记/查回）+ policy.py（VerifyPolicy）+ `contracts/models/cognition/source_verify.py`
+（ClaimVerdict 等契约）。5 个模块，但每文件顶部 docstring 把自己在 ProvenanceGuard
+流水线里的位置写明（"三件事" / "启发式实现" / "介入强度" / "登记簿"），README.md 有三件套
+机制说明 + 缝合点（采集在 `execute.py::_append_tool_result_surface`、校验建议接 delivery_synth）。
+是**文档化的刻意分离**，非 sprawl。→ 不开 story。
 
 **Q2. 哪些模块 shallow？**
-`CLIProvider`（222 行）身兼两职：CLI artifact 构建部署（npx tsc、sudo cp、
-wrapper 脚本）+ per-user daemon 生命周期（pid 文件、pgrep、start.sh）。
-interface（provision/status/heal）承载两个正交关注点，depth 低。
-`DaemonService` 才是正牌 daemon owner（RA-006 单活不变量接缝 `_kill_existing`
-落在这里）。
+policy.py（31 行，VerifyPolicy frozen dataclass + 3 个 classmethod）interface≈implementation。
+但它是纯配置 switchboard（OFF/WARN/ENFORCE 三种 run 姿态命名）；deletion test：
+删掉会把模式开关散进 verifier 的调用方 → concentrates，通过，保留。→ 不开 story。
 
 **Q3. 为可测性抽出的纯函数，bug 藏在调用处？**
-RA-007 把 `render_start_script` 抽成纯函数（cli/services/daemon/start_script.py），
-但 `CLIProvider._write_start_script` 在调用方**另写了一份 inline 的**
-connect start.sh 模板（不同参数：`--gateway/--workspace/--token`）。
-两份 start script 模板各自演化，drift 藏在调用处。
-更严重：`CLIProvider` 自身**零测试**（tests/ 下无 CLIProvider 引用），
-它的 daemon 路径完全不受测试钉住。
+`_extract_literals`（verifier.py）是模块级纯函数 + 模块私有 `_LITERAL` 正则——它是
+**实际决定 verdict 的文法**（哪些字面量算"可核验"：日期/数字/标识符三分支），
+但没有任何接缝：改文法必须改 verifier.py 内部；调用方不能注入；NLI 未来是预留缝
+（docstring 明说），但**当前实际生效的字面文法反而没有缝**。claims.py 的
+split_claims/extract_citations 已是具名导出函数（`__init__` 导出），唯独 verdict 核心的
+文法是匿名的。→ **产出 RA-016**。
 
 **Q4. 紧耦合模块的 seam 泄漏？**
-`user_cli.py:13`：`from lca.infrastructure.cli.services.daemon.daemon import _CONNECT_PROC_PATTERN`
-—— 跨接缝 import **私有**名（前导下划线）。host_runtime 本应经正式接缝
-消费 cli 层的 daemon 契约，现在是靠私有常量"偷渡"。
-`_CONNECT_PROC_PATTERN` 的注释自称 "single source"，但 single 的只是字符串，
-不是行为。
+`ensure_registry` 用 `_lca_source_registry` 私有属性名挂到无类型 runtime 上
+（legacy harness 兜底）——docstring 明示"取不到就返回临时 registry"，是刻意的 fail-soft，
+非泄漏。`SourceVerifier.verify` 拿具体类 `SourceRegistry` 而非 protocol——但 verify 本身
+尚无生产调用方（README"建议接 delivery_synth.py"未落地），现在换 protocol 无收益。
+→ 不开 story（记 observation）。
 
 **Q5. 哪些部分测不到 / 只能绕过 interface 测？**
-`CLIProvider.provision/start_daemon` 经 `Provider.run/run_sudo` 直接
-`subprocess.run` + sudo，无注入点；interface（provision→bool）不经过
-test surface。对比 `DaemonService` 有
-test_daemon_kill_existing / test_daemon_stop_uses_sudo /
-test_daemon_start_script 三组测试钉住。→ **testability gap 实锤**。
+文法（三分支正则）只能经完整 `verify()` + 伪造 registry 内容测——"interface 即 test surface"
+的反例：想钉"标识符最短 4 字符"这类文法行为，必须走整条流水线。测试现状：
+`tests/infrastructure/source_verify/test_source_verify.py` 存在（钉住流水线行为），
+但文法无独立 test surface。→ 并入 RA-016。
 
-**区 A 结论**：产出 RA-014（Strong）。附带发现：`CLIProvider._pid_alive`
-（212-219 行，os.kill(pid,0)/ProcessLookupError/PermissionError）
-是 `lca/infrastructure/cli/service/service.py::pid_alive`（184-196 行，
-同语义）的私有复刻 —— daemon.py 已从 service import 公共版，
-只有 CLIProvider 在用私有复刻。另 `_report_kernel_serve_status`
-用 `curl -sf` 子进程探活，而 DaemonService 用 `http_ready` seam ——
-同一"kernel_serve 可达性"概念两套探活实现。
+**区 A 结论**：产出 RA-016（Worth exploring）。附带 observation：`verify_final_answer`
+尚无生产调用方（采集已接 `execute.py:271`，校验未接）——这是接线 gap，不是架构
+deepening，不开 story。
 
-### 区 B — narrative_writer（精读：sections.py、fold.py、writer.py、__init__.py 全文）
+### 区 B — tool_defer（Muse L1 对齐）
 
-**Q1.** 理解"一步的 narrative"需读 writer（编排）+ sections（5 原语）+ fold
-（5 fold 章节）三文件，但每文件职责单一、docstring 写明分工，
-是 ADR-0164/0185 落地后的**刻意拆分**，非 sprawl。
-**Q2.** `_short/_format_duration/_format_ts` 是小而深的格式化 helper，
-被 sections 与 writer 共享；deletion test：删掉会散落截断逻辑到各渲染器 →
-concentrates，通过。
-**Q3.** `render()` 显式声明为纯函数（"测试 / CLI 直接 print 用"），
-fold 失败走 `_safe_fold` 吞异常降级 N/A —— 真实行为（优雅降级）就在模块内，
-且 fold_provider seam 可注入 mock。无"调用处藏 bug"。
-**Q4.** `FoldedModelVisible` 只在 TYPE_CHECKING 下 import；writer 经
-`spine_filename_for_run` 命名 seam 找 spine，无泄漏。
-**Q5.** render 纯函数 + fold_provider 可注入 → 可测性好。
-**区 B 结论**：无 friction，不开 story（读了 4 文件，问题均不适用）。
+**Q1.** 理解"defer 一轮"要跳 session.py（ContextVar seam、`update_turn`、`render_turn`）+
+policy.py（DeferPolicy）+ tool_search.py（loader tool）+ `concept.tool.fork/dispatch.py`
+（每 turn 刷新）+ `think.history.assemble`（模型可见投影）。session.py 模块 docstring
+把生命周期与三个缝合点逐一名出（"mirroring current_tools_service"、
+"never rebuilt inside dispatch"），是文档化的编排。→ 不开 story。
 
-### 区 C — harness/profile/plan（精读：declarations.py、projection.py、immutable.py、plugin_metadata.py）
+**Q2.** policy.py 纯配置（STANDARD_NAMESPACES/描述表/eager 集合 + for_vocal_mode）；
+tool_search.py 的 ToolSearchTool 是 thin adapter（args→session 调用 + Observation 包装，
+failure_kind 分类引 `docs/specs/tool-failure-recovery.md` §3）。deletion test：
+删 adapter 会把模型参数翻译散进 session/dispatch → concentrates，保留。→ 不开 story。
 
-**Q1.** declarations.py 顶部即声明废弃（ADR-0115 → lca_kernel.declarations），
-跳过；projection.py 是"已解析 Profile 的唯一只读 seam"，
-`ResolvedProfileProjection.build` 一次规范化 11 个字段，下游只消费投影 →
-深模块，无需跳读。
-**Q2.** `plugin_metadata.py`（37 行，单函数）看似 thin，但 docstring 声明
-它是"旧 setup.meta vs 模块级 setup.plugin_meta 合并优先级"的统一 seam，
-调用方有 projection.py 与计划编译多处；deletion test：删掉会把
-"模块级覆盖 setup"优先级规则散到各调用方 → concentrates，通过，保留。
-**Q3/Q4.** 无为可测性抽取的纯函数；`_configuration_values` 的
-model_dump/Mapping 双形态是刻意的兼容 seam，非泄漏。
-**Q5.** frozen dataclass 投影，interface 即 test surface，可测。
-**区 C 结论**：无 friction，不开 story。
+**Q3.** `search_catalog` 的 token 匹配+排序启发式（约 45 行纯逻辑）嵌在 347 行的
+stateful ToolDeferSession 里——但它操作的正是 session 自己的状态（_namespaces/_specs），
+locality 对；interface 路径（update_turn→search_catalog）就是它的 test surface，
+`tests/infrastructure/tool_defer/` 有 8+ 测试文件钉住。→ 不开 story。
+
+**Q4.** `render_turn` 的 eager_present deadlock 兜底（"catalog 指向缺失的 tool_search
+是死锁"）是 dispatch 级知识——但注释明示刻意（loader 必须在 wire 上），属 fail-safe
+设计。`_tool_to_spec` 与 `think.history.assemble._tool_to_spec` 两份 wire shape——
+**刻意**（注释："Kept local on purpose: infrastructure must not import L2 nodes"），
+"one adapter = hypothetical seam" 的反面证据：这里连第二个 adapter 都不该有。
+→ 不开 story。
+
+**Q5.** ToolSearchTool.execute 依赖 ContextVar 绑定（无绑定时返回 validation failure
+observation 而非抛错）——session.py 提供 set/reset seam，tool_defer 测试全覆盖。
+`_describe` 的 ValueError fail-fast vs `update_turn` 的 fail-soft "unknown" 停靠——
+ADR-0256 B2 背书的刻意双轨。→ 不开 story。
+
+**区 B 结论**：无 friction，不开 story（读了 5 文件，问题均不适用或有刻意设计证据）。
+
+### 区 C — lca/session（Fact plane，ADR-0195）
+
+**Q1.** 理解"一次 append"：append.py 的 Session 类自包含（452 行，时序契约 4 步 +
+flush 链 ADR-0186 全写在类 docstring）。但 `derive_messages()` 方法内**函数级 import**
+`lca.plugins.session.runtime.projection.reader`——投影 fabric 的接线在模块级不可见，
+是隐藏 seam。查原因：plugin 层依赖 session 层，反向顶层 import 会成环 → 刻意的延迟绑定。
+→ 不开 story（有证据的刻意）。
+
+**Q2.** catalog.py（45 行）：`known_session_event_types()` 把 4 个词表
+（`event_registry()` + SURFACE_EVENT_TYPES + SPINE_EXECUTION_POINTS +
+SPINE_EVENT_CATEGORIES，来自 3 个包）取并集 + **1 个硬编码字面量**
+`"surface/developer_message"`（ADR-0268 §6 DSH 对齐）。deletion test：删 catalog
+会把"type 闭集"散到各读路径 → concentrates，通过保留。但 4 个词表是*派生*的
+（源头长大自动跟进），第 5 个是*手工*的（源头变了要人记着改这里）。
+→ **产出 RA-017**。
+
+**Q3.** `_to_jsonable` / `_estimate_size` / `_validate_json_safe` / `_snapshot_data`
+四个纯 helper 全在 append.py 内使用处旁边，locality 好。4 遍树遍历是 2026-09-16
+stall postmortem 后的刻意性能取舍（注释写明），非"为可测性抽取"。→ 不开 story。
+
+**Q4.** append.py 顶层 import `lca_kernel.events.session.session` 的 SessionEvent/
+SessionHeader——lca 层直引 kernel 类型。查架构：lca/session 是 Fact plane
+（ADR-0195），kernel 是 vendored 下层；fold.py 的 re-export 是刻意 internal seam
+（防两实现漂移，同 `_snapshot_from_state` 模式）。无泄漏证据。→ 不开 story。
+
+**Q5.** `validate_event_type_for_read` 读路径 fail-closed，有
+`tests/observability/session/test_known_types_fail_closed.py` 钉住；
+`_attach_projection_registry(registry: Any)` 未类型化 setter——小瑕疵，
+不值得单独开 story。
+
+**区 C 结论**：产出 RA-017（Worth exploring）。
 
 ## Duplication 副扫描（friction walk 之后）
 
-- `_pid_alive` 私有复刻（user_cli.py:212）vs `service.pid_alive`：2 站点，
-  并入 RA-014 acceptance（按"converge N identical X" idiom 处理）。
-- `user_cli.py` 内两处 tempfile 舞蹈：`_ensure_wrapper`（156-166）与
-  `_write_start_script`（168-186）——"NamedTemporaryFile 写 → sudo cp →
-  unlink → chmod/chown" 同一仪式两遍。one adapter=hypothetical, two=real →
-  真接缝。产出 RA-015。
-- `run_sudo(["bash","-c", f"echo '…' > …"])` 3 站点（shared.py ×2、user_cli.py ×1）：
-  机械度够但语义是"特权写文件"而非 tempfile-stage，与 RA-015 不完全同形；
-  记为 RA-015 的可选扩展，不强制。
-- 丢弃：`StatusReport.fail` → `ItemStatus.MISSING` 而 `ERROR` 枚举闲置 ——
-  语义小瑕疵，无行为影响，无 story。
+- `ToolSearchTool.execute` 与 `validate` 各算一遍 `has_ns` / `has_nss` / `has_query`
+  （tool_search.py，同模块内约 6 行机械重复）。且两处分类器**口径不一致**：
+  execute 的 has_nss 只判 `isinstance(list)`，validate 的要求非空 list 且元素非空
+  （execute 实际走不到分歧分支——validate 先拦，但"两个真值"本身就是坏味道）。
+  收敛为一个 `_classify_args` helper。→ 产出 RA-018（duplication 类）。
+- 丢弃：`_tool_to_spec` ×2（刻意，注释背书）；append.py 内两个
+  `contextlib.suppress(ValueError)` 取消 idiom（3 行，无行为面）；
+  `_estimate_size` 与 `_to_jsonable` 的双遍历（刻意性能取舍）；
+  `registry.get()` 的 None 处理两处（trivial）。
 
 ## 候选表
 
 | # | Files | Problem | Solution | Benefits（locality+leverage） | Strength |
 |---|-------|---------|----------|-------------------------------|----------|
-| RA-014 | `lca/infrastructure/host_runtime/providers/user_cli.py`、`lca/infrastructure/cli/services/daemon/daemon.py`、`lca/infrastructure/cli/service/service.py`、`lca/infrastructure/host_runtime/environment.py` | 同一个 connect daemon 有两套生命周期实现：`DaemonService`（lca-ops 路径，有 RA-006 单活接缝与 3 组测试）与 `CLIProvider.start/stop_daemon`（host_runtime 路径，零测试、私有复刻 `_pid_alive`、curl 探活）。两者只靠 import 私有常量 `_CONNECT_PROC_PATTERN` 维系；`CLIProvider` 身兼部署+daemon 两职，interface 浅。RA-006 的单活不变量在 CLIProvider 路径上不生效。 | DaemonService 成为 daemon 生命周期的唯一 owner；CLIProvider 的 daemon 部分经显式接缝委托（composition），只保留 artifact 部署；`_CONNECT_PROC_PATTERN` 去私有化或移入 cli.service 公共面；`_pid_alive` 删除改调 `service.pid_alive`；kernel_serve 探活收敛到 `http_ready` seam | locality：daemon 生命周期语义（含单活）只活在一处，修 invariant 不用改两处；leverage：后续 daemon 行为变更（重启策略、健康检查）自动对两条调用路径生效；测试：CLIProvider 的 daemon 路径首次可经委托 mock 被测试钉住 | **Strong** |
-| RA-015 | `lca/infrastructure/host_runtime/providers/user_cli.py` | `_ensure_wrapper` 与 `_write_start_script` 各写一遍 tempfile→sudo cp→unlink→chmod/chown 特权文件仪式 | 抽 `_stage_privileged_file(content, dest, *, owner, mode)` 小 seam，两处委托；3 处 bash echo-write 记为可选扩展 | locality：特权提升仪式（含 unlink 纪律这个安全面）集中一处；leverage：以后加"写前备份/写后校验"只改一处 | Worth exploring |
+| RA-016 | `lca/infrastructure/source_verify/verifier.py` | 实际决定 verdict 的字面量文法（`_LITERAL` 三分支 + `_extract_literals`）是 verifier.py 的模块私有物：无具名接缝、无独立 test surface；改文法必须改 verifier 内部，调用方不可注入；NLI 有预留缝，当前实际生效的文法反而没有 | 把字面量抽取收敛为 `SourceVerifier` 可注入的 seam（protocol/构造参数，默认=现有正则文法）；verifier 只经 seam 拿 literals | locality：文法演化（中文日期形态、新标识符形状）不再碰 verdict 判定逻辑；leverage：后续接 NLI 或领域文法时替换一处；测试：文法可独立于 registry/verify 流水线被钉住 | Worth exploring |
+| RA-017 | `lca/session/catalog.py`（+ DSH surface 词表源头） | `known_session_event_types()` 是 4 个派生词表 + 1 个手工字面量 `"surface/developer_message"` 的并集；前者随源头自动长大，后者靠人记着改——读路径 fail-closed 的保证有一处手工单点 | 把 DSH surface 词表定义为具名常量（与 `SURFACE_EVENT_TYPES` 并列的 single source），catalog 只做并集，零手工字面量 | locality："session 认识哪些 event type"完全派生，无人肉同步点；leverage：DSH 词表再长大时 catalog 零改动；测试：fail-closed 测试继续钉住闭集 | Worth exploring |
+| RA-018 | `lca/infrastructure/tool_defer/tool_search.py` | `execute` 与 `validate` 各自实现一遍参数分类（`has_ns`/`has_nss`/`has_query`），口径还不一致（execute 的 has_nss 不判非空）——"两个真值"的坏味道 | 收敛为单个 `_classify_args(args)` helper，两处共用同一口径（取 validate 的严格口径） | locality：参数形状的判定只活在一处；leverage：加新参数模式时改一处；测试：分类器可直接单测 | Worth exploring |
 
 ## Self-grilling
 
-### RA-014
-- **Constraints**：`lca-ops` 的 daemon start/stop/status 命令行为不变；
-  `HostEnvironment.provision/destroy` 外部行为不变（bool 返回、日志行）；
-  RA-006 单活不变量语义保留；不违反 ADR-0119 决定 4（services 由 lca-ops
-  管理 —— RA-014 正是落实它：host_runtime 不应再私设第二套 daemon 管理）。
-- **Dependencies**：`HostEnvironment` 调 `CLIProvider.start/stop_daemon`
-  与 `heal`；`build_registry` 调 `DaemonService`；测试钉住
-  DaemonService（kill_existing/stop_uses_sudo/start_script 三组），
-  CLIProvider 零测试 → 动它无回归风险。
-- **Shape of the deepened module**：`CLIProvider` 瘦身为纯部署 provider
- （provision/status 的 deployed 检查）；daemon 生命周期经
-  `DaemonService`（或其抽出的 lifecycle seam）委托；
-  `_CONNECT_PROC_PATTERN` 去下划线成为共享常量（或进 cli.service 公共面），
-  私有跨接缝 import 消失。
-- **Test survival**：三组 daemon 测试继续全绿；新增测试钉
-  `CLIProvider.heal` 经委托路径仍工作（mock DaemonService）。
-- **Deletion test**：删掉 CLIProvider 的 daemon 一半 → 生命周期复杂度
-  集中到本就拥有接缝+测试的 DaemonService（concentrates）；CLIProvider
-  interface 变深。 verdict：**通过，该存在**。
+### RA-016
+- **Constraints**：默认文法下 verdict 语义零变化（ADR-0255 §4.8 指称幻觉判定不变）；
+  contracts 冻结 dataclass 不动；`verify_final_answer` 签名不变。
+- **Dependencies**：唯一调用方是 `_judge_claim`（verifier.py 内部）；
+  测试 `tests/infrastructure/source_verify/test_source_verify.py` 钉住流水线行为；
+  生产侧 verify 尚无调用方（README 建议未落地），动它无回归风险。
+- **Shape of the deepened module**：`SourceVerifier(policy, literal_extractor=...)`
+  或模块级 `LiteralExtractor` Protocol；`_extract_literals` 成为默认实现并具名导出；
+  `_LITERAL` 正则随默认实现走。
+- **Test survival**：现有 source_verify 测试全绿；新增测试直接钉文法
+  （中文日期形态、4 字符标识符边界等）而不必伪造 registry。
+- **Deletion test verdict**：删掉 seam → 文法散回 verifier 私有 → concentrates。
+  verdict：**通过**。
 
-### RA-015
-- **Constraints**：tempfile+cp+unlink 原子性、chmod/chown 语义、sudo 密码流不变。
-- **Dependencies**：仅 user_cli.py 内部两处调用。
-- **Shape**：`_stage_privileged_file(content: str, dest: Path, *, owner: str | None, mode: str | None)`；
-  两处委托；echo-write 3 站点可选后续收敛。
-- **Test survival**：无现有测试；新测试用 fake run_sudo 钉住调用序列
-  （cp→chmod/chown→unlink）。
-- **Deletion test**：删掉 helper → 特权仪式散回两处（concentrates）。 verdict：**通过**。
+### RA-017
+- **Constraints**：`known_session_event_types()` 返回集合不变（fail-closed 语义不动）；
+  ADR-0268 §6 的 DSH 对齐不变，只是换个家。
+- **Dependencies**：调用方 `lca/plugins/session/runtime/log/reader.py`；
+  测试 `tests/observability/session/test_known_types_fail_closed.py` +
+  `tests/session/test_session_public_api.py`。
+- **Shape**：DSH surface 词表成为具名 frozenset 常量（放在 fold 词表旁或 DSH 对齐的
+  reader 处，single source）；catalog.py 只 `types.update(...)` 它，删掉硬编码行。
+- **Test survival**：fail-closed 测试继续全绿；新增断言 catalog 无手工字面量
+  （或词表常量单测）。
+- **Deletion test verdict**：删 catalog → 闭集散到各读路径 → concentrates
+  （catalog 本体保留，只动词表来源）。verdict：**通过**。
+
+### RA-018
+- **Constraints**：`execute`/`validate` 对外行为零变化（validate 先拦，execute 的
+  宽松分支实际不可达——收敛后保持该保证）。
+- **Dependencies**：仅 tool_search.py 内部两处；`tool_search_factory` 注册路径不变。
+- **Shape**：模块级 `_classify_args(args)` helper（返回三元组或小 dataclass）；
+  两处共用同一口径（取 validate 的严格口径）。
+- **Test survival**：`tests/infrastructure/tool_defer/test_tool_search*.py` 全绿；
+  新增分类器单测（含 `namespaces=[]` 的口径）。
+- **Deletion test verdict**：删 helper → 分类逻辑散回两处 → concentrates。
+  verdict：**通过**。
 
 ## 丢弃（有证据）
 
-1. narrative_writer 三区：ADR-0164/0185 落地后的刻意拆分，pure render +
-   fold_provider seam，可测，无 friction。
-2. `plugin_metadata.py`：有文档的 legacy 合并 seam，多调用方，
-   deletion test 通过 → 保留。
-3. `Provider.run_sudo` 读相对路径 `.lobehub-stack/sudo.pass`
-   （cwd 隐式契约）：无测试钉住、无已证 bug → speculative，不开 story，
-   记 observation。
-4. `ItemStatus.ERROR` 枚举闲置 / `fail()`→MISSING：语义小瑕疵，无行为影响。
-5. `scripts/snapshot_capability_tree.py`：工具胶水+快照测试，无模块可深挖。
+1. 区 A Q1/Q2：5 模块分离是 README+docstring 文档化的刻意设计；policy.py 是
+   earns-existence 的配置 switchboard。
+2. 区 A Q4：`ensure_registry` 的 monkey-patch 是 legacy harness 刻意 fail-soft；
+   verify 取具体类暂无收益（尚无生产调用方）。
+3. 区 B 全区：5 文件精读——defer 编排是文档化的刻意设计；`_tool_to_spec` 复刻有
+   "infrastructure must not import L2 nodes"注释背书；fail-soft/fail-fast 双轨有
+   ADR-0256 B2 背书；8+ 测试文件钉住。
+4. 区 C Q1：`derive_messages` 的函数级 import 是防循环的刻意延迟绑定；
+   Q3 四遍树遍历是 2026-09-16 postmortem 后的刻意性能取舍；Q4 kernel 类型直引
+   符合 Fact plane 分层。
+5. Observation（不开 story）：`verify_final_answer` 尚无生产调用方——采集已接
+   （`execute.py:271`），校验未接（README 建议 delivery_synth 未落地）。
+   这是接线 gap，optimize 轮可顺手确认，非架构 deepening。
 
 ## Top recommendation
 
-先做 **RA-014**：它是本轮唯一的 Strong —— 两套 daemon 生命周期是真实的
-行为分叉风险（RA-006 的单活接缝只保护了一条路径），且 `CLIProvider`
-零测试意味着重构无回归包袱；做完后 `CLIProvider` 回归为纯部署 provider，
-interface 深度立刻上升。RA-015 是同文件内的顺手收敛，可在 RA-014 之后做。
+先做 **RA-016**：它是本轮唯一的"判定逻辑核心无接缝"问题——文法决定 verdict，
+却是 verifier.py 的匿名私有物；且生产侧 verify 尚未被调用，现在是加缝的最低成本
+窗口（零生产调用方 = 零回归风险）。RA-017 是 catalog 的手工单点消除，
+RA-018 是同模块小收敛，可依次做。
 
-Assessment complete: 2 stories written, top is RA-014.
+Assessment complete: 3 stories written, top is RA-016.
