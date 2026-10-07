@@ -25,7 +25,7 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 from dataclasses import dataclass, field
-from typing import Any, Protocol
+from typing import Any
 
 from lca.contracts.protocols.declarative.declarative_1.ports import PortName
 from lca.contracts.protocols.graph.binding import BindingKind
@@ -42,17 +42,6 @@ from lca.framework.graph.strategy_registry import register_strategy
 # schema's own names; the framework does not encode cognition-layer
 # port names.
 _DEFAULT_DECISION_PORT: PortName = PortName("decision")
-
-
-class _DecisionLike(Protocol):
-    """Structural shape the framework requires for decision payloads.
-
-    The framework never imports the cognition :class:`Decision` type.
-    Cognition implements this protocol structurally; the framework
-    enforces the shape at runtime via :func:`_looks_like_decision`.
-    """
-
-    decision_id: str
 
 
 def _looks_like_decision(payload: Any) -> bool:
