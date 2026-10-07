@@ -215,30 +215,72 @@ def test_unbundled_plugin_does_not_change_plan_ref(monkeypatch) -> None:
     assert all(plugin.id != unrelated.id for plugin in changed.plugins)
 
 
-def test_golden_plan_ref_snapshot() -> None:
-    """Golden fixture: save the plan_ref to a file for CI comparison.
+def _portable_plan_ref() -> str:
+    """plan_ref with the checkout path neutralized (golden-fixture portability).
 
-    This test saves the current plan_ref to tests/fixtures/plan_ref_golden.txt.
-    CI can compare this file against the current plan_ref to detect changes.
+    ``compiled_run_plan_ref`` hashes the declarative payload verbatim, and that
+    payload embeds absolute bundle provenance paths (``<repo>/bundles/*.yaml``).
+    A golden fixture of the raw ref can therefore only ever match the exact
+    checkout where it was generated — useless for CI and other worktrees.
+
+    This helper mirrors the production payload field-for-field (same seam
+    functions as ``compiled_run_plan_ref`` — keep the two in sync) and
+    neutralizes only the repo-root prefix before hashing, so every real plan
+    change (bundles, plugins, profile, control graph) still flips the golden
+    while the checkout path no longer does.
     """
-    tree = _build_capability_tree(DEFAULT_PROFILE)
+    import hashlib
+    import json
+
+    from lca.harness.plan import (
+        _declarative_payload,
+        _unwrap_v2,
+        capability_sub_plan_hash,
+        control_entries_sub_plan_hash,
+        scope_sub_plan_hash,
+    )
+    from lca.harness.profile.resolve.resolve import resolve_profile
+    from lca_kernel.plan.plan_compile import compile_plan
+
+    plan = _unwrap_v2(compile_plan(resolve_profile(REPO / DEFAULT_PROFILE)))
+    payload = {
+        "capability": capability_sub_plan_hash(plan),
+        "control": control_entries_sub_plan_hash(plan),
+        "scope": scope_sub_plan_hash(plan),
+        "profile_path": plan.profile_path,
+        "plan_version": plan.plan_version,
+        "revision": plan.revision,
+        "input_provenance": sorted((kind, path) for kind, path in plan.input_provenance),
+        "declarative": _declarative_payload(plan),
+    }
+    # Mirror canonical_digest's serialization exactly, then neutralize the
+    # checkout path. (canonical_digest does json.dumps(payload, sort_keys=True,
+    # ensure_ascii=False, default=str) + sha256 prefix "sha256:", length 16.)
+    serialized = json.dumps(payload, sort_keys=True, ensure_ascii=False, default=str)
+    normalized = serialized.replace(str(REPO), "<repo>")
+    return "sha256:" + hashlib.sha256(normalized.encode("utf-8")).hexdigest()[:16]
+
+
+def test_golden_plan_ref_snapshot() -> None:
+    """Golden fixture: the portable plan_ref must match the committed fixture.
+
+    The fixture is checkout-path independent (see ``_portable_plan_ref``); a
+    mismatch means the compiled plan itself changed. Regenerate the fixture
+    only when the plan change is intended.
+    """
+    current = _portable_plan_ref()
     golden_path = REPO / "tests" / "fixtures" / "plan_ref_golden.txt"
     golden_path.parent.mkdir(parents=True, exist_ok=True)
 
     if golden_path.exists():
         saved_ref = golden_path.read_text(encoding="utf-8").strip()
-        # If the saved ref differs, it means the profile structure changed
-        # This is expected during development; update the golden file
-        if saved_ref != tree.plan_ref:
-            # For now, just assert they match or the golden file is empty
-            # In CI, this would fail if the plan_ref changed without updating the golden file
-            assert saved_ref == tree.plan_ref, (
-                f"plan_ref changed: golden={saved_ref}, current={tree.plan_ref}. "
-                f"If this is expected, update {golden_path}"
-            )
+        assert saved_ref == current, (
+            f"plan_ref changed: golden={saved_ref}, current={current}. "
+            f"If this is expected, update {golden_path}"
+        )
     else:
         # First run: save the current plan_ref
-        golden_path.write_text(tree.plan_ref + "\n", encoding="utf-8")
+        golden_path.write_text(current + "\n", encoding="utf-8")
 
 
 # ── JSON output is valid ─────────────────────────────────────────────
