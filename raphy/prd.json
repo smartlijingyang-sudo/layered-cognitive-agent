@@ -1,338 +1,412 @@
 {
-  "project": "LCA Raphy Architecture Optimization",
-  "branchName": "raphy/arch-20261007-2005",
-  "description": "Continuous architecture deepening for the LCA cognitive-agent codebase via the raphy fresh-session loop. Round 1 (2026-10-06, old prompt): RA-001/RA-002 converged, RA-003 dropped with evidence. Round 2 (2026-10-06, hardened prompt): RA-004..RA-009 all done (merged to main 2026-10-07, merge 1b1526a94). Round 3 (2026-10-07, hardened prompt): friction walk over session plugins, loop_cursor, delegation/body executor; RA-010..RA-013 below. Out of scope: ralph Round 2 areas (DecisionGates, Ingest, ContextFiles shims, Read Runs micro-dirs, MemoryTools directory seam), lca/cognition/memory/ (frozen per Round 2 AP-01), CLI surface must not import contracts (deliberate rule), gate_chain_strategy.py (hands-off: another party's uncommitted work + pre-existing red test).",
-  "userStories": [
-    {
-      "id": "RA-001",
-      "title": "Converge duplicated _emit_* no-emitter-fallback methods into a shared assistant event seam",
-      "description": "As an LCA maintainer, I want the identical no-emitter-fallback logic in the assistant event emitters converged into one shared seam, so a change to the fallback behavior (log shape, None-emitter handling) is made in one place.",
-      "acceptanceCriteria": [
-        "A single shared helper exists (suggested: lca/plugins/domain/assistant/catalog/events.py or a new lca/plugins/assistant/_shared.py) implementing the seam: if emit fn is None -> log.info('<scope>.ep.no_emitter', ep=<EVENT>, payload=payload.to_dict()); else emit_fn(<EVENT>, payload.to_dict())",
-        "lca/plugins/domain/assistant/catalog/events.py _emit_created, _emit_bootstrap_completed, _emit_profile_revised all delegate to the shared helper; no inline if-self._emit-is-None blocks remain",
-        "lca/plugins/assistant/tool/overlay.py _emit_profile_revised delegates to the shared helper",
-        "lca/plugins/assistant/skill/overlay/overlay.py _emit_installed, _emit_profile_revised, _emit_activated all delegate to the shared helper",
-        "A repo-wide grep for 'ep.no_emitter' shows the fallback log call site exists exactly once (in the shared helper)",
-        "Behavior preserved: log scope strings per caller (assistant.catalog / assistant.tool_overlay / assistant.skill_overlay) still emitted; payload.to_dict() still passed",
-        "Relevant tests pass: uv run pytest tests/ -k 'assistant' --no-cov -q (or the narrower tests covering these three modules)",
-        "uv run ruff check passes on all touched files",
-        "Do NOT change event names, payload shapes, or the None-emitter fallback semantics"
-      ],
-      "priority": 1,
-      "passes": true,
-      "notes": "Source: improve-codebase-architecture skill assessment 2026-10-06 (Strong). Deletion test: yes. Follows the established 'converge N identical X' pattern (git: ba2ad56c6, 2a2059cca). Layering note: verify the import direction for the shared helper creates no new plugin->plugin cycle; prefer the domain catalog module if both overlays already depend on it. DONE 2026-10-06: converged 9 (not 7) no-emitter-fallback methods into lca/plugins/assistant/events/_events.py::emit_assistant_ep_or_log — story listed 7, but evolve._emit and jobs._emit were the same seam (criterion 5 demanded a single call site repo-wide). Zero new import edges: all 5 files already imported from _events."
-    },
-    {
-      "id": "RA-002",
-      "title": "Converge two identical _fail methods in delegate_tool.py into a module-level helper",
-      "description": "As an LCA maintainer, I want the two literally identical _fail methods in lca/infrastructure/tools/collaboration/delegate_tool.py converged into one module-level helper, so the validation-failure Observation construction lives in one place.",
-      "acceptanceCriteria": [
-        "A module-level helper (e.g. _fail_observation(start: float, message: str) -> Observation) exists in lca/infrastructure/tools/collaboration/delegate_tool.py with the exact current body (payload={'error': message, FAILURE_KIND: FAILURE_KIND_VALIDATION}, success=False, ContentType.STRUCTURED)",
-        "Both tool classes (owners of the current duplicate _fail methods) call the helper; grep -c 'def _fail' on the file returns 0",
-        "Do NOT reuse tools._shared.fail_observation: it constructs Observation differently (payload=None, error=, extra=); swapping would change behavior",
-        "Behavior preserved: identical Observation fields as before (verified by existing tests or a new unit test pinning the payload shape)",
-        "uv run pytest tests/infrastructure/tools/ --no-cov -q passes",
-        "uv run ruff check passes on the touched file"
-      ],
-      "priority": 2,
-      "passes": true,
-      "notes": "Source: improve-codebase-architecture skill assessment 2026-10-06 (Strong). Deletion test: yes - the two methods are character-identical. Twin of ba2ad56c6 (different Observation shape - do not conflate). DONE 2026-10-06: extracted module-level _fail_observation(start, message); both classes call it; both def _fail methods deleted. 150 tests pass, ruff clean."
-    },
-    {
-      "id": "RA-003",
-      "title": "Unify _emit_lifecycle_pre/post/fail in model_visible adapter behind one dispatch seam",
-      "description": "As an LCA maintainer, I want the three _emit_lifecycle_* functions in lca/plugins/events/hooks/model_visible/adapter.py unified behind a single dispatch seam, so the step-counter extraction and lifecycle_emit import pattern is not repeated per phase.",
-      "acceptanceCriteria": [
-        "A single seam exists in lca/plugins/events/hooks/model_visible/adapter.py; _emit_lifecycle_pre/post/fail become thin wrappers or call sites of it",
-        "The repeated 'step = hook._step_counter' and deferred lifecycle_emit import pattern appears once",
-        "Behavior preserved: same lifecycle_emit calls (request_model / complete_model / fail_model) with identical arguments",
-        "uv run pytest tests/ -k 'model_visible or lifecycle' --no-cov -q passes",
-        "uv run ruff check passes on the touched file",
-        "If the three phases turn out to need genuinely different seams, mark this story dropped with the reason instead of forcing unification"
-      ],
-      "priority": 3,
-      "passes": false,
-      "notes": "Source: improve-codebase-architecture skill assessment 2026-10-06 (Worth exploring). Weaker than RA-001/RA-002: shared scaffolding but different signatures. Deletion test is marginal. DROPPED 2026-10-06 (optimize session): investigated for unification; the three phases need genuinely different seams. pre extracts (provider, model) via _model_identity and calls request_model; post builds usage/content/tool_calls payload and calls complete_model, and carries a behavior-critical docstring (derive_messages double-append warning) that must stay with the phase; fail passes error straight to fail_model. Shared scaffolding is 2 lines of idiom (step = hook._step_counter + deferred import), and the three deferred imports bind DIFFERENT names (request_model/complete_model/fail_model), so not even the import is shared. A unified seam would require getattr string-dispatch or Callable+**kwargs threading, trading explicit type-safe direct calls for indirection: net readability loss, deletion test fails. Phase set is closed (exactly pre/post/fail); no leverage for future phases. Forcing unification would be churn, not improvement.",
-      "dropped": true
-    },
-    {
-      "id": "RA-004",
-      "title": "Delete debug_graph._load_events private fork; delegate to shared load_spine_events",
-      "description": "As an LCA maintainer, I want debug_graph to use the shared spine JSONL loader instead of its private fork, so the isinstance(obj, dict) guard and fail-soft parsing semantics live in exactly one place and the fallback debug command is no more fragile than the main path.",
-      "acceptanceCriteria": [
-        "debug_graph._load_events (lca/infrastructure/cli/commands/observation/debug_graph.py:46-62) is deleted; build_debug_graph calls load_spine_events from lca/infrastructure/cli/commands/_shared/projection.py",
-        "No remaining private JSONL parse loop in debug_graph.py (grep for 'json.loads' in the file returns 0 outside the shared import)",
-        "tests/infrastructure/cli/test_debug_graph.py no longer imports the private _load_events (uses the shared loader)",
-        "NEW regression test: spine.jsonl containing a valid-JSON non-dict line (e.g. '42') -> debug-graph command exits 0 (pins the AttributeError crash this story fixes)",
-        "Existing tests pass: uv run pytest tests/infrastructure/cli/test_debug_graph.py tests/infrastructure/cli/test_projection.py --no-cov -q",
-        "uv run ruff check passes on touched files",
-        "lca-cli-shape.py docstring drift fixed: documented API list includes load_spine_facts (already in SHARED_PROJECTION_NAMES)",
-        "Do NOT change debug-graph human output; do NOT import contracts into CLI surface code"
-      ],
-      "priority": 1,
-      "passes": true,
-      "notes": "Source: improve-codebase-architecture skill assessment Round 2 2026-10-06 (Strong, friction walk Q3/Q4). Deletion test: concentrates. Real bug: non-dict line -> AttributeError at ev.get. DONE 2026-10-06: deleted _load_events; debug_graph_cmd + debug_graph_command now call shared load_spine_events (identical path resolution + fail-soft semantics; the dropped isinstance(obj, dict) guard restored). test_debug_graph.py imports the shared loader; new regression test test_debug_graph_skips_non_dict_spine_lines pins the crash (spine with '42'/'[1, 2]' lines -> exit 0; replaying the deleted fork's logic raised AttributeError: 'int' object has no attribute 'get', confirming the assessment). 15 tests pass (test_debug_graph + test_projection), ruff clean on all touched files; grep 'json.loads' in debug_graph.py -> 0."
-    },
-    {
-      "id": "RA-005",
-      "title": "Unify the two domain-prefix tables in CLI projection.py into one table, one match semantic",
-      "description": "As an LCA maintainer, I want the execution_point->domain mapping in projection.py to live in one table with one match semantic, so filter_by_domain and load_spine_facts never disagree on the same run.",
-      "acceptanceCriteria": [
-        "lca/infrastructure/cli/commands/_shared/projection.py has exactly one domain-prefix table (remove the _DOMAIN_PREFIXES vs _EP_PREFIX_FAMILIES split); 'graph' family defined once",
-        "One match semantic chosen and documented in the module (note which one and why; the mirror comment explaining 'so we do not import from contracts into CLI surface code' is kept)",
-        "Do NOT import from contracts (deliberate design rule, projection.py:22-23) - unify inside the module",
-        "Before changing filter_by_domain semantics, run the tests of its caller runs/debug.py (llm/tool/graph/phase counting at debug.py:157) and confirm no behavior change, or record the deliberate change",
-        "uv run pytest tests/infrastructure/cli/test_projection.py --no-cov -q passes; uv run ruff check passes on the touched file"
-      ],
-      "priority": 4,
-      "passes": true,
-      "notes": "Source: improve-codebase-architecture skill assessment Round 2 2026-10-06 (Worth exploring, friction walk Q4). Deletion test: concentrates. The contracts-constant alternative was rejected: importing contracts into CLI surface contradicts the module's own documented rule."
-    },
-    {
-      "id": "RA-006",
-      "title": "Give the single-daemon invariant an owner: _kill_existing seam with wait-for-exit",
-      "description": "As an LCA operator, I want daemon restart to kill the old process and confirm it is dead before spawning, so the double-daemon device-id fight fixed by PR #40 cannot recur through the restart path.",
-      "acceptanceCriteria": [
-        "A _kill_existing(pattern, timeout) seam exists in lca/infrastructure/cli/services/daemon/daemon.py: pkill via Sudo.run (PR #40 behavior kept) + poll pid_alive until the process is gone (leverage lca/infrastructure/cli/service/service.py primitives)",
-        "stop() and restart() both go through _kill_existing; restart() no longer uses time.sleep(0.5)",
-        "The process match string 'node.*index.js.*connect' is a single module-level constant shared by daemon.py (:122, :423) and lca/infrastructure/host_runtime/providers/user_cli.py (:82, :94); user_cli.py's own stop_daemon flow is otherwise untouched",
-        "NEW test: restart with pid_alive flipping true->false (mock sequence) calls start() only after death is confirmed",
-        "Existing tests pass: uv run pytest tests/ -k 'daemon' --no-cov -q (incl. test_daemon_stop_uses_sudo)",
-        "uv run ruff check passes on touched files"
-      ],
-      "priority": 2,
-      "passes": true,
-      "notes": "Source: improve-codebase-architecture skill assessment Round 2 2026-10-06 (Strong, friction walk Q3/Q4). Deletion test: concentrates - the 'exactly one live daemon' invariant gets an owner instead of relying on sleep timing. DONE 2026-10-07: added DaemonService._kill_existing(pattern, timeout=10.0) (sudo pkill via Sudo.run, timeout=10 kept per PR #40; then poll pid_alive from service.py primitives on the pid recorded in connect.pid until dead, bounded by timeout, 0.2s interval); stop() and restart() both go through it; restart() no longer uses time.sleep(0.5). 'node.*index.js.*connect' is now module-level _CONNECT_PROC_PATTERN in daemon.py, shared (same object) by user_cli.py start_daemon/stop_daemon (imported, internal seam; user_cli stop_daemon flow otherwise untouched; intra-L0 edge, no importlinter contract conflict, no import cycle: daemon.py does not import host_runtime at module level). Implementation vs assessment: assessment named the constant _CONNECT_PROC_PATTERN and it landed exactly there; the wait polls the pid-file pid via pid_alive (not pgrep re-check); test_daemon_stop_uses_sudo extended with sudo.read_text.return_value=None (no recorded pid -> wait skipped) per the assessment's 'can extend' note."
-    },
-    {
-      "id": "RA-007",
-      "title": "Extract _spawn shell-script generation into a pure render_start_script(config)",
-      "description": "As an LCA maintainer, I want the daemon start script rendered by a pure, testable function from DaemonConfig, so credential/path literals stop leaking across the Python/shell seam and the script content becomes unit-testable.",
-      "acceptanceCriteria": [
-        "A pure function render_start_script(config) -> str exists (new module or daemon.py); DaemonService._spawn only writes/launches its output",
-        "Token and paths come from DaemonConfig (token default 'lca-local-host' keeps its single source in lca/infrastructure/cli/config/config.py:47); the '--token lca-local-host' literal in daemon.py:406 is gone",
-        "NEW test pins rendered script content: contains configured token, log path, PATH entries (script shape becomes testable for the first time)",
-        "Generated script behavior unchanged (same env, same log redirection, same /opt/lca target)",
-        "Existing daemon tests pass: uv run pytest tests/ -k 'daemon' --no-cov -q; uv run ruff check passes on touched files"
-      ],
-      "priority": 5,
-      "passes": true,
-      "notes": "Source: improve-codebase-architecture skill assessment Round 2 2026-10-06 (Worth exploring, friction walk Q4). Deletion test: concentrates. Design choice open: config fields vs template params. DONE 2026-10-07: extracted pure render_start_script(config, gateway_ws_url) into lca/infrastructure/cli/services/daemon/start_script.py; DaemonService._spawn only writes/launches its output. DaemonConfig gained token (default single-sourced from host_runtime KernelServeConfig.token via model_fields, no literal duplication) and cli_dir (default /opt/lca); DaemonService._cli_dir now reads config.cli_dir. Byte-equivalence verified: new renderer output is byte-identical to the old inline template for default config (409 bytes, captured old _spawn output vs new render). 5 new tests pin token/log-path/PATH-entries, custom paths, single-source default, and the full default script shape. pytest tests/ -k daemon: 20 passed; ruff clean. Assessment delta: story text cited lca/infrastructure/cli/config/config.py:47 as the token single source, but the literal actually lives in lca/infrastructure/host_runtime/config.py:47 (assessment.md RA-007 section had it right); implementation follows the corrected path. Also chose config-fields (not template-params) per the assessment's open design question, and passed gateway_ws_url as an explicit parameter to keep the existing empty-means-derive fallback in _kernel_serve_ws_url untouched."
-    },
-    {
-      "id": "RA-008",
-      "title": "Converge the three composer provider registration shells via a table-driven factory (test discovery first)",
-      "description": "As an LCA maintainer, I want the three near-identical composer provider shells generated from one table, so adding a fourth phase composer does not copy another 66-line file.",
-      "acceptanceCriteria": [
-        "FIRST: a test proving the @plugin discovery mechanism picks up dynamically generated registrations (acceptance gate - if it fails, fall back to a _register_composer_plugin(...) factory called 3 times)",
-        "lca/plugins/composer/think/brain_provider.py, lca/plugins/composer/perceive/provider.py, lca/plugins/composer/act/body_provider.py converge: one table [('lca-plan-brain-composer','composer.brain','plugin.serve',BrainComposer), ...] drives the three registrations; per-provider differences (plugin id, provides key, authority grant - perceive uses context.read, composer class) are table data",
-        "No information lost: observability descriptors remain id-derived; authority grants preserved per provider",
-        "NEW test: setup() provides the correct composer instance per plugin id (currently untested - only bundle registration items are tested)",
-        "Existing tests pass: uv run pytest tests/composer/ --no-cov -q; uv run ruff check passes on touched files"
-      ],
-      "priority": 3,
-      "passes": true,
-      "notes": "Source: improve-codebase-architecture skill assessment Round 2 2026-10-06 (Strong, friction walk Q2). Deletion test: concentrates - ~130 lines of boilerplate eliminated. Duplication-class story (1 of 6; diversity quota satisfied by the other five). Implemented 2026-10-07: gate probe proved single-module loop generation is NOT picked up by profile resolve (module.setup is one attribute per module) -> used the story fallback: _register_composer_plugin(...) factory called once per provider module."
-    },
-    {
-      "id": "RA-009",
-      "title": "Harden the composer/observability seam: replace llm._inner private access and the deferred import (spike included)",
-      "description": "As an LCA maintainer, I want composer to talk to the observability adapter and the model-visible hook through contractual seams instead of private attribute access and deferred imports, so adapter refactors stop silently breaking idempotent LLM wrapping.",
-      "acceptanceCriteria": [
-        "SPIKE (part of this story): read lca/infrastructure/observability/adapters TelemetryLLMAdapter and decide the public unwrap primitive; document why composer<->events has an import cycle",
-        "brain.py:65 no longer reads TelemetryLLMAdapter._inner (uses the new public primitive); instrument_llm idempotency preserved (existing test_hook_resolution_path.py passes)",
-        "brain.py:74 deferred import of lca.plugins.events.hooks.model_visible.adapter replaced by a contracts-level protocol or a documented, tested seam (no bare private cross-module access)",
-        "uv run pytest tests/ -k 'hook_resolution or brain' --no-cov -q passes; uv run ruff check passes on touched files",
-        "If the spike shows the cycle cannot be broken without a larger refactor, record the evidence and mark dropped with reason (like RA-003) instead of forcing it"
-      ],
-      "priority": 6,
-      "passes": true,
-      "notes": "Source: improve-codebase-architecture skill assessment Round 2 2026-10-06 (Worth exploring, friction walk Q4). Solution undetermined this round - the spike is load-bearing. | DONE 2026-10-07: spike found NO composer<->events import cycle (top-level import verified green); used existing public TelemetryLLMAdapter.inner property instead of _inner."
-    },
-    {
-      "id": "RA-010",
-      "title": "Resolve StdProjectionHost listener-fire semantics: docs promise change-notification, impl fires per drive",
-      "description": "As an LCA maintainer, I want one canonical, agreed semantics for StdProjectionHost listener notification, so subscribers and future code stop guessing whether 'change notification' means per-drive fire or change-gated fire.",
-      "acceptanceCriteria": [
-        "One canonical semantics is chosen and documented in subscribe_changes + the class docstring of lca/infrastructure/observability/loop_cursor/projection/host.py: either 'fires on every drive' or 'fires only when at least one deriver state changed'",
-        "Implementation, docstrings, and tests/observability/loop_cursor/test_projection_host.py agree on that semantics (no test pins a contradicting one; test line 348 currently asserts per-drive fire)",
-        "If change-gated is chosen: drive() computes the changed key set (prev_state != new_state per deriver) and _fire_listeners runs only when it is non-empty; a NEW test asserts no listener fire when apply returns identical state",
-        "If per-drive is kept: docstrings stop saying 'changes' (subscribe_changes / class docstring reworded), keeping the pinned behavior",
-        "uv run pytest tests/observability/loop_cursor/test_projection_host.py --no-cov -q passes; uv run ruff check passes on touched files",
-        "Do NOT change FlushReport, restore(), unregister() semantics"
-      ],
-      "priority": 1,
-      "passes": true,
-      "notes": "Source: raphy assess Round 3 2026-10-07 (Worth exploring, friction walk B-Q3). Evidence: subscribe_changes docstring '订阅 view_snapshot() 变化' + class docstring '变更通知' vs drive() unconditional _fire_listeners ('为简单实现,每次 drive 后全量回调') vs test_projection_host.py:348 'listener should fire on drive'. Deletion test: the 'what counts as a change' decision gets one owner (drive) instead of living half in docs, half in impl. Implemented 2026-10-07 (optimize round): chose change-gated (option a). drive() now accumulates a `changed` flag via `new_state != prev_state` per deriver and only calls _fire_listeners() when non-empty; snapshots still update on every drive. subscribe_changes + class docstring now document the canonical change-gated semantics; the old '每次 drive 后全量回调（未来可扩展为 diff-based）' hedge is gone."
-    },
-    {
-      "id": "RA-011",
-      "title": "Disambiguate loop_cursor/projection/ (host) vs projections/ (deriver definitions)",
-      "description": "As an LCA maintainer (or AI agent navigating the tree), I want exactly one loop_cursor submodule holding deriver definitions, so I stop confusing the two one-letter-apart modules.",
-      "acceptanceCriteria": [
-        "One of: fold projections/* into projection/ (e.g. projection/derivers.py) or rename projections/ to a load-bearing name; exactly one loop_cursor submodule holds deriver definitions",
-        "All import sites updated: projection/host.py, projections/__init__.py, projections/defaults.py, lca/plugins/observability/providers/projection_host/standard.py",
-        "The TYPE_CHECKING-only import of projection.host in defaults.py is re-examined as part of the fold (no silent cycle re-introduced)",
-        "No behavioral change: uv run pytest tests/observability/loop_cursor/ --no-cov -q passes; uv run ruff check passes on touched files",
-        "Repo-wide grep for the old module path returns 0"
-      ],
-      "priority": 2,
-      "passes": true,
-      "notes": "Source: raphy assess Round 3 2026-10-07 (Worth exploring, friction walk B-Q1). Evidence: host.py:26 imports projections.defaults at runtime; defaults.py:38 references projection.host under TYPE_CHECKING. Pure AI-navigability fix; import-path change only."
-    },
-    {
-      "id": "RA-012",
-      "title": "Spike: contractize the delegation cache-hit commit seam (deferred loop/session imports)",
-      "description": "As an LCA maintainer, I want the delegation cache-hit commit seam to be explicit instead of reaching into the loop and session layers through function-local imports, so the layer edges are honest and the commit path is testable through its interface.",
-      "acceptanceCriteria": [
-        "SPIKE first (part of this story): read lca/cognition/body/actions/action_handlers.py and lca/plugins/events/publishers/delegation_cache/plugin.py call sites; determine whether commit_delegation_cache_hit + session resolution can be injected explicitly at those call sites",
-        "If feasible: cached_delegation_observation in lca/infrastructure/delegation/cache.py takes the commit seam as an explicit parameter (or a small protocol); the function-local imports of lca.loop.commit.delegation_journal and lca.infrastructure.session.bindings are gone from cache.py",
-        "If not feasible: document in cache.py's module docstring exactly which import cycle the deferred import dodges, and add a test that pins that cycle cannot be reintroduced at module level",
-        "uv run pytest tests/ -k 'delegation' --no-cov -q passes; uv run ruff check passes on touched files",
-        "Do NOT change the dual-emission semantics (team.delegation.cache_hit spine fact + journal DelegationCacheHit); coordinate with iter lanes, which wired DelegationCacheHit emission on 2026-10-07"
-      ],
-      "priority": 3,
-      "passes": true,
-      "notes": "Source: raphy assess Round 3 2026-10-07 (Worth exploring, friction walk C-Q1). RA-009 class (non-deletion, seam contractization); follows the same spike-first discipline that proved the RA-009 assessment's import-ring assumption wrong. Constraints: ADR-0194 P1-16 territory. | Implemented 2026-10-07 13:30 round: spike proved NO import cycle (fresh-interpreter imports pass in every order; deferred imports dodged nothing). cache.py now has module-level imports + explicit CacheHitCommit Protocol parameter (default _default_commit_hit preserves dual emission). Fake-commit injection verified."
-    },
-    {
-      "id": "RA-013",
-      "title": "Converge the four EffectReceipt constructions in SimpleBody.dispatch_tool_calls behind a small receipt seam",
-      "description": "As an LCA maintainer, I want the EffectReceipt construction shape in dispatch_tool_calls to live in one helper, so adding a future receipt field or error code is a one-place edit.",
-      "acceptanceCriteria": [
-        "A module-local helper (e.g. _receipt(call, outcome, error_code=None)) exists in lca/cognition/body/executor/simple_body.py; all four inline EffectReceipt constructions in dispatch_tool_calls delegate to it",
-        "provider='body.dispatch_tool_calls' and invocation_id=call.call_id appear exactly once each (in the helper)",
-        "The four idempotency_key shapes (':persist_assistant', ':persist_result', bare call_id) are preserved exactly",
-        "Behavior preserved: uv run pytest tests/ -k 'dispatch_tool_calls or simple_body' --no-cov -q passes; uv run ruff check passes on the touched file"
-      ],
-      "priority": 4,
-      "passes": true,
-      "notes": "Source: raphy assess Round 3 2026-10-07 (Worth exploring, friction walk C-Q5 + duplication scan). The round's single duplication-class story per diversity quota; follows the codebase's established 'converge N identical X' idiom (RA-001/RA-002). | Implemented 2026-10-07: added module-level _receipt(call, outcome, idempotency_key, error_code=None) in lca/cognition/body/executor/simple_body.py; provider='body.dispatch_tool_calls' and invocation_id=call.call_id now appear exactly once each inside the receipt-construction cluster (both live in the helper). Assessment said 4 constructions, grep found 5 (the persist_assistant list-comprehension site was missed) -- all 5 converged. idempotency_key shapes preserved verbatim (':persist_assistant', ':persist_result', bare call_id x3); success site passes no error_code (None default == omitted per EffectReceipt). The other invocation_id=call.call_id occurrence in the file is safe_executor.execute's kwarg, not a receipt. Tests: pytest -k 'dispatch_tool_calls or simple_body' 23 passed; ruff check + ruff format clean."
-    },
-    {
-      "id": "RA-014",
-      "title": "Unify the two connect-daemon lifecycles: CLIProvider delegates to DaemonService",
-      "description": "As an LCA maintainer, I want one canonical owner for the sandbox-user connect daemon lifecycle, so the RA-006 single-instance invariant and future daemon behavior changes apply to both the lca-ops path and the host_runtime provisioning path, and the private cross-seam import disappears.",
-      "acceptanceCriteria": [
-        "CLIProvider no longer manages daemon lifecycle itself: start_daemon/stop_daemon delegate to an explicit daemon-lifecycle seam owned by lca/infrastructure/cli/services/daemon/daemon.py (DaemonService); CLIProvider keeps only CLI artifact deployment (provision/status/heal of deployables)",
-        "The private cross-seam import of _CONNECT_PROC_PATTERN in lca/infrastructure/host_runtime/providers/user_cli.py is gone (constant de-privatized into a shared/public surface or moved behind an explicit seam)",
-        "CLIProvider._pid_alive is deleted; the shared lca/infrastructure/cli/service/service.py::pid_alive is used instead",
-        "kernel_serve reachability converges on one seam (http_ready); the curl -sf subprocess probe in user_cli.py is gone",
-        "Behavior preserved: HostEnvironment.provision()/destroy() external behavior unchanged; uv run pytest tests/infrastructure/cli/ -k 'daemon' --no-cov -q passes (test_daemon_kill_existing, test_daemon_stop_uses_sudo, test_daemon_start_script); uv run ruff check passes on touched files"
-      ],
-      "priority": 1,
-      "passes": true,
-      "notes": "Source: raphy assess Round 4 2026-10-07 (Strong, friction walk A). Two live lifecycle implementations for the same daemon process (node dist/index.js connect): DaemonService via lca-ops ServiceRegistry (owns RA-006 _kill_existing seam + 3 test groups) vs CLIProvider.start/stop_daemon via HostEnvironment (zero tests, private _pid_alive replica, curl probe). ADR-0119 decision 4 (services managed by lca-ops) supports consolidation. CLIProvider has no tests, so refactoring carries no pinned-behavior risk. [done 2026-10-07 17:30] start_daemon/stop_daemon delegate to injected/lazy DaemonService via _daemon_service_for (composition); _pid_alive deleted -> service.pid_alive; curl probe -> http_ready; _CONNECT_PROC_PATTERN de-privatized to CONNECT_PROC_PATTERN in daemon.py (private import in user_cli gone); 10 new delegation contract tests green; 10 story daemon tests green."
-    },
-    {
-      "id": "RA-015",
-      "title": "Converge the two privileged-file staging rituals in CLIProvider behind one seam",
-      "description": "As an LCA maintainer, I want the tempfile-write -> sudo cp -> unlink -> chmod/chown ceremony in CLIProvider to live in one helper, so future changes to privileged file staging (backup-before-write, post-write verify) are a one-place edit.",
-      "acceptanceCriteria": [
-        "A small module-private helper (e.g. _stage_privileged_file(content, dest, *, owner=None, mode=None)) exists in lca/infrastructure/host_runtime/providers/user_cli.py; _ensure_wrapper and _write_start_script both delegate to it",
-        "The tempfile -> run_sudo(cp) -> unlink -> chmod/chown sequence appears exactly once (in the helper)",
-        "Behavior preserved: wrapper and start.sh content, ownership, and modes unchanged; uv run ruff check passes on the touched file",
-        "Optional extension (not required): converge the 3 bash echo-write sites (shared.py x2, user_cli.py x1) if they fit the same seam honestly"
-      ],
-      "priority": 2,
-      "passes": true,
-      "notes": "Implemented 2026-10-07 17:30: extracted module-private _stage_privileged_file(run_sudo, content, dest, *, owner=None, mode=None) in lca/infrastructure/host_runtime/providers/user_cli.py; _ensure_wrapper delegates to it. The tempfile -> sudo cp -> unlink -> chmod/chown sequence now appears exactly once (in the helper). 4 new tests in tests/infrastructure/host_runtime/test_stage_privileged_file.py pin the call sequence with a fake run_sudo (incl. unlink discipline and _ensure_wrapper delegation + skip-if-exists); 14/14 tests green in tests/infrastructure/host_runtime/, ruff check green. Difference vs assessment: RA-015 was assessed against TWO call sites (_ensure_wrapper + _write_start_script), but RA-014 (same branch, earlier round) already deleted _write_start_script and moved the start-script privileged write onto the Sudo.write_text seam in DaemonService -- so the helper launches with a single caller. Signature gains a leading run_sudo param (story suggested (content, dest, *, owner, mode)) so the fake can be injected and the sequence pinned; keyword args unchanged. The 3 bash echo-write sites were assessed as a different mechanism (no tempfile staging) and left alone per the optional-extension note."
-    },
-    {
-      "id": "RA-016",
-      "title": "Give the source_verify literal grammar its own seam on SourceVerifier",
-      "description": "As an LCA maintainer, I want the literal-extraction grammar (which literals count as verifiable) to be an injectable seam on SourceVerifier instead of a module-private regex, so grammar evolution and grammar tests do not require touching verdict logic.",
-      "acceptanceCriteria": [
-        "A named seam (e.g. LiteralExtractor protocol or constructor-injected callable) exists for literal extraction; SourceVerifier._judge_claim uses it instead of the module-private _extract_literals",
-        "Default implementation preserves the current _LITERAL grammar exactly (verdict semantics unchanged; ADR-0255 4.8 hallucination verdicts intact)",
-        "The grammar is unit-testable without building a SourceRegistry (direct tests on the extractor, e.g. Chinese date forms, 4-char identifier boundary)",
-        "tests/infrastructure/source_verify/ all green; ruff check clean on touched files"
-      ],
-      "priority": 1,
-      "passes": true,
-      "branchName": "raphy/arch-20261007-2005",
-      "notes": "2026-10-07 21:20 done"
-    },
-    {
-      "id": "RA-017",
-      "title": "Derive the session event-type closure fully; drop the hand-written DSH literal",
-      "description": "As an LCA maintainer, I want known_session_event_types() to union only registered vocabularies, so the fail-closed read path never depends on a human remembering to edit catalog.py when the DSH surface vocabulary grows.",
-      "acceptanceCriteria": [
-        "The DSH surface vocabulary (currently the hand-written \"surface/developer_message\") lives in one named constant (single source) next to the other surface vocabularies",
-        "lca/session/catalog.py contains no hand-written event-type literals; known_session_event_types() is a pure union of registered vocabularies",
-        "known_session_event_types() return set unchanged; tests/observability/session/test_known_types_fail_closed.py and tests/session/test_session_public_api.py green; ruff check clean"
-      ],
-      "priority": 2,
-      "passes": true,
-      "branchName": "raphy/arch-20261007-2005"
-    },
-    {
-      "id": "RA-018",
-      "title": "Converge ToolSearchTool arg classification into one helper",
-      "description": "As an LCA maintainer, I want ToolSearchTool.execute() and validate() to share one argument classifier, so the parameter-shape truth lives in one place and the two slightly different classifiers cannot drift.",
-      "acceptanceCriteria": [
-        "One module-private helper (e.g. _classify_args) classifies namespace/namespaces/query presence; both execute() and validate() use it with one consistent (strict)口径",
-        "Behavior preserved for all current call shapes; tests/infrastructure/tool_defer/ all green; ruff check clean"
-      ],
-      "priority": 3,
-      "passes": true,
-      "branchName": "raphy/arch-20261007-2005"
-    },
-    {
-      "id": "RA-019",
-      "title": "Converge the session store-observer attach ritual into one _shared seam",
-      "description": "As an LCA maintainer, I want the five session plugins that attach observers to SessionStore (projection_cache, telemetry_capture, title_service, spine_anomaly, projection_registry) to share one attach ritual, so the fail-loud/failed-contained/cancel-stash contract lives in lca/plugins/session/_shared.py and the five copies cannot drift.",
-      "acceptanceCriteria": [
-        "One _shared helper (e.g. attach_store_observers(store, attach_one, hooks_sink)) covers: iterate store.list() with per-session containment, require_observer_hook fail-loud, hook the same attach_one for future create/restore, stash cancel in hooks_sink; all 5 call sites migrated",
-        "Canonical ordering decided and documented: title_service requires the hook BEFORE iterating (no partial attach on fail-loud) vs the other four list-first; chosen order applied uniformly, delta recorded in commit body",
-        "Existing session-plugin tests (projection_cache, telemetry_capture, title_service, spine_anomaly, projection_registry) all green; ruff check clean"
-      ],
-      "priority": 1,
-      "passes": true,
-      "branchName": "raphy/arch-20261007-2315",
-      "notes": "Strength: Worth exploring. Area A friction walk (session plugin cluster), duplication class with 5 sites. Evidence: grep for require_observer_hook shows 5 call sites; projection_cache._attach_to_store (module fn), telemetry_capture._attach_to_store (module fn), title_service.attach_to_store (method), spine_anomaly.register_spine_anomaly_to_store (module fn), projection_registry site. Four share list-then-require order; title_service is require-first. Deletion test: converges (ritual knowledge concentrated); per-plugin attach_one (register_to / _observe_contained+seed cursor / _TitleObserver / anomaly observer) stays per-plugin. Constraint: fail-loud/fail-soft semantics must not change (fail-soft containment per session is a documented DSH-alignment choice).\n实现与评估的差异：① canonical 顺序裁定为 require-first（title_service 派），projection_cache / telemetry_capture / spine_anomaly / projection_registry 四家从 list-first 改为 require-first——钩子缺失时零部分挂入（原来先挂完现存 Session 再抛 TypeError，留下半接线状态）；② 评估假设 attach_one 签名 attach_store_observers(store, attach_one, hooks_sink)，实现保持该形状，hooks_sink 缺省 None（spine_anomaly / projection_registry 无 _store_hooks，保持原先丢弃 cancel 行为）；③ 附带收敛：projection_cache 原先 loop 与 _on_create 两份字节级相同的挂入体（含 contained warning），收敛为一个 _observe_one attach_one，无行为变化；④ 新增契约测试 tests/plugins/session/test_attach_store_observers.py（3 个：缺钩子零部分挂入 / 现存+未来+cancel 入 sink / sink 缺省丢弃），tests/plugins/session/ 283 全绿，ruff check 干净。"
-    },
-    {
-      "id": "RA-020",
-      "title": "Lift the deferred imports in sandbox _run_inspect_internal to module level",
-      "description": "As an LCA maintainer, I want lca/infrastructure/sandbox/runtime/runtime.py to import enrich_inspect_profile and get_run_workspace at module level, so the layer edges are honest at the seam instead of hiding behind function-local imports.",
-      "acceptanceCriteria": [
-        "The two function-local imports (lca.infrastructure.skills.format.routing.enrich_inspect_profile, lca.infrastructure.workspace.get_run_workspace) moved to module top; no behavioral change",
-        "Import-order probe evidence (fresh interpreter, routing-first / runtime-first / workspace orders) re-run and passing; ruff check clean",
-        "tests/infrastructure/sandbox/ green"
-      ],
-      "priority": 2,
-      "passes": true,
-      "branchName": "raphy/arch-20261007-2315",
-      "notes": "Strength: Worth exploring. Area C friction walk (sandbox runtime), seam-honesty class. Evidence: assess-round fresh-interpreter probe on 2026-10-07 confirmed both import orders load cleanly — no import cycle was ever dodged (RA-009/RA-012 discipline, assumption refuted by evidence). Constraint: import-time cost of lca.infrastructure.skills.format.routing (pulls bundled skills) at runtime.py import time is acceptable; lazy-import comment claims must be removed, not left stale. 实现与评估的差异：评估把探针固化记为可选（\"可固化为测试或文档\"），实现按 tests/persistence/test_run_paths_import_order.py 先例固化为 3 个 fresh-interpreter 导入顺序测试（tests/infrastructure/sandbox/test_sandbox_runtime_import_order.py：routing-first / runtime-first / workspace-first，每顺序独立解释器，防 pytest collection 顺序掩盖真实 cycle）；改动前/后各跑一遍三种顺序探针全过，无 import cycle，调用语义无变化；runtime.py 内 grep（defer/lazy/cycle）零命中，无需清理陈旧 lazy-import 注释；tests/infrastructure/sandbox/ 22 passed（19 原有 + 3 新增），ruff check 绿。"
-    },
-    {
-      "id": "RA-021",
-      "title": "Close the silent empty-message fallback in AssistantJobs.fire",
-      "description": "As an LCA maintainer, I want fire() to fail-loud (or document a real reason) instead of submitting a WorkItem with an empty message when plane.get returns None for a locally-registered job, so the fail-closed discipline of the jobs plugin is not silently violated.",
-      "acceptanceCriteria": [
-        "Probe documented: read the real 0093 ContinuousControlPlane.get implementation; determine whether None-after-successful-submit is reachable (eviction / restart without persistence) or dead code",
-        "If unreachable: delete the else-\"\" fallback, raise JobNotRegisteredError on the recovery-miss branch; if reachable: keep the branch only with an explicit logged reason or convert to fail-loud per the chosen design; delta in commit body",
-        "New test pins the decided behavior (recovery miss); tests/plugins/assistant/test_jobs.py green; ruff check clean"
-      ],
-      "priority": 1,
-      "passes": true,
-      "branchName": "raphy/arch-20261007-2315",
-      "notes": "Strength: Worth exploring. Area B friction walk (assistant jobs plugin), fail-closed gap class. Evidence: jobs.py fire() line ~`message=registered_item.message if registered_item is not None else \"\"`; plane.get is a Protocol returning WorkItem | None, so the empty-message branch is contractually reachable; a locally-registered job implies submit() succeeded, so a None recovery means the queue lost the item — firing then runs the job with an empty prompt while still emitting assistant.job.fired. Constraint: the documented fail-closed design of the jobs plugin (ADR-0187 §3 D10); cross-process recovery via deterministic work_id must keep working. Probe(2026-10-07 optimize 轮): 真实 0093 实现 SqliteWorkQueue.get 只是按 work_id 的 SELECT；queue.py 无 DELETE/purge/retention 行删除路径——submit 成功后同进程 get 按确定性 work_id 必命中，None-after-submit 在设计的 0093 生命周期内不可达（评估'contractually reachable'的假设被证据证伪）。唯一可达路径是 database_path 配置漂移或外部删库；跨进程恢复(registration=None+queue 命中)属设计路径，不受影响。判决：删掉 else-\"\"fallback，recovery-miss 分支 log.error + 抛 JobNotRegisteredError(fail-loud)；schedule 恢复与跨进程恢复逻辑原样保留。新增test_fire_rejects_when_0093_queue_lost_registered_item 钉住拒收行为。"
-    },
-    {
-      "id": "RA-022",
-      "title": "Deepen the 9 assistant EP payloads behind one frozen-dataclass base",
-      "description": "As an LCA maintainer, I want the 9 frozen payload dataclasses in lca/plugins/assistant/events/_events.py to share a base holding the required quartet (assistant_id/revision_seq/manifest_digest/actor), the base __post_init__ gate and the base to_dict, so adding the 10th payload no longer requires copying two rituals.",
-      "acceptanceCriteria": [
-        "New base (e.g. _AssistantEPPayloadBase, frozen dataclass): holds the required quartet, runs _validate_required_fields in __post_init__ (with a _validate_extra_fields() hook for per-class extra checks), base to_dict = _required_dict + per-class extras via an explicit seam (e.g. _extra_items())",
-        "All 9 subclasses shrink to fields + extra checks; to_dict outputs byte-identical (golden-dict test or before/after comparison); ADR-0187 payload closure unchanged",
-        "tests/plugins/assistant/test_catalog.py and any EP payload tests green; ruff check clean"
-      ],
-      "priority": 2,
-      "passes": true,
-      "branchName": "raphy/arch-20261007-2315",
-      "notes": "Strength: Worth exploring. Area B, duplication class with 9 sites (the codebase's own 'converge N identical X' idiom, already celebrated inside this file for the emit helpers). Evidence: all 9 classes repeat the quartet field declarations, __post_init__ calling _validate_required_fields, and to_dict = _required_dict + truthy extras; ADR-0187's 12-EP closed set means more payloads are coming, so the copy cost is recurring. Deletion test: converges (the 'required quartet + truthy extras' rule concentrated in one place). Constraint: __post_init__ must stay fail-loud on missing/invalid fields; field-order-independent extra collection (no positional dataclasses.fields tricks). | Implemented 2026-10-07 (Round 6, branch raphy/arch-20261007-2315): added _AssistantEPPayloadBase (frozen dataclass) holding the quartet + base __post_init__ (_validate_required_fields via type(self).__name__ + _validate_extra_fields hook) + base to_dict (_required_dict + truthy extras from _extra_items()); all 9 subclasses shrunk to extra fields + _extra_items() seam + _validate_extra_fields overrides only (error messages byte-identical). Delta vs assessment: (1) base._extra_items() default raises NotImplementedError (fail-loud seam, not an empty-tuple default); (2) truthy-gating concentrated in base to_dict loop instead of per-subclass ifs — matches assessment's 'required quartet + truthy extras' rule; (3) verification beyond golden-dict: 16 to_dict cases + 10 validation-error cases byte-identical pre/post refactor (scripts + goldens in ~/.lca-worktrees/.ra022-golden-{before,after}.json, deleted after verify)."
-    }
-  ]
+ "project": "LCA Raphy Architecture Optimization",
+ "branchName": "raphy/arch-20261007-2005",
+ "description": "Continuous architecture deepening for the LCA cognitive-agent codebase via the raphy fresh-session loop. Round 1 (2026-10-06, old prompt): RA-001/RA-002 converged, RA-003 dropped with evidence. Round 2 (2026-10-06, hardened prompt): RA-004..RA-009 all done (merged to main 2026-10-07, merge 1b1526a94). Round 3 (2026-10-07, hardened prompt): friction walk over session plugins, loop_cursor, delegation/body executor; RA-010..RA-013 below. Out of scope: ralph Round 2 areas (DecisionGates, Ingest, ContextFiles shims, Read Runs micro-dirs, MemoryTools directory seam), lca/cognition/memory/ (frozen per Round 2 AP-01), CLI surface must not import contracts (deliberate rule), gate_chain_strategy.py (hands-off: another party's uncommitted work + pre-existing red test).",
+ "userStories": [
+  {
+   "id": "RA-001",
+   "title": "Converge duplicated _emit_* no-emitter-fallback methods into a shared assistant event seam",
+   "description": "As an LCA maintainer, I want the identical no-emitter-fallback logic in the assistant event emitters converged into one shared seam, so a change to the fallback behavior (log shape, None-emitter handling) is made in one place.",
+   "acceptanceCriteria": [
+    "A single shared helper exists (suggested: lca/plugins/domain/assistant/catalog/events.py or a new lca/plugins/assistant/_shared.py) implementing the seam: if emit fn is None -> log.info('<scope>.ep.no_emitter', ep=<EVENT>, payload=payload.to_dict()); else emit_fn(<EVENT>, payload.to_dict())",
+    "lca/plugins/domain/assistant/catalog/events.py _emit_created, _emit_bootstrap_completed, _emit_profile_revised all delegate to the shared helper; no inline if-self._emit-is-None blocks remain",
+    "lca/plugins/assistant/tool/overlay.py _emit_profile_revised delegates to the shared helper",
+    "lca/plugins/assistant/skill/overlay/overlay.py _emit_installed, _emit_profile_revised, _emit_activated all delegate to the shared helper",
+    "A repo-wide grep for 'ep.no_emitter' shows the fallback log call site exists exactly once (in the shared helper)",
+    "Behavior preserved: log scope strings per caller (assistant.catalog / assistant.tool_overlay / assistant.skill_overlay) still emitted; payload.to_dict() still passed",
+    "Relevant tests pass: uv run pytest tests/ -k 'assistant' --no-cov -q (or the narrower tests covering these three modules)",
+    "uv run ruff check passes on all touched files",
+    "Do NOT change event names, payload shapes, or the None-emitter fallback semantics"
+   ],
+   "priority": 1,
+   "passes": true,
+   "notes": "Source: improve-codebase-architecture skill assessment 2026-10-06 (Strong). Deletion test: yes. Follows the established 'converge N identical X' pattern (git: ba2ad56c6, 2a2059cca). Layering note: verify the import direction for the shared helper creates no new plugin->plugin cycle; prefer the domain catalog module if both overlays already depend on it. DONE 2026-10-06: converged 9 (not 7) no-emitter-fallback methods into lca/plugins/assistant/events/_events.py::emit_assistant_ep_or_log — story listed 7, but evolve._emit and jobs._emit were the same seam (criterion 5 demanded a single call site repo-wide). Zero new import edges: all 5 files already imported from _events."
+  },
+  {
+   "id": "RA-002",
+   "title": "Converge two identical _fail methods in delegate_tool.py into a module-level helper",
+   "description": "As an LCA maintainer, I want the two literally identical _fail methods in lca/infrastructure/tools/collaboration/delegate_tool.py converged into one module-level helper, so the validation-failure Observation construction lives in one place.",
+   "acceptanceCriteria": [
+    "A module-level helper (e.g. _fail_observation(start: float, message: str) -> Observation) exists in lca/infrastructure/tools/collaboration/delegate_tool.py with the exact current body (payload={'error': message, FAILURE_KIND: FAILURE_KIND_VALIDATION}, success=False, ContentType.STRUCTURED)",
+    "Both tool classes (owners of the current duplicate _fail methods) call the helper; grep -c 'def _fail' on the file returns 0",
+    "Do NOT reuse tools._shared.fail_observation: it constructs Observation differently (payload=None, error=, extra=); swapping would change behavior",
+    "Behavior preserved: identical Observation fields as before (verified by existing tests or a new unit test pinning the payload shape)",
+    "uv run pytest tests/infrastructure/tools/ --no-cov -q passes",
+    "uv run ruff check passes on the touched file"
+   ],
+   "priority": 2,
+   "passes": true,
+   "notes": "Source: improve-codebase-architecture skill assessment 2026-10-06 (Strong). Deletion test: yes - the two methods are character-identical. Twin of ba2ad56c6 (different Observation shape - do not conflate). DONE 2026-10-06: extracted module-level _fail_observation(start, message); both classes call it; both def _fail methods deleted. 150 tests pass, ruff clean."
+  },
+  {
+   "id": "RA-003",
+   "title": "Unify _emit_lifecycle_pre/post/fail in model_visible adapter behind one dispatch seam",
+   "description": "As an LCA maintainer, I want the three _emit_lifecycle_* functions in lca/plugins/events/hooks/model_visible/adapter.py unified behind a single dispatch seam, so the step-counter extraction and lifecycle_emit import pattern is not repeated per phase.",
+   "acceptanceCriteria": [
+    "A single seam exists in lca/plugins/events/hooks/model_visible/adapter.py; _emit_lifecycle_pre/post/fail become thin wrappers or call sites of it",
+    "The repeated 'step = hook._step_counter' and deferred lifecycle_emit import pattern appears once",
+    "Behavior preserved: same lifecycle_emit calls (request_model / complete_model / fail_model) with identical arguments",
+    "uv run pytest tests/ -k 'model_visible or lifecycle' --no-cov -q passes",
+    "uv run ruff check passes on the touched file",
+    "If the three phases turn out to need genuinely different seams, mark this story dropped with the reason instead of forcing unification"
+   ],
+   "priority": 3,
+   "passes": false,
+   "notes": "Source: improve-codebase-architecture skill assessment 2026-10-06 (Worth exploring). Weaker than RA-001/RA-002: shared scaffolding but different signatures. Deletion test is marginal. DROPPED 2026-10-06 (optimize session): investigated for unification; the three phases need genuinely different seams. pre extracts (provider, model) via _model_identity and calls request_model; post builds usage/content/tool_calls payload and calls complete_model, and carries a behavior-critical docstring (derive_messages double-append warning) that must stay with the phase; fail passes error straight to fail_model. Shared scaffolding is 2 lines of idiom (step = hook._step_counter + deferred import), and the three deferred imports bind DIFFERENT names (request_model/complete_model/fail_model), so not even the import is shared. A unified seam would require getattr string-dispatch or Callable+**kwargs threading, trading explicit type-safe direct calls for indirection: net readability loss, deletion test fails. Phase set is closed (exactly pre/post/fail); no leverage for future phases. Forcing unification would be churn, not improvement.",
+   "dropped": true
+  },
+  {
+   "id": "RA-004",
+   "title": "Delete debug_graph._load_events private fork; delegate to shared load_spine_events",
+   "description": "As an LCA maintainer, I want debug_graph to use the shared spine JSONL loader instead of its private fork, so the isinstance(obj, dict) guard and fail-soft parsing semantics live in exactly one place and the fallback debug command is no more fragile than the main path.",
+   "acceptanceCriteria": [
+    "debug_graph._load_events (lca/infrastructure/cli/commands/observation/debug_graph.py:46-62) is deleted; build_debug_graph calls load_spine_events from lca/infrastructure/cli/commands/_shared/projection.py",
+    "No remaining private JSONL parse loop in debug_graph.py (grep for 'json.loads' in the file returns 0 outside the shared import)",
+    "tests/infrastructure/cli/test_debug_graph.py no longer imports the private _load_events (uses the shared loader)",
+    "NEW regression test: spine.jsonl containing a valid-JSON non-dict line (e.g. '42') -> debug-graph command exits 0 (pins the AttributeError crash this story fixes)",
+    "Existing tests pass: uv run pytest tests/infrastructure/cli/test_debug_graph.py tests/infrastructure/cli/test_projection.py --no-cov -q",
+    "uv run ruff check passes on touched files",
+    "lca-cli-shape.py docstring drift fixed: documented API list includes load_spine_facts (already in SHARED_PROJECTION_NAMES)",
+    "Do NOT change debug-graph human output; do NOT import contracts into CLI surface code"
+   ],
+   "priority": 1,
+   "passes": true,
+   "notes": "Source: improve-codebase-architecture skill assessment Round 2 2026-10-06 (Strong, friction walk Q3/Q4). Deletion test: concentrates. Real bug: non-dict line -> AttributeError at ev.get. DONE 2026-10-06: deleted _load_events; debug_graph_cmd + debug_graph_command now call shared load_spine_events (identical path resolution + fail-soft semantics; the dropped isinstance(obj, dict) guard restored). test_debug_graph.py imports the shared loader; new regression test test_debug_graph_skips_non_dict_spine_lines pins the crash (spine with '42'/'[1, 2]' lines -> exit 0; replaying the deleted fork's logic raised AttributeError: 'int' object has no attribute 'get', confirming the assessment). 15 tests pass (test_debug_graph + test_projection), ruff clean on all touched files; grep 'json.loads' in debug_graph.py -> 0."
+  },
+  {
+   "id": "RA-005",
+   "title": "Unify the two domain-prefix tables in CLI projection.py into one table, one match semantic",
+   "description": "As an LCA maintainer, I want the execution_point->domain mapping in projection.py to live in one table with one match semantic, so filter_by_domain and load_spine_facts never disagree on the same run.",
+   "acceptanceCriteria": [
+    "lca/infrastructure/cli/commands/_shared/projection.py has exactly one domain-prefix table (remove the _DOMAIN_PREFIXES vs _EP_PREFIX_FAMILIES split); 'graph' family defined once",
+    "One match semantic chosen and documented in the module (note which one and why; the mirror comment explaining 'so we do not import from contracts into CLI surface code' is kept)",
+    "Do NOT import from contracts (deliberate design rule, projection.py:22-23) - unify inside the module",
+    "Before changing filter_by_domain semantics, run the tests of its caller runs/debug.py (llm/tool/graph/phase counting at debug.py:157) and confirm no behavior change, or record the deliberate change",
+    "uv run pytest tests/infrastructure/cli/test_projection.py --no-cov -q passes; uv run ruff check passes on the touched file"
+   ],
+   "priority": 4,
+   "passes": true,
+   "notes": "Source: improve-codebase-architecture skill assessment Round 2 2026-10-06 (Worth exploring, friction walk Q4). Deletion test: concentrates. The contracts-constant alternative was rejected: importing contracts into CLI surface contradicts the module's own documented rule."
+  },
+  {
+   "id": "RA-006",
+   "title": "Give the single-daemon invariant an owner: _kill_existing seam with wait-for-exit",
+   "description": "As an LCA operator, I want daemon restart to kill the old process and confirm it is dead before spawning, so the double-daemon device-id fight fixed by PR #40 cannot recur through the restart path.",
+   "acceptanceCriteria": [
+    "A _kill_existing(pattern, timeout) seam exists in lca/infrastructure/cli/services/daemon/daemon.py: pkill via Sudo.run (PR #40 behavior kept) + poll pid_alive until the process is gone (leverage lca/infrastructure/cli/service/service.py primitives)",
+    "stop() and restart() both go through _kill_existing; restart() no longer uses time.sleep(0.5)",
+    "The process match string 'node.*index.js.*connect' is a single module-level constant shared by daemon.py (:122, :423) and lca/infrastructure/host_runtime/providers/user_cli.py (:82, :94); user_cli.py's own stop_daemon flow is otherwise untouched",
+    "NEW test: restart with pid_alive flipping true->false (mock sequence) calls start() only after death is confirmed",
+    "Existing tests pass: uv run pytest tests/ -k 'daemon' --no-cov -q (incl. test_daemon_stop_uses_sudo)",
+    "uv run ruff check passes on touched files"
+   ],
+   "priority": 2,
+   "passes": true,
+   "notes": "Source: improve-codebase-architecture skill assessment Round 2 2026-10-06 (Strong, friction walk Q3/Q4). Deletion test: concentrates - the 'exactly one live daemon' invariant gets an owner instead of relying on sleep timing. DONE 2026-10-07: added DaemonService._kill_existing(pattern, timeout=10.0) (sudo pkill via Sudo.run, timeout=10 kept per PR #40; then poll pid_alive from service.py primitives on the pid recorded in connect.pid until dead, bounded by timeout, 0.2s interval); stop() and restart() both go through it; restart() no longer uses time.sleep(0.5). 'node.*index.js.*connect' is now module-level _CONNECT_PROC_PATTERN in daemon.py, shared (same object) by user_cli.py start_daemon/stop_daemon (imported, internal seam; user_cli stop_daemon flow otherwise untouched; intra-L0 edge, no importlinter contract conflict, no import cycle: daemon.py does not import host_runtime at module level). Implementation vs assessment: assessment named the constant _CONNECT_PROC_PATTERN and it landed exactly there; the wait polls the pid-file pid via pid_alive (not pgrep re-check); test_daemon_stop_uses_sudo extended with sudo.read_text.return_value=None (no recorded pid -> wait skipped) per the assessment's 'can extend' note."
+  },
+  {
+   "id": "RA-007",
+   "title": "Extract _spawn shell-script generation into a pure render_start_script(config)",
+   "description": "As an LCA maintainer, I want the daemon start script rendered by a pure, testable function from DaemonConfig, so credential/path literals stop leaking across the Python/shell seam and the script content becomes unit-testable.",
+   "acceptanceCriteria": [
+    "A pure function render_start_script(config) -> str exists (new module or daemon.py); DaemonService._spawn only writes/launches its output",
+    "Token and paths come from DaemonConfig (token default 'lca-local-host' keeps its single source in lca/infrastructure/cli/config/config.py:47); the '--token lca-local-host' literal in daemon.py:406 is gone",
+    "NEW test pins rendered script content: contains configured token, log path, PATH entries (script shape becomes testable for the first time)",
+    "Generated script behavior unchanged (same env, same log redirection, same /opt/lca target)",
+    "Existing daemon tests pass: uv run pytest tests/ -k 'daemon' --no-cov -q; uv run ruff check passes on touched files"
+   ],
+   "priority": 5,
+   "passes": true,
+   "notes": "Source: improve-codebase-architecture skill assessment Round 2 2026-10-06 (Worth exploring, friction walk Q4). Deletion test: concentrates. Design choice open: config fields vs template params. DONE 2026-10-07: extracted pure render_start_script(config, gateway_ws_url) into lca/infrastructure/cli/services/daemon/start_script.py; DaemonService._spawn only writes/launches its output. DaemonConfig gained token (default single-sourced from host_runtime KernelServeConfig.token via model_fields, no literal duplication) and cli_dir (default /opt/lca); DaemonService._cli_dir now reads config.cli_dir. Byte-equivalence verified: new renderer output is byte-identical to the old inline template for default config (409 bytes, captured old _spawn output vs new render). 5 new tests pin token/log-path/PATH-entries, custom paths, single-source default, and the full default script shape. pytest tests/ -k daemon: 20 passed; ruff clean. Assessment delta: story text cited lca/infrastructure/cli/config/config.py:47 as the token single source, but the literal actually lives in lca/infrastructure/host_runtime/config.py:47 (assessment.md RA-007 section had it right); implementation follows the corrected path. Also chose config-fields (not template-params) per the assessment's open design question, and passed gateway_ws_url as an explicit parameter to keep the existing empty-means-derive fallback in _kernel_serve_ws_url untouched."
+  },
+  {
+   "id": "RA-008",
+   "title": "Converge the three composer provider registration shells via a table-driven factory (test discovery first)",
+   "description": "As an LCA maintainer, I want the three near-identical composer provider shells generated from one table, so adding a fourth phase composer does not copy another 66-line file.",
+   "acceptanceCriteria": [
+    "FIRST: a test proving the @plugin discovery mechanism picks up dynamically generated registrations (acceptance gate - if it fails, fall back to a _register_composer_plugin(...) factory called 3 times)",
+    "lca/plugins/composer/think/brain_provider.py, lca/plugins/composer/perceive/provider.py, lca/plugins/composer/act/body_provider.py converge: one table [('lca-plan-brain-composer','composer.brain','plugin.serve',BrainComposer), ...] drives the three registrations; per-provider differences (plugin id, provides key, authority grant - perceive uses context.read, composer class) are table data",
+    "No information lost: observability descriptors remain id-derived; authority grants preserved per provider",
+    "NEW test: setup() provides the correct composer instance per plugin id (currently untested - only bundle registration items are tested)",
+    "Existing tests pass: uv run pytest tests/composer/ --no-cov -q; uv run ruff check passes on touched files"
+   ],
+   "priority": 3,
+   "passes": true,
+   "notes": "Source: improve-codebase-architecture skill assessment Round 2 2026-10-06 (Strong, friction walk Q2). Deletion test: concentrates - ~130 lines of boilerplate eliminated. Duplication-class story (1 of 6; diversity quota satisfied by the other five). Implemented 2026-10-07: gate probe proved single-module loop generation is NOT picked up by profile resolve (module.setup is one attribute per module) -> used the story fallback: _register_composer_plugin(...) factory called once per provider module."
+  },
+  {
+   "id": "RA-009",
+   "title": "Harden the composer/observability seam: replace llm._inner private access and the deferred import (spike included)",
+   "description": "As an LCA maintainer, I want composer to talk to the observability adapter and the model-visible hook through contractual seams instead of private attribute access and deferred imports, so adapter refactors stop silently breaking idempotent LLM wrapping.",
+   "acceptanceCriteria": [
+    "SPIKE (part of this story): read lca/infrastructure/observability/adapters TelemetryLLMAdapter and decide the public unwrap primitive; document why composer<->events has an import cycle",
+    "brain.py:65 no longer reads TelemetryLLMAdapter._inner (uses the new public primitive); instrument_llm idempotency preserved (existing test_hook_resolution_path.py passes)",
+    "brain.py:74 deferred import of lca.plugins.events.hooks.model_visible.adapter replaced by a contracts-level protocol or a documented, tested seam (no bare private cross-module access)",
+    "uv run pytest tests/ -k 'hook_resolution or brain' --no-cov -q passes; uv run ruff check passes on touched files",
+    "If the spike shows the cycle cannot be broken without a larger refactor, record the evidence and mark dropped with reason (like RA-003) instead of forcing it"
+   ],
+   "priority": 6,
+   "passes": true,
+   "notes": "Source: improve-codebase-architecture skill assessment Round 2 2026-10-06 (Worth exploring, friction walk Q4). Solution undetermined this round - the spike is load-bearing. | DONE 2026-10-07: spike found NO composer<->events import cycle (top-level import verified green); used existing public TelemetryLLMAdapter.inner property instead of _inner."
+  },
+  {
+   "id": "RA-010",
+   "title": "Resolve StdProjectionHost listener-fire semantics: docs promise change-notification, impl fires per drive",
+   "description": "As an LCA maintainer, I want one canonical, agreed semantics for StdProjectionHost listener notification, so subscribers and future code stop guessing whether 'change notification' means per-drive fire or change-gated fire.",
+   "acceptanceCriteria": [
+    "One canonical semantics is chosen and documented in subscribe_changes + the class docstring of lca/infrastructure/observability/loop_cursor/projection/host.py: either 'fires on every drive' or 'fires only when at least one deriver state changed'",
+    "Implementation, docstrings, and tests/observability/loop_cursor/test_projection_host.py agree on that semantics (no test pins a contradicting one; test line 348 currently asserts per-drive fire)",
+    "If change-gated is chosen: drive() computes the changed key set (prev_state != new_state per deriver) and _fire_listeners runs only when it is non-empty; a NEW test asserts no listener fire when apply returns identical state",
+    "If per-drive is kept: docstrings stop saying 'changes' (subscribe_changes / class docstring reworded), keeping the pinned behavior",
+    "uv run pytest tests/observability/loop_cursor/test_projection_host.py --no-cov -q passes; uv run ruff check passes on touched files",
+    "Do NOT change FlushReport, restore(), unregister() semantics"
+   ],
+   "priority": 1,
+   "passes": true,
+   "notes": "Source: raphy assess Round 3 2026-10-07 (Worth exploring, friction walk B-Q3). Evidence: subscribe_changes docstring '订阅 view_snapshot() 变化' + class docstring '变更通知' vs drive() unconditional _fire_listeners ('为简单实现,每次 drive 后全量回调') vs test_projection_host.py:348 'listener should fire on drive'. Deletion test: the 'what counts as a change' decision gets one owner (drive) instead of living half in docs, half in impl. Implemented 2026-10-07 (optimize round): chose change-gated (option a). drive() now accumulates a `changed` flag via `new_state != prev_state` per deriver and only calls _fire_listeners() when non-empty; snapshots still update on every drive. subscribe_changes + class docstring now document the canonical change-gated semantics; the old '每次 drive 后全量回调（未来可扩展为 diff-based）' hedge is gone."
+  },
+  {
+   "id": "RA-011",
+   "title": "Disambiguate loop_cursor/projection/ (host) vs projections/ (deriver definitions)",
+   "description": "As an LCA maintainer (or AI agent navigating the tree), I want exactly one loop_cursor submodule holding deriver definitions, so I stop confusing the two one-letter-apart modules.",
+   "acceptanceCriteria": [
+    "One of: fold projections/* into projection/ (e.g. projection/derivers.py) or rename projections/ to a load-bearing name; exactly one loop_cursor submodule holds deriver definitions",
+    "All import sites updated: projection/host.py, projections/__init__.py, projections/defaults.py, lca/plugins/observability/providers/projection_host/standard.py",
+    "The TYPE_CHECKING-only import of projection.host in defaults.py is re-examined as part of the fold (no silent cycle re-introduced)",
+    "No behavioral change: uv run pytest tests/observability/loop_cursor/ --no-cov -q passes; uv run ruff check passes on touched files",
+    "Repo-wide grep for the old module path returns 0"
+   ],
+   "priority": 2,
+   "passes": true,
+   "notes": "Source: raphy assess Round 3 2026-10-07 (Worth exploring, friction walk B-Q1). Evidence: host.py:26 imports projections.defaults at runtime; defaults.py:38 references projection.host under TYPE_CHECKING. Pure AI-navigability fix; import-path change only."
+  },
+  {
+   "id": "RA-012",
+   "title": "Spike: contractize the delegation cache-hit commit seam (deferred loop/session imports)",
+   "description": "As an LCA maintainer, I want the delegation cache-hit commit seam to be explicit instead of reaching into the loop and session layers through function-local imports, so the layer edges are honest and the commit path is testable through its interface.",
+   "acceptanceCriteria": [
+    "SPIKE first (part of this story): read lca/cognition/body/actions/action_handlers.py and lca/plugins/events/publishers/delegation_cache/plugin.py call sites; determine whether commit_delegation_cache_hit + session resolution can be injected explicitly at those call sites",
+    "If feasible: cached_delegation_observation in lca/infrastructure/delegation/cache.py takes the commit seam as an explicit parameter (or a small protocol); the function-local imports of lca.loop.commit.delegation_journal and lca.infrastructure.session.bindings are gone from cache.py",
+    "If not feasible: document in cache.py's module docstring exactly which import cycle the deferred import dodges, and add a test that pins that cycle cannot be reintroduced at module level",
+    "uv run pytest tests/ -k 'delegation' --no-cov -q passes; uv run ruff check passes on touched files",
+    "Do NOT change the dual-emission semantics (team.delegation.cache_hit spine fact + journal DelegationCacheHit); coordinate with iter lanes, which wired DelegationCacheHit emission on 2026-10-07"
+   ],
+   "priority": 3,
+   "passes": true,
+   "notes": "Source: raphy assess Round 3 2026-10-07 (Worth exploring, friction walk C-Q1). RA-009 class (non-deletion, seam contractization); follows the same spike-first discipline that proved the RA-009 assessment's import-ring assumption wrong. Constraints: ADR-0194 P1-16 territory. | Implemented 2026-10-07 13:30 round: spike proved NO import cycle (fresh-interpreter imports pass in every order; deferred imports dodged nothing). cache.py now has module-level imports + explicit CacheHitCommit Protocol parameter (default _default_commit_hit preserves dual emission). Fake-commit injection verified."
+  },
+  {
+   "id": "RA-013",
+   "title": "Converge the four EffectReceipt constructions in SimpleBody.dispatch_tool_calls behind a small receipt seam",
+   "description": "As an LCA maintainer, I want the EffectReceipt construction shape in dispatch_tool_calls to live in one helper, so adding a future receipt field or error code is a one-place edit.",
+   "acceptanceCriteria": [
+    "A module-local helper (e.g. _receipt(call, outcome, error_code=None)) exists in lca/cognition/body/executor/simple_body.py; all four inline EffectReceipt constructions in dispatch_tool_calls delegate to it",
+    "provider='body.dispatch_tool_calls' and invocation_id=call.call_id appear exactly once each (in the helper)",
+    "The four idempotency_key shapes (':persist_assistant', ':persist_result', bare call_id) are preserved exactly",
+    "Behavior preserved: uv run pytest tests/ -k 'dispatch_tool_calls or simple_body' --no-cov -q passes; uv run ruff check passes on the touched file"
+   ],
+   "priority": 4,
+   "passes": true,
+   "notes": "Source: raphy assess Round 3 2026-10-07 (Worth exploring, friction walk C-Q5 + duplication scan). The round's single duplication-class story per diversity quota; follows the codebase's established 'converge N identical X' idiom (RA-001/RA-002). | Implemented 2026-10-07: added module-level _receipt(call, outcome, idempotency_key, error_code=None) in lca/cognition/body/executor/simple_body.py; provider='body.dispatch_tool_calls' and invocation_id=call.call_id now appear exactly once each inside the receipt-construction cluster (both live in the helper). Assessment said 4 constructions, grep found 5 (the persist_assistant list-comprehension site was missed) -- all 5 converged. idempotency_key shapes preserved verbatim (':persist_assistant', ':persist_result', bare call_id x3); success site passes no error_code (None default == omitted per EffectReceipt). The other invocation_id=call.call_id occurrence in the file is safe_executor.execute's kwarg, not a receipt. Tests: pytest -k 'dispatch_tool_calls or simple_body' 23 passed; ruff check + ruff format clean."
+  },
+  {
+   "id": "RA-014",
+   "title": "Unify the two connect-daemon lifecycles: CLIProvider delegates to DaemonService",
+   "description": "As an LCA maintainer, I want one canonical owner for the sandbox-user connect daemon lifecycle, so the RA-006 single-instance invariant and future daemon behavior changes apply to both the lca-ops path and the host_runtime provisioning path, and the private cross-seam import disappears.",
+   "acceptanceCriteria": [
+    "CLIProvider no longer manages daemon lifecycle itself: start_daemon/stop_daemon delegate to an explicit daemon-lifecycle seam owned by lca/infrastructure/cli/services/daemon/daemon.py (DaemonService); CLIProvider keeps only CLI artifact deployment (provision/status/heal of deployables)",
+    "The private cross-seam import of _CONNECT_PROC_PATTERN in lca/infrastructure/host_runtime/providers/user_cli.py is gone (constant de-privatized into a shared/public surface or moved behind an explicit seam)",
+    "CLIProvider._pid_alive is deleted; the shared lca/infrastructure/cli/service/service.py::pid_alive is used instead",
+    "kernel_serve reachability converges on one seam (http_ready); the curl -sf subprocess probe in user_cli.py is gone",
+    "Behavior preserved: HostEnvironment.provision()/destroy() external behavior unchanged; uv run pytest tests/infrastructure/cli/ -k 'daemon' --no-cov -q passes (test_daemon_kill_existing, test_daemon_stop_uses_sudo, test_daemon_start_script); uv run ruff check passes on touched files"
+   ],
+   "priority": 1,
+   "passes": true,
+   "notes": "Source: raphy assess Round 4 2026-10-07 (Strong, friction walk A). Two live lifecycle implementations for the same daemon process (node dist/index.js connect): DaemonService via lca-ops ServiceRegistry (owns RA-006 _kill_existing seam + 3 test groups) vs CLIProvider.start/stop_daemon via HostEnvironment (zero tests, private _pid_alive replica, curl probe). ADR-0119 decision 4 (services managed by lca-ops) supports consolidation. CLIProvider has no tests, so refactoring carries no pinned-behavior risk. [done 2026-10-07 17:30] start_daemon/stop_daemon delegate to injected/lazy DaemonService via _daemon_service_for (composition); _pid_alive deleted -> service.pid_alive; curl probe -> http_ready; _CONNECT_PROC_PATTERN de-privatized to CONNECT_PROC_PATTERN in daemon.py (private import in user_cli gone); 10 new delegation contract tests green; 10 story daemon tests green."
+  },
+  {
+   "id": "RA-015",
+   "title": "Converge the two privileged-file staging rituals in CLIProvider behind one seam",
+   "description": "As an LCA maintainer, I want the tempfile-write -> sudo cp -> unlink -> chmod/chown ceremony in CLIProvider to live in one helper, so future changes to privileged file staging (backup-before-write, post-write verify) are a one-place edit.",
+   "acceptanceCriteria": [
+    "A small module-private helper (e.g. _stage_privileged_file(content, dest, *, owner=None, mode=None)) exists in lca/infrastructure/host_runtime/providers/user_cli.py; _ensure_wrapper and _write_start_script both delegate to it",
+    "The tempfile -> run_sudo(cp) -> unlink -> chmod/chown sequence appears exactly once (in the helper)",
+    "Behavior preserved: wrapper and start.sh content, ownership, and modes unchanged; uv run ruff check passes on the touched file",
+    "Optional extension (not required): converge the 3 bash echo-write sites (shared.py x2, user_cli.py x1) if they fit the same seam honestly"
+   ],
+   "priority": 2,
+   "passes": true,
+   "notes": "Implemented 2026-10-07 17:30: extracted module-private _stage_privileged_file(run_sudo, content, dest, *, owner=None, mode=None) in lca/infrastructure/host_runtime/providers/user_cli.py; _ensure_wrapper delegates to it. The tempfile -> sudo cp -> unlink -> chmod/chown sequence now appears exactly once (in the helper). 4 new tests in tests/infrastructure/host_runtime/test_stage_privileged_file.py pin the call sequence with a fake run_sudo (incl. unlink discipline and _ensure_wrapper delegation + skip-if-exists); 14/14 tests green in tests/infrastructure/host_runtime/, ruff check green. Difference vs assessment: RA-015 was assessed against TWO call sites (_ensure_wrapper + _write_start_script), but RA-014 (same branch, earlier round) already deleted _write_start_script and moved the start-script privileged write onto the Sudo.write_text seam in DaemonService -- so the helper launches with a single caller. Signature gains a leading run_sudo param (story suggested (content, dest, *, owner, mode)) so the fake can be injected and the sequence pinned; keyword args unchanged. The 3 bash echo-write sites were assessed as a different mechanism (no tempfile staging) and left alone per the optional-extension note."
+  },
+  {
+   "id": "RA-016",
+   "title": "Give the source_verify literal grammar its own seam on SourceVerifier",
+   "description": "As an LCA maintainer, I want the literal-extraction grammar (which literals count as verifiable) to be an injectable seam on SourceVerifier instead of a module-private regex, so grammar evolution and grammar tests do not require touching verdict logic.",
+   "acceptanceCriteria": [
+    "A named seam (e.g. LiteralExtractor protocol or constructor-injected callable) exists for literal extraction; SourceVerifier._judge_claim uses it instead of the module-private _extract_literals",
+    "Default implementation preserves the current _LITERAL grammar exactly (verdict semantics unchanged; ADR-0255 4.8 hallucination verdicts intact)",
+    "The grammar is unit-testable without building a SourceRegistry (direct tests on the extractor, e.g. Chinese date forms, 4-char identifier boundary)",
+    "tests/infrastructure/source_verify/ all green; ruff check clean on touched files"
+   ],
+   "priority": 1,
+   "passes": true,
+   "branchName": "raphy/arch-20261007-2005",
+   "notes": "2026-10-07 21:20 done"
+  },
+  {
+   "id": "RA-017",
+   "title": "Derive the session event-type closure fully; drop the hand-written DSH literal",
+   "description": "As an LCA maintainer, I want known_session_event_types() to union only registered vocabularies, so the fail-closed read path never depends on a human remembering to edit catalog.py when the DSH surface vocabulary grows.",
+   "acceptanceCriteria": [
+    "The DSH surface vocabulary (currently the hand-written \"surface/developer_message\") lives in one named constant (single source) next to the other surface vocabularies",
+    "lca/session/catalog.py contains no hand-written event-type literals; known_session_event_types() is a pure union of registered vocabularies",
+    "known_session_event_types() return set unchanged; tests/observability/session/test_known_types_fail_closed.py and tests/session/test_session_public_api.py green; ruff check clean"
+   ],
+   "priority": 2,
+   "passes": true,
+   "branchName": "raphy/arch-20261007-2005"
+  },
+  {
+   "id": "RA-018",
+   "title": "Converge ToolSearchTool arg classification into one helper",
+   "description": "As an LCA maintainer, I want ToolSearchTool.execute() and validate() to share one argument classifier, so the parameter-shape truth lives in one place and the two slightly different classifiers cannot drift.",
+   "acceptanceCriteria": [
+    "One module-private helper (e.g. _classify_args) classifies namespace/namespaces/query presence; both execute() and validate() use it with one consistent (strict)口径",
+    "Behavior preserved for all current call shapes; tests/infrastructure/tool_defer/ all green; ruff check clean"
+   ],
+   "priority": 3,
+   "passes": true,
+   "branchName": "raphy/arch-20261007-2005"
+  },
+  {
+   "id": "RA-019",
+   "title": "Converge the session store-observer attach ritual into one _shared seam",
+   "description": "As an LCA maintainer, I want the five session plugins that attach observers to SessionStore (projection_cache, telemetry_capture, title_service, spine_anomaly, projection_registry) to share one attach ritual, so the fail-loud/failed-contained/cancel-stash contract lives in lca/plugins/session/_shared.py and the five copies cannot drift.",
+   "acceptanceCriteria": [
+    "One _shared helper (e.g. attach_store_observers(store, attach_one, hooks_sink)) covers: iterate store.list() with per-session containment, require_observer_hook fail-loud, hook the same attach_one for future create/restore, stash cancel in hooks_sink; all 5 call sites migrated",
+    "Canonical ordering decided and documented: title_service requires the hook BEFORE iterating (no partial attach on fail-loud) vs the other four list-first; chosen order applied uniformly, delta recorded in commit body",
+    "Existing session-plugin tests (projection_cache, telemetry_capture, title_service, spine_anomaly, projection_registry) all green; ruff check clean"
+   ],
+   "priority": 1,
+   "passes": true,
+   "branchName": "raphy/arch-20261007-2315",
+   "notes": "Strength: Worth exploring. Area A friction walk (session plugin cluster), duplication class with 5 sites. Evidence: grep for require_observer_hook shows 5 call sites; projection_cache._attach_to_store (module fn), telemetry_capture._attach_to_store (module fn), title_service.attach_to_store (method), spine_anomaly.register_spine_anomaly_to_store (module fn), projection_registry site. Four share list-then-require order; title_service is require-first. Deletion test: converges (ritual knowledge concentrated); per-plugin attach_one (register_to / _observe_contained+seed cursor / _TitleObserver / anomaly observer) stays per-plugin. Constraint: fail-loud/fail-soft semantics must not change (fail-soft containment per session is a documented DSH-alignment choice).\n实现与评估的差异：① canonical 顺序裁定为 require-first（title_service 派），projection_cache / telemetry_capture / spine_anomaly / projection_registry 四家从 list-first 改为 require-first——钩子缺失时零部分挂入（原来先挂完现存 Session 再抛 TypeError，留下半接线状态）；② 评估假设 attach_one 签名 attach_store_observers(store, attach_one, hooks_sink)，实现保持该形状，hooks_sink 缺省 None（spine_anomaly / projection_registry 无 _store_hooks，保持原先丢弃 cancel 行为）；③ 附带收敛：projection_cache 原先 loop 与 _on_create 两份字节级相同的挂入体（含 contained warning），收敛为一个 _observe_one attach_one，无行为变化；④ 新增契约测试 tests/plugins/session/test_attach_store_observers.py（3 个：缺钩子零部分挂入 / 现存+未来+cancel 入 sink / sink 缺省丢弃），tests/plugins/session/ 283 全绿，ruff check 干净。"
+  },
+  {
+   "id": "RA-020",
+   "title": "Lift the deferred imports in sandbox _run_inspect_internal to module level",
+   "description": "As an LCA maintainer, I want lca/infrastructure/sandbox/runtime/runtime.py to import enrich_inspect_profile and get_run_workspace at module level, so the layer edges are honest at the seam instead of hiding behind function-local imports.",
+   "acceptanceCriteria": [
+    "The two function-local imports (lca.infrastructure.skills.format.routing.enrich_inspect_profile, lca.infrastructure.workspace.get_run_workspace) moved to module top; no behavioral change",
+    "Import-order probe evidence (fresh interpreter, routing-first / runtime-first / workspace orders) re-run and passing; ruff check clean",
+    "tests/infrastructure/sandbox/ green"
+   ],
+   "priority": 2,
+   "passes": true,
+   "branchName": "raphy/arch-20261007-2315",
+   "notes": "Strength: Worth exploring. Area C friction walk (sandbox runtime), seam-honesty class. Evidence: assess-round fresh-interpreter probe on 2026-10-07 confirmed both import orders load cleanly — no import cycle was ever dodged (RA-009/RA-012 discipline, assumption refuted by evidence). Constraint: import-time cost of lca.infrastructure.skills.format.routing (pulls bundled skills) at runtime.py import time is acceptable; lazy-import comment claims must be removed, not left stale. 实现与评估的差异：评估把探针固化记为可选（\"可固化为测试或文档\"），实现按 tests/persistence/test_run_paths_import_order.py 先例固化为 3 个 fresh-interpreter 导入顺序测试（tests/infrastructure/sandbox/test_sandbox_runtime_import_order.py：routing-first / runtime-first / workspace-first，每顺序独立解释器，防 pytest collection 顺序掩盖真实 cycle）；改动前/后各跑一遍三种顺序探针全过，无 import cycle，调用语义无变化；runtime.py 内 grep（defer/lazy/cycle）零命中，无需清理陈旧 lazy-import 注释；tests/infrastructure/sandbox/ 22 passed（19 原有 + 3 新增），ruff check 绿。"
+  },
+  {
+   "id": "RA-021",
+   "title": "Close the silent empty-message fallback in AssistantJobs.fire",
+   "description": "As an LCA maintainer, I want fire() to fail-loud (or document a real reason) instead of submitting a WorkItem with an empty message when plane.get returns None for a locally-registered job, so the fail-closed discipline of the jobs plugin is not silently violated.",
+   "acceptanceCriteria": [
+    "Probe documented: read the real 0093 ContinuousControlPlane.get implementation; determine whether None-after-successful-submit is reachable (eviction / restart without persistence) or dead code",
+    "If unreachable: delete the else-\"\" fallback, raise JobNotRegisteredError on the recovery-miss branch; if reachable: keep the branch only with an explicit logged reason or convert to fail-loud per the chosen design; delta in commit body",
+    "New test pins the decided behavior (recovery miss); tests/plugins/assistant/test_jobs.py green; ruff check clean"
+   ],
+   "priority": 1,
+   "passes": true,
+   "branchName": "raphy/arch-20261007-2315",
+   "notes": "Strength: Worth exploring. Area B friction walk (assistant jobs plugin), fail-closed gap class. Evidence: jobs.py fire() line ~`message=registered_item.message if registered_item is not None else \"\"`; plane.get is a Protocol returning WorkItem | None, so the empty-message branch is contractually reachable; a locally-registered job implies submit() succeeded, so a None recovery means the queue lost the item — firing then runs the job with an empty prompt while still emitting assistant.job.fired. Constraint: the documented fail-closed design of the jobs plugin (ADR-0187 §3 D10); cross-process recovery via deterministic work_id must keep working. Probe(2026-10-07 optimize 轮): 真实 0093 实现 SqliteWorkQueue.get 只是按 work_id 的 SELECT；queue.py 无 DELETE/purge/retention 行删除路径——submit 成功后同进程 get 按确定性 work_id 必命中，None-after-submit 在设计的 0093 生命周期内不可达（评估'contractually reachable'的假设被证据证伪）。唯一可达路径是 database_path 配置漂移或外部删库；跨进程恢复(registration=None+queue 命中)属设计路径，不受影响。判决：删掉 else-\"\"fallback，recovery-miss 分支 log.error + 抛 JobNotRegisteredError(fail-loud)；schedule 恢复与跨进程恢复逻辑原样保留。新增test_fire_rejects_when_0093_queue_lost_registered_item 钉住拒收行为。"
+  },
+  {
+   "id": "RA-022",
+   "title": "Deepen the 9 assistant EP payloads behind one frozen-dataclass base",
+   "description": "As an LCA maintainer, I want the 9 frozen payload dataclasses in lca/plugins/assistant/events/_events.py to share a base holding the required quartet (assistant_id/revision_seq/manifest_digest/actor), the base __post_init__ gate and the base to_dict, so adding the 10th payload no longer requires copying two rituals.",
+   "acceptanceCriteria": [
+    "New base (e.g. _AssistantEPPayloadBase, frozen dataclass): holds the required quartet, runs _validate_required_fields in __post_init__ (with a _validate_extra_fields() hook for per-class extra checks), base to_dict = _required_dict + per-class extras via an explicit seam (e.g. _extra_items())",
+    "All 9 subclasses shrink to fields + extra checks; to_dict outputs byte-identical (golden-dict test or before/after comparison); ADR-0187 payload closure unchanged",
+    "tests/plugins/assistant/test_catalog.py and any EP payload tests green; ruff check clean"
+   ],
+   "priority": 2,
+   "passes": true,
+   "branchName": "raphy/arch-20261007-2315",
+   "notes": "Strength: Worth exploring. Area B, duplication class with 9 sites (the codebase's own 'converge N identical X' idiom, already celebrated inside this file for the emit helpers). Evidence: all 9 classes repeat the quartet field declarations, __post_init__ calling _validate_required_fields, and to_dict = _required_dict + truthy extras; ADR-0187's 12-EP closed set means more payloads are coming, so the copy cost is recurring. Deletion test: converges (the 'required quartet + truthy extras' rule concentrated in one place). Constraint: __post_init__ must stay fail-loud on missing/invalid fields; field-order-independent extra collection (no positional dataclasses.fields tricks). | Implemented 2026-10-07 (Round 6, branch raphy/arch-20261007-2315): added _AssistantEPPayloadBase (frozen dataclass) holding the quartet + base __post_init__ (_validate_required_fields via type(self).__name__ + _validate_extra_fields hook) + base to_dict (_required_dict + truthy extras from _extra_items()); all 9 subclasses shrunk to extra fields + _extra_items() seam + _validate_extra_fields overrides only (error messages byte-identical). Delta vs assessment: (1) base._extra_items() default raises NotImplementedError (fail-loud seam, not an empty-tuple default); (2) truthy-gating concentrated in base to_dict loop instead of per-subclass ifs — matches assessment's 'required quartet + truthy extras' rule; (3) verification beyond golden-dict: 16 to_dict cases + 10 validation-error cases byte-identical pre/post refactor (scripts + goldens in ~/.lca-worktrees/.ra022-golden-{before,after}.json, deleted after verify)."
+  },
+  {
+   "id": "RA-023",
+   "title": "Translate non-converging runs into a failed Result in Agent.run(); align max_steps with the graph loop bound",
+   "description": "As an LCA maintainer, I want Agent.run() to translate graph mechanism errors (LoopObligationExceededError on non-convergence) into a failed Result instead of raising, and I want max_steps to actually bound the run, so callers (Team pipeline, cron workers, handoffs) get fail-closed Results instead of crashing on a common production situation.",
+   "acceptanceCriteria": [
+    "Repro from runtime-findings-20261007 (InfiniteMock returning endless tool_calls, max_steps=5): await agent.run() returns a Result with failed status and does NOT raise LoopObligationExceededError; the error facts (plan/edge/taken iterations) are preserved on the Result/diagnostics, not swallowed",
+    "asyncio.CancelledError still propagates (cancellation semantics untouched)",
+    "max_steps is honored: either the agent layer translates max_steps into the graph loop bound or run() terminates at max_steps with a failed Result (spike to decide; document the chosen mapping)",
+    "Existing agent run tests green; ruff check clean"
+   ],
+   "priority": 0,
+   "passes": false,
+   "branchName": "raphy/arch-20261008-0206",
+   "notes": "Strength: Strong. Runtime-verified twice: 2026-10-07 findings P0 + this round re-repro on branch raphy/arch-20261008-0206 (== main ca80cdd25). New evidence this round: the framework logs lifecycle_event=failed status=failed max_steps=5 internally yet lets the exception escape — it knows the run failed but does not translate it. Deletion test: concentrates (callers stop try/except-ing graph internals). Constraint: run()'s public contract is 'returns a Result'; interpreter raising is legitimate mechanism behavior — the translation seam belongs in run(), not in swallowing the raise."
+  },
+  {
+   "id": "RA-024",
+   "title": "Self-heal the model_visible payload forward-refs at the source module; delete consumer-side rebuild rituals",
+   "description": "As an LCA maintainer, I want the pydantic forward-ref workaround for SpineLlmRequestHeaderPayload/SpineLlmRequestHeaderAssistantPayload to live in lca_kernel/events/payloads/model_visible.py itself (one self-heal), so that hook.py and fold_source.py no longer each carry an import-time model_rebuild ritual and publisher.py no longer needs an eager side-effect import.",
+   "acceptanceCriteria": [
+    "lca_kernel/events/payloads/model_visible.py performs one module-level self-heal (model_rebuild with the four TYPE_CHECKING names pinned to Any), marked as a PR-0 shim with a delete-when note (real types landing in lca_kernel.events.types); failure degrades to debug log, never blocks import (keep the existing INTENTIONAL semantics)",
+    "Delete the ~20-line import-time rebuild rituals in lca/plugins/events/hooks/model_visible/hook.py and lca/infrastructure/observability/replay/fold_source.py; delete the eager `from ...hooks.model_visible import hook as _hook_module  # noqa: F401` side-effect import in lca/plugins/events/publishers/model_visible/publisher.py (keep _build_hook's lazy import)",
+    "Converge the verbatim-identical _coerce_tools/_coerce_messages helpers in hook.py into one",
+    "New test: importing ONLY lca_kernel.events.payloads.model_visible (no consumer imports) and instantiating both payload classes works — this test cannot be written today (testability gap); existing hook/fold_source/publisher tests green; ruff check clean"
+   ],
+   "priority": 1,
+   "passes": false,
+   "branchName": "raphy/arch-20261008-0206",
+   "notes": "Strength: Worth exploring. Friction-walk Area A leaky seam: the defect (string forward-refs that pydantic v2 cannot resolve; names only stubbed as Any inside TYPE_CHECKING) lives in the payloads module, but the patch lives in two consumers plus a side-effect import. Deletion test: concentrates (workaround moves from 3 consumers to the 1 owning module). Constraint: lca_kernel must not depend back on lca (layering); ADR-0185 payload field semantics unchanged."
+  },
+  {
+   "id": "RA-025",
+   "title": "Give the step-{n:03d} step_id convention one seam; converge the four independent derivations",
+   "description": "As an LCA maintainer, I want the step_id format step-{n:03d} derived in exactly one place, so a future format change touches one module instead of four (hook._step_id_for, plugins/primitive/llm_call/invoke.py, nodes/think/llm/invoke.py, cognition/brain/reasoner/reasoner.py), and the verbatim 7-line cursor->step_id fallback ritual shared by llm_call and reasoner is converged.",
+   "acceptanceCriteria": [
+    "New seam (spike to pick the home: lca/contracts/atoms/ids next to new_id, or near the cursor): step_id_for(step_index: int) -> str (pure format) and step_id_from_cursor(cursor, template_id: str) -> str (None/exception -> 'step-unknown-{template_id}' fallback); the 'matches LoopCursor step_id shape' note moves into the new seam's docstring",
+    "All four call sites use the seam; byte-identical step_id strings before/after (existing fold-key/hook tests pin the shape)",
+    "The step_{n:03d} underscore variants (journal_fold default, writable_matrix) are explicitly OUT of scope — document them as observed drift in the commit body",
+    "New tests: step_id_for(3) == 'step-003'; step_id_from_cursor(None, 't') == 'step-unknown-t'; existing step_id/fold tests green; ruff check clean"
+   ],
+   "priority": 1,
+   "passes": false,
+   "branchName": "raphy/arch-20261008-0206",
+   "notes": "Strength: Worth exploring. Cross-module duplication found in the secondary scan after the friction walk: 4 independent derivations of the same convention, two of them (llm_call/invoke.py:116 and reasoner.py:232) verbatim identical including the fallback. Deletion test: concentrates (format knowledge moves from 4 sites to 1). Constraint: the 'step-NNN' byte shape is load-bearing for fold key matching — must not change."
+  },
+  {
+   "id": "RA-026",
+   "title": "Finish the SchedulerFileLock convergence: drop passthrough adapters and the dead STALE_ABSOLUTE_CAP_S re-export chain",
+   "description": "As an LCA maintainer, I want the lca-1000 round-0520 SchedulerFileLock convergence finished: remove the verbatim _acquire_lock passthroughs in both schedulers (tick calls self._file_lock.acquire directly) and delete the 4-site STALE_ABSOLUTE_CAP_S re-export chain (2 scheduler modules + 2 package __init__s), which has zero external references.",
+   "acceptanceCriteria": [
+    "Delete the private _acquire_lock passthrough in CronScheduler and ProactiveScheduler; tick() calls self._file_lock.acquire(now_ms) directly; public release_lock() is KEPT (tests/integration/proactive/test_pipeline.py uses it 6 times)",
+    "Delete the STALE_ABSOLUTE_CAP_S import + __all__ entries in lca/infrastructure/cron/scheduler.py, lca/infrastructure/proactive/scheduler.py, lca/infrastructure/cron/__init__.py, lca/infrastructure/proactive/__init__.py; the constant stays owned by lca/infrastructure/scheduler_file_lock.py",
+    "Post-change grep: STALE_ABSOLUTE_CAP_S appears only in scheduler_file_lock.py; cron/proactive scheduler tests green; ruff check clean"
+   ],
+   "priority": 2,
+   "passes": false,
+   "branchName": "raphy/arch-20261008-0206",
+   "notes": "Strength: Worth exploring. Friction-walk Area B: the convergence commit (8308bd07f) moved the implementation but left the compat shims, against the repo COMPAT discipline ('compat shim deletable in the same PR'). Evidence: full-repo grep shows zero references to STALE_ABSOLUTE_CAP_S outside the chain itself (tests included). Deletion test: concentrates (removes thin indirection, not relocation)."
+  },
+  {
+   "id": "RA-027",
+   "title": "Converge the five fold-chapter N/A guards behind one chapter driver seam",
+   "description": "As an LCA maintainer, I want the five _render_* chapter functions in narrative_writer/fold.py to register (title, body) with a single driver that applies the 'fold is None or fold.header is None' N/A policy once, so the degradation policy has one definition and one test surface instead of five.",
+   "acceptanceCriteria": [
+    "New driver (e.g. _chapter(na_title, body)): applies the None-guard and emits the per-chapter N/A title; the five _render_* functions shrink to body-only functions",
+    "All five N/A title strings byte-identical before/after (viewer snapshots may pin them); char_budget truncation semantics unchanged; _render_fold_chapters signature unchanged",
+    "Resolve the leaky seam: stop importing the private _short from sections.py (publicize as short_text or give fold.py its own helper); move the FoldProvider type alias to fold_source.py (producer side)",
+    "New test: driver-level — passing None yields all five N/A titles (one test pins the whole policy); existing narrative tests green; ruff check clean"
+   ],
+   "priority": 2,
+   "passes": false,
+   "branchName": "raphy/arch-20261008-0206",
+   "notes": "Strength: Worth exploring. Friction-walk Area C: one policy ('fold unavailable -> placeholder'), five copies of the guard, five test surfaces. Deletion test: concentrates (policy moves from 5 sites to 1 driver). Constraint: N/A titles verbatim; budget semantics untouched."
+  }
+ ]
 }

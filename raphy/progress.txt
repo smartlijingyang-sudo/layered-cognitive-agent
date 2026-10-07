@@ -37,6 +37,41 @@
   属 `lca_kernel.events.session.session`，勿收进 session 包做 single
   source（RA-017 的层向论证不适用；Round 4 "注释自称 single source"教训）。
 
+- **model_visible payload forward-ref 缺陷位（RA-024 认领，optimize 前勿动）：**
+  `lca_kernel/events/payloads/model_visible.py` 的四名（AssistantRequestConfig /
+  MessageDict / ToolCallDict / UsageDict）只在 TYPE_CHECKING 块 stub 为 Any，
+  字段字符串引用 pydantic v2 不解析；`hook.py` 与 `fold_source.py` 各有一份
+  import-time rebuild 仪式，`publisher.py` 的 eager import（`noqa: F401`）
+  纯为触发副作用。修法是源头自愈，不是第三处仪式。
+- **step_id `step-{n:03d}` 四处独立派生（RA-025 认领）：** `hook._step_id_for` /
+  `plugins/primitive/llm_call/invoke.py:116` / `nodes/think/llm/invoke.py:190` /
+  `cognition/brain/reasoner/reasoner.py:232`；后两者连 `step-unknown-{template_id}`
+  回退仪式都逐字相同。另有 `step_{n:03d}` 下划线变体（journal_fold 缺省 /
+  writable_matrix）疑似漂移，**未立案**（不同 surface，可能 load-bearing）。
+- **SchedulerFileLock 收敛残留（RA-026 认领）：** 两调度器各留逐字相同的
+  `_acquire_lock`/`release_lock` 直通对（`release_lock` 公开，被
+  `tests/integration/proactive/test_pipeline.py` 用 6 次，保留；`_acquire_lock`
+  私有，可删）；`STALE_ABSOLUTE_CAP_S` 4 处 re-export（2 模块 + 2 包 `__init__`）
+  零外部引用（含 tests）。
+- **fold.py 五章 N/A guard 同一仪式（RA-027 认领）：** 5 个 `_render_*` 各重复
+  `fold is None or fold.header is None`；另 `from …sections import _short`
+  跨模块 import 私有名字（leaky seam）；`FoldProvider` 类型别名放错边（消费者侧）。
+- **P0 已钉（RA-023 认领，最高优）：** `LoopObligationExceededError` 逃逸
+  `Agent.run()`（2026-10-07 findings + 10-08 本轮复现两次）；框架日志自记
+  `status=failed max_steps=5` 却不翻译成 Result；`max_steps` 与 graph
+  `loop.maxIterations=24` 脱节。optimize 实现前**不要**在 `cognitive_agent.py`
+  加 try/except 凑合——要的是 Result 翻译 + 步数对齐，不是吞错。
+- **运行时验证基线（2026-10-08，MockLLMAdapter，LLM_API_KEY=dummy）：**
+  basic run / tool-call run / 同一 agent 双 run 全 completed；P0 复现仍在。
+  `run(None)` TypeError 与 `NativeToolCall.arguments` 传 str 的晦涩报错
+  （10-07 P2）defer 给 iter-quality lane，本轮未立案。
+- **`ModelVisibleHook.before_publish`/`after_dispatch` 占位：** hypothetical seam
+  （为 PR-3 bus pipeline 保留），按 YAGNI 应删，但 ADR-0185 PR-3 显式计划了
+  "0 改动切换"——跟 ADR 对着干不开 story；PR-3 落地或流产时再议。
+- **`ProactiveScheduler` 的 `js` state dict：** `last_run_ms`/`attempts`/
+  `next_retry_ms`/`last_error` 四 key 字面量散四处，无 module——真 friction
+  但无失败证据，speculative，留待有 bug 时立案。
+
 ---
 
 ## Round 6 — assess (2026-10-07 23:15, branch raphy/arch-20261007-2315)
@@ -579,4 +614,39 @@
   - base 的 `_extra_items()` 默认抛 `NotImplementedError` 而非返回空元组：
     接缝缺失 fail-loud，符合 codebase fail-loud 纪律；评估只说"显式接缝"，
     未定默认行为，实现时按纪律补上（已记入 prd notes delta）。
+---
+
+## Round 7 — assess (2026-10-08 02:06, branch raphy/arch-20261008-0206)
+
+- 按硬化版 `raphy-assess.md` 执行：读 `skills/improve-codebase-architecture/SKILL.md`；
+  `git log -70` 定热点；CONTEXT.md（13 行）已读，无增补；friction walk 精读三区
+  （event bus 721 行 + model_visible hook 380 行 + publisher 147 行全文 /
+  scheduler_file_lock 97 行 + cron/proactive scheduler 381/295 行全文 /
+  narrative fold.py 216 行全文，5 问必答）；mandatory runtime verification 真跑；
+  duplication 副扫描；self-grilling 写进 assessment.md；diversity quota 满足
+  （4 friction + 1 runtime，无纯 duplication story）。
+- 运行时验证（252，LLM_API_KEY=dummy，MockLLMAdapter）：basic run ✅ completed；
+  tool-call run ✅ completed；同一 agent 双 run ✅✅；**P0 复现** ❌：
+  InfiniteMock + max_steps=5 → `LoopObligationExceededError` 逃逸出 `agent.run()`，
+  未返回 Result（与 10-07 findings 一致，未修复；新证据：框架日志自记 status=failed
+  却不翻译）。
+- 产出 5 个 stories（`passes: false`），续号 RA-023~027：
+  - RA-023（P0, **Strong**）：`Agent.run()` 建异常翻译 seam——graph 机制错误 →
+    failed Result（CancelledError 仍透传）；spike 定 max_steps 与 loop bound 对齐。
+  - RA-024（P1, Worth exploring）：model_visible payload forward-ref 在源头自愈；
+    删 hook.py/fold_source.py 两处 rebuild 仪式 + publisher eager import；
+    收敛 `_coerce_tools`/`_coerce_messages`。
+  - RA-025（P1, Worth exploring）：`step-{n:03d}` 四处派生收进一个 seam
+    （`step_id_for` + `step_id_from_cursor`，spike 定落点）；下划线变体明确 out of scope。
+  - RA-026（P2, Worth exploring）：调度器收敛收尾——删 `_acquire_lock` 直通对
+    （`release_lock` 公开保留）+ 4 处 `STALE_ABSOLUTE_CAP_S` re-export。
+  - RA-027（P2, Worth exploring）：fold.py 五章 N/A guard 收进 chapter driver；
+    `_short` 去私有化；`FoldProvider` 搬生产者侧。
+- 丢弃（有证据）：`ConsumerHandle.unregister` no-op（刻意设计）；bus trace_id 三件套
+  （好 locality）；`_coerce_producer` 命名（cosmetic）；proactive `js` state dict
+  （speculative）；hook 四并行状态（已修复有注释）；10-07 P2 两项（defer iter-quality）；
+  下划线 step_id 变体（未立案）；before_publish/after_dispatch 占位（ADR-0185 PR-3 计划）。
+- 本轮未跑全量测试（assess 轮只做评估；唯一的"跑"是 mandatory runtime verification
+  四个场景，见上表）。
+- Commit：`chore: [raphy] assess - 5 architecture candidates`（未 push）。
 ---
