@@ -286,10 +286,12 @@ class DeclarativeExecution:
         inner = getattr(plan, "inner", plan)
         if isinstance(inner, V2ExecutablePlan):
             graph_spec = inner.graph_spec
-        elif isinstance(plan, V2ExecutablePlan):
-            graph_spec = plan.graph_spec
         else:
-            graph_spec = self._load_v2_graph_spec(plan)
+            graph_spec = (
+                plan.graph_spec
+                if isinstance(plan, V2ExecutablePlan)
+                else self._load_v2_graph_spec(plan)
+            )
         plan_obj = lift_graph_spec(graph_spec)
         # RA-023: translate the run budget into the graph loop bound.
         # ``max_steps`` only ever tightens the plan's own caps (min rule,

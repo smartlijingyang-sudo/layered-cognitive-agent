@@ -73,10 +73,8 @@ def build_default_tools(
     file_store = store
     if bindings is not None:
         bound = bindings
-    elif fallback:
-        bound = _ambient_bindings(machine_resolver)
     else:
-        bound = PlaneBindings(primary=None)
+        bound = _ambient_bindings(machine_resolver) if fallback else PlaneBindings(primary=None)
 
     search_tools: list[Tool] = web_search_module.build_tools(search=search)
     hil_tools: list[Tool] = ask_user_module.build_tools()

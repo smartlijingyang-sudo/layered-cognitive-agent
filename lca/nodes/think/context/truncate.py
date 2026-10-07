@@ -92,10 +92,11 @@ class ThinkContextTruncateExecutor:
         budget = resolve_budget(context=context)
         payload = resolve_context_payload(context=context)
         try:
-            if not should_compact(budget):
-                receipt = CompactReceipt.noop(bytes_seen=payload_byte_size(payload))
-            else:
-                receipt = self._apply_truncate(payload=payload, budget=budget)
+            receipt = (
+                CompactReceipt.noop(bytes_seen=payload_byte_size(payload))
+                if not should_compact(budget)
+                else self._apply_truncate(payload=payload, budget=budget)
+            )
         except Exception:
             receipt = CompactReceipt.skipped(bytes_seen=0)
         return NodeOutput(port_values={PortName("compact_receipt"): receipt})

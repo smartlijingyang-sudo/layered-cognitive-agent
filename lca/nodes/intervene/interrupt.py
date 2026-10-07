@@ -84,12 +84,12 @@ class InterruptExecutor:
                 f"intervene.interrupt expects int on port 'spine_seq', "
                 f"got {type(seq).__name__}"
             )
-        if decision.action_type == _HITL_ACTION_TYPE or requires_human_input(
-            decision.tool_calls
-        ):
-            kind = "approve"
-        else:
-            kind = "reject"
+        kind = (
+            "approve"
+            if decision.action_type == _HITL_ACTION_TYPE
+            or requires_human_input(decision.tool_calls)
+            else "reject"
+        )
         cmd = Command(
             kind=kind,  # type: ignore[arg-type]
             payload={"decision_id": decision.decision_id},

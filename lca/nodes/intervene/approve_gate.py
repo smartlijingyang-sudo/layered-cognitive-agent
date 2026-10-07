@@ -248,10 +248,11 @@ class ApproveGateExecutor:
                 refused_ports[PortName("approval_requirement")] = req
             return NodeOutput(port_values=refused_ports)
 
-        if req is not None and hasattr(req, "required"):
-            needs_approval = bool(req.required)
-        else:
-            needs_approval = bool(decision.needs_approval)
+        needs_approval = (
+            bool(req.required)
+            if req is not None and hasattr(req, "required")
+            else bool(decision.needs_approval)
+        )
 
         if not needs_approval:
             next_hint = _NEXT_HINT_APPROVE_SKIPPED
