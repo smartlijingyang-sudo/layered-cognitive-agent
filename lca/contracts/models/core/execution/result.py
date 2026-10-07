@@ -71,7 +71,8 @@ class Result:
             trace_id = new_id("trace")
         elif not isinstance(raw_trace_id, str) or not raw_trace_id:
             raise ValueError("source_trace_id must be a non-empty string")
-        trace_id = raw_trace_id
+        else:
+            trace_id = raw_trace_id
         total_steps = raw_total_steps
         return cls(
             trace_id=trace_id,

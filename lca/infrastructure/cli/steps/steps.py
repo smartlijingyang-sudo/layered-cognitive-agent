@@ -238,25 +238,26 @@ def stack_heal(ctx: PipelineContext) -> None:
                 "stack.heal expects 'kernel_serve' to be KernelServeService, "
                 f"got {type(ks).__name__}"
             )
-        spawner = ks.spawner()
-        result = spawner.run()
-        if not result.ok:
-            # SpawnResult 自 785e541d2 起为精简形状（ok/pid/port/
-            # exit_code/duration_ms）；旧的 failed_stage/steps/
-            # actionable/stderr_path 已不存在，读它们必 AttributeError
-            # （被外层 except 吞掉后反而掩盖了真实的 spawn 失败原因）。
-            actionable = (
-                f"spawn failed (exit_code={result.exit_code}, "
-                f"port={result.port}, {result.duration_ms}ms)"
-            )
-            ctx.console.error(f"kernel_serve spawn failed: {actionable}")
-            leftover.append(f"kernel_serve: {actionable}")
-            ctx.failed = True
         else:
-            ctx.console.info(f"kernel_serve spawned (pid={result.pid}, {result.duration_ms}ms)")
-            # re-probe via state() to confirm running projection
-            ks_state = ks.state()
-            ctx.console.service_state("kernel_serve", ks_state)
+            spawner = ks.spawner()
+            result = spawner.run()
+            if not result.ok:
+                # SpawnResult 自 785e541d2 起为精简形状（ok/pid/port/
+                # exit_code/duration_ms）；旧的 failed_stage/steps/
+                # actionable/stderr_path 已不存在，读它们必 AttributeError
+                # （被外层 except 吞掉后反而掩盖了真实的 spawn 失败原因）。
+                actionable = (
+                    f"spawn failed (exit_code={result.exit_code}, "
+                    f"port={result.port}, {result.duration_ms}ms)"
+                )
+                ctx.console.error(f"kernel_serve spawn failed: {actionable}")
+                leftover.append(f"kernel_serve: {actionable}")
+                ctx.failed = True
+            else:
+                ctx.console.info(f"kernel_serve spawned (pid={result.pid}, {result.duration_ms}ms)")
+                # re-probe via state() to confirm running projection
+                ks_state = ks.state()
+                ctx.console.service_state("kernel_serve", ks_state)
     except Exception as exc:
         ctx.console.error(f"kernel_serve heal crashed: {exc}")
         leftover.append("kernel_serve: crashed — see error above")

@@ -228,7 +228,8 @@ class ModelVisibleHook:
             reason = "initial"
         elif headerEquals(previous, current):
             return None  # fold 优化:同 header 不发,不推进计数器
-        reason = "change"
+        else:
+            reason = "change"
 
         messages = _coerce_sequence(kwargs.get("messages"))
         manifest = kwargs.get("manifest")
