@@ -453,3 +453,42 @@
   - `ruff format` 整文件重排时会碰 HEAD 遗留 dirty 行：先用
     `git show HEAD:path | ruff format --check -` 确认遗留，再只收敛自己的 hunks。
 ---
+---
+
+## Round 6 — RA-019 optimize (2026-10-07 23:15 轮，branch raphy/arch-20261007-2315)
+
+- 实现：5 个 session 插件的 store-observer attach ritual 收敛进
+  `lca/plugins/session/_shared.py::attach_store_observers(store, attach_one,
+  hooks_sink=None)`。`attach_one` 负责单 Session 挂入 + fail-soft contained
+  （各 plugin 原有 warning scope 原样保留）；`require_observer_hook`
+  fail-loud 守卫复用；`add_observer_hook` 接管未来 create/restore 的回调
+  直接用 `attach_one`（原来 loop 体与钩回调是两份拷贝，projection_cache
+  的 `_on_create` 即其一）；cancel 存入 `hooks_sink`
+ （spine_anomaly / projection_registry 传缺省 None，保持原先丢弃行为）。
+- 迁移 5 处调用点：projection_cache._attach_to_store、telemetry_capture.
+  _attach_to_store、title_service.attach_to_store（method）、
+  spine_anomaly.register_spine_anomaly_to_store、projection_registry.
+  _attach_to_store；各文件 `_shared` import 由 `require_observer_hook`
+  换为 `attach_store_observers`（title_service 顺带去掉已无用的 `cast` import）。
+- canonical 顺序裁定 **require-first**（title_service 派胜出）：四家原先
+  list-first 改为先 require 再遍历。理由：require-first 是 fail-fast——
+  钩子缺失的 store 上零部分挂入；list-first 会先挂完现存 Session 再抛
+  TypeError，留下"现存已挂、未来无人接管"的半接线状态，且 cancel 也没地
+  存。delta 已记入 commit body 与 prd.json notes。
+- 测试：新增 `tests/plugins/session/test_attach_store_observers.py` 3 个
+  契约测试（缺钩子零部分挂入 / 现存+未来挂入+cancel 入 sink 且 cancel 生效 /
+  sink 缺省丢弃但接管未来不受影响）；`tests/plugins/session/` 全目录
+  283 passed（含 5 插件原有 attach/setup 测试）；`ruff check` 7 个触及文件
+  全绿，`ruff format --check` 通过。无预期红。
+- Commit：`feat: RA-019 - converge session store-observer attach ritual`
+  （body 带 Problem/Solution/Benefits/Strength + 实现与评估差异，未 push）。
+
+- **Learnings for future iterations:**
+  - attach ritual 的两派顺序分歧本质是"fail-fast 原子性"问题：list-first
+    在 fail-loud 点之前做副作用，必然产生半接线状态；以后同类 ritual
+    收敛默认选 require-first，除非遍历本身是守卫的前置条件。
+  - `hooks_sink=None` 缺省即"丢弃 cancel"——spine_anomaly 这类 fire-and-forget
+    式 plugin 不需要可选参数以外的特殊处理，收敛时不用为它加分支。
+  - projection_cache 的 `_on_create` 与 loop 体是 ritual 内部的第二层重复
+    （同文件两份拷贝）：收敛 ritual 时顺手把同文件内重复一起收掉，不算
+    scope creep。

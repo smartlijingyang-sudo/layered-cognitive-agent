@@ -4,10 +4,17 @@
 projection_registry / spine_anomaly / telemetry_capture / title_service）
 原来各有一份字符级相同的 ``add_observer_hook`` fail-loud 守卫，
 收敛到 :func:`require_observer_hook`，fail-loud 契约单点定义。
+
+收敛点：同一五 plugin 的 store-observer attach ritual（现存 Session 逐个
+挂入，单 session 失败 contained → fail-loud 守卫 → ``add_observer_hook``
+接管未来 create/restore → cancel 存 ``_store_hooks``）收敛到
+:func:`attach_store_observers`（RA-019）。canonical 顺序 require-first：
+先 :func:`require_observer_hook` 再遍历现存 Session——钩子缺失时零部分
+挂入（其余四家原先 list-first，会留下半接线状态）。
 """
 
 from collections.abc import Callable
-from typing import Any
+from typing import Any, cast
 
 from lca_kernel.events.session.session import SessionEvent
 
@@ -50,3 +57,32 @@ def turn_of(event: SessionEvent) -> int | None:
     if isinstance(turn, int) and not isinstance(turn, bool) and turn >= 0:
         return turn
     return None
+
+
+def attach_store_observers(
+    store: Any,
+    attach_one: Callable[[Any], None],
+    hooks_sink: list[Callable[[], None]] | None = None,
+) -> None:
+    """Canonical store-observer attach ritual（RA-019）。
+
+    五 session plugin（projection_cache / projection_registry /
+    spine_anomaly / telemetry_capture / title_service）原来各写一遍的
+    ritual 收敛到此。``attach_one`` 负责单个 Session 的挂入与 fail-soft
+    contained（DSH 对齐的文档化选择）；缺 ``add_observer_hook`` 时抛
+    ``TypeError`` fail-loud。
+
+    Canonical 顺序（本轮裁定，覆盖原先的两派分歧）：**require-first**——
+    先 :func:`require_observer_hook` fail-loud，再遍历现存 Session。
+    title_service 本来就是这个顺序；其余四家原先 list-first，改后钩子缺失
+    时零部分挂入（原来会先挂完现存 Session 再抛，留下半接线状态）。
+    ``attach_one`` 同时用作未来 create/restore 的钩子回调；钩子反注册闭包
+    存入 ``hooks_sink``（spine_anomaly / projection_registry 等无
+    ``_store_hooks`` 的 plugin 传 ``None`` 即丢弃）。
+    """
+    hook = require_observer_hook(store)
+    for session in getattr(store, "list", lambda: ())():
+        attach_one(session)
+    cancel = hook(attach_one)
+    if callable(cancel) and hooks_sink is not None:
+        hooks_sink.append(cast("Callable[[], None]", cancel))

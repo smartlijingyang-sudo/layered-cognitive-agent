@@ -47,7 +47,7 @@ from lca.contracts.protocols.session.telemetry.telemetry import (
     TelemetryRecord,
 )
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
-from lca.plugins.session._shared import require_observer_hook, session_id_of
+from lca.plugins.session._shared import attach_store_observers, session_id_of
 from lca_kernel.events.session.session import SessionEvent
 
 _log = structlog.get_logger(__name__)
@@ -421,12 +421,10 @@ def _seed_telemetry_cursor(capture: SessionTelemetryCapture, session: Any) -> No
 def _attach_to_store(store: Any, capture: SessionTelemetryCapture) -> None:
     """对 store 现存 Session 订阅，并经 ``add_observer_hook`` 接管未来 Session。
 
-    失败语义：``store`` 未提供 ``add_observer_hook`` 时抛 ``TypeError``
+    ritual 收敛进 ``_shared.attach_store_observers``（RA-019，canonical
+    require-first）：``store`` 未提供 ``add_observer_hook`` 时抛 ``TypeError``
     （fail-loud，与 persistence_jsonl 一致）。
     """
-    for session in getattr(store, "list", lambda: ())():
-        _observe_contained(capture, session)
-    hook = require_observer_hook(store)
-    cancel = hook(lambda session: _observe_contained(capture, session))
-    if callable(cancel):
-        capture._store_hooks.append(cast("Callable[[], None]", cancel))
+    attach_store_observers(
+        store, lambda session: _observe_contained(capture, session), capture._store_hooks
+    )

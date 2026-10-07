@@ -41,7 +41,7 @@ from lca.contracts.protocols.session.projection.unit import (
     ProjectionUnit,
 )
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
-from lca.plugins.session._shared import require_observer_hook
+from lca.plugins.session._shared import attach_store_observers
 from lca_kernel.events.session.session import SessionEvent, SessionHeader
 
 _log = structlog.get_logger(__name__)
@@ -394,10 +394,9 @@ def _try_attach(registry: ProjectionRegistry, session: Any) -> None:
 
 
 def _attach_to_store(store: Any, registry: ProjectionRegistry) -> None:
-    """对 store 活 Session 挂驱动 observer，并接管未来新 Session（对齐
-    ``persistence_jsonl._attach_to_store``）；缺钩子抛 ``TypeError``。
+    """对 store 活 Session 挂驱动 observer，并接管未来新 Session。
+
+    ritual 收敛进 ``_shared.attach_store_observers``（RA-019，canonical
+    require-first）；缺钩子抛 ``TypeError``。
     """
-    for session in getattr(store, "list", lambda: ())():
-        _try_attach(registry, session)
-    hook = require_observer_hook(store)
-    hook(lambda session: _try_attach(registry, session))
+    attach_store_observers(store, lambda session: _try_attach(registry, session))

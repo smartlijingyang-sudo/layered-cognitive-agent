@@ -14,7 +14,7 @@ import asyncio
 import re
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
-from typing import Any, Protocol, cast, runtime_checkable
+from typing import Any, Protocol, runtime_checkable
 
 import structlog
 from pydantic import BaseModel, Field
@@ -32,7 +32,7 @@ from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import
     OwnershipDeclaration,
 )
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
-from lca.plugins.session._shared import require_observer_hook
+from lca.plugins.session._shared import attach_store_observers
 
 _log = structlog.get_logger(__name__)
 
@@ -239,15 +239,12 @@ class SessionTitleService:
         return cancel
 
     def attach_to_store(self, store: Any) -> None:
-        """挂到 SessionStore:活 Session 逐个挂入 + ``add_observer_hook`` 接管未来
-        ``create``/``restore``(抄 ``persistence_jsonl._attach_to_store``;store 缺钩子
-        抛 ``TypeError`` fail-loud,单个 Session 挂入失败 contained)。"""
-        hook = require_observer_hook(store)
-        for session in getattr(store, "list", lambda: ())():
-            self._attach_session(session)
-        cancel = hook(self._attach_session)
-        if callable(cancel):
-            self._store_hooks.append(cast("Callable[[], None]", cancel))
+        """挂到 SessionStore：活 Session 逐个挂入 + ``add_observer_hook`` 接管未来
+        ``create``/``restore``（ritual 收敛进 ``_shared.attach_store_observers``，
+        RA-019；store 缺钩子抛 ``TypeError`` fail-loud，单个 Session 挂入失败
+        contained）。
+        """
+        attach_store_observers(store, self._attach_session, self._store_hooks)
 
     def _attach_session(self, session: Any) -> None:
         """把 observer 挂到单个 Session;挂入失败 contained。"""
