@@ -215,12 +215,18 @@ async def test_agent_run_loop_invokes_mcp_tool():
 @pytest.mark.asyncio
 async def test_agent_injected_corp_tool_execution(mock_llm):
     """Verify that corp MCP tool oa_whoami can be executed via LCA's Tool execution contract."""
+    # Agent() inside a running event loop requires an already-booted scope;
+    # boot via ensure_default_ctx() like the sibling async tests do.
+    from lca.application.api.api import ensure_default_ctx
+
+    scope = await ensure_default_ctx()
     agent = Agent(
         role="CorporateTester",
         goal="Test corp MCP tool execution",
         backstory="Corporate tester",
         auto_mcp=True,
         llm=mock_llm,
+        scope=scope,
     )
 
     corp_tool = None
