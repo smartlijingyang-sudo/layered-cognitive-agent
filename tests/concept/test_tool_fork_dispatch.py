@@ -76,11 +76,13 @@ class _ToolsServiceStub:
     """Bare-minimum ToolsService stand-in: holds pre-built tools + fork."""
 
     tools: dict[str, Tool]
+    last_fork_bindings: BindingsView | None = None
 
     def fork_for_run(self, bindings: BindingsView) -> _ToolsServiceStub:
-        # The fork returns a new instance with the same tool table — the
-        # dispatch node only reads ``list_tools()`` afterwards, so the
-        # bound-ref shape does not affect the test outcome.
+        # Record which BindingsView the dispatch node forked with, so the
+        # P7 precedence tests can pin explicit-port > seam. The fork itself
+        # still returns a fresh instance with the same tool table.
+        self.last_fork_bindings = bindings
         return _ToolsServiceStub(tools=dict(self.tools))
 
     def list_tools(self) -> list[Tool]:
@@ -144,6 +146,9 @@ async def test_fallback_seam_used_when_port_missing() -> None:
             _input(tools=tools),
         )
         assert "forked_tools" in result.port_values
+        # The fork must have used the seam-built view (from fs).
+        assert tools.last_fork_bindings is not None
+        assert tools.last_fork_bindings.file_store is fs
     finally:
         reset_capability_bindings(token)
 
@@ -170,8 +175,9 @@ async def test_explicit_port_wins_over_seam_when_both_bound() -> None:
             _ctx(),
             _input(explicit, tools=tools),
         )
-        # ToolsService.fork_for_run receives the explicit port's BindingsView.
-        # We assert by tracking which object the stub saw.
+        # The stub records which BindingsView fork_for_run received: the
+        # explicit port's view must win over the bound seam's view.
+        assert tools.last_fork_bindings is explicit
     finally:
         reset_capability_bindings(token)
 
