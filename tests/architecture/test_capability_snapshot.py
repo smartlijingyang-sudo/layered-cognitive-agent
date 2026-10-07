@@ -215,60 +215,20 @@ def test_unbundled_plugin_does_not_change_plan_ref(monkeypatch) -> None:
     assert all(plugin.id != unrelated.id for plugin in changed.plugins)
 
 
-def _portable_plan_ref() -> str:
-    """plan_ref with the checkout path neutralized (golden-fixture portability).
+def test_golden_plan_ref_snapshot() -> None:
+    """Golden fixture: the production plan_ref must match the committed fixture.
 
-    ``compiled_run_plan_ref`` hashes the declarative payload verbatim, and that
-    payload embeds absolute bundle provenance paths (``<repo>/bundles/*.yaml``).
-    A golden fixture of the raw ref can therefore only ever match the exact
-    checkout where it was generated — useless for CI and other worktrees.
-
-    This helper mirrors the production payload field-for-field (same seam
-    functions as ``compiled_run_plan_ref`` — keep the two in sync) and
-    neutralizes only the repo-root prefix before hashing, so every real plan
-    change (bundles, plugins, profile, control graph) still flips the golden
-    while the checkout path no longer does.
+    The plan_ref is checkout-path independent at the source (``hash_stable_path``
+    normalizes provenance before hashing — see
+    ``test_plan_ref_is_independent_of_checkout_path``); a mismatch means the
+    compiled plan itself changed. Regenerate the fixture only when the plan
+    change is intended.
     """
-    import hashlib
-    import json
-
-    from lca.harness.plan import (
-        _declarative_payload,
-        _unwrap_v2,
-        capability_sub_plan_hash,
-        control_entries_sub_plan_hash,
-        scope_sub_plan_hash,
-    )
+    from lca.harness.plan import compiled_run_plan_ref
     from lca.harness.profile.resolve.resolve import resolve_profile
     from lca_kernel.plan.plan_compile import compile_plan
 
-    plan = _unwrap_v2(compile_plan(resolve_profile(REPO / DEFAULT_PROFILE)))
-    payload = {
-        "capability": capability_sub_plan_hash(plan),
-        "control": control_entries_sub_plan_hash(plan),
-        "scope": scope_sub_plan_hash(plan),
-        "profile_path": plan.profile_path,
-        "plan_version": plan.plan_version,
-        "revision": plan.revision,
-        "input_provenance": sorted((kind, path) for kind, path in plan.input_provenance),
-        "declarative": _declarative_payload(plan),
-    }
-    # Mirror canonical_digest's serialization exactly, then neutralize the
-    # checkout path. (canonical_digest does json.dumps(payload, sort_keys=True,
-    # ensure_ascii=False, default=str) + sha256 prefix "sha256:", length 16.)
-    serialized = json.dumps(payload, sort_keys=True, ensure_ascii=False, default=str)
-    normalized = serialized.replace(str(REPO), "<repo>")
-    return "sha256:" + hashlib.sha256(normalized.encode("utf-8")).hexdigest()[:16]
-
-
-def test_golden_plan_ref_snapshot() -> None:
-    """Golden fixture: the portable plan_ref must match the committed fixture.
-
-    The fixture is checkout-path independent (see ``_portable_plan_ref``); a
-    mismatch means the compiled plan itself changed. Regenerate the fixture
-    only when the plan change is intended.
-    """
-    current = _portable_plan_ref()
+    current = compiled_run_plan_ref(compile_plan(resolve_profile(REPO / DEFAULT_PROFILE)))
     golden_path = REPO / "tests" / "fixtures" / "plan_ref_golden.txt"
     golden_path.parent.mkdir(parents=True, exist_ok=True)
 
