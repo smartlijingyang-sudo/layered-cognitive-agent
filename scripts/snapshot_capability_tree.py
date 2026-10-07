@@ -323,6 +323,52 @@ def _parse_plugin_decorator(tree: ast.Module, module_path: str) -> PluginManifes
     return None
 
 
+def _parse_composer_factory_call(tree: ast.Module, module_path: str) -> PluginManifest | None:
+    """Extract plugin metadata from a ``_register_composer_plugin(...)`` factory call.
+
+    RA-008 converged the three phase-composer provider shells into one factory,
+    so the literal ``@plugin`` decorator no longer exists in these modules and
+    the decorator scan misses them. The factory derives every decorator field
+    from ``plane_key`` (plus ``plane_noun``/``interface`` for human-readable
+    text), so the manifest is reconstructed exactly as the old decorator scan
+    produced it.
+    """
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Call):
+            continue
+        func = node.func
+        if not isinstance(func, ast.Name) or func.id != "_register_composer_plugin":
+            continue
+        kwargs: dict[str, str] = {}
+        for kw in node.keywords:
+            if kw.arg is None:
+                continue
+            if isinstance(kw.value, ast.Constant) and isinstance(kw.value.value, str):
+                kwargs[kw.arg] = kw.value.value
+        plane_key = kwargs.get("plane_key")
+        plane_noun = kwargs.get("plane_noun")
+        interface = kwargs.get("interface")
+        if not (plane_key and plane_noun and interface):
+            continue
+        plugin_id = f"lca-plan-{plane_key}-composer"
+        provides_key = f"composer.{plane_key}"
+        return PluginManifest(
+            id=plugin_id,
+            module=module_path,
+            layer="L4",
+            kind="provider",
+            provides=(provides_key,),
+            requires=(),
+            implements=("AgentGraphComposer",),
+            effects=("none",),
+            functional_group=None,
+            description=f"Plan-bound {plane_noun} composer with a narrow {interface} interface.",
+            test_suite="tests/composer/test_composer_consumes_compiled_capability.py",
+            plane=_classify_plane(module_path, "L4", "provider"),
+        )
+    return None
+
+
 def _scan_plugins() -> list[PluginManifest]:
     """Scan plugin directories for ``@plugin`` decorators."""
     manifests: list[PluginManifest] = []
@@ -339,6 +385,8 @@ def _scan_plugins() -> list[PluginManifest]:
         except (SyntaxError, UnicodeDecodeError):
             continue
         manifest = _parse_plugin_decorator(tree, rel)
+        if manifest is None:
+            manifest = _parse_composer_factory_call(tree, rel)
         if manifest:
             manifests.append(manifest)
     return manifests
