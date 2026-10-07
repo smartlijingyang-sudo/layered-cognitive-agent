@@ -121,7 +121,7 @@ def _read_field(
 
     Returns ``_MISSING`` when the key is absent from the source dict.
     """
-    if field.source == "evidence_ref" or field.source == "constant":
+    if field.source in ("evidence_ref", "constant"):
         return _MISSING
     if field.source == "argument":
         if field.python_key not in args:

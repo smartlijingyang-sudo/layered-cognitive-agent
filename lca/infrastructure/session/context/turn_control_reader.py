@@ -182,10 +182,7 @@ def consecutive_same_tool(state: AgentState, tool_name: str) -> int:
     """Count consecutive USE_TOOL turns targeting ``tool_name`` (newest first)."""
     count = 0
     for turn in iter_control_turns_reversed(state):
-        if (
-            turn.action_type != ActionType.USE_TOOL.value
-            and turn.action_type != ActionType.USE_TOOL
-        ):
+        if turn.action_type not in (ActionType.USE_TOOL.value, ActionType.USE_TOOL):
             break
         if turn.tool_name != tool_name:
             break
@@ -199,10 +196,7 @@ def consecutive_identical_tool_calls(state: AgentState, fingerprint: str | None)
         return 0
     count = 0
     for turn in iter_control_turns_reversed(state):
-        if (
-            turn.action_type != ActionType.USE_TOOL.value
-            and turn.action_type != ActionType.USE_TOOL
-        ):
+        if turn.action_type not in (ActionType.USE_TOOL.value, ActionType.USE_TOOL):
             break
         if view_tool_fingerprint(turn) != fingerprint:
             break

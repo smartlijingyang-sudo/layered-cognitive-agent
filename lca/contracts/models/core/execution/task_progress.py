@@ -69,7 +69,7 @@ class TaskProgress:
         判定:remaining 已耗尽 + confidence 足够高(≥ 0.8)。该阈值与
         MultiToolLoopBreakerGate / TaskProgressGate 共用(PR-B 落地后)。
         """
-        return len(self.remaining) == 0 and self.confidence >= 0.8
+        return not self.remaining and self.confidence >= 0.8
 
     def __eq__(self, other: object) -> bool:
         if not isinstance(other, TaskProgress):

@@ -12,7 +12,7 @@ _FILE_KEYS = ("files_created", "files")
 
 
 def _is_use_tool(action_type: object) -> bool:
-    return action_type == ActionType.USE_TOOL or action_type == "use_tool"
+    return action_type in (ActionType.USE_TOOL, "use_tool")
 
 
 def payload_stdout(payload: object | None, *, limit: int = 4000) -> str:
