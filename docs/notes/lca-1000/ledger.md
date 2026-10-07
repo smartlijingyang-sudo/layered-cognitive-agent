@@ -1006,3 +1006,14 @@
 - 验证结果: 无代码改动，无需验证门。扫描脚本 exit 0（ast0522/dead0522/dead0522b/sndb0522）；开工/收工工作区干净（main，ahead 27，未 push，no-push 规则在；d3547bcc8 raphy merge @02:49 在本轮 explore 范围内）。
 - commit: 无代码 commit；本台账单独 docs commit（沿用 0520/0521 `docs(lca-1000): 第0522轮台账` 模式）。
 - 备注: 只 commit docs/notes/lca-1000/ledger.md（`git commit -- <path>` 显式路径）；并发会话本轮期间无新落盘（raphy merge 02:49 早于本轮开工）。注意：252 /tmp 发现 02:05 生成的 sndb0522.py（疑为 02:03 轮次中断残留），ledger 无 0522 条目、无相关 commit，确认无状态需修复；scan/dead 脚本输出已存 252 /tmp；B-092（companion 镜像组 dropped）已记 backlog.md 后续轮免复查。教训：scp 被远端 MOTD banner 挡（Received message too long）——脚本传输用分块 cat > / >> stdin 重定向；ssh252 heredoc 外层会被吃；跨机器脚本归一化差异时 hash diff 失效，改人工逐组裁决。
+补记 (2026-10-08 03:15，轮次外提交): d1844d36d `refactor(doctor): drop dead except RuntimeError re-raise in plugin_shape`（-2 行，删 `PluginShapeDoctor.run()` 中永不分流的 `except RuntimeError: raise`——RuntimeError 不是 FileNotFoundError 子类；commit message 记录 tests/harness/diagnostics/doctor/test_plugin_shape.py 27 passed、ruff clean）。该提交时间落在 0522 轮台账提交之后、0523 轮开工之前，不归属任何一轮；在此补记，不 push（no-push 规则）。
+
+
+## 第0523轮 (2026-10-08 03:33-03:55 CST)
+- 改了什么: `scripts/check_protocol_schema_version.py` 2 行：ALLOWLIST 路径从 `lca/infrastructure/observability/journal/journal_io.py` 更新为 `lca/infrastructure/observability/journal/engine/journal_io.py`；首注释中的文件名同步。TODO(adr-0096) 保留（payload rename 尚未落地，写点仍在 engine/journal_io.py:127）。
+- 依据 skill 哪一节: deslop 清单之"死兼容路径" + LANGUAGE.md（load-bearing interface knowledge：ALLOWLIST 是 CI 门禁对树结构的契约接口，接口随树移动）。
+- 为什么实质: 该脚本接在 CI（ci.yml:28）、pre-commit、pyproject lint 三处。`journal/` 拆包（605e30eab）后已知 `.data` 写点搬到 `engine/journal_io.py:127`，旧 allowlist 不再命中任何路径——修复前脚本在本树上直接 FAIL（红门禁），修复后 PASS。修复前/后门禁行为有真实差异，非凑数改动。Deletion test 反向：删掉 allowlist 会让门禁在已知刻意写点上误报，故正确动作是更新路径而非删除。
+- 选择理由（夜间跳过 grilling，记台账）: 本轮 explore 候选清单：1. AST 同体扫描（8397 函数/243 组，确定性重跑组集合一致）——与 0522 基线逐成员一致，无新组，0522 已逐组人工裁决；2. dead-code 17 真死候选——与 0520–0522 逐成员一致，全部为既往裁决（pydantic @field_validator/@model_validator classmethod、typer @callback 框架按名调用假阳性、`_RoleConfig` docstring 明确保留意图的静态锚点）；3. sndb 同名异体 290 组——与 0521/0522 数量一致，无新可疑对；4. deslop 清单：TODO/FIXME/HACK 均为既往裁决或语义词（s3.py ADR-0167 PR-10 占位、audit 脚本 ADR-XXXX 示例、expander.py 中文示例 XXX、_XFAIL_TODO47 测试标记）；"自承 dead" 全为语义词（dead lock/dead letter/deadline）；noqa F401 两处新命中（tests/architecture/test_0199_invariants_snapshot.py 内 import、grok_x.py re-export）均为有依据的测试/重导出设计，不动；except Exception 791 处沿用既往抽查裁决；5. raphy 自 02:49 merge 后无新落盘。唯一可行动项即本轮修复。
+- 验证结果: `python3 scripts/check_protocol_schema_version.py` → PASS（修复前 FAIL，exit 1）；`~/.local/bin/ruff check` All checks passed；`ruff format --check` clean。
+- commit: 52cd8337c refactor(lca-1000): 第0523轮 跟随 journal/ 拆分更新 CI 门禁的过期 allowlist 路径（未 push）。
+- 备注: 只 add/commit 本轮 1 文件，`git commit -- <path>` 显式路径；开工/收工工作区干净（main，nothing to commit）。教训：ssh252 双引号包裹命令时外层 shell 会求值反引号——patch 字符串含反引号时改用无反引号子串替换（沿用 0521"heredoc 会被外层吃掉"教训）。
