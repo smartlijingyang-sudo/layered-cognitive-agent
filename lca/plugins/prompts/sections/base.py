@@ -23,12 +23,6 @@ class _RoleConfig(_EmptyConfig):
     """Role section has no knobs; kept as a class to anchor plugin typing."""
 
 
-class _TextConfig(_EmptyConfig):
-    """Static instruction blocks read their text from Config.text."""
-
-    text: str
-
-
 class _ToolsConfig(_EmptyConfig):
     """Tools section has no knobs — catalog content is injected at render time."""
 
