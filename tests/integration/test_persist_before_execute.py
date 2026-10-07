@@ -112,6 +112,7 @@ class _FakeTool:
     recorder: _Recorder
     effect_kind: str = "ephemeral"
     is_idempotent: bool = True
+    success: bool = True
 
     async def execute(self, args: dict[str, Any]) -> Any:
         from lca.contracts.atoms.ids.ids import new_id
@@ -120,7 +121,7 @@ class _FakeTool:
         self.recorder.calls.append({"name": self.name, "args": dict(args)})
         return Observation(
             observation_id=new_id("obs"),
-            success=True,
+            success=self.success,
             payload={"echo": args},
         )
 
@@ -358,3 +359,117 @@ def test_result_write_failure_reports_persistence_failed_but_tool_ran() -> None:
     msgs = writer.derive_messages()
     assert [m["role"] for m in msgs] == ["user", "assistant"]
     assert msgs[1]["tool_calls"] == [{"id": "call-1", "name": "echo", "arguments": '{"x": 1}'}]
+
+
+def test_dispatch_tool_calls_with_empty_tool_calls_raises() -> None:
+    """A decision with no ``tool_calls`` is a composition bug — fail loud.
+
+    ``dispatch_tool_calls`` raises ``ToolExecutionError`` before persisting
+    anything, so an empty decision can never produce an assistant row that
+    declares zero calls (which would read as a completed turn).
+    """
+    session = _FlakySession(fail_after=10**6)  # never fail
+    writer = RunSessionWriter(session=session)
+    recorder = _Recorder()
+    registry = _FakeToolRegistry(tools={"echo": _FakeTool(name="echo", recorder=recorder)})
+
+    body = SimpleBody(
+        tool_registry=registry,  # type: ignore[arg-type]
+        safe_executor=_FakeSafeExecutor(),  # type: ignore[arg-type]
+        transport_registry=None,  # type: ignore[arg-type]
+        action_registry=None,  # type: ignore[arg-type]
+        writer=writer,
+    )
+
+    empty = Decision(
+        decision_id="dec-empty",
+        action_type=ActionType.USE_TOOL.value,
+        rationale="test",
+        confidence=1.0,
+        tool_calls=[],
+    )
+    with pytest.raises(ToolExecutionError):
+        asyncio.run(body.dispatch_tool_calls(decision=empty))
+    assert recorder.calls == []
+    assert session.events == []
+
+
+def test_unregistered_tool_reports_tool_not_registered() -> None:
+    """Unknown tool name → FAILED receipt naming the missing tool.
+
+    The assistant row is still persisted first (it carries the declared
+    call); the missing tool produces a single
+    ``EffectReceipt(FAILED, error_code="tool_not_registered:<name>")`` with
+    no tool_result row — no silent skip, no executor invocation.
+    """
+    session = _FlakySession(fail_after=10**6)  # never fail
+    writer = RunSessionWriter(session=session)
+    recorder = _Recorder()
+    registry = _FakeToolRegistry()  # nothing registered
+
+    body = SimpleBody(
+        tool_registry=registry,  # type: ignore[arg-type]
+        safe_executor=_FakeSafeExecutor(),  # type: ignore[arg-type]
+        transport_registry=None,  # type: ignore[arg-type]
+        action_registry=None,  # type: ignore[arg-type]
+        writer=writer,
+    )
+
+    receipts = asyncio.run(
+        body.dispatch_tool_calls(
+            decision=_decision_with_one_tool_call(call_id="call-9", tool_name="ghost")
+        )
+    )
+
+    assert len(receipts) == 1
+    receipt = receipts[0]
+    assert isinstance(receipt, EffectReceipt)
+    assert receipt.outcome is EffectOutcome.FAILED
+    assert receipt.error_code == "tool_not_registered:ghost"
+    assert recorder.calls == []  # nothing executed
+
+    surface_events = [e for e in session.events if e.type.startswith("surface/")]
+    assert [e.type for e in surface_events] == ["surface/assistant_message"]
+
+
+def test_failed_tool_execution_persists_result_and_reports_execution_failed() -> None:
+    """Tool runs but returns ``success=False`` → FAILED(tool_execution_failed).
+
+    Per-call semantics: the failure is isolated to this call's receipt; the
+    ``surface/tool_result`` row IS persisted (the journal records the
+    failure), and the receipt error_code names the execution failure — not
+    a persistence failure.
+    """
+    session = _FlakySession(fail_after=10**6)  # never fail
+    writer = RunSessionWriter(session=session)
+    recorder = _Recorder()
+    registry = _FakeToolRegistry(
+        tools={"echo": _FakeTool(name="echo", recorder=recorder, success=False)}
+    )
+
+    body = SimpleBody(
+        tool_registry=registry,  # type: ignore[arg-type]
+        safe_executor=_FakeSafeExecutor(),  # type: ignore[arg-type]
+        transport_registry=None,  # type: ignore[arg-type]
+        action_registry=None,  # type: ignore[arg-type]
+        writer=writer,
+    )
+
+    receipts = asyncio.run(body.dispatch_tool_calls(decision=_decision_with_one_tool_call()))
+
+    assert len(receipts) == 1
+    receipt = receipts[0]
+    assert isinstance(receipt, EffectReceipt)
+    assert receipt.outcome is EffectOutcome.FAILED
+    assert receipt.error_code == "tool_execution_failed"
+    assert recorder.calls == [{"name": "echo", "args": {"x": 1}}]  # tool did run
+
+    surface_events = [
+        e
+        for e in session.events
+        if e.type.startswith("surface/") or e.type == SURFACE_TOOL_RESULT_TYPE
+    ]
+    assert [e.type for e in surface_events] == [
+        "surface/assistant_message",
+        SURFACE_TOOL_RESULT_TYPE,
+    ]
