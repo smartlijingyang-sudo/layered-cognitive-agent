@@ -24,7 +24,7 @@ from lca.infrastructure.observability.loop_cursor.projection.host import (
     FlushReport,
     StdProjectionHost,
 )
-from lca.infrastructure.observability.loop_cursor.projections.defaults import (
+from lca.infrastructure.observability.loop_cursor.projection_derivers.defaults import (
     default_projection_keys,
 )
 from lca.infrastructure.observability.spine.event.record import EventRecord
@@ -284,7 +284,7 @@ def test_default_projection_list_does_not_consume_close_ep() -> None:
         / "infrastructure"
         / "observability"
         / "loop_cursor"
-        / "projections"
+        / "projection_derivers"
         / "defaults.py"
     )
     source = defaults_path.read_text(encoding="utf-8")

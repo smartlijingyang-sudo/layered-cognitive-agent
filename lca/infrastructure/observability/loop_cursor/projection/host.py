@@ -23,7 +23,7 @@ from lca.contracts.observability.cursor.loop_projection import (
     LoopProjectionSnapshot,
     ProjectionToken,
 )
-from lca.infrastructure.observability.loop_cursor.projections.defaults import (
+from lca.infrastructure.observability.loop_cursor.projection_derivers.defaults import (
     default_projection_definitions,
 )
 from lca.infrastructure.observability.spine.event.record import EventRecord

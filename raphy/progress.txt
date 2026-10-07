@@ -97,3 +97,20 @@ no changes added to commit (use "git add" and/or "git commit -a")
     blast radius；但这也意味着该语义目前只被测试消费——未来接生产调用方时
     以本次落定的 change-gated 为准。
 ---
+## 2026-10-07 12:50 - RA-011
+
+- 实现: `loop_cursor/projections/` 改名为 `loop_cursor/projection_derivers/`
+  (load-bearing 名;二选一方案中的改名项)。`git mv` 保留历史;
+  9 个文件机械更新 import(3 lca + 6 tests);`test_projection_host.py:287`
+  Path 分段拼接的硬编码路径一并修正。
+- TYPE_CHECKING 重审: `projection_derivers/defaults.py:38` 的
+  `from lca.infrastructure.observability.loop_cursor.projection.host import ...`
+  仍在 TYPE_CHECKING 内;实测两模块双向 import 无循环,未引入运行时依赖。
+- 测试: `uv run pytest tests/observability/loop_cursor/ --no-cov -q` 122 passed;
+  `ruff check` 全过;全仓 grep 旧路径 `loop_cursor.projections` 归零。
+- **Learnings for future iterations:**
+  - 改名类 story 的验收必须扫 `Path(...) / "xxx"` 分段拼接路径,
+    纯文本 `loop_cursor/xxx` 正则扫不到它(本轮被它绊住 1 个测试)。
+  - `git mv` + sed 是这类 story 最小 churn 路径;改名后用
+    `importlib.import_module` 双向加载验循环,比读代码更可靠。
+---
