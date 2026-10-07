@@ -143,3 +143,29 @@ no changes added to commit (use "git add" and/or "git commit -a")
   - Pre-existing reds get verified on a pristine worktree (`~/.lca-worktrees/`, never /tmp),
     never fixed inside an unrelated story; worktree removed after.
 ---
+
+## 2026-10-07 14:04 - RA-013
+
+- `SimpleBody.dispatch_tool_calls` 的 5 处 `EffectReceipt` 内联构造收敛为
+  模块级 `_receipt(call, outcome, idempotency_key, error_code=None)`；
+  receipt 构造簇内 `provider="body.dispatch_tool_calls"` 与
+  `invocation_id=call.call_id` 现各出现一次（helper 内）；
+  `idempotency_key` 3 种形状（`:persist_assistant`、`:persist_result`、
+  裸 `call_id`×3）与 `error_code` 字符串逐字保留。
+- Files changed:
+  - `lca/cognition/body/executor/simple_body.py`
+    （新增 `_receipt` helper + `ToolCall` import，5 处调用点改调 helper）
+  - `raphy/prd.json`（RA-013 passes=true）、`raphy/progress.txt`
+- 测试：`pytest tests/ -k 'dispatch_tool_calls or simple_body' --no-cov -q`
+  23 passed；`ruff check` + `ruff format --check` 全过。
+- **Learnings for future iterations:**
+  - 评估说"4 处"，grep 实得 5 处（persist_assistant 的 list-comprehension
+    站点被漏数）——"converge N identical X" 类 story 开工前先 grep 数准，
+    实现数≠评估数时记 delta（如 RA-008 的 assessed 7 / converged 9）。
+  - `EffectReceipt.__post_init__` 对 SUCCEEDED+error_code / FAILED-error_code
+    是 fail-loud ValueError：helper 的 `error_code=None` 默认与省略等价，
+    成功站点不传码，契约行为不变。
+  - 验收"X 出现 exactly once"要限定簇内：本文件另一个
+    `invocation_id=call.call_id` 是 `safe_executor.execute` 的 kwarg，
+    与 receipt 无关——grep 计数前先看上下文。
+---

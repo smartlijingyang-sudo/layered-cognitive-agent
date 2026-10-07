@@ -206,8 +206,8 @@
         "Behavior preserved: uv run pytest tests/ -k 'dispatch_tool_calls or simple_body' --no-cov -q passes; uv run ruff check passes on the touched file"
       ],
       "priority": 4,
-      "passes": false,
-      "notes": "Source: raphy assess Round 3 2026-10-07 (Worth exploring, friction walk C-Q5 + duplication scan). The round's single duplication-class story per diversity quota; follows the codebase's established 'converge N identical X' idiom (RA-001/RA-002)."
+      "passes": true,
+      "notes": "Source: raphy assess Round 3 2026-10-07 (Worth exploring, friction walk C-Q5 + duplication scan). The round's single duplication-class story per diversity quota; follows the codebase's established 'converge N identical X' idiom (RA-001/RA-002). | Implemented 2026-10-07: added module-level _receipt(call, outcome, idempotency_key, error_code=None) in lca/cognition/body/executor/simple_body.py; provider='body.dispatch_tool_calls' and invocation_id=call.call_id now appear exactly once each inside the receipt-construction cluster (both live in the helper). Assessment said 4 constructions, grep found 5 (the persist_assistant list-comprehension site was missed) -- all 5 converged. idempotency_key shapes preserved verbatim (':persist_assistant', ':persist_result', bare call_id x3); success site passes no error_code (None default == omitted per EffectReceipt). The other invocation_id=call.call_id occurrence in the file is safe_executor.execute's kwarg, not a receipt. Tests: pytest -k 'dispatch_tool_calls or simple_body' 23 passed; ruff check + ruff format clean."
     }
   ]
 }
