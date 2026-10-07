@@ -38,6 +38,8 @@ from lca.infrastructure.sandbox.runtime.mount import (
     load_mount_files,
     verify_mount_or_error,
 )
+from lca.infrastructure.skills.format.routing import enrich_inspect_profile
+from lca.infrastructure.workspace import get_run_workspace
 
 _log = structlog.get_logger(__name__)
 
@@ -476,9 +478,6 @@ class RunBoundSandboxRuntime(SandboxRuntime):
                     environment_ready=False,
                 )
             profile = {"files": [], "profiles": {}}
-        from lca.infrastructure.skills.format.routing import enrich_inspect_profile
-        from lca.infrastructure.workspace import get_run_workspace
-
         profile = enrich_inspect_profile(profile)
         self._inspect_profile = profile
         workspace = get_run_workspace()

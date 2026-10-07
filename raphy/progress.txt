@@ -518,3 +518,33 @@
   - 跨进程恢复设计的每个分支单独判定可达性：registration=None+命中是设计路径，
     registration!=None+丢失才是 fail-loud 目标——两种 None 不可混为一谈。
 ---
+
+## 2026-10-07 23:27+ - RA-020（Round 6 optimize）
+
+- 实现：`lca/infrastructure/sandbox/runtime/runtime.py` `_run_inspect_internal` 两处
+  函数级 import 提模块顶层（`lca.infrastructure.skills.format.routing.enrich_inspect_profile`、
+  `lca.infrastructure.workspace.get_run_workspace`，isort 字母序落在 sandbox.* 之后）；
+  函数内延迟 import 删除；调用语义不变，层边诚实化。
+  - 改动前/后各跑一遍三种顺序 fresh-interpreter 探针（routing-first /
+    runtime-first / workspace-first）全过——无 import cycle（RA-009/RA-012
+    纪律的延续：guilty-until-proven-innocent 证伪，延迟 import 无存在理由）。
+  - runtime.py 内 grep（defer/lazy/cycle）零命中，无 lazy-import 注释声明，
+    无需清理陈旧注释。
+  - 探针按 `tests/persistence/test_run_paths_import_order.py` 先例固化为 3 个测试
+    （`tests/infrastructure/sandbox/test_sandbox_runtime_import_order.py`），
+    每顺序独立 fresh interpreter，防 pytest collection 顺序掩盖真实 cycle。
+- 测试：`tests/infrastructure/sandbox/` 22 passed（19 原有 + 3 新增 import-order）；
+  ruff check 绿（runtime.py + 新测试文件）。
+- Files changed: `lca/infrastructure/sandbox/runtime/runtime.py`、
+  `tests/infrastructure/sandbox/test_sandbox_runtime_import_order.py`、
+  `raphy/prd.json`（RA-020 passes=true，notes 记录实现与评估的差异）、
+  `raphy/progress.txt`（本节）。
+- **Learnings for future iterations:**
+  - deferred-import 故事统一用三顺序 fresh-interpreter 探针判 innocence：改动前
+    跑一遍（基线）、改动后再跑一遍（证据）、再固化为 subprocess 测试——
+    `test_run_paths_import_order.py` idiom 可直接抄（noqa S603 注释别漏）。
+  - 主 checkout 脏（iter-tests lane 并发在 main 上干活 + raphy-assess.md 未提交）
+    时按脏树规则走隔离 worktree（`~/.lca-worktrees/raphy-20261007-2327`），
+    绝不 `checkout` 切分支、不碰他人未提交内容；ssh252 输出头部 git 状态块
+    是包装器注入的主工作目录状态，用 ZZMARK marker 定位真实输出。
+---
