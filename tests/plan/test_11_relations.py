@@ -541,10 +541,12 @@ class TestProjectCapabilityPlan:
     def test_provider_bindings_have_capability_owner(self) -> None:
         resolved = resolve_profile("profiles/web-standard.yaml")
         plan = project_capability_plan(resolved)
-        # Sample: lca-llm-service provides 'llm'
-        llm_bindings = [b for b in plan.provider_bindings if b.capability == "llm"]
+        # Sample: lca-llm-resolver provides 'llm_resolver'.
+        # (The old lca-llm-service/'llm' provider model was deleted with
+        # lca/plugins/think/llm in d9b62dec8; resolver model is its successor.)
+        llm_bindings = [b for b in plan.provider_bindings if b.capability == "llm_resolver"]
         assert len(llm_bindings) == 1
-        assert llm_bindings[0].owner_plugin == "lca-llm-service"
+        assert llm_bindings[0].owner_plugin == "lca-llm-resolver"
 
     def test_disabled_excluded_by_default(self) -> None:
         """include_disabled=False 时 disabled plugin 不参与。"""
