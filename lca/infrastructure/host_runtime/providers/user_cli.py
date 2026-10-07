@@ -75,12 +75,16 @@ def _stage_privileged_file(
     with tempfile.NamedTemporaryFile(mode="w", suffix=".sh", delete=False) as file:
         file.write(content)
         file.flush()
-        run_sudo(["cp", file.name, str(dest)])
-        if owner is not None:
-            run_sudo(["chown", owner, str(dest)])
-        if mode is not None:
-            run_sudo(["chmod", mode, str(dest)])
-        Path(file.name).unlink(missing_ok=True)
+        # unlink in finally: a failing sudo call must not leave the staging
+        # tempfile (holding privileged content) on disk.
+        try:
+            run_sudo(["cp", file.name, str(dest)])
+            if owner is not None:
+                run_sudo(["chown", owner, str(dest)])
+            if mode is not None:
+                run_sudo(["chmod", mode, str(dest)])
+        finally:
+            Path(file.name).unlink(missing_ok=True)
 
 
 class CLIProvider(Provider):
