@@ -375,9 +375,9 @@
     "New tests: step_id_for(3) == 'step-003'; step_id_from_cursor(None, 't') == 'step-unknown-t'; existing step_id/fold tests green; ruff check clean"
    ],
    "priority": 1,
-   "passes": false,
+   "passes": true,
    "branchName": "raphy/arch-20261008-0206",
-   "notes": "Strength: Worth exploring. Cross-module duplication found in the secondary scan after the friction walk: 4 independent derivations of the same convention, two of them (llm_call/invoke.py:116 and reasoner.py:232) verbatim identical including the fallback. Deletion test: concentrates (format knowledge moves from 4 sites to 1). Constraint: the 'step-NNN' byte shape is load-bearing for fold key matching — must not change."
+   "notes": "Strength: Worth exploring. Cross-module duplication found in the secondary scan after the friction walk: 4 independent derivations of the same convention, two of them (llm_call/invoke.py:116 and reasoner.py:232) verbatim identical including the fallback. Deletion test: concentrates (format knowledge moves from 4 sites to 1). Constraint: the 'step-NNN' byte shape is load-bearing for fold key matching — must not change.\nDONE 2026-10-08 (optimize session): new seam in lca/contracts/atoms/ids/ids.py (next to new_id): step_id_for(step_index) -> 'step-{n:03d}' (pure format; LoopCursor-shape note moved into its docstring) + step_id_from_cursor(cursor, template_id) -> str (None/exception -> 'step-unknown-{template_id}'). Spike chose contracts/atoms over cursor-side: cursor lives in infrastructure/observability, cognition/brain importing it would be a wrong-direction dependency; contracts is the bottom layer all four call sites already import. All four call sites converged: hook.py deleted _step_id_for (3 sites -> step_id_for); llm_call/invoke.py + reasoner.py verbatim 7-line rituals -> step_id_from_cursor; nodes/think/llm/invoke.py kept its distinct state.step fallback chain, format -> step_id_for(step). Byte-identical step_id strings before/after. step_{n:03d} underscore variants (journal_fold default / writable_matrix) confirmed different surface, left untouched per AC. Tests: 6 new (tests/contracts/atoms/test_step_id.py) incl. AC's step_id_for(3)=='step-003' and step_id_from_cursor(None,'t')=='step-unknown-t'; 73 passed (hook/step_tree/h7/contracts suites); ruff clean."
   },
   {
    "id": "RA-026",

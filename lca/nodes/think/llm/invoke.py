@@ -24,6 +24,7 @@ from typing import Any
 
 from lca.contracts.atoms.control.slot import ControlSlot
 from lca.contracts.atoms.functional.group import FunctionalGroup
+from lca.contracts.atoms.ids.ids import step_id_for
 from lca.contracts.atoms.scope.scope import Scope
 from lca.contracts.harness.composition.plugin_contract import (
     ArchitectureContract,
@@ -187,7 +188,7 @@ def _model_visible_identity(state: Any, request: Any) -> tuple[Any, Any]:
         if isinstance(step_index, int):
             step = step_index + 1
     reasoner_prompt = CurrentReasonerPrompt(
-        step_id=f"step-{step:03d}",
+        step_id=step_id_for(step),
         template_id="",
         selector_decision_path="",
         system_prompt_text=str(request.system or ""),

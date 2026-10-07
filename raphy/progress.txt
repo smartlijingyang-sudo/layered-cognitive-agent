@@ -720,3 +720,29 @@
     保持 stub 块干净。
 ---
 
+
+## 2026-10-08 03:20 - RA-025
+
+- **实现**：`lca/contracts/atoms/ids/ids.py` 新增 `step_id_for(step_index: int) -> str`
+ （纯格式 `step-{n:03d}`；`_step_id_for` 的"与 LoopCursor step_id 形态一致"docstring 注记搬进新
+  seam）+ `step_id_from_cursor(cursor, template_id: str) -> str`（cursor 缺席/异常 →
+  `step-unknown-{template_id}`）。四处调用点全部收敛：hook.py 删 `_step_id_for`（3 处改调
+  `step_id_for`，docstring 提及同步改）；llm_call/invoke.py 与 reasoner.py 的逐字 7 行回退仪式
+  → `step_id_from_cursor(cursor, render.trace.template_id)`；nodes/think/llm/invoke.py 保留其特有的
+  `state.step` 回退链，只把格式串换成 `step_id_for(step)`。
+- **spike 落点**：选 `lca/contracts/atoms/ids`（随 `new_id`），不选 cursor 附近——cursor 住在
+  `infrastructure/observability/loop_cursor`，`cognition/brain` 反向依赖它是层向错误；
+  contracts 是四个调用点（plugins ×2、nodes、cognition）都能无环 import 的最底层，
+  且 step-NNN 形态本就是跨层约定（fold key/hook key/reasoner key），属契约层知识。
+- **文件**：`lca/contracts/atoms/ids/ids.py`、`lca/plugins/events/hooks/model_visible/hook.py`、
+  `lca/plugins/primitive/llm_call/invoke.py`、`lca/nodes/think/llm/invoke.py`、
+  `lca/cognition/brain/reasoner/reasoner.py`、新 `tests/contracts/atoms/test_step_id.py`（6）。
+- **验证**：字节形态前后一致（`step_id_for(3)=="step-003"` 等 6 新测试全绿）；73 回归全绿
+  （hook/step_tree/h7/contracts）；ruff 全绿。`step_{n:03d}` 下划线变体（journal_fold 缺省 /
+  writable_matrix）确认为不同 surface 的漂移，按 AC 只记录未动。
+- **Learnings for future iterations:**
+  - 收敛"逐字相同"时先确认语义也相同：nodes/think 的派生有 `state.step` 回退链，
+    与 llm_call/reasoner 的 7 行仪式不是同一形状——只收敛格式串，不硬套 from_cursor。
+  - 新 seam 落点用层向论证（谁可以 import 谁）而非"离概念近"，结论更硬。
+---
+

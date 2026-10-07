@@ -20,6 +20,7 @@ from typing import Any
 
 from lca.contracts.atoms.control.slot import ControlSlot
 from lca.contracts.atoms.functional.group import FunctionalGroup
+from lca.contracts.atoms.ids.ids import step_id_from_cursor
 from lca.contracts.atoms.scope.scope import Scope
 from lca.contracts.harness.composition.plugin_contract import (
     ArchitectureContract,
@@ -109,13 +110,7 @@ class LlmInvokeExecutor:
         reasoner_prompt: Any = None
         if render.trace is not None:
             cursor = CursorRecord.get()
-            if cursor is None:
-                step_id = f"step-unknown-{render.trace.template_id}"
-            else:
-                try:
-                    step_id = f"step-{cursor.snapshot.step_index + 1:03d}"
-                except Exception:
-                    step_id = f"step-unknown-{render.trace.template_id}"
+            step_id = step_id_from_cursor(cursor, render.trace.template_id)
             reasoner_prompt = CurrentReasonerPrompt(
                 step_id=step_id,
                 template_id=render.trace.template_id,

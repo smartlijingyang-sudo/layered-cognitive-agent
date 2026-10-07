@@ -21,6 +21,7 @@ from typing import Any
 
 from lca.cognition.brain.llm_turn import execute_llm_turn
 from lca.cognition.brain.sections.assembler import render_template
+from lca.contracts.atoms.ids.ids import step_id_from_cursor
 from lca.contracts.models.cognition.boundary import (
     ForkedTools,
     ReasonerContext,
@@ -225,13 +226,7 @@ class PromptReasoner:
             )
 
             cursor = CursorRecord.get()
-            if cursor is None:
-                step_id = f"step-unknown-{render.trace.template_id}"
-            else:
-                try:
-                    step_id = f"step-{cursor.snapshot.step_index + 1:03d}"
-                except Exception:
-                    step_id = f"step-unknown-{render.trace.template_id}"
+            step_id = step_id_from_cursor(cursor, render.trace.template_id)
             reasoner_prompt = CurrentReasonerPrompt(
                 step_id=step_id,
                 template_id=render.trace.template_id,
