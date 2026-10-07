@@ -130,8 +130,6 @@ def _kind_from_execution_target(
         return PlaneKind.MACHINE
     if plan.target is ExecutionTarget.SANDBOX:
         return PlaneKind.SANDBOX
-    if plan.target is ExecutionTarget.NONE:
-        return None
     return None
 
 
