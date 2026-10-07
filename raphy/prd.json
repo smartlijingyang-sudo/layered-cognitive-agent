@@ -277,6 +277,62 @@
       "priority": 3,
       "passes": true,
       "branchName": "raphy/arch-20261007-2005"
+    },
+    {
+      "id": "RA-019",
+      "title": "Converge the session store-observer attach ritual into one _shared seam",
+      "description": "As an LCA maintainer, I want the five session plugins that attach observers to SessionStore (projection_cache, telemetry_capture, title_service, spine_anomaly, projection_registry) to share one attach ritual, so the fail-loud/failed-contained/cancel-stash contract lives in lca/plugins/session/_shared.py and the five copies cannot drift.",
+      "acceptanceCriteria": [
+        "One _shared helper (e.g. attach_store_observers(store, attach_one, hooks_sink)) covers: iterate store.list() with per-session containment, require_observer_hook fail-loud, hook the same attach_one for future create/restore, stash cancel in hooks_sink; all 5 call sites migrated",
+        "Canonical ordering decided and documented: title_service requires the hook BEFORE iterating (no partial attach on fail-loud) vs the other four list-first; chosen order applied uniformly, delta recorded in commit body",
+        "Existing session-plugin tests (projection_cache, telemetry_capture, title_service, spine_anomaly, projection_registry) all green; ruff check clean"
+      ],
+      "priority": 1,
+      "passes": true,
+      "branchName": "raphy/arch-20261007-2315",
+      "notes": "Strength: Worth exploring. Area A friction walk (session plugin cluster), duplication class with 5 sites. Evidence: grep for require_observer_hook shows 5 call sites; projection_cache._attach_to_store (module fn), telemetry_capture._attach_to_store (module fn), title_service.attach_to_store (method), spine_anomaly.register_spine_anomaly_to_store (module fn), projection_registry site. Four share list-then-require order; title_service is require-first. Deletion test: converges (ritual knowledge concentrated); per-plugin attach_one (register_to / _observe_contained+seed cursor / _TitleObserver / anomaly observer) stays per-plugin. Constraint: fail-loud/fail-soft semantics must not change (fail-soft containment per session is a documented DSH-alignment choice).\n实现与评估的差异：① canonical 顺序裁定为 require-first（title_service 派），projection_cache / telemetry_capture / spine_anomaly / projection_registry 四家从 list-first 改为 require-first——钩子缺失时零部分挂入（原来先挂完现存 Session 再抛 TypeError，留下半接线状态）；② 评估假设 attach_one 签名 attach_store_observers(store, attach_one, hooks_sink)，实现保持该形状，hooks_sink 缺省 None（spine_anomaly / projection_registry 无 _store_hooks，保持原先丢弃 cancel 行为）；③ 附带收敛：projection_cache 原先 loop 与 _on_create 两份字节级相同的挂入体（含 contained warning），收敛为一个 _observe_one attach_one，无行为变化；④ 新增契约测试 tests/plugins/session/test_attach_store_observers.py（3 个：缺钩子零部分挂入 / 现存+未来+cancel 入 sink / sink 缺省丢弃），tests/plugins/session/ 283 全绿，ruff check 干净。"
+    },
+    {
+      "id": "RA-020",
+      "title": "Lift the deferred imports in sandbox _run_inspect_internal to module level",
+      "description": "As an LCA maintainer, I want lca/infrastructure/sandbox/runtime/runtime.py to import enrich_inspect_profile and get_run_workspace at module level, so the layer edges are honest at the seam instead of hiding behind function-local imports.",
+      "acceptanceCriteria": [
+        "The two function-local imports (lca.infrastructure.skills.format.routing.enrich_inspect_profile, lca.infrastructure.workspace.get_run_workspace) moved to module top; no behavioral change",
+        "Import-order probe evidence (fresh interpreter, routing-first / runtime-first / workspace orders) re-run and passing; ruff check clean",
+        "tests/infrastructure/sandbox/ green"
+      ],
+      "priority": 2,
+      "passes": true,
+      "branchName": "raphy/arch-20261007-2315",
+      "notes": "Strength: Worth exploring. Area C friction walk (sandbox runtime), seam-honesty class. Evidence: assess-round fresh-interpreter probe on 2026-10-07 confirmed both import orders load cleanly — no import cycle was ever dodged (RA-009/RA-012 discipline, assumption refuted by evidence). Constraint: import-time cost of lca.infrastructure.skills.format.routing (pulls bundled skills) at runtime.py import time is acceptable; lazy-import comment claims must be removed, not left stale. 实现与评估的差异：评估把探针固化记为可选（\"可固化为测试或文档\"），实现按 tests/persistence/test_run_paths_import_order.py 先例固化为 3 个 fresh-interpreter 导入顺序测试（tests/infrastructure/sandbox/test_sandbox_runtime_import_order.py：routing-first / runtime-first / workspace-first，每顺序独立解释器，防 pytest collection 顺序掩盖真实 cycle）；改动前/后各跑一遍三种顺序探针全过，无 import cycle，调用语义无变化；runtime.py 内 grep（defer/lazy/cycle）零命中，无需清理陈旧 lazy-import 注释；tests/infrastructure/sandbox/ 22 passed（19 原有 + 3 新增），ruff check 绿。"
+    },
+    {
+      "id": "RA-021",
+      "title": "Close the silent empty-message fallback in AssistantJobs.fire",
+      "description": "As an LCA maintainer, I want fire() to fail-loud (or document a real reason) instead of submitting a WorkItem with an empty message when plane.get returns None for a locally-registered job, so the fail-closed discipline of the jobs plugin is not silently violated.",
+      "acceptanceCriteria": [
+        "Probe documented: read the real 0093 ContinuousControlPlane.get implementation; determine whether None-after-successful-submit is reachable (eviction / restart without persistence) or dead code",
+        "If unreachable: delete the else-\"\" fallback, raise JobNotRegisteredError on the recovery-miss branch; if reachable: keep the branch only with an explicit logged reason or convert to fail-loud per the chosen design; delta in commit body",
+        "New test pins the decided behavior (recovery miss); tests/plugins/assistant/test_jobs.py green; ruff check clean"
+      ],
+      "priority": 1,
+      "passes": true,
+      "branchName": "raphy/arch-20261007-2315",
+      "notes": "Strength: Worth exploring. Area B friction walk (assistant jobs plugin), fail-closed gap class. Evidence: jobs.py fire() line ~`message=registered_item.message if registered_item is not None else \"\"`; plane.get is a Protocol returning WorkItem | None, so the empty-message branch is contractually reachable; a locally-registered job implies submit() succeeded, so a None recovery means the queue lost the item — firing then runs the job with an empty prompt while still emitting assistant.job.fired. Constraint: the documented fail-closed design of the jobs plugin (ADR-0187 §3 D10); cross-process recovery via deterministic work_id must keep working. Probe(2026-10-07 optimize 轮): 真实 0093 实现 SqliteWorkQueue.get 只是按 work_id 的 SELECT；queue.py 无 DELETE/purge/retention 行删除路径——submit 成功后同进程 get 按确定性 work_id 必命中，None-after-submit 在设计的 0093 生命周期内不可达（评估'contractually reachable'的假设被证据证伪）。唯一可达路径是 database_path 配置漂移或外部删库；跨进程恢复(registration=None+queue 命中)属设计路径，不受影响。判决：删掉 else-\"\"fallback，recovery-miss 分支 log.error + 抛 JobNotRegisteredError(fail-loud)；schedule 恢复与跨进程恢复逻辑原样保留。新增test_fire_rejects_when_0093_queue_lost_registered_item 钉住拒收行为。"
+    },
+    {
+      "id": "RA-022",
+      "title": "Deepen the 9 assistant EP payloads behind one frozen-dataclass base",
+      "description": "As an LCA maintainer, I want the 9 frozen payload dataclasses in lca/plugins/assistant/events/_events.py to share a base holding the required quartet (assistant_id/revision_seq/manifest_digest/actor), the base __post_init__ gate and the base to_dict, so adding the 10th payload no longer requires copying two rituals.",
+      "acceptanceCriteria": [
+        "New base (e.g. _AssistantEPPayloadBase, frozen dataclass): holds the required quartet, runs _validate_required_fields in __post_init__ (with a _validate_extra_fields() hook for per-class extra checks), base to_dict = _required_dict + per-class extras via an explicit seam (e.g. _extra_items())",
+        "All 9 subclasses shrink to fields + extra checks; to_dict outputs byte-identical (golden-dict test or before/after comparison); ADR-0187 payload closure unchanged",
+        "tests/plugins/assistant/test_catalog.py and any EP payload tests green; ruff check clean"
+      ],
+      "priority": 2,
+      "passes": true,
+      "branchName": "raphy/arch-20261007-2315",
+      "notes": "Strength: Worth exploring. Area B, duplication class with 9 sites (the codebase's own 'converge N identical X' idiom, already celebrated inside this file for the emit helpers). Evidence: all 9 classes repeat the quartet field declarations, __post_init__ calling _validate_required_fields, and to_dict = _required_dict + truthy extras; ADR-0187's 12-EP closed set means more payloads are coming, so the copy cost is recurring. Deletion test: converges (the 'required quartet + truthy extras' rule concentrated in one place). Constraint: __post_init__ must stay fail-loud on missing/invalid fields; field-order-independent extra collection (no positional dataclasses.fields tricks). | Implemented 2026-10-07 (Round 6, branch raphy/arch-20261007-2315): added _AssistantEPPayloadBase (frozen dataclass) holding the quartet + base __post_init__ (_validate_required_fields via type(self).__name__ + _validate_extra_fields hook) + base to_dict (_required_dict + truthy extras from _extra_items()); all 9 subclasses shrunk to extra fields + _extra_items() seam + _validate_extra_fields overrides only (error messages byte-identical). Delta vs assessment: (1) base._extra_items() default raises NotImplementedError (fail-loud seam, not an empty-tuple default); (2) truthy-gating concentrated in base to_dict loop instead of per-subclass ifs — matches assessment's 'required quartet + truthy extras' rule; (3) verification beyond golden-dict: 16 to_dict cases + 10 validation-error cases byte-identical pre/post refactor (scripts + goldens in ~/.lca-worktrees/.ra022-golden-{before,after}.json, deleted after verify)."
     }
   ]
 }

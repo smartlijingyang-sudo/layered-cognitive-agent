@@ -21,6 +21,64 @@
   新对象）下 ``!=`` 不误报，``is not`` 会误报——默认 deriver 全是 frozen
   dataclass，``!=`` 天然正确。
 
+- **session attach ritual 顺序分歧（RA-019 待定）：** title_service
+  `attach_to_store` 先 `require_observer_hook` 再遍历（fail-first，无部分挂入），
+  其余四家（projection_cache / telemetry_capture / spine_anomaly /
+  projection_registry）先遍历再 require；RA-019 收敛时定 canonical 顺序。
+- **sandbox `destroy()` 是 terminal：** `unbind_sandbox_runtime` 先 pop
+  再 destroy，被 destroy 的实例永不复用——`_stateless` 不重置不是 bug，
+  后人勿重提（2026-10-07 Round 6 误报教训）。
+- **`_run_inspect_internal` deferred import 已证无 cycle（RA-020）：**
+  skills.format.routing / workspace 三种顺序 fresh-interpreter 探针全过；
+  guilty-until-proven-innocent 对此二模块已证 innocent。
+- **`_revision_of` 两处观察：** tool/overlay.py 私有 vs
+  skill/overlay/gating.py（包内共享）；第三处出现再开 story。
+- **kernel 事件字面量 ≠ session surface 词表：** turn/step/message.*.v1
+  属 `lca_kernel.events.session.session`，勿收进 session 包做 single
+  source（RA-017 的层向论证不适用；Round 4 "注释自称 single source"教训）。
+
+---
+
+## Round 6 — assess (2026-10-07 23:15, branch raphy/arch-20261007-2315)
+
+- 按硬化版 `raphy-assess.md` 执行：读 `skills/improve-codebase-architecture/SKILL.md`；
+  `git log -70` 定热点；friction walk 精读三区（session 插件群 7 文件 /
+  assistant 插件群 4 文件 / sandbox runtime.py + scope.py 全文，5 问必答）；
+  duplication 副扫描；self-grilling 写进 assessment.md；diversity quota 满足
+  （2 friction + 2 duplication）。
+- 热点来源：`lca/plugins/session/_shared.py` ×3（+projection_cache ×3）、
+  assistant 插件群（overlay/jobs/evolve/_events 各 ×2）、
+  `lca/infrastructure/sandbox/runtime/runtime.py` ×2（新鲜热区）。
+  user_cli/daemon/projection/delegation/source_verify/catalog/tool_defer
+  等已做领地全部避开；禁区（ralph Round 2 / lca-1000 / iter 接线 /
+  gate_chain_strategy.py / memory）遵守。
+- 产出 4 个 stories（`passes: false`），续号 RA-019~022：
+  - RA-019（P1, Worth exploring）：5 个 session 插件的 store-observer
+    attach ritual 收敛进 `_shared.attach_store_observers`（list 遍历含
+    contained → require_observer_hook fail-loud → hook 接管未来 →
+    cancel 存 hooks_sink）；附带语义分歧：title_service require-first，
+    其余四家 list-first，optimize 轮定 canonical 顺序并记 delta。
+  - RA-020（P2, Worth exploring）：sandbox `_run_inspect_internal` 的两处
+    函数级 import（skills.format.routing / workspace）提顶层——
+    fresh-interpreter 三种顺序探针已证无 import cycle（RA-009 class，
+    假设被证据证伪），层边诚实化。
+  - RA-021（P1, Worth exploring）：`AssistantJobs.fire` 在 `plane.get`
+    返回 None 时静默发空 prompt WorkItem，违背 fail-closed——先 probe
+    真实 0093 `get` 实现定可达性，不可达则删分支改 fail-loud。
+  - RA-022（P2, Worth exploring）：`events/_events.py` 9 个 EP payload
+    dataclass 的"必含四字段 + `__post_init__` 门 + `to_dict`"收敛为
+    frozen dataclass base（`_extra_items()` 接缝）。
+- 丢弃（有证据）：kernel 事件字面量（turn/step/message）single source
+  （kernel 词表 ≠ session surface 词表，RA-017 层向论证不适用）；
+  `_revision_of` tool/skill 两份（2 处 7 行，杠杆不足，第三处出现再开）；
+  `destroy()` 不重置 `_stateless`（`unbind_sandbox_runtime` 先 pop 再
+  destroy，被 destroy 实例永不复用，生产不可达——误报）；
+  tool/skill overlay 整仪式收敛（ADR-0243 D2 同构是刻意设计，digest
+  前缀与 section 形状差异是本质差异）。
+- 本轮未跑测试（assess 轮只做评估；optimize 轮按各 story 验收标准跑；
+  唯一的"跑"是 import 顺序探针，三种顺序全部干净加载）。
+- Commit：`raphy: raphy/arch-20261007-2315 assess (4 stories)`（未 push）。
+
 ---
 
 ## Round 5 — assess (2026-10-07 20:05, branch raphy/arch-20261007-2005)
@@ -394,4 +452,131 @@
     先 `tail` 看清块边界再下锚。
   - `ruff format` 整文件重排时会碰 HEAD 遗留 dirty 行：先用
     `git show HEAD:path | ruff format --check -` 确认遗留，再只收敛自己的 hunks。
+---
+---
+
+## Round 6 — RA-019 optimize (2026-10-07 23:15 轮，branch raphy/arch-20261007-2315)
+
+- 实现：5 个 session 插件的 store-observer attach ritual 收敛进
+  `lca/plugins/session/_shared.py::attach_store_observers(store, attach_one,
+  hooks_sink=None)`。`attach_one` 负责单 Session 挂入 + fail-soft contained
+  （各 plugin 原有 warning scope 原样保留）；`require_observer_hook`
+  fail-loud 守卫复用；`add_observer_hook` 接管未来 create/restore 的回调
+  直接用 `attach_one`（原来 loop 体与钩回调是两份拷贝，projection_cache
+  的 `_on_create` 即其一）；cancel 存入 `hooks_sink`
+ （spine_anomaly / projection_registry 传缺省 None，保持原先丢弃行为）。
+- 迁移 5 处调用点：projection_cache._attach_to_store、telemetry_capture.
+  _attach_to_store、title_service.attach_to_store（method）、
+  spine_anomaly.register_spine_anomaly_to_store、projection_registry.
+  _attach_to_store；各文件 `_shared` import 由 `require_observer_hook`
+  换为 `attach_store_observers`（title_service 顺带去掉已无用的 `cast` import）。
+- canonical 顺序裁定 **require-first**（title_service 派胜出）：四家原先
+  list-first 改为先 require 再遍历。理由：require-first 是 fail-fast——
+  钩子缺失的 store 上零部分挂入；list-first 会先挂完现存 Session 再抛
+  TypeError，留下"现存已挂、未来无人接管"的半接线状态，且 cancel 也没地
+  存。delta 已记入 commit body 与 prd.json notes。
+- 测试：新增 `tests/plugins/session/test_attach_store_observers.py` 3 个
+  契约测试（缺钩子零部分挂入 / 现存+未来挂入+cancel 入 sink 且 cancel 生效 /
+  sink 缺省丢弃但接管未来不受影响）；`tests/plugins/session/` 全目录
+  283 passed（含 5 插件原有 attach/setup 测试）；`ruff check` 7 个触及文件
+  全绿，`ruff format --check` 通过。无预期红。
+- Commit：`feat: RA-019 - converge session store-observer attach ritual`
+  （body 带 Problem/Solution/Benefits/Strength + 实现与评估差异，未 push）。
+
+- **Learnings for future iterations:**
+  - attach ritual 的两派顺序分歧本质是"fail-fast 原子性"问题：list-first
+    在 fail-loud 点之前做副作用，必然产生半接线状态；以后同类 ritual
+    收敛默认选 require-first，除非遍历本身是守卫的前置条件。
+  - `hooks_sink=None` 缺省即"丢弃 cancel"——spine_anomaly 这类 fire-and-forget
+    式 plugin 不需要可选参数以外的特殊处理，收敛时不用为它加分支。
+  - projection_cache 的 `_on_create` 与 loop 体是 ritual 内部的第二层重复
+    （同文件两份拷贝）：收敛 ritual 时顺手把同文件内重复一起收掉，不算
+    scope creep。
+
+## 2026-10-07 23:15+ - RA-021（Round 6 optimize）
+
+- 实现：`AssistantJobs.fire` 恢复失败分支 fail-loud 收敛（`lca/plugins/assistant/jobs/jobs.py`）
+  - Probe 结论：真实 0093 `SqliteWorkQueue.get` 只是按 work_id 的 SELECT；`queue.py`
+    无 DELETE/purge/retention 行删除路径 → submit 成功后 get 必命中，
+    None-after-submit 在设计的 0093 生命周期内不可达（评估"contractually
+    reachable"的假设被证据证伪）。
+  - 删掉 `message=registered_item.message if registered_item is not None else ""`
+    的静默空 prompt fallback；新增 recovery-miss 分支：log.error + 抛
+    `JobNotRegisteredError`（database_path 漂移 / 外部删库的唯一可达场景 fail-loud
+    拒收）。跨进程恢复（registration=None + queue 命中）与 schedule 恢复逻辑原样保留；
+    fire docstring 补一行 recovery-miss fail-loud 说明。
+- 测试：`tests/plugins/assistant/test_jobs.py` 新增
+  `test_fire_rejects_when_0093_queue_lost_registered_item`（登记存在、队列丢失 ⇒
+  拒收、绝不发空 prompt）；全文件绿；ruff check 绿。
+- Files changed: `lca/plugins/assistant/jobs/jobs.py`、`tests/plugins/assistant/test_jobs.py`、
+  `raphy/prd.json`（RA-021 passes=true，notes 记录 probe 结果与评估差异）、
+  `raphy/progress.txt`（本节）。
+- **Learnings for future iterations:**
+  - Probe Protocol 的 `-> X | None` 返回时先读真实实现：0093 的 `get` 是"SELECT or
+    None"式纯读探针、无行删除路径 → None-after-submit 不可达可证伪，不要停留在
+    "contractually reachable"的合约推理上。
+  - 跨进程恢复设计的每个分支单独判定可达性：registration=None+命中是设计路径，
+    registration!=None+丢失才是 fail-loud 目标——两种 None 不可混为一谈。
+---
+
+## 2026-10-07 23:27+ - RA-020（Round 6 optimize）
+
+- 实现：`lca/infrastructure/sandbox/runtime/runtime.py` `_run_inspect_internal` 两处
+  函数级 import 提模块顶层（`lca.infrastructure.skills.format.routing.enrich_inspect_profile`、
+  `lca.infrastructure.workspace.get_run_workspace`，isort 字母序落在 sandbox.* 之后）；
+  函数内延迟 import 删除；调用语义不变，层边诚实化。
+  - 改动前/后各跑一遍三种顺序 fresh-interpreter 探针（routing-first /
+    runtime-first / workspace-first）全过——无 import cycle（RA-009/RA-012
+    纪律的延续：guilty-until-proven-innocent 证伪，延迟 import 无存在理由）。
+  - runtime.py 内 grep（defer/lazy/cycle）零命中，无 lazy-import 注释声明，
+    无需清理陈旧注释。
+  - 探针按 `tests/persistence/test_run_paths_import_order.py` 先例固化为 3 个测试
+    （`tests/infrastructure/sandbox/test_sandbox_runtime_import_order.py`），
+    每顺序独立 fresh interpreter，防 pytest collection 顺序掩盖真实 cycle。
+- 测试：`tests/infrastructure/sandbox/` 22 passed（19 原有 + 3 新增 import-order）；
+  ruff check 绿（runtime.py + 新测试文件）。
+- Files changed: `lca/infrastructure/sandbox/runtime/runtime.py`、
+  `tests/infrastructure/sandbox/test_sandbox_runtime_import_order.py`、
+  `raphy/prd.json`（RA-020 passes=true，notes 记录实现与评估的差异）、
+  `raphy/progress.txt`（本节）。
+- **Learnings for future iterations:**
+  - deferred-import 故事统一用三顺序 fresh-interpreter 探针判 innocence：改动前
+    跑一遍（基线）、改动后再跑一遍（证据）、再固化为 subprocess 测试——
+    `test_run_paths_import_order.py` idiom 可直接抄（noqa S603 注释别漏）。
+  - 主 checkout 脏（iter-tests lane 并发在 main 上干活 + raphy-assess.md 未提交）
+    时按脏树规则走隔离 worktree（`~/.lca-worktrees/raphy-20261007-2327`），
+    绝不 `checkout` 切分支、不碰他人未提交内容；ssh252 输出头部 git 状态块
+    是包装器注入的主工作目录状态，用 ZZMARK marker 定位真实输出。
+---
+
+## 2026-10-07 23:48+ - RA-022（Round 6 optimize）
+
+- 实现：`lca/plugins/assistant/events/_events.py` 9 个 EP payload dataclass 收敛为
+  frozen dataclass base `_AssistantEPPayloadBase`
+  - Base：必含四字段（assistant_id / revision_seq / manifest_digest / actor）+
+    `__post_init__`（`_validate_required_fields(self, type(self).__name__)` +
+    `_validate_extra_fields()` hook）+ `to_dict`（`_required_dict` +
+    `_extra_items()` 接缝的真值 extras）；接缝默认 `NotImplementedError`
+    （fail-loud，不用空元组默认）。
+  - 9 个子类缩为：extra 字段声明 + `_extra_items()`（按原 to_dict key 顺序返回
+    `(key, value)` 对；`changes` 在接缝内转 `list`）+ 按需 `_validate_extra_fields`
+    覆盖（全部错误文案逐字保留）。各 EP docstring 原样保留。
+  - 验收证据：改动前/后 golden 对比——16 个 to_dict 用例（全字段+最小字段变体，
+    key 顺序计入）+ 10 个校验错误用例（四件套门×3、bool revision_seq、
+    各子类 extra 校验）全部字节一致（`GOLDEN_IDENTICAL`）。
+- 测试：`tests/plugins/assistant/`（test_catalog.py 覆盖部分 payload to_dict）
+  见下；`ruff check` 绿（`_events.py`）。
+- Files changed: `lca/plugins/assistant/events/_events.py`、
+  `raphy/prd.json`（RA-022 passes=true，notes 记录实现与评估的 3 点差异）、
+  `raphy/progress.txt`（本节）。
+- **Learnings for future iterations:**
+  - 收敛型 refactor 的"字节等价"证据标准：golden 抓改动前（to_dict 全变体 +
+    错误文案），改动后重跑 diff——比只跑现有测试更能钉住"形状不变"；
+    golden 脚本放 `~/.lca-worktrees/`（repo 外，验完即删，不进 commit）。
+  - dataclass 继承的 `__post_init__`：子类不定义即继承基类版本，hook 用
+    `self._validate_extra_fields()` 做模板方法；错误文案里类名字面量可用
+    `type(self).__name__` 替代，f-string 里的照抄原样即可字节一致。
+  - base 的 `_extra_items()` 默认抛 `NotImplementedError` 而非返回空元组：
+    接缝缺失 fail-loud，符合 codebase fail-loud 纪律；评估只说"显式接缝"，
+    未定默认行为，实现时按纪律补上（已记入 prd notes delta）。
 ---

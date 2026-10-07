@@ -19,7 +19,7 @@ from typing import Any
 import structlog
 
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
-from lca.plugins.session._shared import require_observer_hook
+from lca.plugins.session._shared import attach_store_observers
 from lca.plugins.session.runtime.spine.event_projection import session_event_to_event_record
 from lca_kernel.events.session.session import SessionEvent, SessionProtocol
 
@@ -76,7 +76,12 @@ class _SpineAnomalyObserver:
 
 
 def register_spine_anomaly_to_store(store: Any, detector: Any) -> None:
-    """Attach anomaly observer to live sessions and future creates/restores."""
+    """Attach anomaly observer to live sessions and future creates/restores.
+
+    ritual 收敛进 ``_shared.attach_store_observers``（RA-019，canonical
+    require-first）；本 plugin 不存钩子 cancel（无 ``_store_hooks``），
+    ``hooks_sink`` 保持缺省即丢弃。
+    """
     observer = _SpineAnomalyObserver(detector)
 
     def _attach(session: Any) -> None:
@@ -89,10 +94,7 @@ def register_spine_anomaly_to_store(store: Any, detector: Any) -> None:
                 exc_info=True,
             )
 
-    for session in getattr(store, "list", lambda: ())():
-        _attach(session)
-    hook = require_observer_hook(store)
-    hook(_attach)
+    attach_store_observers(store, _attach)
 
 
 @plugin(

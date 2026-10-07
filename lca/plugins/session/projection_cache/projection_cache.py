@@ -48,7 +48,7 @@ from lca.contracts.protocols.session.projection.unit import (
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 from lca.infrastructure.persistence.atomic_json_sink import AtomicJsonFileSink, AtomicJsonSnapshot
 from lca.infrastructure.persistence.write_behind import WriteBehindBuffer
-from lca.plugins.session._shared import TURN_ENDED, require_observer_hook, session_id_of
+from lca.plugins.session._shared import TURN_ENDED, attach_store_observers, session_id_of
 from lca_kernel.events.session.session import SessionEvent
 
 if TYPE_CHECKING:
@@ -283,24 +283,12 @@ class ProjectionCache:
 def _attach_to_store(store: Any, cache: ProjectionCache) -> None:
     """对 store 当前活 Session 挂强制写点 observer，并接管未来新 Session。
 
-    时序与失败语义对齐 ``persistence_jsonl._attach_to_store``：先对现存
-    Session 一次性挂入，再经 ``add_observer_hook`` 接管未来 ``create`` /
-    ``restore``；缺钩子抛 ``TypeError``（fail-loud）；单个 Session 挂入
-    失败 contained。钩子反注册闭包存 ``cache._store_hooks``，``close()``
-    时释放。
+    ritual 收敛进 ``_shared.attach_store_observers``（RA-019，canonical
+    require-first）：单个 Session 挂入失败 contained；缺钩子抛 ``TypeError``
+    fail-loud；钩子反注册闭包存 ``cache._store_hooks``，``close()`` 时释放。
     """
-    for session in getattr(store, "list", lambda: ())():
-        try:
-            cache.register_to(session)
-        except Exception:
-            _log.warning(
-                "session.projection_cache.attach_failed",
-                session_id=getattr(session, "id", None),
-                exc_info=True,
-            )
-    hook = require_observer_hook(store)
 
-    def _on_create(session: Any) -> None:
+    def _observe_one(session: Any) -> None:
         try:
             cache.register_to(session)
         except Exception:
@@ -310,9 +298,7 @@ def _attach_to_store(store: Any, cache: ProjectionCache) -> None:
                 exc_info=True,
             )
 
-    cancel = hook(_on_create)
-    if callable(cancel):
-        cache._store_hooks.append(cast("Callable[[], None]", cancel))
+    attach_store_observers(store, _observe_one, cache._store_hooks)
 
 
 @plugin(
