@@ -23,6 +23,37 @@
 
 ---
 
+## Round 5 — assess (2026-10-07 20:05, branch raphy/arch-20261007-2005)
+
+- 按硬化版 `raphy-assess.md` 执行：读 `skills/improve-codebase-architecture/SKILL.md`；
+  friction walk 精读三区（source_verify / tool_defer / lca/session，5 问必答）；
+  duplication 副扫描；self-grilling 写进 assessment.md；diversity quota 满足
+  （2 friction + 1 duplication）。
+- 热点来源：`git log -80` 非测试生产文件（`lca/session/catalog.py`、
+  `lca/infrastructure/source_verify/*`、`lca/infrastructure/tool_defer/*`）；
+  daemon/loop_cursor/delegation cache 等领地按禁区避开。
+- 产出 3 个 stories（`passes: false`），续号 RA-016~018：
+  - RA-016（P1, Worth exploring）：source_verify 字面量文法（`_LITERAL` + `_extract_literals`）
+    是 verifier.py 的模块私有物——实际决定 verdict 却无具名接缝、无独立 test surface →
+    收敛为 SourceVerifier 可注入的 seam（默认=现有正则文法）。
+  - RA-017（P2, Worth exploring）：`known_session_event_types()` 是 4 个派生词表 +
+    1 个手工字面量 `"surface/developer_message"` 的并集 → DSH surface 词表具名常量化，
+    catalog 零手工字面量、纯派生。
+  - RA-018（P3, Worth exploring）：`ToolSearchTool.execute` 与 `validate` 各实现一遍
+    参数分类且口径不一致 → 收敛为单个 `_classify_args` helper。
+- 区 B（tool_defer）5 文件精读后判定无 friction：defer 编排是文档化的刻意设计；
+  `_tool_to_spec` 复刻有"infrastructure must not import L2 nodes"注释背书；
+  fail-soft/fail-fast 双轨有 ADR-0256 B2 背书；8+ 测试文件钉住。
+- 丢弃（有证据）：source_verify 5 模块分离（刻意设计）、policy.py（earns-existence）、
+  `ensure_registry` monkey-patch（刻意 fail-soft）、`derive_messages` 函数级 import
+  （防循环刻意）、append 4 遍树遍历（2026-09-16 postmortem 刻意性能取舍）。
+- Observation（不开 story）：`verify_final_answer` 尚无生产调用方（采集已接
+  `execute.py:271`，校验未接）——接线 gap，optimize 轮可顺手确认。
+- 本轮未跑测试（assess 轮只做评估；optimize 轮按各 story 验收标准跑）。
+- Commit：`chore: [raphy] assess - 3 architecture candidates`（未 push）。
+
+---
+
 ## Round 3 — assess (2026-10-07 09:30, branch raphy/arch-20261007-0930)
 
 - 按硬化版 `raphy-assess.md` 执行：读 `skills/improve-codebase-architecture/SKILL.md`；
