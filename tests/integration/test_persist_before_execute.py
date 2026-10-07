@@ -358,3 +358,74 @@ def test_result_write_failure_reports_persistence_failed_but_tool_ran() -> None:
     msgs = writer.derive_messages()
     assert [m["role"] for m in msgs] == ["user", "assistant"]
     assert msgs[1]["tool_calls"] == [{"id": "call-1", "name": "echo", "arguments": '{"x": 1}'}]
+
+
+def test_dispatch_tool_calls_with_empty_tool_calls_raises() -> None:
+    """A decision with no ``tool_calls`` is a composition bug — fail loud.
+
+    ``dispatch_tool_calls`` raises ``ToolExecutionError`` before persisting
+    anything, so an empty decision can never produce an assistant row that
+    declares zero calls (which would read as a completed turn).
+    """
+    session = _FlakySession(fail_after=10**6)  # never fail
+    writer = RunSessionWriter(session=session)
+    recorder = _Recorder()
+    registry = _FakeToolRegistry(tools={"echo": _FakeTool(name="echo", recorder=recorder)})
+
+    body = SimpleBody(
+        tool_registry=registry,  # type: ignore[arg-type]
+        safe_executor=_FakeSafeExecutor(),  # type: ignore[arg-type]
+        transport_registry=None,  # type: ignore[arg-type]
+        action_registry=None,  # type: ignore[arg-type]
+        writer=writer,
+    )
+
+    empty = Decision(
+        decision_id="dec-empty",
+        action_type=ActionType.USE_TOOL.value,
+        rationale="test",
+        confidence=1.0,
+        tool_calls=[],
+    )
+    with pytest.raises(ToolExecutionError):
+        asyncio.run(body.dispatch_tool_calls(decision=empty))
+    assert recorder.calls == []
+    assert session.events == []
+
+
+def test_unregistered_tool_reports_tool_not_registered() -> None:
+    """Unknown tool name → FAILED receipt naming the missing tool.
+
+    The assistant row is still persisted first (it carries the declared
+    call); the missing tool produces a single
+    ``EffectReceipt(FAILED, error_code="tool_not_registered:<name>")`` with
+    no tool_result row — no silent skip, no executor invocation.
+    """
+    session = _FlakySession(fail_after=10**6)  # never fail
+    writer = RunSessionWriter(session=session)
+    recorder = _Recorder()
+    registry = _FakeToolRegistry()  # nothing registered
+
+    body = SimpleBody(
+        tool_registry=registry,  # type: ignore[arg-type]
+        safe_executor=_FakeSafeExecutor(),  # type: ignore[arg-type]
+        transport_registry=None,  # type: ignore[arg-type]
+        action_registry=None,  # type: ignore[arg-type]
+        writer=writer,
+    )
+
+    receipts = asyncio.run(
+        body.dispatch_tool_calls(
+            decision=_decision_with_one_tool_call(call_id="call-9", tool_name="ghost")
+        )
+    )
+
+    assert len(receipts) == 1
+    receipt = receipts[0]
+    assert isinstance(receipt, EffectReceipt)
+    assert receipt.outcome is EffectOutcome.FAILED
+    assert receipt.error_code == "tool_not_registered:ghost"
+    assert recorder.calls == []  # nothing executed
+
+    surface_events = [e for e in session.events if e.type.startswith("surface/")]
+    assert [e.type for e in surface_events] == ["surface/assistant_message"]
