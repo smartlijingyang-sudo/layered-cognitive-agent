@@ -112,6 +112,7 @@ class _FakeTool:
     recorder: _Recorder
     effect_kind: str = "ephemeral"
     is_idempotent: bool = True
+    success: bool = True
 
     async def execute(self, args: dict[str, Any]) -> Any:
         from lca.contracts.atoms.ids.ids import new_id
@@ -120,7 +121,7 @@ class _FakeTool:
         self.recorder.calls.append({"name": self.name, "args": dict(args)})
         return Observation(
             observation_id=new_id("obs"),
-            success=True,
+            success=self.success,
             payload={"echo": args},
         )
 
@@ -429,3 +430,46 @@ def test_unregistered_tool_reports_tool_not_registered() -> None:
 
     surface_events = [e for e in session.events if e.type.startswith("surface/")]
     assert [e.type for e in surface_events] == ["surface/assistant_message"]
+
+
+def test_failed_tool_execution_persists_result_and_reports_execution_failed() -> None:
+    """Tool runs but returns ``success=False`` → FAILED(tool_execution_failed).
+
+    Per-call semantics: the failure is isolated to this call's receipt; the
+    ``surface/tool_result`` row IS persisted (the journal records the
+    failure), and the receipt error_code names the execution failure — not
+    a persistence failure.
+    """
+    session = _FlakySession(fail_after=10**6)  # never fail
+    writer = RunSessionWriter(session=session)
+    recorder = _Recorder()
+    registry = _FakeToolRegistry(
+        tools={"echo": _FakeTool(name="echo", recorder=recorder, success=False)}
+    )
+
+    body = SimpleBody(
+        tool_registry=registry,  # type: ignore[arg-type]
+        safe_executor=_FakeSafeExecutor(),  # type: ignore[arg-type]
+        transport_registry=None,  # type: ignore[arg-type]
+        action_registry=None,  # type: ignore[arg-type]
+        writer=writer,
+    )
+
+    receipts = asyncio.run(body.dispatch_tool_calls(decision=_decision_with_one_tool_call()))
+
+    assert len(receipts) == 1
+    receipt = receipts[0]
+    assert isinstance(receipt, EffectReceipt)
+    assert receipt.outcome is EffectOutcome.FAILED
+    assert receipt.error_code == "tool_execution_failed"
+    assert recorder.calls == [{"name": "echo", "args": {"x": 1}}]  # tool did run
+
+    surface_events = [
+        e
+        for e in session.events
+        if e.type.startswith("surface/") or e.type == SURFACE_TOOL_RESULT_TYPE
+    ]
+    assert [e.type for e in surface_events] == [
+        "surface/assistant_message",
+        SURFACE_TOOL_RESULT_TYPE,
+    ]
