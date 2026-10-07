@@ -12,7 +12,10 @@ from dataclasses import dataclass
 from typing import Any
 
 from lca.contracts.atoms.relation.relation import Relation, parse_relation
-from lca.contracts.observability.canonical_digest import canonical_digest
+from lca.contracts.observability.canonical_digest import (
+    canonical_digest,
+    hash_stable_path,
+)
 from lca.contracts.protocols.composition.relation import TypedRelation
 
 
@@ -90,7 +93,7 @@ def _provider_binding_payload(binding: ProviderBinding) -> dict[str, str | bool]
         "fallback_policy": binding.fallback_policy,
         "owner_kind": binding.owner_kind,
         "scope": binding.scope,
-        "provenance": binding.provenance,
+        "provenance": hash_stable_path(binding.provenance),
     }
 
 
