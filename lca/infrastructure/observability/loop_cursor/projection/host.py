@@ -23,7 +23,7 @@ from lca.contracts.observability.cursor.loop_projection import (
     LoopProjectionSnapshot,
     ProjectionToken,
 )
-from lca.infrastructure.observability.loop_cursor.projections.defaults import (
+from lca.infrastructure.observability.loop_cursor.projection_derivers.defaults import (
     default_projection_definitions,
 )
 from lca.infrastructure.observability.spine.event.record import EventRecord
@@ -57,6 +57,12 @@ class StdProjectionHost:
         _states:        key -> 内部 reducer state
         _snapshots:     key -> 最后一次 drive 后的 LoopProjectionSnapshot
         _disposed:      key -> True 表已 dispose(注销后 drive 跳过)
+
+    Listener 语义(RA-010,canonical):change-gated —— 仅当某条 deriver 的
+    ``apply`` 返回与之前 ``!=`` 的 state 时,drive 结束后才通知
+    ``subscribe_changes`` 的 listeners;无变化的 drive 只更新 snapshots,
+    不回调。(判定纪律与
+    ``plugins/session/projection_registry`` 的 ``_drive_unit`` 同款 ``!=``)
     """
 
     def __init__(
@@ -121,6 +127,12 @@ class StdProjectionHost:
     def drive(self, snapshot: CursorSnapshot, record: EventRecord) -> None:
         """对所有 active deriver 调 apply(state, snapshot, record)。
 
+        变更门控(change-gated,RA-010):drive 结束后,仅当至少一条 deriver 的
+        state 发生变化(``new_state != prev_state``)时通知 listeners;无变化的
+        drive 只更新 snapshots,不回调。``!=`` 为值语义判定(deriver 纯 reducer
+        返回等值新对象时不误报),纪律与
+        ``plugins/session/projection_registry._drive_unit`` 一致。
+
         L16:本方法不消费 ``writable.iteration.close`` EP ——
         Host 默认清单保证不订阅;由调用方在 drive 前过滤(也由测试断言)。
         """
@@ -130,6 +142,7 @@ class StdProjectionHost:
                 for k, d in self._definitions.items()
                 if k not in self._disposed
             ]
+        changed = False
         for key, definition, prev_state in targets:
             try:
                 new_state = definition.apply(prev_state, snapshot, record)
@@ -141,6 +154,8 @@ class StdProjectionHost:
                     exc_info=True,
                 )
                 continue
+            if new_state != prev_state:
+                changed = True
             with self._lock:
                 self._states[key] = new_state
                 self._snapshots[key] = LoopProjectionSnapshot(
@@ -149,8 +164,10 @@ class StdProjectionHost:
                     last_record=record,
                     monotonic=True,
                 )
-        # drive 完成后通知 listeners(view 派发;为简单实现,每次 drive 后全量回调)
-        self._fire_listeners()
+        # 变更门控:仅当有 deriver 状态变化时通知 listeners
+        # (subscribe_changes 的"变化"承诺;原先"每次 drive 后全量回调"已收敛)
+        if changed:
+            self._fire_listeners()
 
     def _fire_listeners(self) -> None:
         """view_snapshot 变化时通知订阅者(view 派生)。"""
@@ -179,7 +196,9 @@ class StdProjectionHost:
     ) -> Callable[[], None]:
         """订阅 ``view_snapshot()`` 变化;返回 disposer。
 
-        当前实现:每次 drive 后回调一次(行内)。未来可扩展为 diff-based。
+        语义(RA-010,canonical):change-gated —— listener 仅在 drive 使至少一条
+        deriver 的 state 发生变化(``new_state != prev_state``)后被回调一次,
+        参数为全量 ``view_snapshot()``;无变化的 drive 不回调。
         """
         with self._lock:
             self._listeners = getattr(self, "_listeners", [])

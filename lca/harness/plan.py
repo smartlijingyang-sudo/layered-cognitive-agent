@@ -13,7 +13,10 @@ from dataclasses import asdict, is_dataclass
 from enum import Enum
 from typing import Any, Protocol, cast
 
-from lca.contracts.observability.canonical_digest import canonical_digest
+from lca.contracts.observability.canonical_digest import (
+    canonical_digest,
+    hash_stable_path,
+)
 from lca.contracts.protocols.declarative.declarative_2.declarative_phase_graph import (
     CognitivePhaseGraphPlan,
     PluginSpec,
@@ -247,7 +250,7 @@ def _declarative_payload(plan: CompiledRunPlan) -> dict[str, Any]:
                 "cardinality": binding.fallback_policy,
                 "scope": binding.scope,
                 "grant": [binding.effect_class],
-                "provenance": [binding.provenance],
+                "provenance": [hash_stable_path(binding.provenance)],
             }
             for binding in plan.capability_bindings
         ],

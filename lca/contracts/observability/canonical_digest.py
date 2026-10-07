@@ -31,6 +31,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 from typing import Any
 
 DEFAULT_DIGEST_PREFIX: str = "sha256:"
@@ -40,6 +41,32 @@ DEFAULT_DIGEST_PREFIX: str = "sha256:"
 # ADR-0203 §算法分类:不在此集合的 ``length`` 仍可计算(只是无 cross-site
 # 互操作性),这里仅用于文档化主流用法。
 _CONVENTIONAL_HEX_LENGTHS: frozenset[int] = frozenset({12, 16, 24, 32, 64})
+
+
+def hash_stable_path(path: str) -> str:
+    """Normalize *path* for digest inputs so digests stay checkout-independent.
+
+    Bundle/plugin sources are recorded as absolute paths; feeding them to a
+    digest verbatim makes the digest differ per checkout, violating the
+    cross-process stable reference contract. When *path* is absolute and
+    points inside this repo, return it repo-relative (POSIX form); otherwise
+    return it unchanged. Pure path arithmetic, no filesystem access, so the
+    contracts-layer no-I/O constraint holds.
+    """
+    if not path or not os.path.isabs(path):
+        return path
+    try:
+        anchor = os.path.abspath(__file__)
+        # .../lca/contracts/observability/canonical_digest.py -> repo root
+        repo_root = anchor
+        for _ in range(4):
+            repo_root = os.path.dirname(repo_root)
+        rel = os.path.relpath(path, repo_root)
+    except (ValueError, OSError):
+        return path
+    if rel == "." or rel.startswith(".." + os.sep):
+        return path
+    return rel.replace(os.sep, "/")
 
 
 def canonical_digest(

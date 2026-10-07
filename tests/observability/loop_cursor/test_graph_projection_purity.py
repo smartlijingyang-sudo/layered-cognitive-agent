@@ -26,7 +26,7 @@ from datetime import UTC, datetime
 
 from lca.contracts.observability.cursor.loop_cursor import CursorSnapshot
 from lca.contracts.observability.cursor.loop_projection import LoopProjectionDefinition
-from lca.infrastructure.observability.loop_cursor.projections.defaults import (
+from lca.infrastructure.observability.loop_cursor.projection_derivers.defaults import (
     _GraphProjection,
     _GraphState,
 )
