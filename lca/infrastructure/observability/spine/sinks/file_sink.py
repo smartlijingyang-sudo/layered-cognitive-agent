@@ -179,10 +179,11 @@ class FileSink:
     ) -> None:
         self._run_dir = Path(run_dir)
         self._run_id = run_id
-        if spine_filename or file_name == DEFAULT_SPINE_TEMPLATE:
-            file_name = spine_filename_for_run(run_id)
-        else:
-            file_name = resolve_filename(file_name, run_id)
+        file_name = (
+            spine_filename_for_run(run_id)
+            if spine_filename or file_name == DEFAULT_SPINE_TEMPLATE
+            else resolve_filename(file_name, run_id)
+        )
         self._path = self._run_dir / file_name
         self._fsync_protocol = fsync_protocol
         self._fsync_batch = fsync_batch
