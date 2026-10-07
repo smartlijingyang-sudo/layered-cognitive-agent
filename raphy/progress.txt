@@ -21,6 +21,64 @@
   新对象）下 ``!=`` 不误报，``is not`` 会误报——默认 deriver 全是 frozen
   dataclass，``!=`` 天然正确。
 
+- **session attach ritual 顺序分歧（RA-019 待定）：** title_service
+  `attach_to_store` 先 `require_observer_hook` 再遍历（fail-first，无部分挂入），
+  其余四家（projection_cache / telemetry_capture / spine_anomaly /
+  projection_registry）先遍历再 require；RA-019 收敛时定 canonical 顺序。
+- **sandbox `destroy()` 是 terminal：** `unbind_sandbox_runtime` 先 pop
+  再 destroy，被 destroy 的实例永不复用——`_stateless` 不重置不是 bug，
+  后人勿重提（2026-10-07 Round 6 误报教训）。
+- **`_run_inspect_internal` deferred import 已证无 cycle（RA-020）：**
+  skills.format.routing / workspace 三种顺序 fresh-interpreter 探针全过；
+  guilty-until-proven-innocent 对此二模块已证 innocent。
+- **`_revision_of` 两处观察：** tool/overlay.py 私有 vs
+  skill/overlay/gating.py（包内共享）；第三处出现再开 story。
+- **kernel 事件字面量 ≠ session surface 词表：** turn/step/message.*.v1
+  属 `lca_kernel.events.session.session`，勿收进 session 包做 single
+  source（RA-017 的层向论证不适用；Round 4 "注释自称 single source"教训）。
+
+---
+
+## Round 6 — assess (2026-10-07 23:15, branch raphy/arch-20261007-2315)
+
+- 按硬化版 `raphy-assess.md` 执行：读 `skills/improve-codebase-architecture/SKILL.md`；
+  `git log -70` 定热点；friction walk 精读三区（session 插件群 7 文件 /
+  assistant 插件群 4 文件 / sandbox runtime.py + scope.py 全文，5 问必答）；
+  duplication 副扫描；self-grilling 写进 assessment.md；diversity quota 满足
+  （2 friction + 2 duplication）。
+- 热点来源：`lca/plugins/session/_shared.py` ×3（+projection_cache ×3）、
+  assistant 插件群（overlay/jobs/evolve/_events 各 ×2）、
+  `lca/infrastructure/sandbox/runtime/runtime.py` ×2（新鲜热区）。
+  user_cli/daemon/projection/delegation/source_verify/catalog/tool_defer
+  等已做领地全部避开；禁区（ralph Round 2 / lca-1000 / iter 接线 /
+  gate_chain_strategy.py / memory）遵守。
+- 产出 4 个 stories（`passes: false`），续号 RA-019~022：
+  - RA-019（P1, Worth exploring）：5 个 session 插件的 store-observer
+    attach ritual 收敛进 `_shared.attach_store_observers`（list 遍历含
+    contained → require_observer_hook fail-loud → hook 接管未来 →
+    cancel 存 hooks_sink）；附带语义分歧：title_service require-first，
+    其余四家 list-first，optimize 轮定 canonical 顺序并记 delta。
+  - RA-020（P2, Worth exploring）：sandbox `_run_inspect_internal` 的两处
+    函数级 import（skills.format.routing / workspace）提顶层——
+    fresh-interpreter 三种顺序探针已证无 import cycle（RA-009 class，
+    假设被证据证伪），层边诚实化。
+  - RA-021（P1, Worth exploring）：`AssistantJobs.fire` 在 `plane.get`
+    返回 None 时静默发空 prompt WorkItem，违背 fail-closed——先 probe
+    真实 0093 `get` 实现定可达性，不可达则删分支改 fail-loud。
+  - RA-022（P2, Worth exploring）：`events/_events.py` 9 个 EP payload
+    dataclass 的"必含四字段 + `__post_init__` 门 + `to_dict`"收敛为
+    frozen dataclass base（`_extra_items()` 接缝）。
+- 丢弃（有证据）：kernel 事件字面量（turn/step/message）single source
+  （kernel 词表 ≠ session surface 词表，RA-017 层向论证不适用）；
+  `_revision_of` tool/skill 两份（2 处 7 行，杠杆不足，第三处出现再开）；
+  `destroy()` 不重置 `_stateless`（`unbind_sandbox_runtime` 先 pop 再
+  destroy，被 destroy 实例永不复用，生产不可达——误报）；
+  tool/skill overlay 整仪式收敛（ADR-0243 D2 同构是刻意设计，digest
+  前缀与 section 形状差异是本质差异）。
+- 本轮未跑测试（assess 轮只做评估；optimize 轮按各 story 验收标准跑；
+  唯一的"跑"是 import 顺序探针，三种顺序全部干净加载）。
+- Commit：`raphy: raphy/arch-20261007-2315 assess (4 stories)`（未 push）。
+
 ---
 
 ## Round 5 — assess (2026-10-07 20:05, branch raphy/arch-20261007-2005)
