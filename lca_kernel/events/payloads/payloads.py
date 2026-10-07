@@ -1,6 +1,6 @@
 """事件 payload 重新导出（ADR-0180 / ADR-0181 / ADR-0183 PR-7）。
 
-EventBus.publish payload 引用 :mod:`lca.contracts.event` 中的 payload 类型；本模块做单点 re-export，
+EnvelopeBus.publish payload 引用 :mod:`lca.contracts.event` 中的 payload 类型；本模块做单点 re-export，
 便于 plugin manifest 通过 ``lca_kernel.events.payloads.TeamDelegationCacheHit`` 引用，
 避免直接 import :mod:`lca.contracts.event`（避免 contracts → lca_kernel 反向）。
 """
@@ -37,7 +37,7 @@ class EventPluginSpec:
     - ``event_publishes`` — 本 plugin 计划 publish 的 category 集合
     - ``event_subscribes`` — 本 plugin 计划 subscribe 的 category 集合
 
-    ``EventBus.subscribe(*, plugin, ...)`` 鉴权用 yaml subscribers 白名单；
+    ``EnvelopeBus.subscribe(*, plugin, ...)`` 鉴权用 yaml subscribers 白名单；
     EventMechanism.validate_auth_matrix() 已删除，鉴权在 registry.can_subscribe
     一次性物化进 ``subscribers`` 映射。
     - 集合内每个 category 必须在 yaml publishers / subscribers 白名单中存在
@@ -68,7 +68,7 @@ DISPATCH_SELF_OBSERVATION_CATEGORIES: frozenset[str] = frozenset(
 """机制自观察事件字符串闭集（ADR-0183 §3.10）。
 
 不在 :class:`Category` 枚举内：扩 Category 闭集需 ADR + yaml SSOT 登记，
-自观察是框架内部事件，走 EventBus 内部路径，不进注册表鉴权矩阵。
+自观察是框架内部事件，走 EnvelopeBus 内部路径，不进注册表鉴权矩阵。
 I-FW-BUS-4：业务方不得订阅本组事件。
 """
 
@@ -78,7 +78,7 @@ class MechanismDispatchEventPayload(EventPayload):
 
     ``category`` 覆盖父类 Category 枚举，取字符串闭集
     （见 :data:`DISPATCH_SELF_OBSERVATION_CATEGORIES`）——闭集约束见该常量
-    docstring。本 payload 只能经 :meth:`EventBus._emit_self_observation`
+    docstring。本 payload 只能经 :meth:`EnvelopeBus._emit_self_observation`
     内部路径流转：不进注册表鉴权、不触发 post_dispatch hook（防递归）。
 
     字段契约：

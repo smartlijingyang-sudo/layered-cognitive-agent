@@ -836,6 +836,9 @@ _REVERSE_SCAN_PACKAGES = (
     "lca.plugins.loop.reducer",
     "lca.plugins.strategies",
     "lca.plugins.tools.diagnostics",
+    # 机制层术语（EnvelopeBus / SessionEvent / EnvelopeRef …）定义在 lca_kernel，
+    # 不在 lca 下；glossary 现役区收录它们，反向扫描必须覆盖其真实归属包。
+    "lca_kernel",
 )
 _CAMEL_CASE_TERM = re.compile(r"^[A-Z][A-Za-z0-9]*$")
 _DEPRECATED_SECTION_MARKERS = ("已废弃主名", "禁止复活")
@@ -1024,7 +1027,7 @@ class TestGlossaryTermCoverage(unittest.TestCase):
 
 
 class TestGlossaryReverseCoverage(unittest.TestCase):
-    """glossary.md 现役区的 CamelCase 术语必须对应 lca 包内真实类名。
+    """glossary.md 现役区的 CamelCase 术语必须对应 lca / lca_kernel 包内真实类名。
 
     与 TestGlossaryTermCoverage 互为反向：后者保证「代码类 → 术语表」，
     本测试保证「术语表 → 代码类」。缺失反向校验时，ADR-0030 删除的
@@ -1068,7 +1071,7 @@ class TestGlossaryReverseCoverage(unittest.TestCase):
         )
         self.assertFalse(
             missing,
-            "以下现役术语在 lca 包中不存在对应类名"
+            "以下现役术语在 lca / lca_kernel 包中不存在对应类名"
             "（已改名/删除的术语请移入「已废弃主名」表，"
             "概念性词语请勿加粗为术语词条）:\n" + "\n".join(f"  - {term}" for term in missing),
         )

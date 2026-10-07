@@ -278,27 +278,26 @@ def test_pipeline_loader_has_no_mount_sink() -> None:
 
 
 def test_event_session_has_no_eventbus_dual_write() -> None:
-    """ADR-0186 PR-3f: Bridge.append 不得 EventBus.default().publish 双写。
+    """ADR-0186 PR-3f: Bridge.append 不得经总线 default() 单例双写。
 
     RunEventSessionBridge 已迁入 lca.session.lifecycle.bind(旧 event_session.py
-    仅剩 COMPAT re-export);断言跟随生产位置。
+    仅剩 COMPAT re-export);断言跟随生产位置。两种拼写都禁:总线类名为
+    ``EnvelopeBus``,``EventBus`` 覆盖重新引入别名的情况。
     """
     path = _REPO_ROOT / "lca" / "session" / "lifecycle" / "bind.py"
     assert path.exists(), "lca/session/lifecycle/bind.py missing"
     text = path.read_text(encoding="utf-8")
-    assert "EventBus.default().publish" not in text, (
-        "ADR-0186 PR-3f: event_session still dual-writes via EventBus.default().publish"
-    )
+    for token in ("EnvelopeBus.default().publish", "EventBus.default().publish"):
+        assert token not in text, f"ADR-0186 PR-3f: event_session still dual-writes via {token}"
 
 
 def test_session_publish_has_no_eventbus_fallback() -> None:
-    """ADR-0186 hard closure: _session_publish 不得 EventBus.default().publish。"""
+    """ADR-0186 hard closure: _session_publish 不得回退到总线 default() 单例投递。"""
     path = _REPO_ROOT / "lca" / "plugins" / "events" / "publishers" / "_session_publish.py"
     assert path.exists(), "_session_publish.py missing"
     text = path.read_text(encoding="utf-8")
-    assert "EventBus.default().publish" not in text, (
-        "ADR-0186: _session_publish still falls back to EventBus.default().publish"
-    )
+    for token in ("EnvelopeBus.default().publish", "EventBus.default().publish"):
+        assert token not in text, f"ADR-0186: _session_publish still falls back to {token}"
 
 
 def test_pipeline_loader_has_no_bus_subscribe() -> None:

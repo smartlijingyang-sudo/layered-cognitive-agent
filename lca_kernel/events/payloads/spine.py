@@ -1,7 +1,7 @@
 """Spine 壳类 payload（ADR-0181 D2 / ADR-0183 PR-7）。
 
 承载 spine EP 字符串 + caller payload dict + chain 字段，套进
-:class:`EventBus` 发送。SPINE_EXECUTION_POINTS 是 spine EP 字符串闭集，承自
+:class:`EnvelopeBus` 发送。SPINE_EXECUTION_POINTS 是 spine EP 字符串闭集，承自
 ``lca/infrastructure/observability/spine/manifest/manifest.py`` 的
 ``EXECUTION_POINTS``（ADR-0195 O1 COMPAT re-export；迁移已完成，现 SSOT 为
 ``lca_kernel/events/config/observability/spine.yaml`` → 本模块）。

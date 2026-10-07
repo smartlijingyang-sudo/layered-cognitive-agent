@@ -109,7 +109,7 @@ class MissingPluginIdentityError(EventMechanismError):
 class EventNoSinkError(EventMechanismError):
     """持久 category 零挂载 sink，且投递策略为 strict（ADR-0184 I2 发送必落）。
 
-    由 ``EventBus._dispatch_sinks`` 上抛：对注册表标记持久（``plane:
+    由 ``EnvelopeBus._dispatch_sinks`` 上抛：对注册表标记持久（``plane:
     OBSERVABILITY``）的 category，零落盘不是合法终态。发送方收到错误后
     自行决定重试或修复装配；事件不进入 ``_fanout``。
     """

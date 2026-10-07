@@ -19,12 +19,12 @@ from typing import Any, ClassVar
 import pytest
 
 from lca.plugins.session.runtime.bus.facade import as_bus_facade
-from lca_kernel.events.bus.bus import EventBus
+from lca_kernel.events.bus.bus import EnvelopeBus
 
 # ── fixtures ────────────────────────────────────────────────────────────
 # bound_session 来自上层 conftest:publish 走绑定 Session 路径(ADR-0186 fail-loud)。
-# hook 构造的 bus 形参沿用生产惯用法 EventBus.default()(与 EnvelopeBus.default()
-# 同一单例,仅作鉴权 registry 载体);_CapturingSession 委托走 as_bus_facade append。
+# 单例经 EnvelopeBus.set_default 注入,仅作鉴权 registry 载体;
+# _CapturingSession 委托走 as_bus_facade append。
 
 
 @pytest.fixture
@@ -32,16 +32,17 @@ def hook(bound_session: Any, bus: Any) -> Any:
     """单实例 ModelVisibleHook + state state。
 
     bus 形参来自上层 conftest 的测试 catalog bus;本 fixture 将其
-    set_default(鉴权走 EventBus.default().registry),teardown 时复位单例。
+    set_default(鉴权走 EnvelopeBus.default().registry),teardown 时复位单例。
+    hook 自身不持有 bus。
     """
-    EventBus.set_default(bus)
+    EnvelopeBus.set_default(bus)
     try:
-        yield _build_hook_fixture(bus)
+        yield _build_hook_fixture()
     finally:
-        EventBus.reset_singleton()
+        EnvelopeBus.reset_singleton()
 
 
-def _build_hook_fixture(bus: Any) -> Any:
+def _build_hook_fixture() -> Any:
     """单实例 :class:`ModelVisibleHook` + state state (cursor / prompt 显式传入)。
 
     spec section H: hook 构造不再接 ``cursor_provider`` / ``prompt_ctx_getter``
@@ -78,7 +79,7 @@ def _build_hook_fixture(bus: Any) -> Any:
             self._snapshot.step_index += 1
             self._snapshot.step_id = step_id
 
-    h = ModelVisibleHook(bus=bus)
+    h = ModelVisibleHook()
 
     def make_prompt(template_id: str, text: str) -> Any:
         return CurrentReasonerPrompt(
@@ -102,7 +103,7 @@ def _build_hook_fixture(bus: Any) -> Any:
 # ── 盖章 1: yaml 鉴权 + I-MV-1 ──────────────────────────────────────────
 
 
-def test_i_mv_1_model_visible_publisher_authorized(bus: EventBus[Any]) -> None:
+def test_i_mv_1_model_visible_publisher_authorized(bus: EnvelopeBus[Any]) -> None:
     """``ModelVisiblePublisher`` 在两类 model-visible category 的 publishers 集合内。"""
     from lca.contracts.event import Category
     from lca.plugins.events.publishers.model_visible.publisher import (
@@ -118,7 +119,7 @@ def test_i_mv_1_model_visible_publisher_authorized(bus: EventBus[Any]) -> None:
         )
 
 
-def test_i_mv_1_unauthorized_producer_rejected(bus: EventBus[Any]) -> None:
+def test_i_mv_1_unauthorized_producer_rejected(bus: EnvelopeBus[Any]) -> None:
     """非授权 class publish → ``UnauthorizedPublishError``(鉴权矩阵生效)。"""
     from lca.contracts.event import Category
     from lca_kernel.events.errors.errors import UnauthorizedPublishError
@@ -499,8 +500,8 @@ def test_adapter_pre_post_share_step_identity(bound_session: Any, bus: Any) -> N
         selector_decision_path="default",
         system_prompt_text="sys",
     )
-    EventBus.set_default(bus)
-    hook = ModelVisibleHook(bus=bus)
+    EnvelopeBus.set_default(bus)
+    hook = ModelVisibleHook()
 
     class _Inner:
         async def complete(self, prompt_text: str, **kwargs: Any) -> LLMResponse:
@@ -522,7 +523,7 @@ def test_adapter_pre_post_share_step_identity(bound_session: Any, bus: Any) -> N
     try:
         response = asyncio.run(adapter.complete("hello", cursor=cursor, reasoner_prompt=prompt))
     finally:
-        EventBus.reset_singleton()
+        EnvelopeBus.reset_singleton()
         reset_publish_session(token)
 
     assert response.text == "done"
@@ -542,8 +543,8 @@ def test_setup_provides_marker_and_hook() -> None:
     """``setup()`` 注册 marker class 与 :class:`ModelVisibleHook` 实例到 ctx。
 
     注:``@plugin`` 装饰把 :func:`setup` 包成 ``CordisPlugin`` 对象,实际
-    函数经 ``plugin.setup`` 拿到;EventBus.default() 走进程单例,本测试
-    仅断言 marker class 注入 + hook 提供 + setup 签名(防声明漂移)。
+    函数经 ``plugin.setup`` 拿到。本测试仅断言 marker class 注入 + hook
+    提供 + setup 签名(防声明漂移)。
     """
     from lca.plugins.events.publishers.model_visible.publisher import (
         ModelVisiblePublisher,
@@ -586,6 +587,49 @@ def test_setup_provides_marker_and_hook() -> None:
     assert "config" in sig.parameters
 
 
+def test_hook_holds_no_bus_and_setup_never_requests_singleton(monkeypatch: Any) -> None:
+    """``ModelVisibleHook`` 不持有总线;``setup()`` 不索取进程单例。
+
+    守护点:若 ``setup()`` 索取进程单例,在未 boot 的进程里共享槽会被填成
+    一个没有 ``subscribe`` / ``mount_sink`` 的实例,后续 ``EnvelopeBus.default()``
+    拿到同一个空壳,publish 静默零投递。鉴权 registry 由 Session 投递入口
+    读取,plugin setup 无需持有总线。
+    """
+    from lca.plugins.events.hooks.model_visible.hook import ModelVisibleHook
+    from lca.plugins.events.publishers.model_visible.publisher import (
+        setup as plugin_setup,
+    )
+    from lca_kernel.events.bus import bus as bus_module
+
+    assert not hasattr(ModelVisibleHook(), "_bus"), "hook 不应持有总线引用"
+
+    requested: list[str] = []
+    monkeypatch.setattr(
+        bus_module.EnvelopeBus,
+        "default",
+        classmethod(lambda cls: requested.append(cls.__name__)),
+    )
+
+    captured: dict[str, Any] = {}
+
+    class _Ctx:
+        def provide(self, key: Any, value: Any, **_kwargs: Any) -> None:
+            captured[str(key)] = value
+
+    from pydantic import BaseModel
+
+    class _EmptyConfig(BaseModel):
+        model_config = {"extra": "forbid"}
+
+    import asyncio
+
+    setup_fn = getattr(plugin_setup, "setup", plugin_setup)
+    asyncio.run(setup_fn(_Ctx(), _EmptyConfig()))
+
+    assert requested == [], "setup() 不得索取进程单例;单例装配是 lca.events.bus manifest 的职责"
+    assert isinstance(captured["llm.adapter.hook.model_visible"], ModelVisibleHook)
+
+
 def test_plugin_decorator_metadata() -> None:
     """``@plugin`` 元数据与现有 15 个 spine_reflector 同形(I-FW-BUS-1 一致)。"""
     from lca.plugins.events.publishers.model_visible.publisher import (
@@ -604,7 +648,7 @@ def test_plugin_decorator_metadata() -> None:
 # ── helpers ─────────────────────────────────────────────────────────────
 
 
-def bus_count_published(bus: EventBus[Any]) -> int:
+def bus_count_published(bus: EnvelopeBus[Any]) -> int:
     """LEGACY:publish 已改走 Session.append,本 helper 不再被任何测试使用。
     保留仅作历史参照。
     """

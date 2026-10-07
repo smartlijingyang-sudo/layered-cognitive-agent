@@ -12,7 +12,7 @@ composer 装配 ``instrument_llm(llm, *, ctx=...)`` 从
 
 失败语义(L10 + D5):hook 抛错 / publish 失败 ⇒ 吞错,不挡业务。
 装饰器自身只是「调用 hook」,不持有真值、不写盘;所有事实走 hook 内部 fold
-+ EventBus.publish,落 :class:`SpineLlmRequestHeaderPayload` /
++ EnvelopeBus.publish,落 :class:`SpineLlmRequestHeaderPayload` /
 :class:`SpineLlmRequestHeaderAssistantPayload` 至 ``<run_id>.spine.jsonl``。
 
 本装饰器只发 catalog 事实(``model.completed.v1`` / ``assistant.responded.v1``)。

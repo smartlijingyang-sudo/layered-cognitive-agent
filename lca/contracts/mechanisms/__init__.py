@@ -1,18 +1,18 @@
 """跨层机制契约 —— 不产生业务认知语义，只负责挂载 / 触发 / 查找。
 
 边界判定（三者 vs 业务协议）：
-- EventBus / Hook / HookRegistry：观察与横切副作用，不改变决策语义
+- Hook / HookRegistry：观察与横切副作用，不改变决策语义
 - NamedRegistryProtocol / ComponentRegistryProtocol / TransportRegistryProtocol：按名解析实现，无业务规则
 - FactoryRegistry：多实现 registry seam（BODIES / BRAINS / …，ADR-0062）
 - 业务协议（Brain / Body / Memory / Runtime / Team…）→ 放 protocols/
 
-protocols/ 包内不应再定义 Registry / EventBus / Hook 类。
+protocols/ 包内不应再定义 Registry / Hook 类。
+事件总线本体在 :mod:`lca_kernel.events.bus`，不在 contracts 层重复声明 Protocol。
 """
 
 from __future__ import annotations
 
-from collections.abc import Awaitable, Callable
-from typing import Any, Protocol, TypeVar, runtime_checkable
+from typing import Any, Protocol, runtime_checkable
 
 from lca.contracts.mechanisms.capability.capability import (
     REQUIRED_CAPABILITY_KEYS as REQUIRED_CAPABILITY_KEYS,
@@ -78,38 +78,6 @@ from lca.contracts.mechanisms.seam.seam import (
     consume as consume,
 )
 from lca.contracts.models.core.state.state import AgentState
-
-T = TypeVar("T")
-
-
-@runtime_checkable
-class EventBus(Protocol):
-    """事件总线：发布 / 订阅异步事件 + waterfall/serial 分发。
-
-    - ``emit``：fire-and-forget 广播（观察者模式）
-    - ``waterfall``：around-middleware 链（每个 listener 收到 (payload, next)）
-    - ``serial``：串行决策链（每个 listener 收到 payload，返回新 payload）
-    """
-
-    def emit(self, event_name: str, payload: dict[str, Any], trace_id: str) -> None: ...
-    def subscribe(
-        self, event_name: str, handler: Callable[[dict[str, Any]], Awaitable[None]]
-    ) -> None: ...
-    async def drain(self) -> None:
-        """等待已发射事件的订阅者全部处理完（run 收尾前调用，
-        保证异步派发的桥接事件先于容器关闭落入 journal）。"""
-        ...
-
-    async def waterfall(self, event_name: str, initial: T) -> T:
-        """Around-middleware 链：每个 listener 收到 (payload, next)。
-        调用 next() 交给下一个 listener；不调用 = 短路。
-        用于权限检查、策略拦截、Hook 链式调用。"""
-        ...
-
-    async def serial(self, event_name: str, initial: T) -> T:
-        """串行决策链：每个 listener 收到 payload，返回新 payload。
-        用于"最后一个 listener 说了算"的决策场景。"""
-        ...
 
 
 @runtime_checkable

@@ -161,7 +161,7 @@ class DefaultReducer(Reducer):
       改这一处）。
     - 每个方法是纯函数（除 await 内 yield）；无 side effect。
     - 公共 ``apply_*`` 方法通过 ``_instrument_apply`` 包装,每次调用经
-      EventBus 发 ``runtime.reducer.apply`` start/end marker。
+      EnvelopeBus 发 ``runtime.reducer.apply`` start/end marker。
     """
 
     @_instrument_apply

@@ -252,7 +252,7 @@ class TestFailedTerminalCarriesErrorRef:
 
 
 class _CollectingPublishSession:
-    """最小 publish Session:S1 鉴权走 EventBus,append 留底 payload。"""
+    """最小 publish Session:S1 鉴权走 EnvelopeBus,append 留底 payload。"""
 
     def __init__(self, bus: object) -> None:
         self._bus = bus
@@ -299,16 +299,16 @@ class _CollectingPublishSession:
 
 
 def _bind_collecting_session() -> tuple[_CollectingPublishSession, object, object]:
-    """绑定 test catalog EventBus + collecting Session;返回 (session, token, bus)。"""
+    """绑定 test catalog EnvelopeBus + collecting Session;返回 (session, token, bus)。"""
     from lca.plugins.events.publishers._session_publish import (
         set_publish_session,
     )
-    from lca_kernel.events.bus.bus import EventBus
+    from lca_kernel.events.bus.bus import EnvelopeBus
     from lca_kernel.events.test.catalog import build_test_bus
 
     bus = build_test_bus()
     session = _CollectingPublishSession(bus)
-    EventBus.set_default(bus)
+    EnvelopeBus.set_default(bus)
     token = set_publish_session(session)
     return session, token, bus
 
@@ -326,7 +326,7 @@ class TestInstrumentApply:
     def test_instrument_apply_success_emits_paired_markers(self) -> None:
         """One fold emits start + end markers to the bound publish Session."""
         from lca.plugins.events.publishers._session_publish import reset_publish_session
-        from lca_kernel.events.bus.bus import EventBus
+        from lca_kernel.events.bus.bus import EnvelopeBus
 
         _reset_active_run_id()
         session, token, _bus = _bind_collecting_session()
@@ -334,7 +334,7 @@ class TestInstrumentApply:
             DefaultReducer().apply_step_advanced(_state(), 2)
         finally:
             reset_publish_session(token)
-            EventBus.set_default(None)
+            EnvelopeBus.set_default(None)
 
         markers = [p for p in session.payloads if isinstance(p, SpineEventPayload)]
         assert [m.payload for m in markers] == [
@@ -355,7 +355,7 @@ class TestInstrumentApply:
             DeclarativeValidationError,
         )
         from lca.plugins.events.publishers._session_publish import reset_publish_session
-        from lca_kernel.events.bus.bus import EventBus
+        from lca_kernel.events.bus.bus import EnvelopeBus
 
         _reset_active_run_id()
         session, token, _bus = _bind_collecting_session()
@@ -371,7 +371,7 @@ class TestInstrumentApply:
                 )
         finally:
             reset_publish_session(token)
-            EventBus.set_default(None)
+            EnvelopeBus.set_default(None)
 
         markers = [
             p.payload
@@ -384,7 +384,7 @@ class TestInstrumentApply:
     def test_instrument_apply_routes_to_bound_session_only(self) -> None:
         """marker 只落当前上下文绑定的 Session;未绑定的收集实例收不到。"""
         from lca.plugins.events.publishers._session_publish import reset_publish_session
-        from lca_kernel.events.bus.bus import EventBus
+        from lca_kernel.events.bus.bus import EnvelopeBus
 
         _reset_active_run_id()
         bound, token, _bus = _bind_collecting_session()
@@ -393,7 +393,7 @@ class TestInstrumentApply:
             DefaultReducer().apply_paused(_state(), "snap-ref")
         finally:
             reset_publish_session(token)
-            EventBus.set_default(None)
+            EnvelopeBus.set_default(None)
 
         assert len(bound.payloads) == 2
         # 隔离实例未被 set_publish_session,reducer 不可能路由到它

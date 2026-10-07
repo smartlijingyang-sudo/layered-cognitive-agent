@@ -1,4 +1,4 @@
-"""Session 的 EventBus Protocol 适配面（publish append / observe callback）。
+"""Session 的 EnvelopeBus Protocol 适配面（publish append / observe callback）。
 
 runtime :class:`~lca.session.append.Session` 的公开面是
 ``append(event_type, data) → SessionEvent`` 与
@@ -9,8 +9,8 @@ runtime :class:`~lca.session.append.Session` 的公开面是
 契约:
 
 - ``append`` 把 ``payload.category`` 写成 ``event_type``，其余可 JSON 字段
-  写成 ``data``（不含 category）；``producer`` 不入日志（鉴权仍在
-  EventBus fallback）。返回由 :class:`SessionEvent` 合成的 :class:`EventRef`
+  写成 ``data``（不含 category）；``producer`` 不入日志（鉴权仍走
+  EnvelopeBus 的 registry）。返回由 :class:`SessionEvent` 合成的 :class:`EventRef`
   （``event_id = "{session.id}:{seq}"``，``category = event.type``）。
 - ``observe`` 把 ``callback(payload, ref)`` 登记为 :class:`SessionObserver`；
   派发时优先交 in-flight 的原 payload（跨 facade 实例共享），否则从

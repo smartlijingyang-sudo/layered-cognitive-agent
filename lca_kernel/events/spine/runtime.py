@@ -190,7 +190,7 @@ class SpineEventRecord:
     causation_id: str | None = None
     prev_event_hash: str | None = None
     event_hash: str | None = None
-    # ADR-0183 §3.9 PR-12:trace_id 由 EventBus.publish 解析后注入;
+    # ADR-0183 §3.9 PR-12:trace_id 由 EnvelopeBus.publish 解析后注入;
     # ref.trace_id(可空)透传到落盘字节布局,供跨事件因果追踪。
     trace_id: str | None = None
 

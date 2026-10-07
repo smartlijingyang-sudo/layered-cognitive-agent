@@ -45,7 +45,7 @@ argv / LCA_PROFILE
 
 - import `lca.plugins.transport` / Starlette / uvicorn
 - 在 kernel 内 `Session.append` run 事实（boot catalog 除外）
-- 第二套 Manifest schema 或平行 EventBus
+- 第二套 Manifest schema 或平行 EnvelopeBus
 
 ## 读代码顺序
 

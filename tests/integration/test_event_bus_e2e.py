@@ -1,6 +1,6 @@
-"""EventBus 端到端集成测试 —— ADR-0183 验证链。
+"""EnvelopeBus 端到端集成测试 —— ADR-0183 验证链。
 
-覆盖链路(纯 EventBus 公开 API):
+覆盖链路(纯 EnvelopeBus 公开 API):
 publish → pre_dispatch hook → schema 校验 → sink 派发(FD-1)→ SpineSink 落盘
 ``<run_id>.spine.jsonl`` → SpineReader 还原(10 键字节布局,含 ``trace_id``)。
 
@@ -28,7 +28,7 @@ import pytest
 from lca.contracts.event import Category, EventPayload, Plane
 from lca.harness.profile.resolve.pipeline_loader import apply_pipeline
 from lca_kernel.events import EventRef
-from lca_kernel.events.bus.bus import EventBus, FailureSemantics, PayloadSchemaError
+from lca_kernel.events.bus.bus import EnvelopeBus, FailureSemantics, PayloadSchemaError
 from lca_kernel.events.errors.errors import (
     UnauthorizedPublishError,
     UnauthorizedSubscribeError,
@@ -196,10 +196,10 @@ def _make_pipeline(hook_cls: type = RecordingPreDispatchHook) -> Pipeline:
 
 
 @pytest.fixture
-def bus(event_singletons_reset: None) -> EventBus[EventPayload]:
+def bus(event_singletons_reset: None) -> EnvelopeBus[EventPayload]:
     """reset_singleton 后经 default() 取出的进程级单例。"""
-    EventBus.set_default(EventBus(_make_registry()))
-    return EventBus.default()
+    EnvelopeBus.set_default(EnvelopeBus(_make_registry()))
+    return EnvelopeBus.default()
 
 
 @pytest.fixture
@@ -211,7 +211,7 @@ def spine_sink(tmp_path) -> Iterator[SpineSink]:
     sink.close()
 
 
-def _wire_sink(bus: EventBus[EventPayload], sink: SpineSink) -> None:
+def _wire_sink(bus: EnvelopeBus[EventPayload], sink: SpineSink) -> None:
     # 命令式装载:publish 期经 _dispatch_sinks 把 build_record 结果派发到后端。
     bus.mount_sink("spine", sink, failure=FailureSemantics.FAIL_FAST)
 
@@ -220,7 +220,7 @@ def _wire_sink(bus: EventBus[EventPayload], sink: SpineSink) -> None:
 
 
 def test_publish_hook_schema_fanout_spine_roundtrip(
-    bus: EventBus[EventPayload],
+    bus: EnvelopeBus[EventPayload],
     spine_sink: SpineSink,
     tmp_path,
 ) -> None:
@@ -264,11 +264,11 @@ def test_publish_hook_schema_fanout_spine_roundtrip(
     assert RecordingPreDispatchHook.calls == [(SpineEventPayload, TestProducer)] * 3
 
 
-def test_default_singleton_is_process_level(bus: EventBus[EventPayload]) -> None:
-    assert EventBus.default() is bus
+def test_default_singleton_is_process_level(bus: EnvelopeBus[EventPayload]) -> None:
+    assert EnvelopeBus.default() is bus
 
 
-def test_publish_trace_id_explicit_and_generated(bus: EventBus[EventPayload]) -> None:
+def test_publish_trace_id_explicit_and_generated(bus: EnvelopeBus[EventPayload]) -> None:
     explicit = bus.publish(_spine_payload(0), producer=TestProducer, trace_id="trc_e2e_fixed")
     assert explicit.trace_id == "trc_e2e_fixed"
     generated = bus.publish(_spine_payload(1), producer=TestProducer)
@@ -279,7 +279,7 @@ def test_publish_trace_id_explicit_and_generated(bus: EventBus[EventPayload]) ->
 
 
 def test_unauthorized_producer_rejected(
-    bus: EventBus[EventPayload],
+    bus: EnvelopeBus[EventPayload],
     tmp_path,
 ) -> None:
     RecordingPreDispatchHook.calls.clear()
@@ -291,7 +291,7 @@ def test_unauthorized_producer_rejected(
     assert list(tmp_path.glob("*.spine.jsonl")) == []
 
 
-def test_unauthorized_subscribe_rejected(bus: EventBus[EventPayload]) -> None:
+def test_unauthorized_subscribe_rejected(bus: EnvelopeBus[EventPayload]) -> None:
     with pytest.raises(UnauthorizedSubscribeError):
         bus.subscribe(
             plugin=UnauthorizedPlugin,
@@ -303,13 +303,13 @@ def test_unauthorized_subscribe_rejected(bus: EventBus[EventPayload]) -> None:
 # ── schema 校验与 hook 哨兵 ──────────────────────────────────────────────
 
 
-def test_schema_validation_rejects_wrong_payload_type(bus: EventBus[EventPayload]) -> None:
+def test_schema_validation_rejects_wrong_payload_type(bus: EnvelopeBus[EventPayload]) -> None:
     with pytest.raises(PayloadSchemaError):
         bus.publish(WrongPayload(), producer=TestProducer)
 
 
 def test_pre_dispatch_skip_dispatch_blocks_publish(
-    bus: EventBus[EventPayload],
+    bus: EnvelopeBus[EventPayload],
     spine_sink: SpineSink,
     tmp_path,
 ) -> None:
@@ -324,7 +324,7 @@ def test_pre_dispatch_skip_dispatch_blocks_publish(
 # ── 失败语义(I-FW-BUS-2)────────────────────────────────────────────────
 
 
-def test_fail_fast_sink_failure_propagates(bus: EventBus[EventPayload]) -> None:
+def test_fail_fast_sink_failure_propagates(bus: EnvelopeBus[EventPayload]) -> None:
     def _boom(payload: EventPayload, ref: EventRef) -> None:
         raise RuntimeError("sink down")
 
@@ -338,7 +338,7 @@ def test_fail_fast_sink_failure_propagates(bus: EventBus[EventPayload]) -> None:
         bus.publish(_spine_payload(0), producer=TestProducer)
 
 
-def test_contained_subscriber_failure_is_swallowed(bus: EventBus[EventPayload]) -> None:
+def test_contained_subscriber_failure_is_swallowed(bus: EnvelopeBus[EventPayload]) -> None:
     seen: list[str] = []
 
     def _boom(payload: EventPayload, ref: EventRef) -> None:
@@ -370,7 +370,7 @@ def test_consumer_rule_prefix_match() -> None:
 
 
 def test_register_pipeline_does_not_mount_sinks(
-    bus: EventBus[EventPayload],
+    bus: EnvelopeBus[EventPayload],
     tmp_path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -388,7 +388,7 @@ def test_register_pipeline_does_not_mount_sinks(
 
 
 def test_apply_pipeline_mounts_sinks_declaratively(
-    bus: EventBus[EventPayload],
+    bus: EnvelopeBus[EventPayload],
     tmp_path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

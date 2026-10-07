@@ -2,7 +2,7 @@
 #
 # 装配路径：profile boot 时 lca/harness/profile/pipeline_loader.py 按约定
 # （<profile 目录>/event-pipeline/<profile stem>.yaml）发现本文件，构造
-# Pipeline 后调 EventBus.default().register_pipeline(pipeline)。
+# Pipeline 后调 EnvelopeBus.default().register_pipeline(pipeline)。
 #
 # 约束（附录 C §C.1）：
 # - hooks 类必须可无参构造（register_pipeline 走 spec.hook() 实例化）；

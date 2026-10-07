@@ -1,4 +1,4 @@
-"""ADR-0183 PR-7 EventBus 鉴权测试。"""
+"""ADR-0183 PR-7 EnvelopeBus 鉴权测试。"""
 
 from __future__ import annotations
 
@@ -7,7 +7,7 @@ import pytest
 from lca.plugins.events.publishers.delegation_cache.plugin import DelegationCachePlugin
 from lca.plugins.events.sinks.spine_file_sink.sink import SpineFileSink
 from lca_kernel.events import Category, EventRef, TeamDelegationCacheHit
-from lca_kernel.events.bus.bus import EventBus, FailureSemantics
+from lca_kernel.events.bus.bus import EnvelopeBus, FailureSemantics
 from lca_kernel.events.errors.errors import (
     MissingPluginIdentityError,
     UnauthorizedPublishError,
@@ -15,17 +15,17 @@ from lca_kernel.events.errors.errors import (
 )
 
 
-def _make_bus() -> EventBus:
+def _make_bus() -> EnvelopeBus:
     from lca_kernel.events.test.catalog import build_test_bus
     return build_test_bus()
 
 
 @pytest.fixture
-def bus() -> EventBus:
+def bus() -> EnvelopeBus:
     return _make_bus()
 
 
-def test_authorized_publish_returns_event_ref(bus: EventBus) -> None:
+def test_authorized_publish_returns_event_ref(bus: EnvelopeBus) -> None:
     ref = bus.publish(
         TeamDelegationCacheHit(callee_role="analyst", subtask="汇总", step=3),
         producer=DelegationCachePlugin,
@@ -34,7 +34,7 @@ def test_authorized_publish_returns_event_ref(bus: EventBus) -> None:
     assert ref.category == Category.TEAM_DELEGATION_CACHE_HIT.value
 
 
-def test_unauthorized_publish_raises(bus: EventBus) -> None:
+def test_unauthorized_publish_raises(bus: EnvelopeBus) -> None:
     class _RoguePlugin:
         pass
 
@@ -46,7 +46,7 @@ def test_unauthorized_publish_raises(bus: EventBus) -> None:
     assert exc_info.value.plugin_id.endswith("_RoguePlugin")
 
 
-def test_authorized_subscribe_receives_events(bus: EventBus) -> None:
+def test_authorized_subscribe_receives_events(bus: EnvelopeBus) -> None:
     received: list = []
     bus.subscribe(
         plugin=SpineFileSink,
@@ -62,7 +62,7 @@ def test_authorized_subscribe_receives_events(bus: EventBus) -> None:
     assert payload.callee_role == "a"
 
 
-def test_unauthorized_subscribe_raises(bus: EventBus) -> None:
+def test_unauthorized_subscribe_raises(bus: EnvelopeBus) -> None:
     class _RogueSubscriber:
         pass
 
@@ -74,7 +74,7 @@ def test_unauthorized_subscribe_raises(bus: EventBus) -> None:
         )
 
 
-def test_publish_requires_plugin(bus: EventBus) -> None:
+def test_publish_requires_plugin(bus: EnvelopeBus) -> None:
     with pytest.raises(MissingPluginIdentityError, match="publish"):
         bus.publish(
             TeamDelegationCacheHit(callee_role="x", subtask="y", step=0),
@@ -82,7 +82,7 @@ def test_publish_requires_plugin(bus: EventBus) -> None:
         )
 
 
-def test_subscribe_requires_plugin(bus: EventBus) -> None:
+def test_subscribe_requires_plugin(bus: EnvelopeBus) -> None:
     with pytest.raises(MissingPluginIdentityError, match="subscribe"):
         bus.subscribe(
             plugin=None,  # type: ignore[arg-type]
@@ -91,7 +91,7 @@ def test_subscribe_requires_plugin(bus: EventBus) -> None:
         )
 
 
-def test_consumer_exception_does_not_propagate(bus: EventBus) -> None:
+def test_consumer_exception_does_not_propagate(bus: EnvelopeBus) -> None:
     def boom(_p, _r):
         raise RuntimeError("boom")
 
@@ -108,7 +108,7 @@ def test_consumer_exception_does_not_propagate(bus: EventBus) -> None:
     assert isinstance(ref, EventRef)
 
 
-def test_spine_file_sink_in_registry(bus: EventBus) -> None:
+def test_spine_file_sink_in_registry(bus: EnvelopeBus) -> None:
     """SpineFileSink 在 yaml subscribers 白名单 → can_subscribe 通过。"""
     cat = Category.TEAM_DELEGATION_CACHE_HIT
     assert bus.registry.can_subscribe(SpineFileSink, cat) is True

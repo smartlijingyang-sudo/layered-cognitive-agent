@@ -36,7 +36,7 @@ REQUIRED_README_PACKAGES = REQUIRED_LCA_TOP | {"lca_kernel"}
 # 2026-09-14 dead-code 修剪:events/publishers/spine_loop_cursor 与
 # events/publishers/spine_writable_matrix 两个目录已删除,不再列入
 # legacy plugin roots 守卫(cursor 写入走 SessionWritePortAdapter →
-# Session.append SSOT,不再经 EventBus 旁路)。
+# Session.append SSOT,不再经 EnvelopeBus 旁路)。
 LEGACY_PLUGIN_ROOTS_NO_NEW_PLUGIN_PY: frozenset[str] = frozenset()
 
 SEAM_TREE_ANCHORS = frozenset(

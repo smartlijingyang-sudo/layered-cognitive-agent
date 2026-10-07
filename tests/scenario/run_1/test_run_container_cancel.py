@@ -22,7 +22,7 @@ from lca.contracts.models.team.role.team import RoleProfile, ToolPermissionManif
 from lca.infrastructure.observability.facade.team.profile import TeamTraceProfile
 from lca.plugins.session.runtime.store.store import SessionStore
 from lca.session.lifecycle.bind import EventSessionBinder
-from lca_kernel.events.bus.bus import EventBus
+from lca_kernel.events.bus.bus import EnvelopeBus
 from lca_kernel.events.test.catalog import build_test_bus
 from tests.support.observability_helpers import make_test_bound
 
@@ -30,9 +30,9 @@ from tests.support.observability_helpers import make_test_bound
 @pytest.fixture(autouse=True)
 def _test_event_bus() -> Iterator[None]:
     bus = build_test_bus()
-    EventBus.set_default(bus)
+    EnvelopeBus.set_default(bus)
     yield
-    EventBus.reset_singleton()
+    EnvelopeBus.reset_singleton()
 
 
 class _HangRuntime:

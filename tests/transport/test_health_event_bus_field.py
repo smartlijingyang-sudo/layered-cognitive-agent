@@ -1,9 +1,9 @@
 """PR-4: /health handler exposes ``event_bus`` field + PersistenceObserver observability.
 
-The health payload bundles EventBus delivery counters and, when loaded,
+The health payload bundles EnvelopeBus delivery counters and, when loaded,
 PersistenceObserver fsync policy. ``queue_depth`` is 0 (sync observer).
 ``dropped_total > 0`` flips ``status`` to ``degraded`` without breaking
-readiness. The field is omitted when EventBus is unavailable (graceful
+readiness. The field is omitted when EnvelopeBus is unavailable (graceful
 degradation).
 """
 
@@ -57,12 +57,12 @@ def client() -> TestClient:
 
 @pytest.fixture(autouse=True)
 def _reset_event_bus_singleton() -> Iterator[None]:
-    """Avoid cross-test bleed: each test gets a fresh EventBus instance."""
-    from lca_kernel.events import EventBus
+    """Avoid cross-test bleed: each test gets a fresh EnvelopeBus instance."""
+    from lca_kernel.events import EnvelopeBus
 
-    EventBus.reset_singleton()
+    EnvelopeBus.reset_singleton()
     yield
-    EventBus.reset_singleton()
+    EnvelopeBus.reset_singleton()
 
 
 # ── /health handler ──────────────────────────────────────────────────────
@@ -115,7 +115,7 @@ def test_health_payload_event_bus_dropped_sets_degraded(
     # ADR-0268: bus renamed to EnvelopeBus; production calls
     # ``lca_kernel.events.EnvelopeBus.default().delivery_snapshot()``
     # directly, so the patch target must be EnvelopeBus (patching the
-    # EventBus compat shim subclass would not affect the base class).
+    # EnvelopeBus compat shim subclass would not affect the base class).
     monkeypatch.setattr("lca_kernel.events.EnvelopeBus.delivery_snapshot", _fake_snapshot)
 
     body = client.get("/health").json()

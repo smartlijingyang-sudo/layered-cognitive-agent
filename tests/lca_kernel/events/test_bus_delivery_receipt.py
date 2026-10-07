@@ -18,7 +18,7 @@ import pytest
 
 from lca.contracts.event import Category, EventPayload, Plane, TeamDelegationCacheHit
 from lca_kernel.events import _DEFAULT_CONFIG_DIR
-from lca_kernel.events.bus.bus import DeliveryPolicy, EventBus, EventRef
+from lca_kernel.events.bus.bus import DeliveryPolicy, EnvelopeBus, EventRef
 from lca_kernel.events.errors.errors import EventNoSinkError
 from lca_kernel.events.payloads.spine import SpineEventPayload
 from lca_kernel.events.registry.registry import EventRegistry, EventSpec
@@ -88,7 +88,7 @@ def spine_payload() -> SpineEventPayload:
     )
 
 
-def _counts(bus: EventBus[EventPayload], category: str) -> dict[str, int]:
+def _counts(bus: EnvelopeBus[EventPayload], category: str) -> dict[str, int]:
     return bus.delivery_snapshot()[category]
 
 
@@ -211,7 +211,7 @@ class TestDeliveryCounters:
                 Category.TEAM_DELEGATION_CACHE_HIT: TeamDelegationCacheHit
             },
         )
-        isolated = EventBus(registry)
+        isolated = EnvelopeBus(registry)
         isolated.mount_sink("rec", _RecordingSink())
         payload = TeamDelegationCacheHit(callee_role="a", subtask="b", step=1)
         isolated.publish(payload, producer=_Producer)
@@ -345,7 +345,7 @@ class TestEventsDeliveryCommand:
     @pytest.fixture
     def seeded_default_bus(
         self, team_producer: type, team_payload: TeamDelegationCacheHit
-    ) -> EventBus[EventPayload]:
+    ) -> EnvelopeBus[EventPayload]:
         """把带计数的 bus 注入进程单例,供 CLI 命令读取。"""
         # NOTE(round-0390): yaml publishers use id-form tokens
         # ('delegation_cache'); without the test catalog they stay unresolved
@@ -356,9 +356,9 @@ class TestEventsDeliveryCommand:
             _DEFAULT_CONFIG_DIR, catalog=build_test_catalog()
         )
         registry.refresh()
-        seeded: EventBus[EventPayload] = EventBus(registry)
+        seeded: EnvelopeBus[EventPayload] = EnvelopeBus(registry)
         seeded.publish(team_payload, producer=team_producer)
-        EventBus.set_default(seeded)
+        EnvelopeBus.set_default(seeded)
         return seeded
 
     def test_json_output(self, seeded_default_bus) -> None:

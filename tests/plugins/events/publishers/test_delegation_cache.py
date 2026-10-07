@@ -15,7 +15,7 @@ from lca.plugins.events.publishers.delegation_cache.plugin import (
     DelegationCachePlugin,
 )
 from lca_kernel.events import TeamDelegationCacheHit
-from lca_kernel.events.bus.bus import EventBus, EventRef
+from lca_kernel.events.bus.bus import EnvelopeBus, EventRef
 
 
 def _state_with_hit_result(
@@ -77,7 +77,7 @@ def test_delegation_cache_plugin_emits_via_session() -> None:
     from lca_kernel.events.test.catalog import build_test_bus
 
     bus = build_test_bus()
-    EventBus.set_default(bus)
+    EnvelopeBus.set_default(bus)
     captured: dict[str, Any] = {}
 
     class FakeSession:
@@ -100,7 +100,7 @@ def test_delegation_cache_plugin_emits_via_session() -> None:
         observation = DelegationCachePlugin().cached_observation(spec, state)
     finally:
         reset_publish_session(token)
-        EventBus.reset_singleton()
+        EnvelopeBus.reset_singleton()
 
     assert isinstance(observation, Observation)
     assert observation.success is True
@@ -133,7 +133,7 @@ def test_cache_module_delegates_to_plugin() -> None:
     from lca_kernel.events.test.catalog import build_test_bus
 
     bus = build_test_bus()
-    EventBus.set_default(bus)
+    EnvelopeBus.set_default(bus)
     captured: list[Any] = []
 
     class FakeSession:
@@ -156,7 +156,7 @@ def test_cache_module_delegates_to_plugin() -> None:
         observation = cached_delegation_observation(spec, state)
     finally:
         reset_publish_session(token)
-        EventBus.reset_singleton()
+        EnvelopeBus.reset_singleton()
 
     assert isinstance(observation, Observation)
     assert len(captured) == 1
@@ -173,7 +173,7 @@ def test_unauthorized_plugin_class_cannot_publish() -> None:
     from lca_kernel.events.test.catalog import build_test_bus
 
     bus = build_test_bus()
-    EventBus.set_default(bus)
+    EnvelopeBus.set_default(bus)
     try:
         with __import__("pytest").raises(
             __import__(
@@ -185,4 +185,4 @@ def test_unauthorized_plugin_class_cannot_publish() -> None:
                 producer=_RoguePlugin,
             )
     finally:
-        EventBus.reset_singleton()
+        EnvelopeBus.reset_singleton()

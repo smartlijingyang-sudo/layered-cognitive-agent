@@ -25,7 +25,7 @@ from lca.plugins.transport.webserver.handlers.runs.session.session.session impor
     RunStatus,
 )
 from lca.session.lifecycle.bind import EventSessionBinder
-from lca_kernel.events.bus.bus import EventBus
+from lca_kernel.events.bus.bus import EnvelopeBus
 from lca_kernel.events.test.catalog import build_test_bus
 from tests.support.gateway_scripted import ScriptedLLMResolver
 
@@ -33,9 +33,9 @@ from tests.support.gateway_scripted import ScriptedLLMResolver
 @pytest.fixture(autouse=True)
 def _test_event_bus() -> Iterator[None]:
     bus = build_test_bus()
-    EventBus.set_default(bus)
+    EnvelopeBus.set_default(bus)
     yield
-    EventBus.reset_singleton()
+    EnvelopeBus.reset_singleton()
 
 
 @pytest.fixture(autouse=True)

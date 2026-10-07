@@ -131,10 +131,10 @@ LLM adapter.complete(...)                                LLM adapter.complete(..
 
 **不破坏的 ADR-0183 不变量**:
 
-- I-FW-BUS-1(producer 唯一入口 `EventBus.publish`)
+- I-FW-BUS-1(producer 唯一入口 `EnvelopeBus.publish`)
 - I-FW-SSOT-1(`<run_id>.spine.jsonl` 唯一 SSOT)— **本 ADR 强化**:删旁路文件
-- I-FW-BUS-2(consumer 唯一入口 `EventBus.subscribe`)
-- I-FW-BUS-3(plugin 不可改 EventBus 内部 / SpineSink 字节布局)
+- I-FW-BUS-2(consumer 唯一入口 `EnvelopeBus.subscribe`)
+- I-FW-BUS-3(plugin 不可改 EnvelopeBus 内部 / SpineSink 字节布局)
 - I-FW-BUS-4(业务不订阅 `event.bus.dispatch.*`)
 
 **新增 5 条 I-MV 不变量**(PR-4 由架构测试守护):

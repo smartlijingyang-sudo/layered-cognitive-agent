@@ -1,10 +1,10 @@
-"""EventBus 架构不变量 —— ADR-0183 §4。
+"""EnvelopeBus 架构不变量 —— ADR-0183 §4。
 
 不变量（ADR-0183 §4):
-- I-FW-BUS-1: producer 唯一入口 = EventBus.publish；reducer / cursor / runtime_loop
+- I-FW-BUS-1: producer 唯一入口 = EnvelopeBus.publish；reducer / cursor / runtime_loop
   禁直写 spine / 直调 sink。
-- I-FW-BUS-2: consumer 唯一入口 = EventBus.subscribe(*, failure=...)；不允许在
-  EventBus 框架外调 .subscribe( / .register_sink( (manifest.py 内部走
+- I-FW-BUS-2: consumer 唯一入口 = EnvelopeBus.subscribe(*, failure=...)；不允许在
+  EnvelopeBus 框架外调 .subscribe( / .register_sink( (manifest.py 内部走
   EventMechanism 除外)。
 - I-FW-BUS-4: 业务不订阅 event.bus.dispatch.*。
 - I-FW-SSOT-1: <run_id>.spine.jsonl 唯一 SSOT；events.jsonl legacy reader 必须
@@ -117,7 +117,7 @@ def _is_excluded(line: str, exclude_substrings: tuple[str, ...]) -> bool:
 
 
 class TestIFwBus1:
-    """I-FW-BUS-1: producer 唯一入口 = EventBus.publish。
+    """I-FW-BUS-1: producer 唯一入口 = EnvelopeBus.publish。
 
     当前守护范围:
     - sink 直调部分(spine_chain_sink. / spine_file_sink.write): PR-1+2+4 已收口
@@ -190,7 +190,7 @@ class TestIFwBus1:
 
 
 class TestIFwBus2:
-    """I-FW-BUS-2: consumer 唯一入口 = EventBus.subscribe(*, failure=...)。
+    """I-FW-BUS-2: consumer 唯一入口 = EnvelopeBus.subscribe(*, failure=...)。
 
     当前守护范围:除白名单外,生产路径不应有 .subscribe( / .register_sink(
     调用。白名单:EventMechanism 框架内(lca_kernel/events/)、
@@ -200,7 +200,7 @@ class TestIFwBus2:
 
     # 框架内 + manifest.py 内部 + 测试自身的合法位置
     _ALLOW_PATH_SUBSTRINGS: tuple[str, ...] = (
-        "lca_kernel/events/",  # EventMechanism / EventBus 框架本体
+        "lca_kernel/events/",  # EventMechanism / EnvelopeBus 框架本体
         "lca/plugins/events/",  # 业务方 plugin manifest 内部走 EventMechanism
         "archive/",  # 归档
         str(_THIS_TEST_FILE.name),  # 本测试文件

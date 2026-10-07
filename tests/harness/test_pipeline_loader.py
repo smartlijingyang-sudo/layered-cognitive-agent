@@ -25,7 +25,7 @@ from lca.harness.profile.resolve.pipeline_loader import (
     register_pipeline_once,
 )
 from lca_kernel.events import TeamDelegationCacheHit
-from lca_kernel.events.bus.bus import EventBus, FailureSemantics
+from lca_kernel.events.bus.bus import EnvelopeBus, FailureSemantics
 from lca_kernel.events.hooks.hooks import DefaultFailureHook, PayloadSchemaHook
 from lca_kernel.events.pipeline.pipeline import HookSpec, Pipeline, Stage
 from lca_kernel.events.sinks.spine_sink import SpineSink, SpineSinkClosedError
@@ -77,8 +77,8 @@ def _write_yaml(path: Path, data: object) -> Path:
     return path
 
 
-def _make_bus() -> EventBus:
-    """独立 EventBus(默认鉴权矩阵),避免单例串扰。"""
+def _make_bus() -> EnvelopeBus:
+    """独立 EnvelopeBus(默认鉴权矩阵),避免单例串扰。"""
     from lca_kernel.events.test.catalog import build_test_bus
 
     return build_test_bus()

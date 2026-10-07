@@ -125,7 +125,7 @@ S1 的空壳路径无任何用例触达。违反 [AGENTS.md §1.5 规则 6](../.
 
 **验收**：
 1. `grep -n '_bus' lca/plugins/events/hooks/model_visible/hook.py` 零命中
-2. `git grep -n 'EnvelopeBus.default()' -- 'lca/plugins/**'` 零命中
+2. `git grep -n 'EnvelopeBus.default()' -- 'lca/plugins/events/**'` 零命中。[`query_endpoints.py:614`](../../../lca/plugins/transport/webserver/handlers/runs/api/query_endpoints.py) 是 `/health` 的真实消费方，保留；PR-2 单类收口后它成为唯一正确的调用形态
 3. `configure_delivery_policy` / `delivery_policy` / `delivery_snapshot` 在 `bus.py` 各只剩一处 `def`
 4. `pytest tests/lca_kernel/events/ tests/plugins/events/publishers/model_visible/ --no-cov` 零失败（基线 252 passed + 16 passed）
 5. 新增回归测试：`ModelVisibleHook()` 无参可构造，且 `capture_pre_llm` 行为与去参前逐字段相同
@@ -149,6 +149,8 @@ S1 的空壳路径无任何用例触达。违反 [AGENTS.md §1.5 规则 6](../.
   - [`tests/architecture/test_fold_no_io.py:295`](../../../tests/architecture/test_fold_no_io.py) — 字面构造禁令 `node.func.id == "EventBus"` 改为 `"EnvelopeBus"`
   - [`tests/architecture/test_assistant_routes_invariants.py:179`](../../../tests/architecture/test_assistant_routes_invariants.py) — 禁词表加 `"EnvelopeBus.publish"`
 - [`tests/lca_kernel/events/test_envelope_bus.py`](../../../tests/lca_kernel/events/test_envelope_bus.py) — 重写：删 `isinstance(bus, EventBus)`（`:76`）与 `TestEventBusCompatShim` 类名，断言改为「publish 抵达已 mount 的 sink」与「publish 抵达已 subscribe 的 callback」
+- **实施补记（原文件清单低估）**：删除 `class EventBus` 会让 35 个测试文件在 import 期即失败（`from lca_kernel.events.bus.bus import EventBus`），[AGENTS.md §5](../../../AGENTS.md)「Protocol / 公共签名 → 全部实现 + 测试」要求同 PR 闭环，故这 35 个文件随类名机械更新，属 PR-2 而非 PR-3。两处需要判断而非机械替换：[`test_architecture_iteration_contracts.py:33`](../../../tests/scenario/architecture/test_architecture_iteration_contracts.py) 的 `("lca.contracts.mechanisms", "EventBus")` 指的是 PR-3 才处理的同名 Protocol，必须保持 `EventBus`；[`test_doctor_profile_cli.py`](../../../tests/infrastructure/cli/test_doctor_profile_cli.py) 的 forbidden 针列表两种拼写都留，避免守护被改名收窄
+- **第四处名字字面量守护（原清单遗漏）**：[`test_session_ssot_invariants.py:280-300`](../../../tests/architecture/test_session_ssot_invariants.py) 的两个双写禁令断言 `"EventBus.default().publish" not in text`。改名后生产代码只会写 `EnvelopeBus.default().publish`，断言将永远为真 —— 改为同时检查两种拼写
 
 **验收**：
 1. `git grep -n 'class EventBus' -- 'lca_kernel/**'` 零命中
@@ -174,6 +176,8 @@ S1 的空壳路径无任何用例触达。违反 [AGENTS.md §1.5 规则 6](../.
 - prose 收敛：`git grep -l '\bEventBus\b' -- 'lca/**/*.py' 'lca_kernel/**/*.py'` 的 33 个文件（约 103 处 docstring / 注释 / plugin `description=` 字符串）统一改为 `EnvelopeBus`。已确认低风险：[`test_event_bus_invariants.py`](../../../tests/architecture/test_event_bus_invariants.py) 的 I-FW-BUS-1/2 守护的是调用模式（`_spine.append(` / `event_spine.append(` / `.subscribe(`）与路径白名单，不依赖类名字面量，仅其 docstring 需同步
 - contracts 同名 Protocol：删 [`contracts/mechanisms/__init__.py:86-112`](../../../lca/contracts/mechanisms/__init__.py) 的 `EventBus(Protocol)` 及 [`contracts/__init__.py:14`](../../../lca/contracts/__init__.py)、[`contracts/protocols/__init__.py:17,391`](../../../lca/contracts/protocols/__init__.py) 三处导出；同步改 [`contracts/mechanisms/__init__.py:4,9`](../../../lca/contracts/mechanisms/__init__.py) 的边界判定 prose
 - [`docs/specs/glossary.md`](../../specs/glossary.md) · [`docs/specs/architecture.md`](../../specs/architecture.md) · [`lca_kernel/README.md:38`](../../../lca_kernel/README.md) — 术语条目对齐（`docs/adr/` 与 `docs/notes/archived/` 不动）
+- **实施补记（原清单遗漏的非 `lca/`·`lca_kernel/` 引用点）**：[`bundles/event-bus-components.yaml:9`](../../../bundles/event-bus-components.yaml)、[`profiles/event-pipeline/web-standard.yaml:5`](../../../profiles/event-pipeline/web-standard.yaml)、[`pyproject.toml:158`](../../../pyproject.toml)、[`scripts/check_platform_directory.py:39`](../../../scripts/check_platform_directory.py)、[`scripts/event_bus_status.py:9,151`](../../../scripts/event_bus_status.py)、[`scripts/route_legacy_patterns.py:73`](../../../scripts/route_legacy_patterns.py)。六处均为注释或标签字符串，无功能耦合（`route_legacy_patterns.py` 的三元组第三位是描述文本，不是 grep 模式）。它们不在 G6 的 grep 范围内，但留着会让词表继续分叉
+- **实施补记**：[`test_architecture_iteration_contracts.py:33`](../../../tests/scenario/architecture/test_architecture_iteration_contracts.py) 的 `("lca.contracts.mechanisms", "EventBus")` 断言该 Protocol 的导出名。PR-3 删除或重命名 contracts Protocol 时，这一条必须同步，否则该测试失败
 
 **验收**：
 1. **G6 / O4 归零门**：`rg '\bEventBus\b' lca/ lca_kernel/ --glob '!**/harness/**' --glob '!**/tests/**' --glob '!**/bus/**'` 退出码 1（零命中）
@@ -202,6 +206,10 @@ S1 的空壳路径无任何用例触达。违反 [AGENTS.md §1.5 规则 6](../.
 | `python scripts/check_package_contracts.py` | exit 1，60 issues / 82 packages |
 | `python scripts/check_protocol_impl.py` | exit 1，42 issues |
 | `python scripts/check_no_any.py` | exit 1（无汇总计数，验收逐条 diff 输出） |
+| `pytest tests/scenario/code/test_code_conventions.py::TestFileLineCountLimit --no-cov` | 1 failed（基线提交 `81221a945` 上即失败：`lca/infrastructure/observability/loop_cursor/projection/host.py` 258 行有效代码 > 阈值 250）。与本计划无关，不修 |
+| `pytest tests/ --no-cov`（全量） | 151 failed。在 `81221a945` 的 pristine worktree 上跑同一命令得到**逐条相同**的 151 条失败集合，是三个 PR 共同的回归对照基线 |
+| `ruff format --check`（本计划触及的测试文件） | 12 个文件在 pristine HEAD 上即未格式化（`test_event_bus_authority_consistency` / `test_fold_no_io` / `test_session_ssot_invariants` / `test_bus_delivery_receipt` / `test_event_bus_auth` / `test_event_bus` / `test_self_observation` / `test_spine_payload` / `test_trace_context` / `test_execution_point_coverage` / `test_run_container_cancel` / `test_health_event_bus_field`）。待格式化 hunk 零命中 `EnvelopeBus` 行，属既有债，本计划不附带重排 |
+| `pytest tests/integration/test_l10_filename_migration.py --no-cov` | 1 failed（journal 文件名迁移，与总线无关；pristine 基线同样失败） |
 | `python scripts/verify_md_links.py` | exit 1，123 broken links |
 | `python scripts/verify_doc_budgets.py` | exit 1，2 documents over budget |
 | `python scripts/check_doc_layering.py` | exit 1 |
@@ -210,6 +218,34 @@ S1 的空壳路径无任何用例触达。违反 [AGENTS.md §1.5 规则 6](../.
 `tests/architecture/` 与 `tests/contracts/test_protocols_package_contract.py` 是本计划三个守护点的所在套件，其既有失败必须在 PR-2 开工前逐条记录，验收只比对失败集增量。
 
 每个 PR 的报告必须逐项区分「本次引入」与「既有失败」，只有退出码为 0 的命令才能写为「通过」。
+
+## 实施结果（2026-10-07）
+
+三个 PR 全部落地在分支 `refactor/envelope-bus-single-class`（基线提交 `81221a945`）。
+
+| PR | commit | 变更量 | 结果 |
+|---|---|---|---|
+| PR-1 | `54fe1fde9` | 5 files, +73/−54 | 死依赖与三份重复 body 已删；新增回归守护并 teeth check |
+| PR-2 | `3d5a3cd06` | 47 files, +507/−568 | `class EventBus` 已删，投递面并入 `EnvelopeBus`；`bus.py` 824 → 721 行；两处 `# type: ignore[assignment]` 归零 |
+| PR-3 | 见本提交 | — | G6 / O4 归零门达成；contracts 同名 Protocol 已删 |
+
+**G6 / O4 归零门实测**：`rg '\bEventBus\b' lca/ lca_kernel/ --glob '!**/harness/**' --glob '!**/tests/**' --glob '!**/bus/**'` 退出码 1（零命中）；去掉三个 glob 后 `rg '\bEventBus\b' lca/ lca_kernel/` 同样零命中 —— 严于 [ADR-0194:230](../../adr/0194-cognitive-loop-architecture-convergence.md) 的「仅 harness」要求。
+
+**全量回归对照**：`pytest tests/ --no-cov` 在 pristine 基线 worktree（`81221a945`）、PR-2 后、PR-3 后三次运行均为 **151 failed**，且三次失败集合逐条相同（`comm` 双向差集为空）。零回归，亦无意外修复。
+
+**contracts Protocol 删除的四道门实测**：类型位标注零命中、`isinstance` 零命中、`lca/contracts` 外零 import、字符串形态仅 `__all__` 一处。删除后 `tests/contracts/` 全绿，`Hook` 等其余导出不变。随之孤立的 `Awaitable` / `Callable` / `TypeVar T` 已一并移除。
+
+**一处计划外的闭环**：删除该 Protocol 后 [`test_code_conventions.py`](../../../tests/scenario/code/test_code_conventions.py) 的 `TestGlossaryReverseCoverage` 变红 —— glossary 现役区的 `EventBus` 词条此前是靠 `lca/contracts` 里那个同名 Protocol 命中的，正是本计划 §S7 指出的名字碰撞在掩护一个文档门禁。修法是把 `_REVERSE_SCAN_PACKAGES` 扩到 `lca_kernel`（术语的真实归属包），该改动单调：只增加类名集合，不会让其它术语变红，基数门 `>= 1700` 仍满足。
+
+**文档边界（deliberate，非遗漏）**：
+
+| 处理 | 范围 | 理由 |
+|---|---|---|
+| 已改名 | `docs/specs/glossary.md`、`docs/observability/architecture-overview.md`、`docs/debug/run-debug-guide.md`、`docs/specs/session-event-pipeline-spec.md`、`lca_kernel/README.md`、`bundles/`、`profiles/`、`pyproject.toml`、`scripts/` | 描述当前状态的规范与运行文档 |
+| 保持原名 | `docs/adr/**`、`docs/notes/archived/**` | 冻结，规则禁止修改 |
+| 保持原名 | `docs/notes/implemented/**`、`docs/notes/proposed/**`、`docs/design/**`、`docs/plans/**` | 特定 PR / 设计稿的历史记录；改名会篡改「那个 PR 当时做了什么」 |
+| 保持原名 | `docs/specs/0194-0195-implementation-plan.md` §7.5 `G6 EventBus` 与 P2-08 行标题 | 引用 ADR-0194 冻结的退役项名与历史 PR 标题；该行的「交付」列已更新为实际结果 |
+| 保持原名 | 本文件 | 本文件的主题就是 `EventBus` → `EnvelopeBus` 的退役，必须写旧名 |
 
 ## 复盘触发
 
@@ -229,3 +265,7 @@ S1 的空壳路径无任何用例触达。违反 [AGENTS.md §1.5 规则 6](../.
 **R3 · `configure_delivery_policy` 零生产调用点。** PR-1 去掉重复 body 后仍是一个只有测试使用的公开旋钮。按 [AGENTS.md §1.5 规则 6](../../../AGENTS.md)「每个新依赖/抽象/配置项必有 owner + delete-when」，需要 owner 与删除条件，或接入生产装配（[ADR-0184 PR-C](../../adr/0184-event-lifecycle-managed-delivery.md) 的 `strict=True` 翻转）。属行为决策，不是清理。
 
 **R4 · [ADR-0195:222](../../adr/0195-platform-architecture-convergence.md) 的路径笔误。** O4 行写作 `lca_kernel/events/bus.py`，实际为 `lca_kernel/events/bus/bus.py`。老 ADR 不动，此条仅记录。
+
+**R5 · [`scripts/event_bus_status.py`](../../../scripts/event_bus_status.py) 的骨架模块检查已失效。** `check_skeleton_modules` 的 `required` 列 6 个扁平路径（`lca_kernel/events/bus.py`、`hooks.py`、`pipeline.py`、`reader.py`、`spine_runtime.py`、`sinks/spine_sink.py`），其中 5 个在包化重构后已不存在（实际为 `bus/bus.py`、`hooks/hooks.py` 等），只有 `sinks/spine_sink.py` 命中。该检查恒报 missing，是与本计划无关的既有失效诊断；`invariant=` 那行只是标签字符串，无功能耦合（PR-3 已随词表收敛改名为 `EnvelopeBus`）。修法是按当前包布局重写 `required` 并补一条会因路径漂移而失败的测试。
+
+**R6 · [`docs/specs/harness-spine-spec.md`](../../specs/harness-spine-spec.md) §1.1 描述不存在的模块。** 该节自称「代码基线：main 分支的真实状态」，但 `lca/infrastructure/plugin/kernel/_host.py`（`PluginHost`）与 `ScopedPluginHost` 在仓库中均不存在，`git grep 'EventBus()' -- 'lca/**' 'lca_kernel/**'` 零命中。其 `events: EventBus` 字段指插件内核设计期的 cordis 形态事件面，与本计划的总线不是同一对象，故 PR-3 未在该文件改名。这是与本计划无关的既有文档—代码漂移，需单独一轮判定该 spec 是迁往 `docs/design/` 还是按当前代码重写。

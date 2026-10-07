@@ -70,7 +70,7 @@ _OWNER_TABLE: dict[str, list[tuple[str, str, str]]] = {
         ("lca/plugins/body/", "PR-7", "plugin Body 必须经 SafeExecutor"),
     ],
     "hook_attach": [
-        ("lca/cognition/", "PR-7", "EventBus / HookMiddleware 收口"),
+        ("lca/cognition/", "PR-7", "EnvelopeBus / HookMiddleware 收口"),
         ("lca/runtime/", "PR-7", "runtime_loop 走 envelope"),
         ("lca/agent/", "PR-7", "Agent / Team 走 envelope"),
         ("lca/application/", "PR-7", "spawn -> bind_plan 收口"),

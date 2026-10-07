@@ -1,9 +1,12 @@
-"""ADR-0184 PR-1:EnvelopeBus / EventBus compat shim 测试。
+"""EnvelopeBus 投递契约测试。
 
-覆盖(plan §PR-1 验证清单):
-- test_envelope_bus_publish_returns_envelope_ref:EnvelopeBus.publish 返回 4 字段 EnvelopeRef
-- test_event_bus_compat_shim_preserves_persisted_subscriber_count:EventBus.publish EventRef 6 字段
-- test_event_bus_compat_shim_no_regression_on_existing_wire:跑现 test_event_bus 全部 test,无回归
+覆盖:
+- publish 返回 6 字段 :class:`EventRef`,两项投递事实在返回前填齐
+- publish 抵达已 subscribe 的 consumer 与已 mount_sink 的落盘后端
+- 无装配时 ``default()`` 自建的实例具备完整投递面
+
+计数器四值、零落盘策略与 ``delivery_snapshot`` 拷贝语义见
+``tests/lca_kernel/events/test_bus_delivery_receipt.py``。
 """
 
 from __future__ import annotations
@@ -12,22 +15,13 @@ from lca.contracts.event import Category, EventPayload
 from lca_kernel.events import (
     EnvelopeBus,
     EnvelopeRef,
-    EventBus,
     EventRef,
     TeamDelegationCacheHit,
 )
+from lca_kernel.events.spine.runtime import SpineEventRecord
 from lca_kernel.events.test.catalog import build_test_bus
 
 # ── 公共 helpers ─────────────────────────────────────────────────────────
-
-
-def _make_envelope_bus() -> EnvelopeBus[EventPayload]:
-    """独立 EnvelopeBus 实例(PR-1 测试隔离,不污染单例)。
-
-    直接复用 :func:`build_test_bus` — 它返回 EventBus 实例,EnvelopeBus
-    是其父类,测试用 isinstance 校验更宽松。
-    """
-    return build_test_bus()  # type: ignore[return-value]
 
 
 def _authorized_payload() -> EventPayload:
@@ -43,79 +37,102 @@ def _authorized_producer() -> type:
     return DelegationCachePlugin
 
 
-# ── 1:EnvelopeBus.publish 返回 EnvelopeRef ──────────────────────────────
+def _authorized_subscriber() -> type:
+    from lca.plugins.events.sinks.spine_file_sink.sink import SpineFileSink
+
+    return SpineFileSink
 
 
-class TestEnvelopeBusPublish:
-    def test_envelope_bus_publish_returns_envelope_ref(self) -> None:
-        """EnvelopeBus.publish 返回 EnvelopeRef,4 字段非 None。"""
-        bus = _make_envelope_bus()
+class _RecordingSink:
+    """最小 SinkBackend:只收集 record。"""
+
+    def __init__(self) -> None:
+        self.records: list[SpineEventRecord] = []
+
+    def append(self, record: SpineEventRecord) -> None:
+        self.records.append(record)
+
+    def flush(self) -> None: ...
+
+    def close(self) -> None: ...
+
+
+# ── 回执 ────────────────────────────────────────────────────────────────
+
+
+class TestPublishReceipt:
+    def test_publish_returns_six_field_event_ref(self) -> None:
+        """publish 返回 EventRef;6 字段就位且类型正确。"""
+        bus = build_test_bus()
         ref = bus.publish(_authorized_payload(), producer=_authorized_producer())
+        assert isinstance(ref, EventRef)
         assert isinstance(ref, EnvelopeRef)
-        # 4 字段全部非 None / 非空
         assert ref.event_id and isinstance(ref.event_id, str)
         assert ref.category == "team.delegation.cache_hit"
         assert ref.trace_id and isinstance(ref.trace_id, str)
         assert isinstance(ref.ts, float)
-        # EnvelopeRef 上不应有 persisted / subscriber_count(它们是 EventRef 字段)
-        # 注:此处用 hasattr 作弱断言,因为 EventRef 继承 EnvelopeRef,若收到
-        # EventRef 实例时仍有那些字段属于上层兼容行为。
-        if isinstance(ref, EventRef):
-            # 兼容 shim 返回:persisted / subscriber_count 类型对就行
-            assert isinstance(ref.persisted, bool)
-            assert isinstance(ref.subscriber_count, int)
-
-
-# ── 3:EventBus 兼容 shim — EventRef 6 字段保留 ──────────────────────────
-
-
-class TestEventBusCompatShim:
-    def test_event_bus_compat_shim_preserves_persisted_subscriber_count(self) -> None:
-        """EventBus.publish 返回 EventRef,含 persisted / subscriber_count 6 字段。"""
-        bus: EventBus[EventPayload] = build_test_bus()
-        assert isinstance(bus, EventBus)
-        ref = bus.publish(_authorized_payload(), producer=_authorized_producer())
-        assert isinstance(ref, EventRef)
-        # 6 字段(4 字段从 EnvelopeRef + 2 字段 EventRef 自身)
-        assert hasattr(ref, "event_id")
-        assert hasattr(ref, "category")
-        assert hasattr(ref, "trace_id")
-        assert hasattr(ref, "ts")
-        assert hasattr(ref, "persisted")
-        assert hasattr(ref, "subscriber_count")
-        # 类型断言
-        assert isinstance(ref.event_id, str)
         assert isinstance(ref.persisted, bool)
         assert isinstance(ref.subscriber_count, int)
-        # 无订阅者默认配置下 subscriber_count == 0
+
+    def test_receipt_reports_zero_delivery_without_sink_or_subscriber(self) -> None:
+        """零 sink + 零订阅者:persisted False、subscriber_count 0。"""
+        bus = build_test_bus()
+        ref = bus.publish(_authorized_payload(), producer=_authorized_producer())
+        assert ref.persisted is False
         assert ref.subscriber_count == 0
 
-    def test_event_bus_compat_shim_subscriber_count_after_subscribe(self) -> None:
-        """EventBus.publish 在订阅后,EventRef.subscriber_count > 0(persisted=False)。"""
+    def test_receipt_fills_delivery_facts_before_return(self) -> None:
+        """投递事实在 publish 返回前同步填齐,生产者读到既成事实。"""
         bus = build_test_bus()
-        from lca.plugins.events.sinks.spine_file_sink.sink import SpineFileSink
-
+        sink = _RecordingSink()
+        bus.mount_sink("receipt-probe", sink)
+        seen: list[EventRef] = []
         bus.subscribe(
-            plugin=SpineFileSink,
+            plugin=_authorized_subscriber(),
             category=Category.TEAM_DELEGATION_CACHE_HIT,
-            on_event=lambda _p, _r: None,
+            on_event=lambda _p, r: seen.append(r),
         )
-        ref = bus.publish(_authorized_payload(), producer=_authorized_producer())
-        assert ref.subscriber_count == 1
-        # 当前严格 strict=False + 无 sink → persisted=False(降级为 dropped)
-        assert ref.persisted is False
 
-    def test_event_bus_compat_shim_no_regression_on_existing_wire(self) -> None:
-        """EventBus 兼容 shim 路径与现有 wire 行为一致(counters 四值)。"""
-        bus = build_test_bus()
-        bus.publish(_authorized_payload(), producer=_authorized_producer())
-        snap = bus.delivery_snapshot()
-        # 至少有过 publish(team.delegation.cache_hit 应在 snapshot 内)
-        assert "team.delegation.cache_hit" in snap
-        entry = snap["team.delegation.cache_hit"]
-        # 四值存在 + 类型对
-        for key in ("published", "persisted", "delivered", "dropped"):
-            assert key in entry
-            assert isinstance(entry[key], int)
-        # published 必须 >= 1
-        assert entry["published"] >= 1
+        ref = bus.publish(_authorized_payload(), producer=_authorized_producer())
+
+        assert ref.persisted is True
+        assert ref.subscriber_count == 1
+        assert len(sink.records) == 1
+        assert sink.records[0].to_dict()["event_id"] == ref.event_id
+        # consumer 回调收到的回执与返回给生产者的是同一份投递事实
+        assert len(seen) == 1
+        assert seen[0].event_id == ref.event_id
+        assert seen[0].persisted is True
+
+
+# ── 进程单例 ────────────────────────────────────────────────────────────
+
+
+class TestProcessSingleton:
+    def test_default_without_boot_has_full_delivery_surface(self) -> None:
+        """无装配时 ``default()`` 自建的实例具备完整投递面。
+
+        单例槽是进程级共享变量:装配路径(``lca.events.bus`` manifest 的
+        ``setup_bus``)经 ``set_default`` 注入,未装配时 ``default()`` 按
+        config 目录自建。自建实例必须与装配实例同形 —— 缺 ``subscribe``
+        或 ``mount_sink`` 的实例会接受 publish、返回回执,却零落盘零派发。
+        """
+        EnvelopeBus.reset_singleton()
+        try:
+            bus = EnvelopeBus.default()
+            assert isinstance(bus, EnvelopeBus)
+            for name in (
+                "publish",
+                "subscribe",
+                "subscribe_self_observation",
+                "mount_sink",
+                "register_pipeline",
+                "delivery_snapshot",
+                "configure_delivery_policy",
+            ):
+                assert callable(getattr(bus, name, None)), f"default() 实例缺 {name}"
+            # 投递面可用:mount_sink 接受装载(无鉴权门,直接落 _sinks)
+            bus.mount_sink("singleton-probe", _RecordingSink())
+            assert EnvelopeBus.default() is bus, "单例槽必须返回同一实例"
+        finally:
+            EnvelopeBus.reset_singleton()

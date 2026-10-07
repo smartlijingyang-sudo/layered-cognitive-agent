@@ -11,7 +11,6 @@ import types
 
 from lca.contracts.mechanisms import (
     ComponentRegistryProtocol,
-    EventBus,
     Hook,
     HookRegistry,
     NamedRegistryProtocol,

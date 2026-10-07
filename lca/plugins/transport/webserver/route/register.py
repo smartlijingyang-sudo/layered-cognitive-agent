@@ -145,7 +145,7 @@ def _next_carrier_seq() -> int:
 
 
 # ── trace emit 是装饰,不能影响请求正确性(ADR-0181+1 / 本 PR 修复) ─────
-# EventBus 任何鉴权/落盘异常(EventMechanismError 族)只 log + 计数,
+# EnvelopeBus 任何鉴权/落盘异常(EventMechanismError 族)只 log + 计数,
 # 不上抛到 handler。理由:trace 是 observability 副作用,如果 publisher
 # 授权或 sink 故障,正确性(用户能拿到响应)优先于可观测性。
 # 其他异常(代码 bug 等)照常上抛,让 fail-fast 可见。

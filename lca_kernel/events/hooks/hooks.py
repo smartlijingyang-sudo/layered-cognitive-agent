@@ -4,7 +4,7 @@ plugin 通过实现 hook Protocol 注入自定义逻辑；Pipeline 装载时绑�
 
 不变量（ADR-0183 §4）:
 - I-FW-BUS-3: 自定义逻辑只能通过 Pipeline 编排 + 4 hook Protocol + SinkBackend
-  协议注入；plugin 不允许 import EventBus 内部。
+  协议注入；plugin 不允许 import EnvelopeBus 内部。
 """
 
 from __future__ import annotations
@@ -19,7 +19,7 @@ from lca.contracts.event import Category, EventPayload
 from lca_kernel.events.payloads.payloads import MechanismDispatchEventPayload
 
 if TYPE_CHECKING:
-    from lca_kernel.events.bus.bus import EventBus, EventRef
+    from lca_kernel.events.bus.bus import EnvelopeBus, EventRef
     from lca_kernel.events.registry.registry import EventSpec
 
 # ── 公开枚举 / 哨兵 ──────────────────────────────────────────────────────
@@ -111,12 +111,12 @@ class FailureHook(Protocol):
 class PublishContext:
     """publish 阶段的不可变上下文,沿 hook chain 传递。"""
 
-    bus: EventBus
+    bus: EnvelopeBus
     producer: type
     ts: float
     trace_id: str | None = None
     """publish 显式传入的 trace_id;ambient contextvars 回退由
-    EventBus._resolve_trace_id 统一解析,hook 不重复实现。"""
+    EnvelopeBus._resolve_trace_id 统一解析,hook 不重复实现。"""
 
 
 @dataclass(frozen=True, slots=True)
@@ -141,7 +141,7 @@ class ConsumerResult:
 class TraceContextHook:
     """PreDispatchHook：trace_id seam,保持 payload 透传。
 
-    trace_id 解析由 :meth:`EventBus._resolve_trace_id` 单点承担
+    trace_id 解析由 :meth:`EnvelopeBus._resolve_trace_id` 单点承担
     (显式参数 → payload.trace_id → ambient contextvars → new_id);
     EventPayload 是 frozen + extra=forbid 的 pydantic 模型,hook 无法
     泛化写入 trace_id 字段,因此本 hook 不重复实现解析,仅作为
@@ -160,8 +160,8 @@ class TraceContextHook:
 class PayloadSchemaHook:
     """PreDispatchHook：失败时 raise PayloadSchemaError。
 
-    校验逻辑由 EventBus.publish 调用 spec_for(category) 后委托本 hook;
-    本类作为 marker,实装校验由 EventBus 在 hook chain 中执行(§3.1 step 4)。
+    校验逻辑由 EnvelopeBus.publish 调用 spec_for(category) 后委托本 hook;
+    本类作为 marker,实装校验由 EnvelopeBus 在 hook chain 中执行(§3.1 step 4)。
     """
 
     def before_publish(

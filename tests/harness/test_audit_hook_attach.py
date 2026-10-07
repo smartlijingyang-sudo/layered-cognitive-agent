@@ -88,7 +88,7 @@ class TestScanHookAttach:
         # event_bus.py legitimately holds _emit
         _write_py(
             root / "event_bus.py",
-            "class EventBus:\n    def _emit(self, event):\n        pass\n",
+            "class EnvelopeBus:\n    def _emit(self, event):\n        pass\n",
         )
         # hook_registry.py legitimately holds middleware_bag
         _write_py(

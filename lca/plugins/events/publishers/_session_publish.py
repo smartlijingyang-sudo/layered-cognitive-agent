@@ -2,14 +2,14 @@
 
 publisher 单点入口走 ``Session.append``;调用方必须先经
 :func:`set_publish_session` / run bind 绑定 Session。无 active Session
-时 fail-loud(``MissingPublishSessionError``),不走 EventBus.publish。
+时 fail-loud(``MissingPublishSessionError``),不走 EnvelopeBus.publish。
 
 设计边界:
 - helper 只承载入口路由(Session.append);payload/producer 语义由调用方
   负责,本模块不重写。
 - Session.append 接受 ``payload`` 与 ``producer``;返回 :class:`EventRef`
   (ref.category / ref.event_id)。
-- Session 与 EventBus 共用 ``EventRegistry.can_publish``(S1);在
+- Session 与 EnvelopeBus 共用 ``EventRegistry.can_publish``(S1);在
   ``session.append`` 前鉴权,避免 active Session 绕过授权。
 - 绑定状态:本模块采用 module-level 变量承载 active Session(SPEC section H
   删除 ``_current_session`` ContextVar 后;Task 5 删除该 ContextVar,后续 Task
@@ -32,16 +32,16 @@ if TYPE_CHECKING:
 
 
 def _authorize_producer(payload: Any, producer: Any) -> None:
-    """Run EventBus S1 authorization before Session.append.
+    """Run EnvelopeBus S1 authorization before Session.append.
 
-    Uses the same ``EventBus.default().registry.can_publish`` matrix as
-    ``EventBus.publish``. Raises ``UnauthorizedPublishError`` on deny.
+    Uses the same ``EnvelopeBus.default().registry.can_publish`` matrix as
+    ``EnvelopeBus.publish``. Raises ``UnauthorizedPublishError`` on deny.
     Missing plugin identity / category defers to EnvelopeBus / schema checks.
     """
-    from lca_kernel.events.bus.bus import EventBus
+    from lca_kernel.events.bus.bus import EnvelopeBus
     from lca_kernel.events.errors.errors import UnauthorizedPublishError
 
-    bus: EventBus[Any] = EventBus.default()  # type: ignore[assignment]
+    bus: EnvelopeBus[Any] = EnvelopeBus.default()
     coerce = getattr(bus, "_coerce_producer", None)
     producer_cls = coerce(producer) if callable(coerce) else producer
     category = getattr(payload, "category", None)
@@ -138,8 +138,8 @@ def publish_via_session(
 
     参数:
     - ``payload``:typed 事件 payload(SpineEventPayload 或其它 EventPayload 子类);
-      与 ``EventBus.publish(payload, producer=...)`` 形态一致。
-    - ``producer``:publisher plugin class(EventBus 鉴权用)。
+      与 ``EnvelopeBus.publish(payload, producer=...)`` 形态一致。
+    - ``producer``:publisher plugin class(EnvelopeBus 鉴权用)。
 
     返回:
     :class:`EventRef``——``Session.append`` 回执(runtime Session 由 bus

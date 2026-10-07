@@ -24,7 +24,7 @@ from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import
     OwnershipDeclaration,
 )
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
-from lca_kernel.events.bus.bus import EventBus
+from lca_kernel.events.bus.bus import EnvelopeBus
 from lca_kernel.events.registry.registry import EventRegistry
 
 
@@ -40,8 +40,8 @@ class _BusConfig(BaseModel):
     kind=PluginKind.PROVIDER,
     effects="none",
     description=(
-        "事件总线本体（ADR-0183 / ADR-0194 G6 / ADR-0195 O4）：kernel 元层；"
-        "EnvelopeBus 为 canonical 入口，EventBus 为 compat shim；"
+        "事件总线本体（ADR-0183 / ADR-0184）：kernel 元层；"
+        "EnvelopeBus 为 publish / subscribe / mount_sink 唯一入口；"
         "按 lca_kernel/events/config/**/*.yaml 鉴权矩阵路由。"
     ),
     test_suite="tests/lca_kernel/events/test_event_bus.py",
@@ -63,16 +63,15 @@ class _BusConfig(BaseModel):
     ),
 )
 async def setup_bus(ctx: PluginContext, config: _BusConfig) -> None:
-    """机制 boot：构造 EnvelopeBus 默认实例（EventBus compat shim）+ 设为全局默认 + provide。"""
+    """机制 boot：构造 EnvelopeBus 实例 + 设为全局默认 + provide。"""
     from pathlib import Path
 
     config_dir = Path(__file__).resolve().parent.parent / "config"  # noqa: ASYNC240 -- boot-time one-off path resolution in setup_bus
     registry = EventRegistry.load(config_dir)
-    # EventBus compat subclass required for register_pipeline until G6 delete-when.
-    bus: EventBus = EventBus(registry)
+    bus: EnvelopeBus = EnvelopeBus(registry)
     ctx.provide("event.bus", bus)
-    # 进程级单例：业务方无 ctx 也能调 EventBus.default()（ADR-0183 §3.1）。
-    EventBus.set_default(bus)
+    # 进程级单例：业务方无 ctx 也能调 EnvelopeBus.default()（ADR-0183 §3.1）。
+    EnvelopeBus.set_default(bus)
 
 
 # Profile `$module` 解析要求模块级 ``setup`` 符号（见 resolve._resolve_plugins）。

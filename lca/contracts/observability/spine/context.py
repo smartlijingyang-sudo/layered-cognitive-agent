@@ -50,7 +50,7 @@ class SpineContext:
     _epoch: ContextVar[int] = ContextVar("lca_spine_epoch", default=0)
     _span_counter: ContextVar[int] = ContextVar("lca_spine_span_counter", default=0)
     _hash_chain: ContextVar[str | None] = ContextVar("lca_spine_prev_hash", default=None)
-    # ADR-0183 §3.9 PR-12:trace_id 由 EventBus.publish 注入;cursor 走
+    # ADR-0183 §3.9 PR-12:trace_id 由 EnvelopeBus.publish 注入;cursor 走
     # ``write_port_append`` 老路径不接 ref,通过本 contextvars 兜底拿。
     _trace_id: ContextVar[str | None] = ContextVar("lca_spine_trace_id", default=None)
 

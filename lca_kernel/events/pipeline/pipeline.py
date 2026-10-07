@@ -1,7 +1,7 @@
 """Pipeline 声明式编排 —— ADR-0183 §3.3。
 
 Profile 启动时调 ``bus.register_pipeline(pipeline)``；Pipeline 把 hooks /
-sinks / consumer_rules 三段声明一次性装载到 EventBus。装载后不可热替换
+sinks / consumer_rules 三段声明一次性装载到 EnvelopeBus。装载后不可热替换
 （按 YAGNI；如需见 ADR-0183 §5）。
 """
 

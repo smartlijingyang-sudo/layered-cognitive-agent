@@ -27,7 +27,7 @@
    ``packages/core/session/src/surface.ts`` ``foldSurface``)。词表是 LCA
    spine / model-visible category,不是 dsh ``user/message`` 三件套。
 
-不动 production 行为:无 ``Bus.publish``、无 sink 写入、无 EventBus 内部状态;
+不动 production 行为:无 ``Bus.publish``、无 sink 写入、无 EnvelopeBus 内部状态;
 仅作为 viewer / explain / replay / debug-run 的离线重建函数。
 
 delete-when:N/A(纯加法,后续 PR-2 publisher fold 状态、PR-3 viewer 重建、

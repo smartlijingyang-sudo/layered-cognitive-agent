@@ -31,7 +31,7 @@ from lca.harness.declarative.compile.instrument.wrap import set_active_spine_acc
 from lca.infrastructure.observability.facade.run.context import run_scope
 from lca.runtime.loop.runtime_loop import CognitiveRuntime
 from lca.session.append import Session
-from lca_kernel.events.bus.bus import EventBus
+from lca_kernel.events.bus.bus import EnvelopeBus
 
 
 class _RecordingSpine:
@@ -71,18 +71,18 @@ def recording_spine() -> Iterator[_RecordingSpine]:
 
 @pytest.fixture
 def sent_payloads() -> Iterator[list[Any]]:
-    """Capture envelope emits routed through the default EventBus."""
+    """Capture envelope emits routed through the default EnvelopeBus."""
     sent: list[Any] = []
 
     class _RecordingBus:
         def publish(self, payload: Any, *, producer: type, trace_id: str | None = None) -> None:
             sent.append(payload)
 
-    EventBus.set_default(cast("Any", _RecordingBus()))
+    EnvelopeBus.set_default(cast("Any", _RecordingBus()))
     try:
         yield sent
     finally:
-        EventBus.set_default(None)
+        EnvelopeBus.set_default(None)
 
 
 @pytest.fixture
@@ -90,7 +90,7 @@ def bound_session() -> Iterator[Session]:
     """Bind a real Session: Session-SSOT facts commit instead of loud-drop.
 
     ``exception.finally`` / ``lifecycle.finally`` (and ``exception.caught``
-    when a session is bound) no longer travel the default EventBus; without
+    when a session is bound) no longer travel the default EnvelopeBus; without
     a bound session ``publish_ep_bound`` drops them with
     ``fact_gateway.unbound_drop`` (0379).
     """

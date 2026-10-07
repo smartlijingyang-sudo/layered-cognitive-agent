@@ -14,7 +14,7 @@ import pytest
 
 from lca.contracts.event import Category, EventPayload
 from lca_kernel.events import EventRef, TeamDelegationCacheHit
-from lca_kernel.events.bus.bus import EventBus, FailureSemantics, reset_trace_id, set_trace_id
+from lca_kernel.events.bus.bus import EnvelopeBus, FailureSemantics, reset_trace_id, set_trace_id
 from lca_kernel.events.errors.errors import MissingPluginIdentityError, UnauthorizedSubscribeError
 from lca_kernel.events.hooks.hooks import MechanismDispatchObserver
 from lca_kernel.events.payloads.payloads import (
@@ -27,13 +27,13 @@ SINKS_END = "event.bus.dispatch.sinks.end"
 CONSUMERS_END = "event.bus.dispatch.consumers.end"
 
 
-def _make_bus() -> EventBus[EventPayload]:
+def _make_bus() -> EnvelopeBus[EventPayload]:
     from lca_kernel.events.test.catalog import build_test_bus
     return build_test_bus()
 
 
 @pytest.fixture
-def bus() -> EventBus[EventPayload]:
+def bus() -> EnvelopeBus[EventPayload]:
     return _make_bus()
 
 
@@ -62,7 +62,7 @@ def payload() -> TeamDelegationCacheHit:
     return TeamDelegationCacheHit(callee_role="a", subtask="b", step=1)
 
 
-def _install_observer(bus: EventBus[EventPayload]) -> None:
+def _install_observer(bus: EnvelopeBus[EventPayload]) -> None:
     bus.register_pipeline(
         Pipeline(
             name="t",
@@ -71,7 +71,7 @@ def _install_observer(bus: EventBus[EventPayload]) -> None:
     )
 
 
-def _capture(bus: EventBus[EventPayload]) -> list[tuple[MechanismDispatchEventPayload, EventRef]]:
+def _capture(bus: EnvelopeBus[EventPayload]) -> list[tuple[MechanismDispatchEventPayload, EventRef]]:
     """注册两个自观察消费者,收集 (payload, ref)。"""
     captured: list[tuple[MechanismDispatchEventPayload, EventRef]] = []
     for cat in (SINKS_END, CONSUMERS_END):
@@ -105,13 +105,13 @@ class TestPayloadClosedSet:
 
 
 class TestSubscribeSelfObservation:
-    def test_reject_outside_closed_set(self, bus: EventBus[EventPayload]) -> None:
+    def test_reject_outside_closed_set(self, bus: EnvelopeBus[EventPayload]) -> None:
         with pytest.raises(UnauthorizedSubscribeError):
             bus.subscribe_self_observation(
                 plugin=object, category="not.dispatch.cat", on_event=lambda p, r: None
             )
 
-    def test_reject_missing_plugin(self, bus: EventBus[EventPayload]) -> None:
+    def test_reject_missing_plugin(self, bus: EnvelopeBus[EventPayload]) -> None:
         with pytest.raises(MissingPluginIdentityError):
             bus.subscribe_self_observation(
                 plugin=None,  # type: ignore[arg-type]
@@ -126,7 +126,7 @@ class TestSubscribeSelfObservation:
 class TestObserverEmission:
     def test_consumers_end_emitted(
         self,
-        bus: EventBus[EventPayload],
+        bus: EnvelopeBus[EventPayload],
         authorized_plugin: type,
         subscriber_plugin: type,
         payload: TeamDelegationCacheHit,
@@ -151,7 +151,7 @@ class TestObserverEmission:
 
     def test_sinks_end_emitted(
         self,
-        bus: EventBus[EventPayload],
+        bus: EnvelopeBus[EventPayload],
         authorized_plugin: type,
         subscriber_plugin: type,
         payload: TeamDelegationCacheHit,
@@ -172,7 +172,7 @@ class TestObserverEmission:
 
     def test_both_stages_emitted(
         self,
-        bus: EventBus[EventPayload],
+        bus: EnvelopeBus[EventPayload],
         authorized_plugin: type,
         subscriber_plugin: type,
         payload: TeamDelegationCacheHit,
@@ -198,7 +198,7 @@ class TestObserverEmission:
 
     def test_contained_failure_recorded(
         self,
-        bus: EventBus[EventPayload],
+        bus: EnvelopeBus[EventPayload],
         authorized_plugin: type,
         subscriber_plugin: type,
         payload: TeamDelegationCacheHit,
@@ -228,7 +228,7 @@ class TestObserverEmission:
 class TestTraceContinuity:
     def test_self_observation_inherits_trace(
         self,
-        bus: EventBus[EventPayload],
+        bus: EnvelopeBus[EventPayload],
         authorized_plugin: type,
         subscriber_plugin: type,
         payload: TeamDelegationCacheHit,
@@ -256,7 +256,7 @@ class TestTraceContinuity:
 class TestAntiRecursion:
     def test_no_self_observation_of_self_observation(
         self,
-        bus: EventBus[EventPayload],
+        bus: EnvelopeBus[EventPayload],
         authorized_plugin: type,
         subscriber_plugin: type,
         payload: TeamDelegationCacheHit,
@@ -279,7 +279,7 @@ class TestAntiRecursion:
 
     def test_self_observation_not_fanned_out_to_subscribers(
         self,
-        bus: EventBus[EventPayload],
+        bus: EnvelopeBus[EventPayload],
         authorized_plugin: type,
         subscriber_plugin: type,
         payload: TeamDelegationCacheHit,
