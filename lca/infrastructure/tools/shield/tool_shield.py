@@ -62,7 +62,7 @@ class ToolPitfallShield:
                 continue
 
             # 3. 收集当前标题下的 bullet
-            if current_tool and (stripped.startswith("- ") or stripped.startswith("* ")):
+            if current_tool and stripped.startswith(("- ", "* ")):
                 bullet_text = stripped.lstrip("-* ").strip()
                 tool_bullets.append(bullet_text)
 

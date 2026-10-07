@@ -121,7 +121,7 @@ class ActAuthorizeExecutor:
         if decision.action_type == "use_tool":
             for call in decision.tool_calls:
                 name = call.tool_name.strip().lower()
-                if name.startswith("self_destruct") or name.startswith("rm_rf_root"):
+                if name.startswith(("self_destruct", "rm_rf_root")):
                     raise ValueError(
                         f"act.authorize: unsafe tool name rejected: {call.tool_name!r}"
                     )

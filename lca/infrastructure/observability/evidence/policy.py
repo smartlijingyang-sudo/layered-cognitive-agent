@@ -62,7 +62,7 @@ class DefaultEvidencePolicy(EvidencePolicy):
         if any(kw in lowered for kw in keywords):
             return Classification.RESTRICTED
         # 默认按 media_type 区分
-        if media_type.startswith("application/json") or media_type.startswith("text/"):
+        if media_type.startswith(("application/json", "text/")):
             return Classification.INTERNAL
         return Classification.INTERNAL
 
