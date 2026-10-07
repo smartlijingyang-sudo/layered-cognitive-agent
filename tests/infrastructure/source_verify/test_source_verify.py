@@ -137,3 +137,40 @@ def test_policy_defaults() -> None:
     assert VerifyPolicy.default().mode == VerifyMode.WARN
     assert VerifyPolicy.disabled().mode == VerifyMode.OFF
     assert VerifyPolicy.enforcing().mode == VerifyMode.ENFORCE
+
+
+def test_literal_grammar_chinese_date_forms() -> None:
+    # 文法直接单测: 无需构建 SourceRegistry
+    from lca.infrastructure.source_verify import default_literal_extractor
+
+    assert "2026年10月1日" in default_literal_extractor("截止 2026年10月1日 生效。")
+    assert "2026-10-01" in default_literal_extractor("截止 2026-10-01 生效。")
+
+
+def test_literal_grammar_identifier_length_boundary() -> None:
+    from lca.infrastructure.source_verify import default_literal_extractor
+
+    lits = default_literal_extractor("编号 abc 与 abcd。")
+    assert "abcd" in lits  # 4 字符标识符被抽取
+    assert "abc" not in lits  # 3 字符标识符不在文法内
+
+
+def test_literal_extractor_seam_is_used_by_judge() -> None:
+    # 注入固定抽取器: _judge_claim 必须走接缝, 而非模块私有文法
+    from lca.infrastructure.source_verify import SourceVerifier
+
+    r = _registry()
+    v = SourceVerifier(literal_extractor=lambda claim: ("90 天",))
+    d = v.verify("根据账户记录, 退款窗口为 30 天。", r)
+    assert d.decision == "needs_review"
+    assert d.verdicts[0].verdict == ClaimVerdict.UNSUPPORTED
+
+
+def test_default_extractor_keeps_pipeline_semantics() -> None:
+    # 默认实现 = 旧文法: 流水线判决语义不变
+    from lca.infrastructure.source_verify import SourceVerifier
+
+    r = _registry()
+    d = SourceVerifier().verify("根据政策文档, 退款窗口为 30 天。", r)
+    assert d.decision == "pass"
+    assert d.verdicts[0].verdict == ClaimVerdict.SUPPORTED

@@ -28,12 +28,15 @@ from lca.infrastructure.source_verify.registry import (
     source_marker,
 )
 from lca.infrastructure.source_verify.verifier import (
+    LiteralExtractor,
     SourceVerifier,
+    default_literal_extractor,
     verify_final_answer,
 )
 
 __all__ = [
     "ClaimVerdict",
+    "LiteralExtractor",
     "SourceClaimVerdict",
     "SourceKind",
     "SourceRef",
@@ -42,6 +45,7 @@ __all__ = [
     "VerifyDecision",
     "VerifyMode",
     "VerifyPolicy",
+    "default_literal_extractor",
     "ensure_registry",
     "extract_citations",
     "get_registry",

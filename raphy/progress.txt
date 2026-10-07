@@ -291,3 +291,33 @@
     `import subprocess/tempfile` 之后——按 ruff --fix 为准，别手排。
 ---
 
+
+## 2026-10-07 21:22 - RA-016
+
+- `SourceVerifier` 新增可注入接缝 `LiteralExtractor` Protocol（构造参数
+  `literal_extractor`，默认 `default_literal_extractor`）；`_judge_claim`
+  改经 `self._literal_extractor(claim)` 拿字面量，不再调模块私有的
+  `_extract_literals`（验收 1）。
+- `_extract_literals` 按评估改名为具名导出的 `default_literal_extractor`
+  （包 `__init__` 新增导出 `LiteralExtractor` / `default_literal_extractor`，
+  `__all__` 同步）；`_LITERAL` 正则随默认实现走，字节等价，判决语义不变
+  （ADR-0255 §4.8 hallucination 判决 intact，验收 2）。
+- 新增 4 个测试：中文日期形态（`2026年10月1日`/`2026-10-01`）、
+  4 字符标识符边界（`abcd` 抽取 / `abc` 不抽取）、注入固定抽取器证明
+  `_judge_claim` 走接缝、默认实现流水线语义不变——文法单测无需构建
+  SourceRegistry（验收 3）。
+- Files changed:
+  - `lca/infrastructure/source_verify/verifier.py`
+    （Protocol + 默认实现 + 构造注入 + 调用点）
+  - `lca/infrastructure/source_verify/__init__.py`（导出）
+  - `tests/infrastructure/source_verify/test_source_verify.py`（4 新增）
+  - `raphy/prd.json`（RA-016 passes=true）、`raphy/progress.txt`
+- 测试：`tests/infrastructure/source_verify/` 17 passed（含 4 新增，验收 4）；
+  `ruff check` + `ruff format --check` touched 文件全过。
+- **Learnings for future iterations:**
+  - 远端 shell 的 `$HOME` 是 `/home/lichao` 不是 `/home/hatch`：ssh252 里 `~`
+    展开到 lichao，绝对路径写 `/home/lichao/...`；此前用 `/home/hatch/...`
+    读 prd.json 报 FileNotFoundError 白查了几分钟。
+  - ruff format 要求顶层 class 前两个空行：Protocol 类紧跟 `_log = ...`
+    只空一行会被 reformat——seam 类定义时一次写对两个空行。
+---
