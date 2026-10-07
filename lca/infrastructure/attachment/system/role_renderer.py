@@ -19,7 +19,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from importlib import resources
-from typing import Protocol
 
 from lca.contracts.models.core.state.plane import PlaneKind, PlaneRef
 from lca.contracts.models.core.workspace.file_ref import FileRef
@@ -35,17 +34,6 @@ from lca.infrastructure.attachment.settings.settings import (
 from lca.infrastructure.file.store import FileStore
 from lca.infrastructure.observability import current_file_store as get_current_run_file_store
 from lca.infrastructure.sandbox.factory.factory import ONLYBOXES
-
-
-class _PlaneAccess(Protocol):
-    """Minimal subset of :class:`PlaneRef` we actually read here."""
-
-    kind: PlaneKind
-    root: str
-    outputs_dir: str
-    label: str
-    platform: str
-    home: str
 
 
 @dataclass(frozen=True)
