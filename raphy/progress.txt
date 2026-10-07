@@ -114,3 +114,32 @@ no changes added to commit (use "git add" and/or "git commit -a")
   - `git mv` + sed 是这类 story 最小 churn 路径;改名后用
     `importlib.import_module` 双向加载验循环,比读代码更可靠。
 ---
+## 2026-10-07 13:30 - RA-012
+- Spike first: read both call sites (`action_handlers.py:310`, `delegation_cache/plugin.py:52`).
+  Lifted the 4 deferred imports to module level in a scratch edit and ran fresh-interpreter
+  imports in 4 orders (`cache` alone, `delegation_journal`-first, `action_handlers`,
+  `plugin`) — all pass. Conclusion: **no import cycle was ever dodged** (RA-009 class:
+  assessment's cycle assumption refuted by evidence). Chose the feasible branch.
+- Implemented: `CacheHitCommit` Protocol + `_default_commit_hit` (spine fact via
+  `commit_delegation_cache_hit` + journal `DelegationCacheHit` via `record`, raw-session
+  gated — dual emission unchanged, iter-lane wiring e98a29595 preserved);
+  `cached_delegation_observation(spec, state, *, commit=_default_commit_hit)`.
+  Function-local imports of `lca.loop.commit.delegation_journal` and
+  `lca.infrastructure.session.bindings` are gone from cache.py; layer edges now honest
+  at module level. Production call sites keep the default; tests can inject a fake
+  (verified: fake receives `(callee_role='Alice', subtask='analyze', step=0)`).
+- Files changed: `lca/infrastructure/delegation/cache.py`, `raphy/prd.json`
+- Tests: `uv run pytest tests/ -k 'delegation' --no-cov -q` → 61 passed, 1 pre-existing red
+  (`test_trace_coherence.py::test_member_runs_chain_through_delegation` fails identically
+  on pristine HEAD 81221a945 — unrelated, not touched); `ruff check` clean on touched file.
+- **Learnings for future iterations:**
+  - Deferred-import clusters are guilty-until-proven-innocent: the 4-order fresh-interpreter
+    import probe is a 30-second spike that settles "is there really a cycle" (RA-009, RA-012
+    both refuted the assumption).
+  - When existing tests call the seam target directly AND assert its side effects
+    (`test_cache_module_delegates_to_plugin` asserts spine emission with no seam arg),
+    the seam parameter must default to the real wiring — required-param designs die on
+    test evidence, not on aesthetics.
+  - Pre-existing reds get verified on a pristine worktree (`~/.lca-worktrees/`, never /tmp),
+    never fixed inside an unrelated story; worktree removed after.
+---

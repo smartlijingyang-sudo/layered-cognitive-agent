@@ -192,8 +192,8 @@
         "Do NOT change the dual-emission semantics (team.delegation.cache_hit spine fact + journal DelegationCacheHit); coordinate with iter lanes, which wired DelegationCacheHit emission on 2026-10-07"
       ],
       "priority": 3,
-      "passes": false,
-      "notes": "Source: raphy assess Round 3 2026-10-07 (Worth exploring, friction walk C-Q1). RA-009 class (non-deletion, seam contractization); follows the same spike-first discipline that proved the RA-009 assessment's import-ring assumption wrong. Constraints: ADR-0194 P1-16 territory."
+      "passes": true,
+      "notes": "Source: raphy assess Round 3 2026-10-07 (Worth exploring, friction walk C-Q1). RA-009 class (non-deletion, seam contractization); follows the same spike-first discipline that proved the RA-009 assessment's import-ring assumption wrong. Constraints: ADR-0194 P1-16 territory. | Implemented 2026-10-07 13:30 round: spike proved NO import cycle (fresh-interpreter imports pass in every order; deferred imports dodged nothing). cache.py now has module-level imports + explicit CacheHitCommit Protocol parameter (default _default_commit_hit preserves dual emission). Fake-commit injection verified."
     },
     {
       "id": "RA-013",
