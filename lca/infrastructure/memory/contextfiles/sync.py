@@ -122,7 +122,7 @@ def parse_memory_markdown_claims(
             )
             continue
 
-        if not (line_stripped.startswith("- ") or line_stripped.startswith("* ")):
+        if not line_stripped.startswith(("- ", "* ")):
             continue
 
         bullet_content = line_stripped[2:].strip()
