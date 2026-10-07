@@ -137,7 +137,7 @@ def _next_hourly(
         fold=0,
     )
     if candidate <= now_local:
-        candidate = candidate + timedelta(hours=1)
+        candidate += timedelta(hours=1)
         candidate = candidate.replace(
             minute=minute,
             second=0,
@@ -145,7 +145,7 @@ def _next_hourly(
             fold=0,
         )
     while not wall_clock_exists(candidate):
-        candidate = candidate + timedelta(hours=1)
+        candidate += timedelta(hours=1)
         candidate = candidate.replace(
             minute=minute,
             second=0,
@@ -173,7 +173,7 @@ def _next_daily(
         fold=0,
     )
     if candidate <= now_local:
-        candidate = candidate + timedelta(days=1)
+        candidate += timedelta(days=1)
         candidate = candidate.replace(
             hour=hour,
             minute=minute,
@@ -182,7 +182,7 @@ def _next_daily(
             fold=0,
         )
     while not wall_clock_exists(candidate):
-        candidate = candidate + timedelta(days=1)
+        candidate += timedelta(days=1)
         candidate = candidate.replace(
             hour=hour,
             minute=minute,
@@ -210,7 +210,7 @@ def _next_weekly(
     )
     # 找到本周/下周里 weekday 对应的日期，再对齐墙钟。
     days_ahead = (weekday - candidate.weekday()) % 7
-    candidate = candidate + timedelta(days=days_ahead)
+    candidate += timedelta(days=days_ahead)
     candidate = candidate.replace(
         hour=hour,
         minute=minute,
@@ -219,7 +219,7 @@ def _next_weekly(
         fold=0,
     )
     if candidate <= now_local:
-        candidate = candidate + timedelta(days=7)
+        candidate += timedelta(days=7)
         candidate = candidate.replace(
             hour=hour,
             minute=minute,
@@ -228,7 +228,7 @@ def _next_weekly(
             fold=0,
         )
     while not wall_clock_exists(candidate):
-        candidate = candidate + timedelta(days=7)
+        candidate += timedelta(days=7)
         candidate = candidate.replace(
             hour=hour,
             minute=minute,

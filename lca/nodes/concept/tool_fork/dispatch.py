@@ -253,7 +253,7 @@ class ToolForkDispatchExecutor:
             )
 
             items = filter_tools_by_assistant(items, bindings.home_path)
-            items = items + _custom_tools_from_home(bindings.home_path, items)
+            items += _custom_tools_from_home(bindings.home_path, items)
         # ── ADR-0248 运行时总装：声带追加 / 子代理禁声 / AutoReview 包装 ──
         from lca.infrastructure.auto_review.wrapped_tool import (
             AutoReviewWrappedTool,
