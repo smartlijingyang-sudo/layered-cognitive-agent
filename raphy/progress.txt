@@ -864,3 +864,24 @@
     别在 252 侧用 python 读本机 /tmp 路径（上次 FileNotFoundError 翻车一次）。
 ---
 
+
+## 2026-10-08 05:40 - RA-028
+- CLIProvider daemon status/heal 观察路径收敛进 DaemonService seam：删
+  `_report_daemon_status`（直读 `user.state_dir/connect.pid` + 私有路径推导）
+  与 `_report_kernel_serve_status`（对 `state()` 已算好的 gateway 再做一次
+  `http_ready` 探测）；`status()` 改从注入的 `DaemonService.state()` 经新
+  `_project_check` 投影 daemon/gateway（owner 名 → provider 名映射、
+  owner 缺 check 时 hard fail 不静默跳过；gateway 不可达保持 warn 级别契约）；
+  `heal()` 改调 `DaemonService.restart()`（RA-006 单活语义归 seam）；
+  `user_cli.py` 不再 import `pid_alive`/`http_ready`；CLI-deployed 检查留 provider。
+- Files changed: `lca/infrastructure/host_runtime/providers/user_cli.py`,
+  `tests/infrastructure/host_runtime/test_cli_provider_daemon_delegation.py`,
+  `raphy/prd.json`（RA-028 passes=true + learnings）
+- **Learnings for future iterations:**
+  - `_project_check` 是"owner HealthCheck → provider StatusReport"的可复用投影
+    形状：source/target 名映射 + 缺席 hard fail，今后同类 owner-seam 收敛可直接套用。
+  - 测试环境坑：252 本机 `/opt/lca/dist/index.js` 真实存在，`deployed` 检查在 CI 机器上是
+    OK 而非 MISSING——断言改钉"provider 自有 `_cli_js` 镜像"而非固定状态。
+  - 被删代码的旧测试（`test_kernel_serve_status_converges_on_http_ready`）不硬留：
+    删代码的同时把它的"钉住意图"（收敛在 http_ready 语义）翻译成新 seam 的投影测试。
+---
