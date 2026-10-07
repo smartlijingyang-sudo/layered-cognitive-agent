@@ -8,7 +8,7 @@
        本枚举给出试点最小闭集，PR 2–13 逐个补齐。
 - D3：每个 EventPayload 必须声明 ``category`` 字段，子类覆盖 default。
 - D4：本模块不导出 publish/subscribe；那由机制
-  :class:`lca_kernel.events.bus.EnvelopeBus` 暴露（:class:`EventBus` 为 compat shim）。
+  :class:`lca_kernel.events.bus.EnvelopeBus` 暴露。
 """
 
 from __future__ import annotations
@@ -368,7 +368,7 @@ class EventPayload(BaseModel):
     """所有事件 payload 的基类。
 
     业务方构造一个具体子类（typed 字段），经 Session / FactGateway 或
-    机制 :meth:`EnvelopeBus.publish`（:class:`EventBus` compat shim）投递；
+    机制 :meth:`EnvelopeBus.publish` 投递；
     机制读 ``payload.category`` 决定路由，不要求业务方传 category。
     """
 

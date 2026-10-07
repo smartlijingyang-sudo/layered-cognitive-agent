@@ -6,7 +6,7 @@
 - I-FW-SSOT-2:``RunStatus`` / ``JournalRunStatus`` 双类计数(目标 1)
 - ``EventMechanism`` 迁移进度计数(基线参考)
 - PR-5:``_build_event_record`` 旧入口残留(目标 0)+ ``build_record`` 新入口
-- EventBus 骨架模块 / Pipeline 装载点 / 鉴权矩阵 yaml 存在性
+- EnvelopeBus 骨架模块 / Pipeline 装载点 / 鉴权矩阵 yaml 存在性
 
 12 PR 落地态见 docs/adr/0183 §5.2 与 docs/notes/implemented/runbook/2026-09-03-event-bus-pr-matrix.md §B.1。
 PR 全部合入但部分 grep 仍未归零(详见附录 B §B.2 验收行)。
@@ -148,7 +148,7 @@ def check_modules() -> CheckResult:
     missing = [str(p.relative_to(_ROOT)) for p in required if not p.exists()]
     return CheckResult(
         id="eventbus-skeleton-modules",
-        invariant="EventBus 骨架模块齐备",
+        invariant="EnvelopeBus 骨架模块齐备",
         observed=not missing,
         expected="6 模块全在",
         status="ok" if not missing else "missing",

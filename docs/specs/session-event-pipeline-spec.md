@@ -45,7 +45,7 @@ Session 事件流是唯一事实:`Session.append` 是唯一写入口,持久化�
 
 | 类别 | 形态 | DSH 对照 | LCA 现状 | 是否落盘 |
 |---|---|---|---|---|
-| 运行时总线事件 | 实时协作、拦截、改写、策略控制 | Cordis `ctx.emit/on/waterfall`(`agent/request`、`tools/pre-execute` 等),**不**进 Session 日志 | spine EventBus 类别(`lca_kernel/events/config/observability/spine.yaml`) | DSH:否;LCA:是 → `<run_id>.spine.jsonl`(Journal 平面,正按 ADR-0186 向 Session 平面收敛) |
+| 运行时总线事件 | 实时协作、拦截、改写、策略控制 | Cordis `ctx.emit/on/waterfall`(`agent/request`、`tools/pre-execute` 等),**不**进 Session 日志 | spine EnvelopeBus 类别(`lca_kernel/events/config/observability/spine.yaml`) | DSH:否;LCA:是 → `<run_id>.spine.jsonl`(Journal 平面,正按 ADR-0186 向 Session 平面收敛) |
 | Session 持久事件 | 可恢复、可重放、可审计的事实 | `SessionEventMap` 闭集(`user/message`、`assistant/message`、`tool/call`、`turn/start` 等) | `@session_event` 词表(`lca/contracts/harness/memory/events.py`,23 种) | 是 → `*.session.jsonl` |
 | 提交/持久化通知 | 「某条事件已提交」的路由信号 | `session/event`、`session/flush`——本身**不是**日志记录 | `SessionObserver`、`FlushListener` | 通知自身不落日志 |
 

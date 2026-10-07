@@ -152,7 +152,7 @@ class TestIAssistantRoutesEpSurface:
 
     EP 发射是 catalog 插件的责任（PR-3）；PR-5 的路由只消费 catalog
     调用结果（fail-closed 4xx）。本测试锁定 routes_assistants 模块内
-    不出现 cordis publish / EventBus publish / 直接 EP 发射 helper 调用。
+    不出现 cordis publish / 事件总线 publish / 直接 EP 发射 helper 调用。
     """
 
     @staticmethod
@@ -171,7 +171,8 @@ class TestIAssistantRoutesEpSurface:
         return [(f.name, f.read_text(encoding="utf-8")) for f in sorted(pkg.glob("*.py"))]
 
     def test_routes_assistants_does_not_emit_cordis_events(self) -> None:
-        """``routes_assistants``（PR-5 起为子包）不得调 cordis EventBus.publish /
+        """``routes_assistants``（PR-5 起为子包）不得调事件总线 publish
+        （``EnvelopeBus.publish``，兼禁旧拼写 ``EventBus.publish``）/
         publish_event 等直接发射面（EP 发射是 catalog 责任，PR-3）。
         """
         # 显式禁词（按需追加；EP 发射面 ≠ 事件总线）

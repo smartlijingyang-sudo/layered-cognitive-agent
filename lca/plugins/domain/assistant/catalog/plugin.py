@@ -122,7 +122,7 @@ async def setup(ctx: PluginContext, config: Config) -> None:
     2. 若 ``event_descriptor_registry`` 已登记 ``assistant.*`` EP 描述符,
        跳过(避免重复 register);否则补登 12 个 assistant 描述符(PR-2
        已落 contracts 层冻结元数据,本步骤仅在 registry 缺位时补齐)。
-    3. EP 发射走 audited ``ctx.emit``(PluginEventBus.emit),具体 EventBus.publish
+    3. EP 发射走 audited ``ctx.emit``(PluginEventBus.emit),具体 EnvelopeBus.publish
        由 lca.events.bus plugin 装配期安装。
 
     失败语义:``assistants_root`` 不可写 → 立即抛 ProfileResolveError 衍生错误

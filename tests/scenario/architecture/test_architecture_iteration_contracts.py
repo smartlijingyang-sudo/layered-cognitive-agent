@@ -30,7 +30,6 @@ CASES: list[tuple[str, str]] = [
     ("lca.contracts.harness.act.tool_governance", "ToolGovernance"),
     ("lca.contracts.harness.act.trace_context", "AgentTraceContext"),
     ("lca.contracts.harness.tasks.workflow", "WorkflowProgress"),
-    ("lca.contracts.mechanisms", "EventBus"),
     ("lca.contracts.mechanisms.capability.capability", "CapabilityKey"),
     ("lca.contracts.mechanisms.composition.composition", "PluginFactory"),
     ("lca.contracts.mechanisms.content.addressable", "ContentAddressableStore"),

@@ -88,7 +88,7 @@ IngestCache, LLMResolver, ModeDefinition, ModelDefinition, ParsedMessages
 | **ModularBrain** | 默认 Brain（reasoner / critic 可替换）；原生 function calling 直接产出 Decision，无需 DecisionParser |
 | **Turn** | 单步记录：decision + act result + reflection |
 | **Budget** | token / cost / steps / wall_clock 预算 |
-| **Hook** / **HookRegistry** / **EventBus** | 生命周期钩子与事件总线。`EventBus`（canonical 名 `EnvelopeBus`，ADR-0183）是进程级实时事件分发机制（publish → hook → sink dispatch），不是事实平面。事实平面 SSOT 是 `Session.append`（ADR-0186/0192）。 |
+| **Hook** / **HookRegistry** / **EnvelopeBus** | 生命周期钩子与事件总线。`EnvelopeBus`（ADR-0183）是进程级实时事件分发机制（publish → hook → sink dispatch），不是事实平面。事实平面 SSOT 是 `Session.append`（ADR-0186/0192）。 |
 | **Telemetry** | 业务层唯一发射门面契约：span / event / score，不耦合任何后端 |
 | **SpanName** / **EventName** | 封闭遥测词表（span 名 / 业务事件名），配 **VocabDef** 目录登记唯一发射点 |
 | **SpanView** | OTel span 的本地投影视图 |

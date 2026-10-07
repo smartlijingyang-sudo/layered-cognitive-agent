@@ -103,7 +103,7 @@ def offload_placeholder(*, execution_point: str, offloaded: str, sidecar: str) -
 def serializable_event(rec: EventRecord) -> dict[str, Any]:
     """Convert ``EventRecord`` → JSON-safe dict (datetime → isoformat)。
 
-    trace_id(ADR-0183 §3.9 PR-12):EventBus.publish 经 ref.trace_id 注入;
+    trace_id(ADR-0183 §3.9 PR-12):EnvelopeBus.publish 经 ref.trace_id 注入;
     老路径不接 ref 时为 None,序列化输出 ``null``,保持向后兼容。
     """
     return {

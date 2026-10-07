@@ -65,7 +65,7 @@ class _Config(BaseModel):
     effects="none",
     description=(
         "DelegationCachePlugin（ADR-0180 试点）：publisher plugin；"
-        "通过 EventBus.publish 发 team.delegation.cache_hit。"
+        "通过 EnvelopeBus.publish 发 team.delegation.cache_hit。"
     ),
     test_suite="tests/plugins/events/publishers/test_delegation_cache.py",
     functional_group=FunctionalGroup.G8_COLLAB,

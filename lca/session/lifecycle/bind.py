@@ -44,7 +44,7 @@ __all__ = [
 
 
 def _session_event_parts(payload: Any) -> tuple[str, dict[str, Any]]:
-    """Project an EventBus payload into Session.append(type, data).
+    """Project an EnvelopeBus payload into Session.append(type, data).
 
     SpineEventPayload keeps header/fold bytes in ``payload``; other
     EventPayload subclasses dump remaining fields. Failure: unknown
@@ -111,7 +111,7 @@ class RunEventSessionBridge:
         Session.observe 已同步派发。
         时序: 先置 ``_inflight_payload``，再 ``Session.append``（同步通知
         observer），再按 seq 固化到 ``_payloads``，返回与 observer 同形的
-        EventRef。``producer`` 保留签名兼容，本桥不投递 EventBus。
+        EventRef。``producer`` 保留签名兼容，本桥不投递 EnvelopeBus。
         """
         del producer
         event_type, data = _session_event_parts(payload)
@@ -125,7 +125,7 @@ class RunEventSessionBridge:
         return _event_ref_from_session(self._session, event)
 
     def observe(self, plugin: type, callback: EventObserverCallback) -> object:
-        """Register an EventBus-shaped callback as a SessionObserver.
+        """Register an EnvelopeBus-shaped callback as a SessionObserver.
 
         时序: 只对后续 append 生效。``plugin`` 是注册名义，Session 观察面
         不按 plugin 鉴权。回调收到 append 时的原始 payload。

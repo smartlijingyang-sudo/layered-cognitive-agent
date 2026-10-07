@@ -111,7 +111,7 @@ branch: adr0194/p1-03-session-append-reexport
 | **P2-05** | refactor(spine.yaml): 退役 brain.gate.* 或 wire think 子 span | 0194 G3 | yaml 变更 | coverage 测试 | P2-01 | 与 P2-03 并行 |
 | **P2-06** | refactor(gateway): publish_ep 内聚 spine_enrich | 0194 §3.1, 0195 Observer | enrich 移入 gateway | spine_enrich 测试 | P1-02 | Lane B |
 | **P2-07** | refactor(obs): EmitPipeline 仅 hook-less 测试 | 0194 G5, O3 | 生产路径删除 | test_session_ssot | P2-06 | 串行 |
-| **P2-08** | refactor(kernel): EventBus → EnvelopeBus 别名收敛 | 0194 G6, O4 | bus.py COMPAT 删除计划 | test_event_bus | P2-06 | 与 P2-07 并行 |
+| **P2-08** | refactor(kernel): EventBus → EnvelopeBus 别名收敛 | 0194 G6, O4 | bus.py COMPAT 已删除：投递面并入 `EnvelopeBus` 单类，`EventBus` 类与 `lca.contracts.mechanisms` 同名 Protocol 均已移除 | test_event_bus | P2-06 | 与 P2-07 并行 |
 | **P2-09** | refactor(obs): WritableMatrix coordinator 删 stub | 0194 G7, O5 | coordinator 清理 | writable 测试 | P2-03 | 与 P2-07 并行 |
 | **P2-10** | refactor(reflector): spine_reflector_runtime → gateway | 0194 G4, O2 | runtime EP 迁移 | runtime envelope 测试 | P1-02 | **可 10–16 并行** |
 | **P2-11** | refactor(reflector): spine_reflector_cognition → gateway | G4 | cognition EP | cognition spine 测试 | P1-02 | 并行 |

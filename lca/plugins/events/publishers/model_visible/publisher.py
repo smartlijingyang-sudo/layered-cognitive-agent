@@ -67,7 +67,7 @@ class ModelVisiblePublisher:
 
     业务方不直接调用;真正 publish 走 :class:`ModelVisibleHook` 内部
     ``publish_via_session(payload, producer=ModelVisiblePublisher)`` →
-    ``Session.append``(ADR-0186 Session SSOT;不走 EventBus.publish)。
+    ``Session.append``(ADR-0186 Session SSOT;不走 EnvelopeBus.publish)。
     """
 
 

@@ -40,7 +40,7 @@ class EventRecord:
     # Optional — used by PR-6 orphan semantics
     phase: str = "live"
     reason: str | None = None
-    # Optional — trace_id 由 EventBus.publish 注入(ADR-0183 §3.9 PR-12);
+    # Optional — trace_id 由 EnvelopeBus.publish 注入(ADR-0183 §3.9 PR-12);
     # 老路径不接 ref 时为 None,保持向后兼容。
     trace_id: str | None = None
 

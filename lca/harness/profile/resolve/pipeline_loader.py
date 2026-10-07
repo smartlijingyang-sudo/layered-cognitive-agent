@@ -166,7 +166,7 @@ def pipeline_from_mapping(
     )
 
 
-# ── EnvelopeBus 装配（EventBus compat 子类仍用于 register_pipeline）────────
+# ── EnvelopeBus 装配 ────────────────────────────────────────────────────
 
 # 同一 bus 实例上 (name, version) 只装载一次。key 挂在 bus 实例上:
 # 测试重置 EnvelopeBus 单例后新实例自动恢复可装载,无需手工清状态。

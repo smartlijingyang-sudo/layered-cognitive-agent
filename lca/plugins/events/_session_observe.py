@@ -36,7 +36,7 @@ __all__ = [
 ]
 
 EventObserverCallback = Callable[[EventPayload, EventRef], None]
-"""观察者回调签名 —— 与 ``EventBus.subscribe`` 的 ``on_event`` 契约同源。"""
+"""观察者回调签名 —— 与 ``EnvelopeBus.subscribe`` 的 ``on_event`` 契约同源。"""
 
 
 @runtime_checkable

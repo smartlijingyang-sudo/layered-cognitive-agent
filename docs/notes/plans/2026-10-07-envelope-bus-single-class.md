@@ -219,6 +219,34 @@ S1 的空壳路径无任何用例触达。违反 [AGENTS.md §1.5 规则 6](../.
 
 每个 PR 的报告必须逐项区分「本次引入」与「既有失败」，只有退出码为 0 的命令才能写为「通过」。
 
+## 实施结果（2026-10-07）
+
+三个 PR 全部落地在分支 `refactor/envelope-bus-single-class`（基线提交 `81221a945`）。
+
+| PR | commit | 变更量 | 结果 |
+|---|---|---|---|
+| PR-1 | `54fe1fde9` | 5 files, +73/−54 | 死依赖与三份重复 body 已删；新增回归守护并 teeth check |
+| PR-2 | `3d5a3cd06` | 47 files, +507/−568 | `class EventBus` 已删，投递面并入 `EnvelopeBus`；`bus.py` 824 → 721 行；两处 `# type: ignore[assignment]` 归零 |
+| PR-3 | 见本提交 | — | G6 / O4 归零门达成；contracts 同名 Protocol 已删 |
+
+**G6 / O4 归零门实测**：`rg '\bEventBus\b' lca/ lca_kernel/ --glob '!**/harness/**' --glob '!**/tests/**' --glob '!**/bus/**'` 退出码 1（零命中）；去掉三个 glob 后 `rg '\bEventBus\b' lca/ lca_kernel/` 同样零命中 —— 严于 [ADR-0194:230](../../adr/0194-cognitive-loop-architecture-convergence.md) 的「仅 harness」要求。
+
+**全量回归对照**：`pytest tests/ --no-cov` 在 pristine 基线 worktree（`81221a945`）、PR-2 后、PR-3 后三次运行均为 **151 failed**，且三次失败集合逐条相同（`comm` 双向差集为空）。零回归，亦无意外修复。
+
+**contracts Protocol 删除的四道门实测**：类型位标注零命中、`isinstance` 零命中、`lca/contracts` 外零 import、字符串形态仅 `__all__` 一处。删除后 `tests/contracts/` 全绿，`Hook` 等其余导出不变。随之孤立的 `Awaitable` / `Callable` / `TypeVar T` 已一并移除。
+
+**一处计划外的闭环**：删除该 Protocol 后 [`test_code_conventions.py`](../../../tests/scenario/code/test_code_conventions.py) 的 `TestGlossaryReverseCoverage` 变红 —— glossary 现役区的 `EventBus` 词条此前是靠 `lca/contracts` 里那个同名 Protocol 命中的，正是本计划 §S7 指出的名字碰撞在掩护一个文档门禁。修法是把 `_REVERSE_SCAN_PACKAGES` 扩到 `lca_kernel`（术语的真实归属包），该改动单调：只增加类名集合，不会让其它术语变红，基数门 `>= 1700` 仍满足。
+
+**文档边界（deliberate，非遗漏）**：
+
+| 处理 | 范围 | 理由 |
+|---|---|---|
+| 已改名 | `docs/specs/glossary.md`、`docs/observability/architecture-overview.md`、`docs/debug/run-debug-guide.md`、`docs/specs/session-event-pipeline-spec.md`、`lca_kernel/README.md`、`bundles/`、`profiles/`、`pyproject.toml`、`scripts/` | 描述当前状态的规范与运行文档 |
+| 保持原名 | `docs/adr/**`、`docs/notes/archived/**` | 冻结，规则禁止修改 |
+| 保持原名 | `docs/notes/implemented/**`、`docs/notes/proposed/**`、`docs/design/**`、`docs/plans/**` | 特定 PR / 设计稿的历史记录；改名会篡改「那个 PR 当时做了什么」 |
+| 保持原名 | `docs/specs/0194-0195-implementation-plan.md` §7.5 `G6 EventBus` 与 P2-08 行标题 | 引用 ADR-0194 冻结的退役项名与历史 PR 标题；该行的「交付」列已更新为实际结果 |
+| 保持原名 | 本文件 | 本文件的主题就是 `EventBus` → `EnvelopeBus` 的退役，必须写旧名 |
+
 ## 复盘触发
 
 每个 PR 落地后：
@@ -238,4 +266,6 @@ S1 的空壳路径无任何用例触达。违反 [AGENTS.md §1.5 规则 6](../.
 
 **R4 · [ADR-0195:222](../../adr/0195-platform-architecture-convergence.md) 的路径笔误。** O4 行写作 `lca_kernel/events/bus.py`，实际为 `lca_kernel/events/bus/bus.py`。老 ADR 不动，此条仅记录。
 
-**R5 · [`scripts/event_bus_status.py`](../../../scripts/event_bus_status.py) 的骨架模块检查已失效。** `check_skeleton_modules` 的 `required` 列 6 个扁平路径（`lca_kernel/events/bus.py`、`hooks.py`、`pipeline.py`、`reader.py`、`spine_runtime.py`、`sinks/spine_sink.py`），其中 5 个在包化重构后已不存在（实际为 `bus/bus.py`、`hooks/hooks.py` 等），只有 `sinks/spine_sink.py` 命中。该检查恒报 missing，是与本计划无关的既有失效诊断；`invariant="EventBus 骨架模块齐备"` 只是标签字符串，无功能耦合。修法是按当前包布局重写 `required` 并补一条会因路径漂移而失败的测试。
+**R5 · [`scripts/event_bus_status.py`](../../../scripts/event_bus_status.py) 的骨架模块检查已失效。** `check_skeleton_modules` 的 `required` 列 6 个扁平路径（`lca_kernel/events/bus.py`、`hooks.py`、`pipeline.py`、`reader.py`、`spine_runtime.py`、`sinks/spine_sink.py`），其中 5 个在包化重构后已不存在（实际为 `bus/bus.py`、`hooks/hooks.py` 等），只有 `sinks/spine_sink.py` 命中。该检查恒报 missing，是与本计划无关的既有失效诊断；`invariant=` 那行只是标签字符串，无功能耦合（PR-3 已随词表收敛改名为 `EnvelopeBus`）。修法是按当前包布局重写 `required` 并补一条会因路径漂移而失败的测试。
+
+**R6 · [`docs/specs/harness-spine-spec.md`](../../specs/harness-spine-spec.md) §1.1 描述不存在的模块。** 该节自称「代码基线：main 分支的真实状态」，但 `lca/infrastructure/plugin/kernel/_host.py`（`PluginHost`）与 `ScopedPluginHost` 在仓库中均不存在，`git grep 'EventBus()' -- 'lca/**' 'lca_kernel/**'` 零命中。其 `events: EventBus` 字段指插件内核设计期的 cordis 形态事件面，与本计划的总线不是同一对象，故 PR-3 未在该文件改名。这是与本计划无关的既有文档—代码漂移，需单独一轮判定该 spec 是迁往 `docs/design/` 还是按当前代码重写。

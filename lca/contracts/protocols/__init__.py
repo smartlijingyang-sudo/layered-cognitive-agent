@@ -14,7 +14,6 @@ from __future__ import annotations
 # ── 跨层机制（re-exported from mechanisms for convenience）──
 from lca.contracts.mechanisms import (
     ComponentRegistryProtocol,
-    EventBus,
     Hook,
     HookRegistry,
     NamedRegistryProtocol,
@@ -388,7 +387,6 @@ __all__ = [
     "EffectHandlerRegistry",
     "EffectPolicyPlan",
     "EnvelopeVerdict",
-    "EventBus",
     "GraphNodeExecutionContext",
     "GraphNodeExecutor",
     "GraphNodeExecutorRegistryProtocol",
