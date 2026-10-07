@@ -1,7 +1,7 @@
 """webserver 请求级 trace_id 隔离(ADR-0183 §3.9 / PR-12)。
 
 不起真实 webserver(需完整 profile boot);用纯 ASGI TraceIdMiddleware +
-真实 EventBus + asyncio.Barrier 强制并发交错,验证两个请求的事件链
+真实 EnvelopeBus + asyncio.Barrier 强制并发交错,验证两个请求的事件链
 trace_id 各自独立、不串、请求退出后 ambient 复位。
 """
 
@@ -19,7 +19,7 @@ from lca.plugins.events.sinks.spine_file_sink.sink import SpineFileSink
 from lca.plugins.transport.webserver.lifespan.adapter import TraceIdMiddleware
 from lca_kernel.events import TeamDelegationCacheHit
 from lca_kernel.events.bus.bus import (
-    EventBus,
+    EnvelopeBus,
     current_trace_id,
     reset_trace_id,
     set_trace_id,
@@ -27,7 +27,7 @@ from lca_kernel.events.bus.bus import (
 
 
 @pytest.fixture
-def bus() -> EventBus[EventPayload]:
+def bus() -> EnvelopeBus[EventPayload]:
     from lca_kernel.events.test.catalog import build_test_bus
 
     return build_test_bus()
@@ -55,7 +55,7 @@ async def _drive_request(app: TraceIdMiddleware, path: str) -> None:
 
 class TestWebserverTraceIsolation:
     async def test_two_concurrent_requests_isolated_traces(
-        self, bus: EventBus[EventPayload]
+        self, bus: EnvelopeBus[EventPayload]
     ) -> None:
         """并发两请求:各自事件链 trace_id 独立,互不串。"""
         records: dict[str, tuple[str, str | None]] = {}
@@ -95,7 +95,9 @@ class TestWebserverTraceIsolation:
         # 请求退出后 ambient 复位
         assert current_trace_id() is None
 
-    async def test_outer_ambient_restored_after_request(self, bus: EventBus[EventPayload]) -> None:
+    async def test_outer_ambient_restored_after_request(
+        self, bus: EnvelopeBus[EventPayload]
+    ) -> None:
         """请求退出用 token reset:外层 ambient 值不被请求覆盖。"""
 
         async def inner_app(scope: dict[str, object], receive, send) -> None:

@@ -66,7 +66,7 @@ from lca.plugins.prompts.template_provider import (
     _builtin_templates,
     _ProviderImpl,
 )
-from lca_kernel.events.bus.bus import EventBus
+from lca_kernel.events.bus.bus import EnvelopeBus
 from lca_kernel.events.test.catalog import build_test_bus
 
 
@@ -168,17 +168,17 @@ class _FakePublishSession:
 def _bound_publish_session() -> Iterator[None]:
     """Reasoner emit(prompt_assembler.assemble.*) 走 publish_via_session,
     无绑定 Session 时 fail-loud(ADR-0186);S1 鉴权需要授权目录的
-    EventBus。绑测试 bus + 最小 fake Session 让 emit 通过
+    EnvelopeBus。绑测试 bus + 最小 fake Session 让 emit 通过
     (与 tests/plugins/events/publishers/conftest.py 同形)。
     """
     bus = build_test_bus()
-    EventBus.set_default(bus)
+    EnvelopeBus.set_default(bus)
     token = set_publish_session(_FakePublishSession())
     try:
         yield
     finally:
         reset_publish_session(token)
-        EventBus.set_default(None)
+        EnvelopeBus.set_default(None)
 
 
 def test_assembler_walks_template_section_refs() -> None:

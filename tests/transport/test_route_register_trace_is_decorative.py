@@ -1,7 +1,7 @@
 """route_register trace emit 装饰性锁住(ADR-0181+1)。
 
 锁住契约:``_instrument_route_handler`` 包装的 route handler 在
-EventBus publish 失败时(UnauthorizedPublishError 等 EventMechanismError
+EnvelopeBus publish 失败时(UnauthorizedPublishError 等 EventMechanismError
 族异常)必须继续返回业务响应,handler 不能 fail。
 
 回归覆盖(2026-09-04 web-standard 500):publisher 授权错位导致每次

@@ -51,11 +51,11 @@ def client() -> TestClient:
 
 @pytest.fixture(autouse=True)
 def _reset_event_bus_singleton() -> Iterator[None]:
-    from lca_kernel.events import EventBus
+    from lca_kernel.events import EnvelopeBus
 
-    EventBus.reset_singleton()
+    EnvelopeBus.reset_singleton()
     yield
-    EventBus.reset_singleton()
+    EnvelopeBus.reset_singleton()
 
 
 # ── plugin block shape ─────────────────────────────────────────────

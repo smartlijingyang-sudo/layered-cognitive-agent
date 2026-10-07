@@ -1,8 +1,8 @@
-"""EventBus 鉴权三方一致性架构测试 —— plugin-universe PR-6。
+"""EnvelopeBus 鉴权三方一致性架构测试 —— plugin-universe PR-6。
 
 对事件系统强制三向对齐(ADR-0183 §2.2 + plugin-universe PR-6):
 
-  yaml whitelist ⟺ manifest ``@plugin`` 声明 ⟺ 生产 ``EventBus.subscribe(...)`` 调用
+  yaml whitelist ⟺ manifest ``@plugin`` 声明 ⟺ 生产 ``EnvelopeBus.subscribe(...)`` 调用
 
 每条事件 category 的订阅者集合必须同时满足:
 
@@ -18,11 +18,11 @@
 
    本测试守护:已声明为 ``@plugin`` 的事件组件不再出现新的自订阅绕过。
 2. **yaml vs. production subscribe** — yaml 授权的每个 category 至少有一处
-   production ``EventBus.subscribe(`` 调用站点;否则 yaml 授权了零订阅者
+   production ``EnvelopeBus.subscribe(`` 调用站点;否则 yaml 授权了零订阅者
    的孤儿 category。允许 ``spine.`` 兜底规则(机制在 Pipeline 装载期按前缀
    统一接线)。
 
-测试不启动 EventBus 注册中心,只读 yaml + AST 扫描;维护成本接近 0。
+测试不启动 EnvelopeBus 注册中心,只读 yaml + AST 扫描;维护成本接近 0。
 """
 
 from __future__ import annotations
@@ -162,7 +162,7 @@ def _file_has_plugin_decorator(path: Path) -> str | None:
 
 
 def _collect_production_subscribe_callsites() -> set[str]:
-    """生产 ``EventBus.subscribe(`` 调用站点集合(去重:行级 grep)。"""
+    """生产 ``EnvelopeBus.subscribe(`` 调用站点集合(去重:行级 grep)。"""
     sites: set[str] = set()
     for root in _SCAN_ROOTS:
         if not root.exists():
@@ -251,7 +251,7 @@ class TestYamlWhitelistAndPluginDeclaration:
 
 
 class TestEveryYamlCategoryHasProductionSubscribe:
-    """不变量 2:yaml 授权的每个 category 至少有一处 production ``EventBus.subscribe(``
+    """不变量 2:yaml 授权的每个 category 至少有一处 production ``EnvelopeBus.subscribe(``
     调用站点;否则 yaml 授权了零订阅者的孤儿 category。
 
     兜底规则(consumer_rules[prefix="spine."])由机制在 Pipeline 装载期按前缀

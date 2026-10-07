@@ -11,7 +11,7 @@ This guard:
   - identifies *durable* entries — those whose ``publishers`` route
     through ``DefaultFactGateway`` (the only durable spine publisher;
     spine EPs that publish via plugin marker ids stay on the in-process
-    EventBus and are not subject to HPC-L6);
+    EnvelopeBus and are not subject to HPC-L6);
   - asserts each durable entry's ``fields:`` block declares at least one
     activation-binding field;
   - parses the canonical Python contracts payload dataclasses

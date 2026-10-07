@@ -265,7 +265,7 @@ class TestFoldNoIo:
         )
 
     def test_fold_module_does_not_publish_to_event_bus(self) -> None:
-        """fold 包内各文件 AST 无 ``EventBus`` / ``bus`` 标识符 + ``.publish(`` 调用。
+        """fold 包内各文件 AST 无 ``EnvelopeBus`` / ``bus`` 标识符 + ``.publish(`` 调用。
 
         fold 是离线重建函数;若偷偷 publish 就破坏 ADR-0183 I-FW-BUS-1
         与 ADR-0185 §3.4 的"不动 production 行为"约束。AST 扫描过滤
@@ -291,15 +291,16 @@ class TestFoldNoIo:
                         f"{fold_file.relative_to(_REPO_ROOT)}:"
                         f"{node.lineno}: {ast.unparse(node.func)} call"
                     )
-                # EventBus(...) — 字面类构造
-                elif isinstance(node.func, ast.Name) and node.func.id == "EventBus":
+                # EnvelopeBus(...) — 字面类构造
+                elif isinstance(node.func, ast.Name) and node.func.id == "EnvelopeBus":
                     violations.append(
                         f"{fold_file.relative_to(_REPO_ROOT)}:"
-                        f"{node.lineno}: EventBus(...) literal construct"
+                        f"{node.lineno}: EnvelopeBus(...) literal construct"
                     )
 
         assert not violations, (
-            "ADR-0183 I-FW-BUS-1 违规:fold 包不应调 EventBus.publish\n" + "\n".join(violations[:5])
+            "ADR-0183 I-FW-BUS-1 违规:fold 包不应调 EnvelopeBus.publish\n"
+            + "\n".join(violations[:5])
         )
 
 

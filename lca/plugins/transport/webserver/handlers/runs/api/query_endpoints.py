@@ -474,7 +474,7 @@ def health_payload(run_port: RunPort, *, ctx: Any) -> dict[str, Any]:
     resolver plugin; this projection is now run-port-only and fits inside
     the carrier surface.
 
-    Includes ``event_bus`` field (PR-4) aggregating EventBus delivery
+    Includes ``event_bus`` field (PR-4) aggregating EnvelopeBus delivery
     counters and, when loaded, PersistenceObserver fsync policy.
     ``queue_depth`` is always 0 (sync observer; no queue). ``dropped_total > 0``
     flips ``status`` to ``degraded``; readiness is unaffected (frontend
@@ -516,9 +516,9 @@ def _read_plugin_health(ctx: Any) -> dict[str, Any] | None:
     in the live event-registry catalog.
     """
     try:
-        from lca_kernel.events import EventBus
+        from lca_kernel.events import EnvelopeBus
 
-        bus = EventBus.default()
+        bus: EnvelopeBus[Any] = EnvelopeBus.default()
         registry = bus.registry
         registered = len(getattr(registry, "_plugins", {}))
 
@@ -601,7 +601,7 @@ def _read_plugin_health(ctx: Any) -> dict[str, Any] | None:
 
 
 def _read_event_bus_health() -> dict[str, Any] | None:
-    """Read EventBus delivery counters and PersistenceObserver status (if loaded).
+    """Read EnvelopeBus delivery counters and PersistenceObserver status (if loaded).
 
     Graceful degradation: PersistenceObserver is imported lazily. Any error —
     import, attribute, or runtime — yields core counters with

@@ -174,8 +174,9 @@ class TestIAssistantRoutesEpSurface:
         """``routes_assistants``（PR-5 起为子包）不得调 cordis EventBus.publish /
         publish_event 等直接发射面（EP 发射是 catalog 责任，PR-3）。
         """
-        # 显式禁词（按需追加；EP 发射面 ≠ cordis 事件总线）
+        # 显式禁词（按需追加；EP 发射面 ≠ 事件总线）
         forbidden = (
+            "EnvelopeBus.publish",
             "EventBus.publish",
             ".publish_event(",
             "publish_assistant_",

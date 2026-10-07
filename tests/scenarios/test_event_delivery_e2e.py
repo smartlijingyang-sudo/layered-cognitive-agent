@@ -52,7 +52,7 @@ from lca.plugins.transport.webserver.handlers.runs.session.session.session impor
     RunStatus,
 )
 from lca_kernel import run_kernel_lifespan
-from lca_kernel.events.bus.bus import EventBus
+from lca_kernel.events.bus.bus import EnvelopeBus
 from tests.harness.scripted_llm import ScriptedLLMAdapter
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -88,14 +88,14 @@ class _ScriptedResolver:
 
 @pytest.fixture
 def event_singletons_reset() -> Iterator[None]:
-    """EventBus 进程级单例测试前后对称重置。
+    """EnvelopeBus 进程级单例测试前后对称重置。
 
     与 ``tests/integration/conftest.py:event_singletons_reset`` 同语义；
     conftest 夹具按目录作用域可见，场景层取不到，故本地设置。
     """
-    EventBus.reset_singleton()
+    EnvelopeBus.reset_singleton()
     yield
-    EventBus.reset_singleton()
+    EnvelopeBus.reset_singleton()
 
 
 @pytest.fixture
@@ -223,7 +223,7 @@ async def test_event_delivery_counters_zero_dropped(
 
     # 4. 总线按 category 的投递计数 dropped == 0（D2）。
     # 访问器形态锁定为 delivery_snapshot() → category → 四值计数（PR-A 提供）。
-    snapshot: Any = EventBus.default().delivery_snapshot()
+    snapshot: Any = EnvelopeBus.default().delivery_snapshot()
     for category, counters in snapshot.items():
         assert counters["dropped"] == 0, (
             f"category={category} dropped={counters['dropped']}：publish 成功但未落盘/未派发"

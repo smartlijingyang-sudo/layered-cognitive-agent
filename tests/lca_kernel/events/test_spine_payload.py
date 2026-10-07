@@ -59,7 +59,7 @@ def test_all_spine_execution_points_have_category_mapping() -> None:
 
 
 def test_loop_cursor_record_ep_passes_validation() -> None:
-    """loop cursor record_* EP 经 EventBus 路径时不应再 fail-fast。"""
+    """loop cursor record_* EP 经 EnvelopeBus 路径时不应再 fail-fast。"""
     p = SpineEventPayload(
         execution_point="step.tool_call.record",
         channel="fact",

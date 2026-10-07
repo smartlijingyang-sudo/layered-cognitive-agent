@@ -1,20 +1,17 @@
-"""事件总线 —— ADR-0183 §3 / ADR-0183 PR-7 收口 / ADR-0184 PR-1。
+"""事件总线 —— ADR-0183 §3 / ADR-0184。
 
 公开面：
-- :class:`EnvelopeBus` —— ADR-0184 PR-1 统一入口(主)
-- :class:`EventBus` —— EnvelopeBus 兼容 shim(30 天窗口)
+- :class:`EnvelopeBus` —— 事件总线唯一入口(publish / subscribe / mount_sink /
+  register_pipeline)
 - :class:`EnvelopeRef` / :class:`EventRef` —— publish 返回值
 - :class:`PersistenceObserver` / :class:`EnvelopeDeliveryObserver` —— 落盘 observer
 - :class:`SessionEvent` / :class:`SessionObserver` —— Session SSOT 面(ADR-0186)
 - :class:`Category` / :class:`Plane` / :class:`EventPayload` —— 协议类型
   （实际定义在 :mod:`lca.contracts.event`，本模块 re-export）
 
-PR-7 收口：旧 EventMechanism(ADR-0180) 整个文件删除；
-PR-1 收口：EventBus 改为 EnvelopeBus 子类,保留全部现有方法。
-
 不在此暴露：
 - :class:`EventRegistry` —— SSOT 加载器，机制内部
-- 任何旧 ``JournalEvent`` / ``record()`` / reflector helper
+- ``JournalEvent`` / ``record()`` / reflector helper —— 不属于本机制公开面
 """
 
 from pathlib import Path
@@ -33,7 +30,6 @@ from lca_kernel.events.bus.bus import (
     DeliveryPolicy,
     EnvelopeBus,
     EnvelopeRef,
-    EventBus,
     EventRef,
 )
 from lca_kernel.events.fold.fold import (
@@ -73,7 +69,6 @@ __all__ = [
     "EnvelopeDeliveryObserver",
     "EnvelopeRef",
     "EpochHeader",
-    "EventBus",
     "EventPayload",
     "EventRef",
     "FsyncProtocol",

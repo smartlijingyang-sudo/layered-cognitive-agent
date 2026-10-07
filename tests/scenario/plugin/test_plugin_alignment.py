@@ -7,7 +7,7 @@ These four assertions cover the criteria from the alignment plan:
   at most 10 shim modules (each allowlist entry has a one-line comment
   explaining why it cannot adopt the canonical shape).
 
-* (b) Interaction path uniqueness — EventBus and HookRegistry share exactly
+* (b) Interaction path uniqueness — EnvelopeBus and HookRegistry share exactly
   one dispatch backend (cordis events); parallel local listener tables are
   forbidden.
 
@@ -154,7 +154,7 @@ def test_tier1_plugin_shape() -> None:
 def test_eventbus_and_hookregistry_single_backend() -> None:
     """The only event/hook dispatch backend is cordis events.
 
-    EventBus and HookRegistry dispatch must always route through Cordis
+    EnvelopeBus and HookRegistry dispatch must always route through Cordis
     rather than a parallel local listener table. The cordis business wrapper
     (``lca/cognition/event_bus.py``) is removed by PR-30 (ADR-0169 §D9 +
     评审 §S4); only ``hook_registry.py`` remains as the surface that

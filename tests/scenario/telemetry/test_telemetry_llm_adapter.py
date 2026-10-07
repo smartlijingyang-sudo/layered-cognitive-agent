@@ -13,7 +13,7 @@ legacy ``MemoryJournal`` (``facade.record``). This file asserts:
   is dead.
 
 The ``session_publish`` fixture (publish_via_session) is the same one
-``test_session_publish.py`` uses; it stands up a session + EventBus and
+``test_session_publish.py`` uses; it stands up a session + EnvelopeBus and
 binds the global publish context so :func:`emit_llm_stream_token` /
 :func:`emit_llm_call_*` actually land in a Session log we can read.
 """
@@ -36,7 +36,7 @@ from lca.plugins.events.publishers._session_publish import (
     set_publish_session,
 )
 from lca.session.append import Session
-from lca_kernel.events.bus.bus import EventBus
+from lca_kernel.events.bus.bus import EnvelopeBus
 from lca_kernel.events.test.catalog import build_test_bus
 
 
@@ -97,13 +97,13 @@ class TestTelemetryLLMAdapter(unittest.IsolatedAsyncioTestCase):
             hasattr(_adapter_mod, "record"),
             "TelemetryLLMAdapter must not import facade.record (ADR-0192 SSOT)",
         )
-        EventBus.set_default(build_test_bus())
+        EnvelopeBus.set_default(build_test_bus())
         self._session = Session("telemetry-adapter-test")
         self._session_token = set_publish_session(self._session)
 
     def tearDown(self) -> None:
         reset_publish_session(self._session_token)
-        EventBus.set_default(None)
+        EnvelopeBus.set_default(None)
 
     async def test_complete_success_emits_llm_call_start_end(self) -> None:
         adapter = TelemetryLLMAdapter(_FakeInner())

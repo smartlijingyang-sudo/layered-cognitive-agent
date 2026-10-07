@@ -1,4 +1,4 @@
-"""EventBus 单元测试 —— ADR-0183 PR-1+PR-2 守护。
+"""EnvelopeBus 单元测试 —— ADR-0183 PR-1+PR-2 守护。
 
 覆盖:
 - publish / subscribe / register_pipeline 三入口
@@ -9,7 +9,7 @@
 - trace_id 优先顺序:显式参数 → payload.trace_id → ambient contextvars → new_id("trc")
 - 鉴权失败 raise UnauthorizedPublishError
 - ConsumerHandle.unregister 留 stub
-- 重置 EventBus.default() 单例(测试隔离)
+- 重置 EnvelopeBus.default() 单例(测试隔离)
 
 不变量 I-FW-BUS-1/2 的单元测试;架构不变量测试见
 ``tests/architecture/test_event_bus_invariants.py``。
@@ -27,7 +27,7 @@ from lca_kernel.events import (
 )
 from lca_kernel.events.bus.bus import (
     ConsumerHandle,
-    EventBus,
+    EnvelopeBus,
     FailureSemantics,
     PayloadSchemaError,
 )
@@ -54,15 +54,15 @@ from lca_kernel.events.registry.registry import EventRegistry
 # ── helpers ──────────────────────────────────────────────────────────────
 
 
-def _make_bus() -> EventBus[EventPayload]:
-    """独立 EventBus 实例(从默认 yaml 加载 registry),避免单例串扰。"""
+def _make_bus() -> EnvelopeBus[EventPayload]:
+    """独立 EnvelopeBus 实例(从默认 yaml 加载 registry),避免单例串扰。"""
     from lca_kernel.events.test.catalog import build_test_bus
     return build_test_bus()
 
 
 @pytest.fixture
-def bus() -> EventBus[EventPayload]:
-    """每个测试用独立 EventBus 实例。"""
+def bus() -> EnvelopeBus[EventPayload]:
+    """每个测试用独立 EnvelopeBus 实例。"""
     return _make_bus()
 
 
@@ -104,7 +104,7 @@ class TestPublish:
 
     def test_publish_basic_returns_event_ref(
         self,
-        bus: EventBus[EventPayload],
+        bus: EnvelopeBus[EventPayload],
         authorized_plugin: type,
         authorized_payload: EventPayload,
     ) -> None:
@@ -115,7 +115,7 @@ class TestPublish:
 
     def test_publish_unauthorized_raises(
         self,
-        bus: EventBus[EventPayload],
+        bus: EnvelopeBus[EventPayload],
         authorized_payload: EventPayload,
     ) -> None:
         """producer 不在白名单 → raise UnauthorizedPublishError。"""
@@ -128,7 +128,7 @@ class TestPublish:
 
     def test_publish_missing_plugin_identity_raises(
         self,
-        bus: EventBus[EventPayload],
+        bus: EnvelopeBus[EventPayload],
         authorized_payload: EventPayload,
     ) -> None:
         """producer=None 或非 type → raise MissingPluginIdentityError。"""
@@ -139,7 +139,7 @@ class TestPublish:
 
     def test_event_ref_has_iso_ts(
         self,
-        bus: EventBus[EventPayload],
+        bus: EnvelopeBus[EventPayload],
         authorized_plugin: type,
         authorized_payload: EventPayload,
     ) -> None:
@@ -149,7 +149,7 @@ class TestPublish:
 
     def test_trace_id_priority_payload_first(
         self,
-        bus: EventBus[EventPayload],
+        bus: EnvelopeBus[EventPayload],
         authorized_plugin: type,
     ) -> None:
         """trace_id 显式传入 → EventRef.trace_id 等于传入值。"""
@@ -162,7 +162,7 @@ class TestPublish:
 
     def test_trace_id_priority_generated_when_omitted(
         self,
-        bus: EventBus[EventPayload],
+        bus: EnvelopeBus[EventPayload],
         authorized_plugin: type,
         authorized_payload: EventPayload,
     ) -> None:
@@ -172,7 +172,7 @@ class TestPublish:
 
     def test_payload_schema_mismatch_raises(
         self,
-        bus: EventBus[EventPayload],
+        bus: EnvelopeBus[EventPayload],
         authorized_plugin: type,
     ) -> None:
         """payload type 与 yaml spec 不符 → raise PayloadSchemaError。"""
@@ -192,7 +192,7 @@ class TestSubscribe:
 
     def test_subscribe_records_consumer(
         self,
-        bus: EventBus[EventPayload],
+        bus: EnvelopeBus[EventPayload],
         authorized_subscriber_plugin: type,
         authorized_plugin: type,
         authorized_payload: EventPayload,
@@ -212,7 +212,7 @@ class TestSubscribe:
 
     def test_subscribe_unauthorized_raises(
         self,
-        bus: EventBus[EventPayload],
+        bus: EnvelopeBus[EventPayload],
     ) -> None:
         """plugin 不在白名单 → raise UnauthorizedSubscribeError。"""
 
@@ -228,7 +228,7 @@ class TestSubscribe:
 
     def test_subscribe_missing_plugin_identity_raises(
         self,
-        bus: EventBus[EventPayload],
+        bus: EnvelopeBus[EventPayload],
     ) -> None:
         """plugin=None 或非 type → raise MissingPluginIdentityError。"""
         with pytest.raises(MissingPluginIdentityError):
@@ -240,7 +240,7 @@ class TestSubscribe:
 
     def test_subscribe_returns_consumer_handle(
         self,
-        bus: EventBus[EventPayload],
+        bus: EnvelopeBus[EventPayload],
         authorized_subscriber_plugin: type,
     ) -> None:
         """subscribe 返回 ConsumerHandle(含 plugin / category,unregister 留 stub)。"""
@@ -257,7 +257,7 @@ class TestSubscribe:
 
     def test_subscribe_accepts_category_string(
         self,
-        bus: EventBus[EventPayload],
+        bus: EnvelopeBus[EventPayload],
         authorized_subscriber_plugin: type,
     ) -> None:
         """subscribe 接受 category=str(自动 coerce 到 Category enum)。"""
@@ -277,7 +277,7 @@ class TestFailureSemantics:
 
     def test_subscribe_with_fail_fast_propagates(
         self,
-        bus: EventBus[EventPayload],
+        bus: EnvelopeBus[EventPayload],
         authorized_subscriber_plugin: type,
         authorized_plugin: type,
         authorized_payload: EventPayload,
@@ -298,7 +298,7 @@ class TestFailureSemantics:
 
     def test_subscribe_with_contained_swallows(
         self,
-        bus: EventBus[EventPayload],
+        bus: EnvelopeBus[EventPayload],
         authorized_subscriber_plugin: type,
         authorized_plugin: type,
         authorized_payload: EventPayload,
@@ -328,7 +328,7 @@ class TestFailureSemantics:
 
     def test_subscribe_default_is_contained(
         self,
-        bus: EventBus[EventPayload],
+        bus: EnvelopeBus[EventPayload],
         authorized_subscriber_plugin: type,
         authorized_plugin: type,
         authorized_payload: EventPayload,
@@ -356,7 +356,7 @@ class TestRegisterPipeline:
 
     def test_register_pipeline_stores_pipeline(
         self,
-        bus: EventBus[EventPayload],
+        bus: EnvelopeBus[EventPayload],
         authorized_subscriber_plugin: type,
         authorized_plugin: type,
         authorized_payload: EventPayload,
@@ -388,7 +388,7 @@ class TestRegisterPipeline:
 
     def test_pre_dispatch_hook_can_replace_payload(
         self,
-        bus: EventBus[EventPayload],
+        bus: EnvelopeBus[EventPayload],
         authorized_subscriber_plugin: type,
         authorized_plugin: type,
     ) -> None:
@@ -427,7 +427,7 @@ class TestRegisterPipeline:
 
     def test_pre_dispatch_hook_can_skip_dispatch(
         self,
-        bus: EventBus[EventPayload],
+        bus: EnvelopeBus[EventPayload],
         authorized_subscriber_plugin: type,
         authorized_plugin: type,
         authorized_payload: EventPayload,
@@ -455,12 +455,12 @@ class TestRegisterPipeline:
 
     def test_post_dispatch_hook_yields_followup_events(
         self,
-        bus: EventBus[EventPayload],
+        bus: EnvelopeBus[EventPayload],
         authorized_plugin: type,
         authorized_payload: EventPayload,
         monkeypatch: pytest.MonkeyPatch,
     ) -> None:
-        """post_dispatch hook yield 的新事件也走 publish(由本 EventBus 实例)。"""
+        """post_dispatch hook yield 的新事件也走 publish(由本 EnvelopeBus 实例)。"""
         from lca_kernel.events import TeamDelegationCacheHit
 
         yielded: list[EventPayload] = []
@@ -503,7 +503,7 @@ class TestFailureHook:
 
     def test_failure_hook_contains_default(
         self,
-        bus: EventBus[EventPayload],
+        bus: EnvelopeBus[EventPayload],
         authorized_subscriber_plugin: type,
         authorized_plugin: type,
         authorized_payload: EventPayload,
@@ -525,7 +525,7 @@ class TestFailureHook:
 
     def test_failure_hook_rethrow_propagates(
         self,
-        bus: EventBus[EventPayload],
+        bus: EnvelopeBus[EventPayload],
         authorized_subscriber_plugin: type,
         authorized_plugin: type,
         authorized_payload: EventPayload,
@@ -546,7 +546,7 @@ class TestFailureHook:
 
     def test_failure_hook_explicit_rethrow_via_hook(
         self,
-        bus: EventBus[EventPayload],
+        bus: EnvelopeBus[EventPayload],
         authorized_subscriber_plugin: type,
         authorized_plugin: type,
         authorized_payload: EventPayload,
@@ -611,36 +611,36 @@ class TestPipelineAndConsumerRule:
 
 
 class TestSingleton:
-    """ADR-0183 §3.1 EventBus 进程级单例。"""
+    """ADR-0183 §3.1 EnvelopeBus 进程级单例。"""
 
     def test_event_bus_default_returns_same_instance(self) -> None:
         """多次 default() 返回同一实例(进程级单例)。"""
-        EventBus.reset_singleton()
+        EnvelopeBus.reset_singleton()
         try:
-            a = EventBus.default()
-            b = EventBus.default()
+            a = EnvelopeBus.default()
+            b = EnvelopeBus.default()
             assert a is b
         finally:
-            EventBus.reset_singleton()
+            EnvelopeBus.reset_singleton()
 
     def test_default_singleton_reset(self) -> None:
         """reset_singleton 后 default() 返回新实例。"""
-        EventBus.reset_singleton()
+        EnvelopeBus.reset_singleton()
         try:
-            a = EventBus.default()
-            EventBus.reset_singleton()
-            b = EventBus.default()
+            a = EnvelopeBus.default()
+            EnvelopeBus.reset_singleton()
+            b = EnvelopeBus.default()
             assert a is not b
         finally:
-            EventBus.reset_singleton()
+            EnvelopeBus.reset_singleton()
 
     def test_set_default_replaces(self) -> None:
         """set_default 可注入自定义实例。"""
-        EventBus.reset_singleton()
+        EnvelopeBus.reset_singleton()
         try:
             registry = EventRegistry.load(_DEFAULT_CONFIG_DIR)
-            custom: EventBus[EventPayload] = EventBus(registry)
-            EventBus.set_default(custom)
-            assert EventBus.default() is custom
+            custom: EnvelopeBus[EventPayload] = EnvelopeBus(registry)
+            EnvelopeBus.set_default(custom)
+            assert EnvelopeBus.default() is custom
         finally:
-            EventBus.reset_singleton()
+            EnvelopeBus.reset_singleton()

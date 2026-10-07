@@ -517,7 +517,7 @@ class TestReadOnlyInvariant:
         """The doctor CLI module imports no journal / session / network writers."""
         source = Path(profile_module.__file__).read_text(encoding="utf-8")
         # Forbidden imports: Session, FactGateway, journal_io, write_journal,
-        # append_event, RunStore, EventBus — none of these should appear.
+        # append_event, RunStore, EnvelopeBus — none of these should appear.
         forbidden = [
             "lca.session",
             "lca.journal",
@@ -526,6 +526,7 @@ class TestReadOnlyInvariant:
             "write_journal",
             "append_event",
             "RunStore",
+            "EnvelopeBus",
             "EventBus",
             "urllib.request",
             "urllib3",

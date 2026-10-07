@@ -18,18 +18,18 @@ from lca.contracts.models.observability.journal.journal import (
 from lca.contracts.models.team.role.team import RoleProfile, ToolPermissionManifest
 from lca.plugins.session.runtime.store.store import SessionStore
 from lca.session.lifecycle.bind import EventSessionBinder
-from lca_kernel.events.bus.bus import EventBus
+from lca_kernel.events.bus.bus import EnvelopeBus
 from lca_kernel.events.test.catalog import build_test_bus
 from tests.support.observability_helpers import _RunStoreBackend, make_test_bound
 
 
 @pytest.fixture(autouse=True)
 def _test_event_bus() -> Iterator[None]:
-    """Provide a configured test EventBus for Session-bound publishes."""
+    """Provide a configured test EnvelopeBus for Session-bound publishes."""
     bus = build_test_bus()
-    EventBus.set_default(bus)
+    EnvelopeBus.set_default(bus)
     yield
-    EventBus.reset_singleton()
+    EnvelopeBus.reset_singleton()
 
 
 class _ResumeRuntime:

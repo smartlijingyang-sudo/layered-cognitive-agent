@@ -1,9 +1,9 @@
-"""PR-12 trace_id contextvars 注入 + 解析链单元测试（迁移 EventBus-only / ADR-0183 PR-7）。
+"""PR-12 trace_id contextvars 注入 + 解析链单元测试（迁移 EnvelopeBus-only / ADR-0183 PR-7）。
 
 覆盖:
 - set_trace_id / reset_trace_id / current_trace_id 三件套
 - publish 解析链:显式参数 > payload.trace_id > contextvars > new_id("trc")
-- TraceContextHook 透传(解析由 EventBus 单点承担)
+- TraceContextHook 透传(解析由 EnvelopeBus 单点承担)
 """
 
 from __future__ import annotations
@@ -14,7 +14,7 @@ from lca.contracts.atoms.ids.ids import new_id
 from lca.contracts.event import EventPayload
 from lca_kernel.events import TeamDelegationCacheHit
 from lca_kernel.events.bus.bus import (
-    EventBus,
+    EnvelopeBus,
     current_trace_id,
     reset_trace_id,
     set_trace_id,
@@ -22,13 +22,13 @@ from lca_kernel.events.bus.bus import (
 from lca_kernel.events.hooks.hooks import PublishContext, TraceContextHook
 
 
-def _make_bus() -> EventBus[EventPayload]:
+def _make_bus() -> EnvelopeBus[EventPayload]:
     from lca_kernel.events.test.catalog import build_test_bus
     return build_test_bus()
 
 
 @pytest.fixture
-def bus() -> EventBus[EventPayload]:
+def bus() -> EnvelopeBus[EventPayload]:
     return _make_bus()
 
 
@@ -87,7 +87,7 @@ class TestTraceContextVar:
 
 class TestPublishTraceResolution:
     def test_explicit_param_wins(
-        self, bus: EventBus[EventPayload], authorized_plugin: type
+        self, bus: EnvelopeBus[EventPayload], authorized_plugin: type
     ) -> None:
         """显式 trace_id 参数优先级最高(即使 ambient 已设)。"""
         ambient = set_trace_id("trc_ambient")
@@ -99,7 +99,7 @@ class TestPublishTraceResolution:
             reset_trace_id(ambient)
 
     def test_contextvar_used_when_no_explicit(
-        self, bus: EventBus[EventPayload], authorized_plugin: type
+        self, bus: EnvelopeBus[EventPayload], authorized_plugin: type
     ) -> None:
         ambient = set_trace_id("trc_ambient")
         try:
@@ -110,7 +110,7 @@ class TestPublishTraceResolution:
             reset_trace_id(ambient)
 
     def test_generated_when_no_source(
-        self, bus: EventBus[EventPayload], authorized_plugin: type
+        self, bus: EnvelopeBus[EventPayload], authorized_plugin: type
     ) -> None:
         p = TeamDelegationCacheHit(callee_role="a", subtask="b", step=1)
         ref = bus.publish(p, producer=authorized_plugin)
@@ -118,7 +118,7 @@ class TestPublishTraceResolution:
         assert ref.trace_id != ""
 
     def test_payload_trace_id_beats_contextvar(
-        self, bus: EventBus[EventPayload], authorized_plugin: type
+        self, bus: EnvelopeBus[EventPayload], authorized_plugin: type
     ) -> None:
         """payload.trace_id 属性优先于 ambient contextvars。"""
 
@@ -139,9 +139,9 @@ class TestPublishTraceResolution:
 
 class TestTraceContextHook:
     def test_before_publish_passthrough(
-        self, bus: EventBus[EventPayload], authorized_plugin: type
+        self, bus: EnvelopeBus[EventPayload], authorized_plugin: type
     ) -> None:
-        """TraceContextHook 不改 payload(解析在 EventBus._resolve_trace_id)。"""
+        """TraceContextHook 不改 payload(解析在 EnvelopeBus._resolve_trace_id)。"""
         hook = TraceContextHook()
         p = TeamDelegationCacheHit(callee_role="a", subtask="b", step=1)
         ctx = PublishContext(bus=bus, producer=authorized_plugin, ts=0.0)

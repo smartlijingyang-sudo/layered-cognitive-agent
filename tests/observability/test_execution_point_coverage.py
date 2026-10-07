@@ -32,7 +32,7 @@ from lca.contracts.protocols import LLMAdapter
 from lca.infrastructure.session.emit.cognitive_emit import (
     run_reasoner_generate_thoughts_with_spine_facts,
 )
-from lca_kernel.events.bus.bus import EventBus
+from lca_kernel.events.bus.bus import EnvelopeBus
 from lca_kernel.events.test.catalog import build_test_bus
 
 
@@ -40,7 +40,7 @@ from lca_kernel.events.test.catalog import build_test_bus
 def _bound_publish_session():
     """emit_* 走 publish_via_session:无绑定 Session fail-loud(ADR-0186)。
 
-    fake session 把 append 委托给当前 default EventBus —— 测试用
+    fake session 把 append 委托给当前 default EnvelopeBus —— 测试用
     ``_CapturingBus`` 覆盖 default 时仍可捕获 emit(与
     publishers/conftest.py 的 FakePublishSession 同形)。
     """
@@ -51,16 +51,16 @@ def _bound_publish_session():
 
     class _FakePublishSession:
         def append(self, payload: Any, *, producer: Any = None) -> Any:
-            return EventBus.default().publish(payload, producer=producer)
+            return EnvelopeBus.default().publish(payload, producer=producer)
 
     bus = build_test_bus()
-    EventBus.set_default(bus)
+    EnvelopeBus.set_default(bus)
     token = set_publish_session(_FakePublishSession())
     try:
         yield
     finally:
         reset_publish_session(token)
-        EventBus.set_default(None)
+        EnvelopeBus.set_default(None)
 
 
 class _AllowAllRegistry:
@@ -72,7 +72,7 @@ class _AllowAllRegistry:
 
 
 class _CapturingBus:
-    """Stub matching ``EventBus.publish(...)`` keyword surface (ADR-0183 §3.1)."""
+    """Stub matching ``EnvelopeBus.publish(...)`` keyword surface (ADR-0183 §3.1)."""
 
     def __init__(self) -> None:
         self.calls: list[dict[str, Any]] = []

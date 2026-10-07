@@ -2,12 +2,12 @@ r"""I-MV-1 架构不变量 —— ADR-0185 §4。
 
 I-MV-1: ``ModelVisiblePublisher`` 是 ``spine.llm.request.header`` 与
 ``spine.llm.request.header.assistant`` 两类 spine event 的唯一授权 producer。
-生产路径必须通过 EventBus.publish(..., producer=ModelVisiblePublisher) 投递,
-不允许任何业务方在 ``lca/`` 树下绕过 EventBus 直接 publish 这两类 category。
+生产路径必须通过 EnvelopeBus.publish(..., producer=ModelVisiblePublisher) 投递,
+不允许任何业务方在 ``lca/`` 树下绕过 EnvelopeBus 直接 publish 这两类 category。
 
 守护方式:``rg "publish.*spine\.llm\.request\.header" lca/`` 命中行必须仅落在
 ``lca/plugins/events/publishers/model_visible/`` 路径下,且全部通过
-``EventBus.publish`` 入口(由 I-FW-BUS-1 守护)。
+``EnvelopeBus.publish`` 入口(由 I-FW-BUS-1 守护)。
 """
 
 from __future__ import annotations

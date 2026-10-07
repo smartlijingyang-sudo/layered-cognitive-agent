@@ -13,7 +13,7 @@ from __future__ import annotations
 from importlib import import_module
 from pathlib import Path
 
-from lca_kernel.events.bus.bus import EnvelopeBus, EventBus
+from lca_kernel.events.bus.bus import EnvelopeBus
 from lca_kernel.events.registry.registry import EventRegistry
 
 
@@ -23,7 +23,7 @@ def build_test_catalog() -> dict[str, type]:
     与生产路径等价：枚举 event-bus 组件中带 ``marker_class`` 的 publisher。
     FactGateway-routed spine categories 在 yaml 里用 class-path token
     ``lca.loop.fact_gateway.DefaultFactGateway`` 授权；本 catalog 只覆盖
-    仍走 EventBus marker 鉴权的 plugin id。
+    走 EnvelopeBus marker 鉴权的 plugin id。
     """
     catalog: dict[str, type] = {}
     pairs: tuple[tuple[str, str, str], ...] = (
@@ -52,12 +52,12 @@ def build_test_catalog() -> dict[str, type]:
 
 
 def build_test_bus(config_dir: Path | None = None) -> EnvelopeBus:
-    """PR-5：测试路径下构造 catalog 已注入的 EnvelopeBus。
+    """测试路径下构造 catalog 已注入的 EnvelopeBus。
 
     1. 构造 :data:`build_test_catalog`（id → marker class）；
     2. :class:`EventRegistry.load` 装载 yaml，注入 catalog（让 id 与
        class-path 双形态 token 都能解析）；
-    3. 返回 :class:`EnvelopeBus`（实例为 EventBus compat 子类）。
+    3. 返回 :class:`EnvelopeBus`。
 
     与生产路径（profile resolve → setup_bus → catalog 注入）等价。
     """
@@ -70,7 +70,7 @@ def build_test_bus(config_dir: Path | None = None) -> EnvelopeBus:
     # 此处 load 已注入，所以 _plugins 已就位,refresh 不必重跑；但保险起见
     # 跑一次让 consumer_rules raw tokens 重新物化）。
     registry.refresh()
-    return EventBus(registry)
+    return EnvelopeBus(registry)
 
 
 __all__ = ["build_test_bus", "build_test_catalog"]
