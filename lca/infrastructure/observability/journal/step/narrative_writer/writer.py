@@ -15,7 +15,6 @@ from lca.contracts.models.observability.journal.doc import JournalDocument
 from lca.contracts.models.observability.journal.step import JournalStep
 from lca.infrastructure.atomic.write import atomic_write_text
 from lca.infrastructure.observability.journal.step.narrative_writer.fold import (
-    FoldProvider,
     _render_fold_chapters,
 )
 from lca.infrastructure.observability.journal.step.narrative_writer.sections import (
@@ -29,8 +28,9 @@ from lca.infrastructure.observability.journal.step.narrative_writer.sections imp
     _render_thinking,
     _render_tool_call,
     _render_tool_result,
-    _short,
+    short_text,
 )
+from lca.infrastructure.observability.replay.fold_source import FoldProvider
 from lca.infrastructure.observability.spine.sinks.naming import spine_filename_for_run
 
 if TYPE_CHECKING:
@@ -54,7 +54,7 @@ def _render_step(
     if step.subagent_role:
         lines.append(f"_subagent: {step.subagent_role}_")
     if step.error:
-        lines.append(f"_error: `{_short(step.error, 200)}`_")
+        lines.append(f"_error: `{short_text(step.error, 200)}`_")
     lines.append("")
     if step.context_before is not None:
         lines.extend(_render_context(step))
@@ -102,7 +102,7 @@ def _render_step(
 
 def _render_summary(doc: JournalDocument) -> list[str]:
     lines = ["## 📊 Summary", ""]
-    lines.append(f"- objective: `{_short(doc.metadata.objective, 200)}`")
+    lines.append(f"- objective: `{short_text(doc.metadata.objective, 200)}`")
     lines.append(f"- outcome: **{doc.metadata.outcome}**")
     if doc.started_at and doc.closed_at:
         dur_ms = int((doc.closed_at - doc.started_at) * 1000)
@@ -126,21 +126,21 @@ def _render_summary(doc: JournalDocument) -> list[str]:
         # 摘要 = reflect.summary / tool_result.delta_summary / thinking.decision
         summary = "—"
         if s.reflect is not None and s.reflect.summary:
-            summary = _short(s.reflect.summary, 60)
+            summary = short_text(s.reflect.summary, 60)
         elif s.tool_result is not None and s.tool_result.delta_summary:
-            summary = _short(s.tool_result.delta_summary, 60)
+            summary = short_text(s.tool_result.delta_summary, 60)
         elif s.thinking is not None and s.thinking.decision:
             summary = f"[{s.thinking.decision}]"
         elif s.tool_calls:
-            summary = "; ".join(_short(c.arguments_summary, 60) for c in s.tool_calls)
+            summary = "; ".join(short_text(c.arguments_summary, 60) for c in s.tool_calls)
         elif s.tool_call is not None:
-            summary = _short(s.tool_call.arguments_summary, 60)
+            summary = short_text(s.tool_call.arguments_summary, 60)
         lines.append(
             f"| {s.step_index} "
             f"| {s.phase} "
             f"| {_format_duration(s.duration_ms)} "
             f"| {outcome_str} "
-            f"| {_short(summary, 80)} |"
+            f"| {short_text(summary, 80)} |"
         )
     lines.append("")
     # 因果链
@@ -149,7 +149,7 @@ def _render_summary(doc: JournalDocument) -> list[str]:
     chain = doc.prior_summary_chain()
     if chain:
         for i, summary in enumerate(chain, 1):
-            lines.append(f"{i}. {_short(summary, 200)}")
+            lines.append(f"{i}. {short_text(summary, 200)}")
     else:
         lines.append("_(空)_")
     return lines
@@ -230,7 +230,7 @@ class StepNarrativeWriter:
             if totals is not None
             else f"total_steps={document.total_steps()}"
         )
-        lines.append(f"# Run Narrative —— {_short(document.metadata.objective, 120)}")
+        lines.append(f"# Run Narrative —— {short_text(document.metadata.objective, 120)}")
         lines.append("")
         lines.append(
             f"> {total_str}  "

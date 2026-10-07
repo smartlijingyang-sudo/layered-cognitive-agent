@@ -19,7 +19,7 @@ ADR-0185 PR-4 收口:旧 ``<run_dir>/model_visible/`` 旁路读取已删除,
 from __future__ import annotations
 
 import logging
-from collections.abc import Iterable, Mapping
+from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -74,6 +74,12 @@ class FoldedModelVisible:
     header_digest: str
     source: str
     digest_verified: bool
+
+
+# Fold provider seam —— 每 step 调一次;返回 None 表示 fold SSOT 不可用,
+# narrative 应优雅降级到 N/A 占位(不抛错、不影响其它章节)。test 用 mock
+# callable 注入;production 走默认 ``fold_model_visible``(读 spine.jsonl)。
+FoldProvider = Callable[[str, str], "FoldedModelVisible | None"]
 
 
 # 来源标记字符串;viewer 字符串比对走这个常量化值

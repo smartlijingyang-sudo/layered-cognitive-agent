@@ -768,3 +768,33 @@
     评估的"零引用"断言要复核，不能只信。
 ---
 
+
+## 2026-10-08 03:55 - RA-027
+
+- **实现**：`narrative_writer/fold.py` 五个 `_render_*` 的
+  `fold is None or fold.header is None` 守卫收进单一 driver
+  `_chapter(na_title, body, fold)`（fold 不可用 → 逐字 N/A 标题占位，否则调 body）；
+  每个 `_render_*` 剩一行 `_chapter` 调用 + docstring，真值体搬进 `_`*`_body` helper。
+  5 章 N/A 标题逐字保留；`_render_fold_chapters` 签名与 `char_budget` 截断语义未动。
+  leaky seam：`sections._short` 公开化为 `short_text`（def + 15 内部调用；fold.py 4 处、
+  writer.py 9 处调用同步改名）。`FoldProvider` 别名搬到 `fold_source.py`（生产者侧）；
+  writer.py 与包 `__init__` 改从生产者侧 import；包公开 surface
+  （`FoldProvider`、`StepNarrativeWriter`）不变。
+- **与评估的差异**：`_short` 选了公开化为 `short_text` 而非 fold 自有 helper——sections.py
+  本就是 markdown 截断 helper 的属主，改名无重复逻辑；driver 实际签名是三元
+  `_chapter(na_title, body, fold)`（fold 必须传入，评估的二元写法是简写）。
+  另：writer.py 也在 import `_short`（评估只提了 fold.py），一并改名。
+- **文件**：`narrative_writer/fold.py`、`sections.py`、`writer.py`、`__init__.py`、
+  `replay/fold_source.py`、`tests/observability/spine/derivers/test_narrative_fold_chapters.py`
+  （+3 新测试）。
+- **验证**：3 新 driver 级测试全绿（5×`_render_*(None)` 逐字 N/A 标题；header=None 同路降级；
+  fold 可用时调 body）；41 回归全绿（fold chapters + writer + sections + all-tool-calls）；
+  19 消费者测试全绿（deriver plugins + cli journal steps）；ruff 全绿
+  （中途 I001 import 排序用 `--fix` 修好）。
+- **Learnings for future iterations:**
+  - "leaky seam 私有 import"动手前 grep 全仓 import 方——writer.py 也是 `_short` 的调用方，
+    评估只数了 fold.py；改名类操作必须覆盖所有调用方。
+  - pytest 同一次调用传了不存在的目录会导致"no tests ran"零收集（exit 0 静默）；
+    传参前确认路径存在，目录与文件混传本就按红线分开跑。
+---
+

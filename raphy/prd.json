@@ -404,9 +404,9 @@
     "New test: driver-level — passing None yields all five N/A titles (one test pins the whole policy); existing narrative tests green; ruff check clean"
    ],
    "priority": 2,
-   "passes": false,
+   "passes": true,
    "branchName": "raphy/arch-20261008-0206",
-   "notes": "Strength: Worth exploring. Friction-walk Area C: one policy ('fold unavailable -> placeholder'), five copies of the guard, five test surfaces. Deletion test: concentrates (policy moves from 5 sites to 1 driver). Constraint: N/A titles verbatim; budget semantics untouched."
+   "notes": "Strength: Worth exploring. Friction-walk Area C: one policy ('fold unavailable -> placeholder'), five copies of the guard, five test surfaces. Deletion test: concentrates (policy moves from 5 sites to 1 driver). Constraint: N/A titles verbatim; budget semantics untouched.\nDONE 2026-10-08 (optimize session): converged the five _render_* N/A guards (fold is None or fold.header is None) into a single driver _chapter(na_title, body, fold) in narrative_writer/fold.py; each _render_* is now a one-line _chapter call with its body moved to a _*_body helper. 5 chapter N/A titles verbatim; _render_fold_chapters signature and char_budget truncation semantics untouched. Leaky seam fixed: sections._short renamed to public short_text (def + 15 internal calls), fold.py/writer.py import sites updated (writer had 9 call sites). FoldProvider type alias moved to fold_source.py (producer side); writer.py and package __init__.py now import it from there; package public surface (FoldProvider, StepNarrativeWriter) unchanged. Tests: 3 new driver-level tests (five _render_*(None) -> exact 5 N/A titles; header=None degrades; body called when fold available); 41 passed (fold chapters + narrative writer + sections + all-tool-calls suites) + 19 passed (deriver plugins + cli journal steps consumers); ruff clean."
   }
  ]
 }
