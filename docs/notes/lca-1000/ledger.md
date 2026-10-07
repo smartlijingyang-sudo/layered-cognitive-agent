@@ -909,7 +909,7 @@
   5. deprecated/legacy/v1/v2（`_unwrap_v2` / `migrate_v1_to_v2` / `_is_bundle_graph_v2`）—— 驳回：ADR-0221 / ADR-0096 支撑的 load-bearing seam 与迁移路径。
   6. AST 同体扫描重跑：4846 函数、113 组，与 515 轮组集合逐成员一致 —— 无新候选；既往判例（507–515 沿用驳回）维持。
 - 验证结果: `~/.local/bin/ruff check` 2 文件 All checks passed；`ruff format --check` already formatted；导入冒烟：模块可 import、`hasattr(m, "parse_auth_config_ids")` 为 False、canonical 路径 `ComposioSettings.from_plugin_config(auth_config_ids='{"a":"1","b":""}')` 仍正确解析为 `{"a": "1"}`（空值过滤规则 intact）；targeted pytest 2 文件（tests/scenario/composio/test_composio_integration.py、tests/lca_plugins/transport/webserver/test_routes_composio.py）：12 passed。
-- commit: <待回填> refactor(lca-1000): 第0516轮 删除 composio env settings 中零调用的 parse_auth_config_ids 重复定义（未 push）。
+- commit: 6264c06f9 refactor(lca-1000): 第0516轮 删除 composio env settings 中零调用的 parse_auth_config_ids 重复定义（未 push）。
 - 备注: 只 add/commit 本轮 2 文件（代码 1 + ledger.md），`git commit -- <paths>` 显式路径；并发会话已 staged 的 2 个测试文件改动及 untracked（docs/notes/audit-2026-10-05.md、ralph/）全程未触碰；515 轮 hash 回填（ac4211cf3）属本 campaign 自有 bookkeeping，随本次一并提交（沿用 505–515 做法）。备份 /tmp/bak_0516_env_settings.py（252，改动前 env/settings.py）。scan0516.py/scan0516_out.txt/members515.txt/members516.txt 留本地 hidden_files/scratch（非仓库文件）。
 
 ## 第0517轮 (2026-10-07 00:33-00:53 CST)
@@ -941,5 +941,5 @@
   5. `_RoleConfig`/`_TextConfig`（prompts/sections/base.py）—— 驳回/Defer：`_RoleConfig` docstring 明确保留意图（"anchor plugin typing"）；`_TextConfig` 是否真死需进一步确证（defer，不硬删）。
   6. 其余 106 组 —— 与 0517 组集合逐成员一致（仅行号漂移；6 组消失系 raphy RA-016..RA-022 重构所致），既往判例（507–517 沿用驳回）维持。
 - 验证结果: `~/.local/bin/ruff check` All checks passed；`ruff format --check` already formatted；import 冒烟：模块可 import、`hasattr(m, "_PlaneAccess")` 为 False；targeted pytest 2 文件（tests/lca/infrastructure/attachment/test_default_provider.py、tests/lca/cognition/brain/test_reasoner_cloud_branch_renders_uploaded_files.py）：12 passed。
-- commit: <待回填> refactor(lca-1000): 第0518轮 删除 attachment role_renderer 中零引用的 _PlaneAccess Protocol（未 push）。
+- commit: 4720146f1 refactor(lca-1000): 第0518轮 删除 attachment role_renderer 中零引用的 _PlaneAccess Protocol（未 push）。
 - 备注: 只 add/commit 本轮 2 文件（代码 1 + ledger.md），`git commit -- <paths>` 显式路径；并发会话 raphy 在本轮期间 merge 了 raphy/arch-20261007-2315（RA-019/020/021/022）到 main，其文件全程未触碰；0517 台账 commit 已回填 9e102128d（recover commit，arguments.py 改动已在 main 上）；真0517（gate_chain_strategy._DecisionLike）已 moot——该 Protocol 已不在当前 main 上（10-07 raphy 重构中移除，无 cherry-pick 对象），待裁决事项 (a) 自然消解；(c) 本地 origin/main 引用仍异常（ahead 9 commits，含 raphy 的 merge 与我方 0514–0518），no-push 规则下不动，留待 Chao 裁决。备份 /tmp/bak_0518/role_renderer.py（252，改动前原文件）。scan0518.py/scan0518_out.txt/dead0518.py/patch0518.py 在 252 /tmp；patch0518.py 另存本地 hidden_files/scratch（非仓库文件）。教训：跨机器 sort 用 LC_ALL=C 统一 collation 否则 comm 误报；dead 扫描 refs=1 候选先看装饰器（pydantic/typer 假阳性成堆）；ssh252 外层输出带分支 banner，管道结果先 grep '^lca/' 再处理。
