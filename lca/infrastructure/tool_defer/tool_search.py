@@ -160,8 +160,6 @@ class ToolSearchTool(Tool):
                 "One of 'namespace' (str), 'namespaces' (list[str]) "
                 "or 'query' (str) must be provided"
             )
-        if shape.has_namespace and not isinstance(args["namespace"], str):
-            return "'namespace' must be a non-empty string"
         if shape.has_namespaces and not all(
             isinstance(x, str) and bool(x) for x in args["namespaces"]
         ):
