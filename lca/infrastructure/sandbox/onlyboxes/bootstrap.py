@@ -88,7 +88,7 @@ def parse_terminal_response(
     # ADR-0046 alignment: harvest artifact marker block from stdout
     cleaned_stdout, generated, diags = strip_artifacts(stdout)
     if diags:
-        stderr = stderr + "".join(diags)
+        stderr += "".join(diags)
 
     if cleaned_stdout:
         emitter.emit_stdout(cleaned_stdout)
