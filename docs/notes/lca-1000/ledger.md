@@ -1017,3 +1017,19 @@
 - 验证结果: `python3 scripts/check_protocol_schema_version.py` → PASS（修复前 FAIL，exit 1）；`~/.local/bin/ruff check` All checks passed；`ruff format --check` clean。
 - commit: 52cd8337c refactor(lca-1000): 第0523轮 跟随 journal/ 拆分更新 CI 门禁的过期 allowlist 路径（未 push）。
 - 备注: 只 add/commit 本轮 1 文件，`git commit -- <path>` 显式路径；开工/收工工作区干净（main，nothing to commit）。教训：ssh252 双引号包裹命令时外层 shell 会求值反引号——patch 字符串含反引号时改用无反引号子串替换（沿用 0521"heredoc 会被外层吃掉"教训）。
+
+
+## 第0524轮 (2026-10-08 04:03-04:12 CST)
+- 改了什么: 无代码改动。**本轮未发现新的实质机会**（依据 body 规则 4：不硬凑 trivial commit）。
+- 依据 skill 哪一节: SKILL.md Deletion test + LANGUAGE.md（load-bearing knowledge / interface 即 test surface / Two adapters = real seam）+ DEEPENING.md Seam discipline + poteto-mode（no-comments：只为 non-obvious why 保留注释；**No is an acceptable answer**）——见候选清单的驳回依据。
+- 关键设计决策（夜间跳过 grilling，记台账）: 首次完整裁决 `lca/contracts/harness/composition/plugin.py:36` 的 deprecated 别名块（ScopeKind/PluginKind/ProviderMode/ExtensionPoint/CapabilityGrant/PluginManifest，头注"kept for migration period; remove in Chunk 2"），**驳回/不动**——(a) 迁移期尚未结束：同文件 docstring 明确"After Chunk 5 migration, callers should use cordis.Context directly"，Chunk 5 未到，删除是提前拆除迁移桥；(b) 这是并发会话 cordis 迁移的在途设计（RA 系列/doctor 均在该区域活跃），不 re-litigate 并发会话的新鲜工作（沿用 0522 判例）；(c) deletion test 反向：迁移期的显式弃用声明本身就是 load-bearing interface 知识，不是死兼容路径。deslop 只清"无依据"的兼容，有明确迁移 horizon 的不动。
+- 候选清单（本轮 explore：AST 同体扫描 8397 函数/243 组 + dead-code 扫描 1931 候选名集合 + 真死扫描（lca+tests+scripts）17 候选 + 同名异体扫描 290 组 + deslop 清单 + 并发会话新鲜 diff 复查）:
+  1. AST 243 组 —— 与 0523 快照（/tmp/ast0523.txt）逐行一致，零新组（0522/0523 已逐组人工裁决）。注意：/tmp/h0522.txt 是 0517–0521 旧归一化的 107 组 hash，已废弃；本轮基线取 ast0523.txt。
+  2. dead 1931 候选名集合 —— 与 0522 逐成员一致；仅 `_format_location`/`_invoke_script`/`_remediation_for`（plugin_shape.py）行号 -2 漂移，系 d1844d36d 删 2 行所致，非新候选。
+  3. 真死 17 候选 —— 与 0522 裁决集合逐成员一致（`_RoleConfig` docstring 明确保留意图的静态锚点；`_coerce_dev_mode`/`_composio_root`/`_names_unique`/`_tupleize` 框架按名调用或保留；`_validate_*` ×12 全部 pydantic @field_validator/@model_validator classmethod 假阳性）。
+  4. sndb 290 组 —— 与 0522 输出逐行一致，无新可疑对。
+  5. deslop：TODO/FIXME/HACK 仅既往裁决项（expander.py 中文示例 XXX、s3.py ADR-0167 PR-10 占位）；noqa 全树 22 处逐条有明确依据（E402 模块导入顺序、S105 硬编码字面、S110 best-effort、S108 sandbox scratch、ASYNC230/240 纯 CPU、S603/S607 固定 argv 部署调用），不动；"kept for" 自承项全部有据（observability ADR-0055、derivers 测试/CLI replay、trace_inspector v2 replay、cli legacy alias、contracts Deprecated aliases 迁移期、_helpers/fact_reader replay/bundle 兼容）；except Exception 自 0523 起无新增（树仅 3 个 docs/CI/doctor 小提交）。
+  6. 并发会话：自 0523 轮后无新落盘（HEAD=f5898024d），工作区开工/收工均干净。
+- 验证结果: 无代码改动，无需验证门。扫描脚本全部 exit 0（ast0522/dead0522/dead0522b/sndb0522 确定性重跑）。
+- commit: 无代码 commit；本台账单独 docs commit（沿用 0521/0522/0523 `docs(lca-1000): 第NNNN轮台账` 模式）。
+- 备注: 只 commit docs/notes/lca-1000/ledger.md（`git add` + `git commit -- <path>` 显式路径）；开工前工作区干净（main，ahead 31，未 push，no-push 规则在）。扫描输出存 252 /tmp（ast0524_out.txt、dead0524_out.txt、dead0524b_out.txt、sndb0524_out.txt）。教训：ast0522.py 输出 hash 是 `h[:10]`（10 字符）而非 12 字符，grep 提取模式写错会导致空集合误判 diff——以后提取组键用 `^G ` 行全行比对或 awk 取第 3 列；/tmp/h0522.txt 是旧归一化基线，不要再用。
