@@ -321,3 +321,41 @@
   - ruff format 要求顶层 class 前两个空行：Protocol 类紧跟 `_log = ...`
     只空一行会被 reformat——seam 类定义时一次写对两个空行。
 ---
+
+## 2026-10-07 21:38 - RA-017
+
+- 新模块 `lca/session/surface_types.py`：`DEVELOPER_MESSAGE_TYPE =
+  "surface/developer_message"` + `DSH_SURFACE_EVENT_TYPES` frozenset——DSH 对齐
+  session surface 词表的 single source（ADR-0268 §6）。家选在 session 包内而非
+  run_session_writer：`lca/session` 从不 import `lca/runtime`（反向已有
+  runtime→session 边），放 writer 会造成包级双向依赖；也不放 fold 词表旁
+  （那是 spine category 词表，与 session event type 是两个命名空间）。
+- `lca/session/catalog.py`：`types.add("surface/developer_message")` 手写字面量删除，
+  改 `types.update(DSH_SURFACE_EVENT_TYPES)`；`known_session_event_types()` 现为
+  纯具名词表并集（验收 1/2）。
+- `lca/runtime/session/run_session_writer.py`：生产者侧两处字面量
+  （`_surface_event_to_message` 的 type 比对、`append_developer_message` 的
+  session.append）改用同一常量——新增 DSH surface 类型时只改 surface_types.py
+  一处，生产者与读路径闭集自动跟随。
+- 新增 2 测试：`test_known_types_is_pure_registered_vocabulary_union`
+  （闭集 == 五个具名词表并集，钉住"零手工字面量"）、
+  `test_dsh_surface_vocabulary_is_single_sourced`（writer 与 catalog 共用同一
+  常量对象）；`known_session_event_types()` 返回集合不变（验收 3）。
+- Files changed:
+  - `lca/session/surface_types.py`（新增）
+  - `lca/session/catalog.py`（import + 并集）
+  - `lca/runtime/session/run_session_writer.py`（生产者两处改用常量）
+  - `tests/observability/session/test_known_types_fail_closed.py`（2 新增）
+  - `raphy/prd.json`（RA-017 passes=true，文本级编辑排版零变化）、`raphy/progress.txt`
+- 测试：两验收文件 14 passed（含 2 新增）；`ruff check` touched 文件全过。
+  注：`ruff format --check run_session_writer.py` 仍 dirty，但系 HEAD 遗留（已验证
+  HEAD 版同样 dirty）；本轮把 format 顺手改的两处无关 hunk 已还原，diff 只含
+  story 改动。
+- **Learnings for future iterations:**
+  - prd.json 是 1 空格缩进：RA-016 用 `json.dumps(indent=2)` 整文件重排制造了
+    280 行噪音 diff——后续改 prd.json 一律文本级精准编辑（RA-017 已验证排版零变化）。
+  - "放在其它 surface 词汇旁"要先看命名空间：fold 的 SURFACE_EVENT_TYPES 是
+    spine category 闭集，session event type 是另一套——并列放一起是错的家；
+    层向检查（`lca/session` 从不 import `lca/runtime`）决定常量只能住在
+    session 包内或更底层。
+---

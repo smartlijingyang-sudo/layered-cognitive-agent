@@ -6,6 +6,7 @@ Known-type closure and read-path fail-closed validation.
 from __future__ import annotations
 
 from lca.contracts.harness.tasks.session import event_registry
+from lca.session.surface_types import DSH_SURFACE_EVENT_TYPES
 from lca_kernel.events.fold.fold import SURFACE_EVENT_TYPES
 from lca_kernel.events.payloads.spine import SPINE_EVENT_CATEGORIES, SPINE_EXECUTION_POINTS
 
@@ -32,8 +33,8 @@ def known_session_event_types() -> frozenset[str]:
     types.update(SURFACE_EVENT_TYPES)
     types.update(SPINE_EXECUTION_POINTS)
     types.update(SPINE_EVENT_CATEGORIES)
-    # RunSessionWriter 使用的 DSH 对齐 surface 词表（ADR-0268 §6）。
-    types.add("surface/developer_message")
+    # DSH 对齐 surface 词表（ADR-0268 §6）：具名词表单点，零手工字面量。
+    types.update(DSH_SURFACE_EVENT_TYPES)
     return frozenset(types)
 
 

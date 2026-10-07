@@ -263,7 +263,7 @@
         "known_session_event_types() return set unchanged; tests/observability/session/test_known_types_fail_closed.py and tests/session/test_session_public_api.py green; ruff check clean"
       ],
       "priority": 2,
-      "passes": false,
+      "passes": true,
       "branchName": "raphy/arch-20261007-2005"
     },
     {
