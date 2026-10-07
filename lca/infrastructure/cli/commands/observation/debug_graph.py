@@ -103,7 +103,7 @@ def build_debug_graph(events: list[dict[str, Any]]) -> dict[str, Any]:
         p = end_ev.get("payload") or {}
         elapsed = p.get("elapsed_ms", 0)
         dispatch = p.get("dispatch", "")
-        in_keys = list((p.get("inputs") or {}).keys())
+        in_keys = list(p.get("inputs") or {})
         outputs = p.get("outputs") or {}
         entry = {
             "marker": marker,

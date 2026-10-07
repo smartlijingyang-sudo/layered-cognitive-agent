@@ -28,7 +28,7 @@ class UnknownSessionEventTypeError(ValueError):
 
 def known_session_event_types() -> frozenset[str]:
     """本构建理解的 session event type 闭集（yaml/decorator 注册 + surface + spine EP）。"""
-    types = set(event_registry().keys())
+    types = set(event_registry())
     types.update(SURFACE_EVENT_TYPES)
     types.update(SPINE_EXECUTION_POINTS)
     types.update(SPINE_EVENT_CATEGORIES)

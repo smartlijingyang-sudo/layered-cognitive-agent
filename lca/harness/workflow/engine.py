@@ -33,7 +33,7 @@ class WorkflowEngine:
         if not meta.name or not meta.phases or len(phases) != len(meta.phases):
             raise ValueError("workflow needs a name and uniquely named phases")
         for phase in meta.phases:
-            unknown = set(phase.deps) - phases.keys()
+            unknown = set(phase.deps) - set(phases)
             if unknown:
                 raise ValueError(f"phase {phase.name} depends on unknown phases: {sorted(unknown)}")
         pending = {phase.name: set(phase.deps) for phase in meta.phases}
@@ -59,7 +59,7 @@ class WorkflowEngine:
         pending = set(phases)
         self._publish_progress(results, pending, on_progress)
         while pending:
-            ready = sorted(name for name in pending if set(phases[name].deps) <= results.keys())
+            ready = sorted(name for name in pending if set(phases[name].deps) <= set(results))
             tasks = {
                 name: asyncio.create_task(self._run_phase(meta, phases[name], results, worker))
                 for name in ready

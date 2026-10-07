@@ -115,7 +115,7 @@ def register(app: typer.Typer) -> None:
         if as_json:
             typer.echo(json.dumps(serialized, default=str, indent=2))
         else:
-            typer.echo(f"compiled: profile={profile_path} keys={sorted(serialized.keys())}")
+            typer.echo(f"compiled: profile={profile_path} keys={sorted(serialized)}")
 
     @app.command(name="kernel_check")
     def kernel_check(

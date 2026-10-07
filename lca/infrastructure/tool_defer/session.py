@@ -132,7 +132,7 @@ class ToolDeferSession:
             )
         raise ValueError(
             f"namespace {namespace!r} has no description in policy; "
-            f"known: {sorted(self._policy.namespace_descriptions.keys())}"
+            f"known: {sorted(self._policy.namespace_descriptions)}"
         )
 
     def _mcp_aliases(self) -> dict[str, str]:

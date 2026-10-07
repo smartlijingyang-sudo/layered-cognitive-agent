@@ -74,7 +74,7 @@ async def _office_has_content(runtime: Any, guest_path: str) -> bool:
     if not isinstance(data, dict):
         return bool(payload.get("success", True))
     if "slides" in data and isinstance(data["slides"], list):
-        return len(data["slides"]) > 0
+        return bool(data["slides"])
     if "headings" in data and isinstance(data["headings"], list) and data["headings"]:
         return True
     for key in _OUTLINE_EMPTY_KEYS:
@@ -82,7 +82,7 @@ async def _office_has_content(runtime: Any, guest_path: str) -> bool:
         if isinstance(value, int):
             return value > 0
         if isinstance(value, list):
-            return len(value) > 0
+            return bool(value)
     paragraphs = data.get("paragraphs")
     if isinstance(paragraphs, int):
         return paragraphs > 0

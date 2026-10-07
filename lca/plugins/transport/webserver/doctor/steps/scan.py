@@ -237,7 +237,7 @@ def _scan_xref(run_dir: Path, run_id: str, scan: StepScan) -> StepScan:
                     and ep.startswith("phase.")
                     and ep.endswith(".fold")
                 ):
-                    keys = tuple(sorted(payload.keys()))
+                    keys = tuple(sorted(payload))
                     phase_fold_payload_kinds.setdefault(ep, set()).add(str(keys))
                     if ep == "phase.think.fold":
                         kind = payload.get("objective_kind")

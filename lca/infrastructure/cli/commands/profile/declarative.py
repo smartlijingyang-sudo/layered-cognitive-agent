@@ -256,7 +256,7 @@ def register(app: typer.Typer) -> None:
                         "id": n.id,
                         "factory": n.factory,
                         "purpose": n.purpose,
-                        "config_keys": sorted(n.config.keys()),
+                        "config_keys": sorted(n.config),
                         # ADR-0219 §10.11: ``sub_spec_ref`` lives on the node
                         # itself, not under ``config``.
                         "sub_spec_ref": (

@@ -21,7 +21,7 @@ def summarize_args(args: Mapping[str, Any], *, limit: int = 200) -> str:
     """
     if not args:
         return ""
-    keys = list(args.keys())[:5]
+    keys = list(args)[:5]
     head = ", ".join(f"{k}={repr(args[k])[:32]}" for k in keys)
     if len(head) > limit:
         return head[:limit] + "…"

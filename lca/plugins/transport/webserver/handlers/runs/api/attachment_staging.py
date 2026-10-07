@@ -83,7 +83,7 @@ async def stage_machine_attachments(
                 AttachmentStagingFailed(
                     plane_id=machine.id,
                     error=f"{type(exc).__name__}: {exc}",
-                    failed_paths=tuple(files.keys()),
+                    failed_paths=tuple(files),
                     run_id=session.run_id,
                 )
             )
@@ -97,7 +97,7 @@ async def stage_machine_attachments(
                 AttachmentStagingFailed(
                     plane_id=machine.id,
                     error=error_msg,
-                    failed_paths=tuple(files.keys()),
+                    failed_paths=tuple(files),
                     run_id=session.run_id,
                 )
             )

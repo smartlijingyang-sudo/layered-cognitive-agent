@@ -77,7 +77,7 @@ class DeferPolicy:
 
     @property
     def known_namespaces(self) -> frozenset[str]:
-        return frozenset(self.namespace_descriptions.keys())
+        return frozenset(self.namespace_descriptions)
 
     @classmethod
     def default(cls) -> DeferPolicy:

@@ -95,7 +95,7 @@ def _walk_notes_tree(
         # Match the same shape as ``scripts/check_notes_tree.py``:
         # header three-line — line 1 title, line 2 blank, line 3 Status.
         lines = text.splitlines()
-        if len(lines) >= 3 and lines[1].strip() == "":
+        if len(lines) >= 3 and not lines[1].strip():
             status_match = _STATUS_LINE_RE.match(lines[2])
             if status_match is not None:
                 has_status = True

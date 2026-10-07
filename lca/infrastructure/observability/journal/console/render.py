@@ -57,7 +57,7 @@ def render_run_card(trace: dict[str, Any]) -> str:
     strategy = trace.get("strategy_key", "")
     status = trace.get("status", "")
     duration_s = trace.get("duration_s", 0.0)
-    header = f"{identity}" + (f" · {strategy}" if strategy else "")
+    header = str(identity) + (f" · {strategy}" if strategy else "")
     lines = [
         hr("run card"),
         _card_line(f"{header} · {status} · {duration_s:.1f}s · {trace.get('steps', 0)} steps"),

@@ -233,7 +233,7 @@ def _build_bundle_yaml(
     """
     module = f"lca_agent_presets.{preset_id}.plugins.{plugin_name}"
     meta_yaml_lines: list[str] = []
-    for key in sorted(plugin_meta.keys()):
+    for key in sorted(plugin_meta):
         value = plugin_meta[key]
         # 不做 YAML 转义——plugin_meta 的 value 通常是字符串/list/dict，统一交给 yaml.dump 处理
         meta_yaml_lines.append(f"        {key}: {_yaml_scalar(value)}")

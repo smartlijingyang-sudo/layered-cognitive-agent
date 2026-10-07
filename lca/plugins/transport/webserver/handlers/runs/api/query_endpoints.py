@@ -533,7 +533,7 @@ def _read_plugin_health(ctx: Any) -> dict[str, Any] | None:
         except Exception:
             resolved = None
         if resolved is not None:
-            catalog_ids = set(getattr(registry, "_plugins", {}).keys())
+            catalog_ids = set(getattr(registry, "_plugins", {}))
             for plugin in getattr(resolved, "plugins", ()):
                 marker = getattr(getattr(plugin, "definition", None), "marker_class", None)
                 if marker is None:

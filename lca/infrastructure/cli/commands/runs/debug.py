@@ -425,7 +425,7 @@ def _join_data_flow(
     """
     out: dict[str, list[str]] = {n["node_id"]: [] for n in nodes}
     for src in nodes:
-        src_outputs = set((src.get("outputs") or {}).keys())
+        src_outputs = set(src.get("outputs") or {})
         src_outputs.discard("_ts_in")
         src_outputs.discard("_ts_out")
         if not src_outputs:
@@ -465,7 +465,7 @@ def _layer_events(events: list[SpineRow]) -> dict[str, Any]:
             "execution_point": e.get("execution_point", ""),
             "outcome": e.get("outcome"),
             "when": e.get("when") or e.get("ts"),
-            "payload_keys": sorted((e.get("payload") or {}).keys()),
+            "payload_keys": sorted(e.get("payload") or {}),
         }
         for e in events
     ]

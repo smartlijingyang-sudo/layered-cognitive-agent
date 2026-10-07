@@ -42,7 +42,7 @@ def diagnose_alias(alias: str) -> DiagnoseReport:
 
 def list_diagnose_aliases() -> tuple[str, ...]:
     """所有内置 diagnose alias;按注册顺序。"""
-    return tuple(DIAGNOSE_ALIASES.keys())
+    return tuple(DIAGNOSE_ALIASES)
 
 
 __all__ = ["DiagnoseReport", "diagnose_alias", "list_diagnose_aliases"]

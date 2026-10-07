@@ -108,9 +108,9 @@ class AgentStateProjection:
             # ADR-0158 决策 四:final_output 不再是 agentState 字段;
             # view 不导出该键;调用方改读 TerminalOutcome.final_output_ref。
             "last_error": state.last_error,
-            "working_memory_keys": list(state.working_memory.keys()),
+            "working_memory_keys": list(state.working_memory),
             "history_length": len(state.history),
-            "extra_keys": list(state.extra.keys()),
+            "extra_keys": list(state.extra),
         }
 
 

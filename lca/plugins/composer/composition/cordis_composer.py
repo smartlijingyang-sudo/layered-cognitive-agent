@@ -183,7 +183,7 @@ class CordisComposer(Composer):
 
     def inspect(self, *, actor_role: str = "") -> InspectResult:
         entries: list[InspectEntry] = []
-        for key in sorted(self._meta_by_key.keys()):
+        for key in sorted(self._meta_by_key):
             meta = self._meta_by_key.get(key, {})
             name = key.split(":", 1)[-1] if key.startswith("plugin:") else key
             entries.append(
@@ -217,7 +217,7 @@ class CordisComposer(Composer):
 
     def _safe_context_keys(self) -> tuple[str, ...]:
         try:
-            keys = list(getattr(self._ctx, "own_bindings", {}).keys())
+            keys = list(getattr(self._ctx, "own_bindings", {}))
         except Exception:
             keys = []
         return tuple(sorted(keys))

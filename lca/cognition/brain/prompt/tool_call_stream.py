@@ -71,7 +71,7 @@ def pop_completed_slots(slots: dict[str, dict[str, Any]]) -> list[dict[str, Any]
     (无关事实正确性 —— 事件携带 ``run_seq`` 是真正的因果序)。
     """
     completed: list[dict[str, Any]] = []
-    for key in list(slots.keys()):
+    for key in list(slots):
         slot = slots.get(key)
         if slot is None or not slot.get("done"):
             continue

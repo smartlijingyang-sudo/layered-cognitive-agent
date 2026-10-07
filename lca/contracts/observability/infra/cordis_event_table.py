@@ -240,7 +240,7 @@ def lookup_cordis_name(execution_point: str) -> CordisEventTableEntry:
 
 def all_execution_points() -> tuple[str, ...]:
     """全部已登记 execution_point(快照)。"""
-    return tuple(_CORDIS_EVENT_TABLE_BY_EP.keys())
+    return tuple(_CORDIS_EVENT_TABLE_BY_EP)
 
 
 __all__ = [

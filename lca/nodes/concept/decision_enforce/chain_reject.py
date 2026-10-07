@@ -68,7 +68,7 @@ class GateChainRejectExecutor:
         enforced = input.port_values.get(PortName("enforced_decision"))
         _log.info(
             "gate.chain.reject port_values_keys=%s candidate=%r",
-            sorted(input.port_values.keys()),
+            sorted(input.port_values),
             candidate,
         )
         _log.info(

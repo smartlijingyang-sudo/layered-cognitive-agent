@@ -199,7 +199,7 @@ class RunBoundSandboxRuntime(SandboxRuntime):
         # Only remember keys on success: a failed stage must stay retryable on
         # the next ``ensure_ready`` instead of being skipped as already staged.
         if result.success:
-            self._staged_file_keys.update(new_files.keys())
+            self._staged_file_keys.update(new_files)
         return result
 
     async def _ensure_workspace_dirs(self) -> SandboxExecResult | None:
