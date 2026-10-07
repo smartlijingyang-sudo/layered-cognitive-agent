@@ -14,7 +14,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from lca.contracts.observability.cursor.loop_cursor import CursorSnapshot
-from lca.infrastructure.observability.loop_cursor.projections.langfuse_projection import (
+from lca.infrastructure.observability.loop_cursor.projection_derivers.langfuse_projection import (
     LangfuseProjection,
     langfuse_sdk_available,
 )

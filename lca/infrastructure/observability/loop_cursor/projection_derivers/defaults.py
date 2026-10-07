@@ -270,13 +270,13 @@ def default_exporter_definitions() -> list[LoopProjectionDefinition]:
     """
     # 局部 import 避免循环 + 与 metrics_projection / otel_projection
     # / langfuse_projection 模块加载顺序解耦(它们仅在 register 时需要)。
-    from lca.infrastructure.observability.loop_cursor.projections.langfuse_projection import (
+    from lca.infrastructure.observability.loop_cursor.projection_derivers.langfuse_projection import (
         LangfuseProjection,
     )
-    from lca.infrastructure.observability.loop_cursor.projections.metrics_projection import (
+    from lca.infrastructure.observability.loop_cursor.projection_derivers.metrics_projection import (
         MetricsProjection,
     )
-    from lca.infrastructure.observability.loop_cursor.projections.otel_projection import (
+    from lca.infrastructure.observability.loop_cursor.projection_derivers.otel_projection import (
         OtelProjection,
     )
 

@@ -24,7 +24,7 @@ from lca.infrastructure.observability.loop_cursor.projection.host import (
     FlushReport,
     StdProjectionHost,
 )
-from lca.infrastructure.observability.loop_cursor.projections.defaults import (
+from lca.infrastructure.observability.loop_cursor.projection_derivers.defaults import (
     default_projection_keys,
 )
 from lca.infrastructure.observability.spine.event.record import EventRecord
@@ -284,7 +284,7 @@ def test_default_projection_list_does_not_consume_close_ep() -> None:
         / "infrastructure"
         / "observability"
         / "loop_cursor"
-        / "projections"
+        / "projection_derivers"
         / "defaults.py"
     )
     source = defaults_path.read_text(encoding="utf-8")
@@ -345,11 +345,47 @@ def test_subscribe_changes_disposer() -> None:
     calls: list[dict[str, Any]] = []
     dispose = host.subscribe_changes(lambda v: calls.append(v))
     host.drive(_snap(), _record(ep="phase.think.fold", seq=1))
-    assert calls, "listener should fire on drive"
+    assert calls, "listener should fire when drive changes deriver state"
     dispose()
     calls.clear()
     host.drive(_snap(), _record(ep="phase.think.fold", seq=2))
     assert calls == []
+
+
+def test_subscribe_changes_no_fire_when_state_unchanged() -> None:
+    """RA-010:apply 返回等同 state 时 drive 不回调 listener。
+
+    change-gated 语义:``new_state != prev_state`` 为 False(等值新对象亦算
+    无变化)则不通知;但 snapshots 仍更新(view 语义不动)。
+    """
+
+    class _NoChange(LoopProjectionDefinition):
+        key = "nochange"
+        version = 1
+
+        def init(self):
+            return {"n": 0}
+
+        def apply(self, state, snapshot, record):
+            return {"n": 0}  # 等值新对象:!= 为 False,属无变化
+
+        def view(self, state):
+            return state
+
+        def restore(self, state):
+            return state
+
+    host = StdProjectionHost(initial=[_NoChange()])
+    calls: list[dict[str, Any]] = []
+    dispose = host.subscribe_changes(lambda v: calls.append(v))
+    try:
+        host.drive(_snap(), _record(ep="phase.think.fold", seq=1))
+        host.drive(_snap(), _record(ep="phase.think.fold", seq=2))
+        assert calls == [], "listener must NOT fire when no deriver state changed"
+        # 无回调不代表无推进:snapshots 照常更新
+        assert host.view_snapshot()["nochange"].seq == 2
+    finally:
+        dispose()
 
 
 # ── 6. restore ────────────────────────────────────────────────────────

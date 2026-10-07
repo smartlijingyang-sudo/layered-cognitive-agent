@@ -13,7 +13,7 @@ from datetime import UTC, datetime
 from typing import Any
 
 from lca.contracts.observability.cursor.loop_cursor import CursorSnapshot
-from lca.infrastructure.observability.loop_cursor.projections.otel_projection import (
+from lca.infrastructure.observability.loop_cursor.projection_derivers.otel_projection import (
     OtelProjection,
     otel_sdk_available,
 )
