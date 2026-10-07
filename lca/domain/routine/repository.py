@@ -48,7 +48,7 @@ class JsonRoutineRepository:
                 with file.open("r", encoding="utf-8") as fh:
                     data = json.load(fh)
                 routines.append(RoutineSpec.model_validate(data))
-            except (json.JSONDecodeError, OSError, ValueError):
+            except (OSError, ValueError):
                 continue
         return routines
 
@@ -86,7 +86,7 @@ class JsonRoutineRepository:
             with target.open("r", encoding="utf-8") as fh:
                 data = json.load(fh)
             return RoutineTrigger.model_validate(data)
-        except (json.JSONDecodeError, OSError, ValueError):
+        except (OSError, ValueError):
             return None
 
 
