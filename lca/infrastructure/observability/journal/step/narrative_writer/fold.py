@@ -128,7 +128,7 @@ def _render_prompt_sections(fold: FoldedModelVisible | None) -> list[str]:
         text_chars = section.get("text_chars")
         digest = section.get("content_digest") or ""
         digest_short = str(digest)[:16] if digest else "—"
-        chars_str = f"{text_chars}" if text_chars is not None else "?"
+        chars_str = str(text_chars) if text_chars is not None else "?"
         line = f"- `{name}` — text_chars={chars_str} digest={digest_short}"
         if section.get("skipped_empty"):
             line += " (skipped_empty)"

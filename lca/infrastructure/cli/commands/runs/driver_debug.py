@@ -311,8 +311,8 @@ def _boot_factory_index(profile: Path) -> dict[str, list[str]]:
             for node in cap_graph.get("nodes", []):
                 for cap in node.get("provides", []) or []:
                     if "::" in cap:
-                        out.setdefault(cap, []).append(f"{node['id']}")
-                        out.setdefault(f"{cap}.ref", []).append(f"{node['id']}")
+                        out.setdefault(cap, []).append(str(node['id']))
+                        out.setdefault(f"{cap}.ref", []).append(str(node['id']))
             return out
 
         return asyncio.run(_boot())
