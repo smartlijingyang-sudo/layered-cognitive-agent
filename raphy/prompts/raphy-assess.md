@@ -32,7 +32,11 @@ because the helpers are missing.
    
    If you cannot answer a question for an area, say which files you read and why the question doesn't apply — "didn't look" is not an answer.
 
-3. **Duplication scan (secondary, not primary)**: only AFTER the friction walk, grep for mechanical duplication. Duplication is the weakest finding class — it must not be the only class you return (see quota below).
+3. **Runtime verification (mandatory)**: static analysis is not enough. Actually RUN the agent core flows with the mock LLM and record what breaks:
+   `cd ~/layered-cognitive-agent && LLM_API_KEY=dummy python3 -c "import asyncio; from lca.application.api.api import Agent, ensure_default_ctx; from lca.infrastructure.llm_adapter.mock.llm import MockLLMAdapter; asyncio.run(main())"` where main() does ensure_default_ctx() then Agent(tools=[], llm=MockLLMAdapter()).run('smoke').
+   Minimum: (a) basic run reaches COMPLETED, (b) run with a tool call, (c) two sequential runs on one agent. Every crash/hang/silent-failure is a P0 candidate with repro. If hidden_files/runtime-findings-*.md exists, read it first; those outrank static findings.
+
+4. **Duplication scan (secondary, not primary)**: only AFTER the friction walk, grep for mechanical duplication. Duplication is the weakest finding class — it must not be the only class you return (see quota below).
 
 ### Phase 2 — Self-grilling (replaces the skill's interactive grilling loop)
 
