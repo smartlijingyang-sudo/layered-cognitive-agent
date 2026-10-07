@@ -72,6 +72,35 @@
   `next_retry_ms`/`last_error` 四 key 字面量散四处，无 module——真 friction
   但无失败证据，speculative，留待有 bug 时立案。
 
+- **daemon 观察路径仍绕行 lifecycle owner（RA-028 认领）：** RA-014 把 DaemonService
+  立为 daemon-lifecycle 唯一 owner 并委托了 start/stop，但 `CLIProvider.status()` 的
+  `_report_daemon_status` 仍直读 pid 文件（自家路径推导 `user.state_dir/connect.pid`
+  vs DaemonService 经 sudo 读 `/home/<user>/.lca/connect.pid`——两套推导可分歧 +
+  特权不对称），`_report_kernel_serve_status` 对 `DaemonService.state()` 已算好的
+  gateway check 再做一次 `http_ready` 探测，`heal()` 手写 stop+start 而 DaemonService
+  有 `restart()`。**与 RA-014/015 正交**（那两轮是 start/stop lifecycle），不是重审。
+- **journal `turn` 是 stringly 缝（RA-029 认领）：** `state.extra["current_turn"]`
+  魔法字符串，1 写方（`harness/projection/agent_state.py:70`）+ 2 读方
+  （`simple_body.py:230`、`nodes/think/llm/invoke.py:104`），各带静默 `.get(..., 0)`；
+  而同一 `AgentState` 上的兄弟维度 `state.step` 是具名字段。修法对标 RA-025
+  （`step_id_for`）：给 turn 具名 seam，静默 0 默认收进 seam 显式化。
+- **anomaly detector 误报风暴（RA-030 认领）：** 健康 run 数十条误报——`_check_stalled`
+  见跳号就报（spine 多生产者本就跳号）、`_check_collision` 见 span_id 重复就报
+  （关联事件复用 span_id 正常）、`_check_cycle` 在 `runtime.reducer.apply` 连续 2 次
+  就报（每事件必跑，构造性误报）。检测器模型与 spine 实际语义对不上；修完前
+  "anomaly_detector 刷屏"不作为真异常证据。
+- **运行时验证基线（2026-10-08 05:15，Round 8 复测，MockLLMAdapter，LLM_API_KEY=dummy）：**
+  basic / tool-call / 同一 agent 双 run 全 completed；非收敛 run（InfiniteMock +
+  max_steps=5）返回 failed Result 无抛错——**RA-023 修复生效**。`run(None)` TypeError
+  与 `NativeToolCall.arguments` 传 str 晦涩报错（10-07 P2）仍 defer 给 iter-quality。
+- **`NativeToolCall` wire 三字段的 getattr 死防御：** `project_llm_response` 里
+  `getattr(call, "wire_status", None) or "ok"` 三处，但类型是 frozen dataclass 具名字段，
+  getattr 永不 fallback——"类型保证 vs 防御式读取"矛盾，小杠杆未立案；以后 friction walk
+  见到可直接按诚实化修，不必开 story。
+- **`_handle_output_text_chunk` per-chunk 重查 bindings：** 函数内 import +
+  每 chunk `current_bindings_view()`，可能是"bindings 可热变"刻意设计，无失败证据，
+  观察中，未立案。
+
 ---
 
 ## Round 6 — assess (2026-10-07 23:15, branch raphy/arch-20261007-2315)
@@ -796,5 +825,42 @@
     评估只数了 fold.py；改名类操作必须覆盖所有调用方。
   - pytest 同一次调用传了不存在的目录会导致"no tests ran"零收集（exit 0 静默）；
     传参前确认路径存在，目录与文件混传本就按红线分开跑。
+---
+
+## Round 8 — assess (2026-10-08 05:06, branch raphy/arch-20261008-0506)
+
+- 按硬化版 `raphy-assess.md` 执行：读 `skills/improve-codebase-architecture/SKILL.md`；
+  `git log -40` 定热点；friction walk 精读三区（host_runtime providers 5 文件 +
+  daemon.py state/restart 对比 / brain/llm_turn 5 文件 + NativeToolCall 类型 /
+  simple_body.py dispatch 全路径 + current_turn 写读三方，5 问必答）；
+  mandatory runtime verification（mock LLM 真跑 4 场景）；duplication 副扫描；
+  self-grilling 写进 assessment.md；diversity quota 满足（3 friction，0 duplication）。
+- 热点来源：`providers/user_cli.py` ×3（2 笔 RA-014/015 自家 + 1 笔后续 fix，本轮只走
+  status/heal 观察路径，与 RA-014/015 正交）；`test_persist_before_execute.py` ×2
+  （生产侧 simple_body.py 无故事覆盖）；observability/adapters ×2 含 iter-tests revert
+  战，按禁区避开；其余热点均为 RA-023~027 领地。
+- 产出 3 个 stories（`passes: false`），续号 RA-028~030：
+  - RA-028（P1, Worth exploring）：CLIProvider daemon status/heal 改走 DaemonService
+    观察 seam——删 `_report_daemon_status`/`_report_kernel_serve_status` 私有推导与
+    `pid_alive` import，status 投影 `DaemonService.state()`，heal 走 restart 形状；
+    全仓 pid_alive 非 owner 直调只剩 user_cli.py:207 一处（孤例佐证）。
+  - RA-029（P2, Worth exploring）：journal `turn` 具名 seam——`state.step` typed vs
+    `turn` stringly 的不对称；1 写 + 2 读的魔法字符串 + 静默 0 默认收进 seam。
+  - RA-030（P2, Worth exploring）：anomaly detector 模型对齐 spine 语义——stalled/
+    collision/cycle 三检查在健康 run 上构造性误报数十条；修法按生产者追序列、
+    collision 只报并发 open、cycle 区分 per-event/per-turn EP。
+- **Top 推荐 RA-028**：RA-014 的组织结论已写好只是观察路径漏网，deletion test 最脆，
+  且有具体分歧 hazard（两套 pid 路径推导 + 直读/sudo 特权不对称）。
+- **运行时验证**：A basic ✅ completed / B tool-call ✅ completed / C 双 run ✅✅ /
+  D 非收敛 ✅ failed Result 无抛错（RA-023 生效）；anomaly_detector 健康 run 误报风暴
+  确认（stalled/collision/cycle 三类）。
+- **Learnings for future iterations:**
+  - Round 7 评估曾以"RA-014/015 已做"整体避开 user_cli.py——避开的是"领地"不是"文件"；
+    同一文件不同 seam（lifecycle vs 观察路径）可以正交立案，但必须在 assessment 顶部
+    Scope 写清正交性，避免后人误判重复立案。
+  - "类型保证 vs 防御式读取"矛盾（NativeToolCall wire 字段的 getattr）是诚实化小修，
+    杠杆不足单独立 story，但值得记入 patterns 供以后顺手修。
+  - 本机 /tmp 的脚本经 `ssh252 'python3' < /tmp/xxx.py` 走 stdin 传 252 最稳；
+    别在 252 侧用 python 读本机 /tmp 路径（上次 FileNotFoundError 翻车一次）。
 ---
 

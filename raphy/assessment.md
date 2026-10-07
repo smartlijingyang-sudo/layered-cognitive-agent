@@ -1,248 +1,216 @@
-# Raphy Assessment — Round 7 (2026-10-08 02:06, branch `raphy/arch-20261008-0206`)
+# Raphy Assessment — Round 8 (2026-10-08 05:06, branch `raphy/arch-20261008-0506`)
 
 ASSESS ONLY. 本轮按硬化版 `raphy-assess.md` 执行：读 `skills/improve-codebase-architecture/SKILL.md`
 → git log 热点定域 → CONTEXT.md + 相关 ADR → 三区 friction walk（5 问必答，端到端精读非 grep）
-→ mandatory runtime verification（mock LLM 真跑：basic / tool-call / 双 run + P0 复现）
-→ duplication 副扫描 → self-grilling → stories 入 prd.json（`userStories` 键，RA-023 起编号）。
+→ mandatory runtime verification（mock LLM 真跑：basic / tool-call / 双 run / 非收敛复现）
+→ duplication 副扫描 → self-grilling → stories 入 prd.json（`userStories` 键，RA-028 起编号）。
 
 ## Scope（YAGNI）
 
-`git log --oneline -70` 生产代码热点（排除已做故事领地 + 纯测试 + 禁区）：
-- `lca/infrastructure/host_runtime/providers/user_cli.py` ×3 → RA-014/015 已做，避开
-- `lca/infrastructure/observability/loop_cursor/projection/host.py` ×3 → RA-010/011 已做，避开
-- `lca/infrastructure/source_verify/verifier.py` ×2 → RA-016 已做，避开
-- `lca/infrastructure/tool_defer/tool_search.py` ×2 → RA-018 已做，避开
-- `lca/session/catalog.py` ×2 → RA-017 已做，避开
-- `lca/infrastructure/sandbox/runtime/runtime.py` ×2 → RA-020 已做，避开
-- `lca/plugins/session/*`（title_service/telemetry_capture/_shared）→ RA-019 已做，避开
-- `lca/plugins/transport/webserver/**` → lca-1000 活跃迁移领地（禁区），避开
-- `lca/cognition/memory/` → Round 2 冻结（禁区），避开
-- `gate_chain_strategy.py` → 他人工作（禁区），避开
+`git log --oneline -40` 生产代码热点（排除已做故事领地 + 纯测试 + 禁区）：
+- `lca/infrastructure/host_runtime/providers/user_cli.py` ×3 → 其中 2 笔是 RA-014/015 自己的
+  converge，第 3 笔是其后续 fix（`7aa5a7202` unlink tempfile in finally）。Round 7 评估曾整体避开，
+  但本轮 friction walk 只走**观察路径**（status/heal），RA-014/015 的 scope 是 start/stop
+  lifecycle——不重审已收敛部分，只看 RA-014 声明 seam 后**仍绕行**的 status/heal。
+- `lca/infrastructure/observability/adapters/policy.py` ×2 → 含 iter-tests 的 revert 战
+  （`3a7bc323a` 恢复 `e51902b07` 删掉的 else），iter lane 刚动过，避开。
+- `tests/integration/test_persist_before_execute.py` ×2 → persist-before-execute 是活跃 seam，
+  其生产侧 `lca/cognition/body/executor/simple_body.py` 无 raphy 故事覆盖，可走。
+- 其余热点（model_visible hook、schedulers、fold_source、tool_search）均为 RA-023~027 领地，避开。
+- 禁区遵守：ralph Round 2（DecisionGates / Ingest / ContextFiles shims / Read Runs micro-dirs /
+  `lca/cognition/memory/`）、lca-1000 迁移领地（`plugins/transport/webserver/`、`contracts/event.py`）、
+  `gate_chain_strategy.py`（他人工作）、`brain/decision_gates/`（Round 2 领地）。
 
-三区 friction walk 定域（全是近 40 commits 内动过、且无 raphy 故事覆盖的）：
-- **Area A**：事件总线 + model_visible（`lca_kernel/events/bus/bus.py` 721 行全文 /
-  `lca/plugins/events/hooks/model_visible/hook.py` 380 行全文 /
-  `lca/plugins/events/publishers/model_visible/publisher.py` 147 行全文）
-- **Area B**：双 tick 调度器（`lca/infrastructure/scheduler_file_lock.py` 97 行全文 /
-  `lca/infrastructure/cron/scheduler.py` 381 行全文 /
-  `lca/infrastructure/proactive/scheduler.py` 295 行全文）——lca-1000 第 0520 轮刚收敛文件锁
-- **Area C**：journal narrative fold 章节（`lca/infrastructure/observability/journal/step/narrative_writer/fold.py` 216 行全文）
+三区 friction walk 定域（精读文件，非 grep）：
+- **Area A**：host_runtime providers（`providers/user_cli.py` 225 行 / `shared.py` 258 行 /
+  `user_workspace.py` 57 行 / `user_account.py` 67 行 / `providers/__init__.py` 128 行全文）
+  + 对比 `lca/infrastructure/cli/services/daemon/daemon.py` 的 `state()`/`restart()`（200-262 / 85-164 行）。
+- **Area B**：`lca/cognition/brain/llm_turn/`（`executor.py` 195 行 / `mode.py` 18 行 / `policy.py` 37 行 /
+  `response_projection.py` 134 行 / `__init__.py` 18 行全文）+ `NativeToolCall` 类型定义
+  （`contracts/models/core/conversation/llm.py` 24-46 行）。
+- **Area C**：`lca/cognition/body/executor/simple_body.py`（399 行，dispatch_tool_calls 全路径精读）
+  + `state.extra["current_turn"]` 的写方（`harness/projection/agent_state.py:70`）与另一读方
+  （`nodes/think/llm/invoke.py:104`）。
 
-CONTEXT.md（13 行）已读：领域词汇只有"Profile 启动产物 / 程序化 Profile 输入 / StopPolicy"三条，
-本轮三区均不触及这些概念，无需增补。ADR 相关：ADR-0183/0184（bus）、ADR-0185（model_visible/fold）、
-ADR-0186（Session SSOT）、ADR-0263 §9（调度器锁）、ADR-0268（cron）——读了各文件头部的引用节，
-未重读全文（头部已把不变量写清）。
+## Friction walk — 5 问必答
 
-## Friction walk（5 问必答）
+### Area A：host_runtime providers（daemon 观察路径）
 
-### Area A — event bus + model_visible hook/publisher
+1. **理解一个概念要在多少小模块间跳？** "daemon 当前状态"要跳 4 处：`CLIProvider.status()`
+   → `_report_daemon_status`（直读 pid 文件）→ `DaemonService.state()`（另一套状态计算）
+   → `ServiceState`（`cli/service/service.py`）。同一个 daemon，两套状态推导。
+2. **shallow module？** `_daemon_service_for`（模块级函数，接口 `(config, user)` vs 实现 6 字段映射）
+   偏薄但 load-bearing（RA-014 的映射契约）；`_report_daemon_status` / `_report_kernel_serve_status`
+   是薄的重复推导——deletion test：删掉它们、改从 `DaemonService.state()` 投影，复杂度**收敛**
+   （少一套 pid 文件路径推导 + 少一次 gateway 探测）。
+3. **为可测试抽出的纯函数藏 bug？** `_stage_privileged_file`（RA-015）抽出后真正的 bug
+   （sudo 失败残留 tempfile）藏在**仪式内部**，`7aa5a7202` 事后才补 finally unlink——"抽出"没有
+   让 bug 更早暴露。不适用为新 story（已修复），记为教训。
+4. **leaky seam？** **有，RA-028 的核心**：RA-014 宣布 DaemonService 是"唯一 daemon-lifecycle owner"
+   并委托了 start/stop，但**观察路径仍绕行**：(a) `_report_daemon_status` 直读
+   `Path(self.user.state_dir) / "connect.pid"` + `pid_alive`，而 DaemonService 经 sudo 读
+   `/home/<user>/.lca/connect.pid`——"pid 文件在哪"是两套独立推导，home 定制时可分歧；
+   直读 vs sudo 读还有特权不对称。(b) `_report_kernel_serve_status` 用 `http_ready(health_url)`
+   再探一次 gateway，而 `DaemonService.state()` 已算好 gateway check——同一端点两次探测。
+   (c) `heal()` 手写 `stop_daemon(); start_daemon()`，而 DaemonService 有 `restart()`（= stop+start，
+   含 RA-006 的 single-instance 语义）——形状重复。(d) 全仓 `pid_alive` 的非 owner 直调只剩
+   user_cli.py:207 一处（daemon.py / lobehub.py 是各自 lifecycle owner，合法）。
+5. **不可测试/绕过接口测试？** `CLIProvider.status()` 的 daemon 分支今天只能靠磁盘上真实 pid
+   文件测（`test_private_pid_alive_replica_is_gone` 只钉"私有 replica 已删"，没钉"改走 seam"）；
+   若改从注入的 DaemonService 投影，fake DaemonService 可直接断言——"interface is the test surface"
+   在此成立。
 
-1. **理解一个概念要在多少小模块间跳？** 理解"一次 model-visible 事件如何发布"要在四处跳：
-   `hook.py`（capture_pre/post_llm 拼 payload）→ `publisher.py`（marker 类 + setup 注入 hook）→
-   `bus.py`（publish S1 鉴权→S2 回执→S3 落盘→S4 派发）→ `publishers/_session_publish.publish_via_session`
-   → `Session.append`（ADR-0186，不走 bus）。注意分叉：`bus.publish` 与 `publish_via_session`
-   是两条发布路径，而 `hook.before_publish`/`after_dispatch` 的占位方法暗示"未来走 bus pipeline"——
-   读者必须同时持有"现在走 session、未来可能走 bus"两套心智模型。
-2. **哪些 module 是 shallow？** ① `publisher._build_hook()`：单行 lazy import 包装，
-   interface == implementation；② `ModelVisibleHook.before_publish`/`after_dispatch`：
-   no-op 的 Protocol 形状占位，注释明说"为未来 PR 切 bus pipeline 形态时 0 改动"保留——
-   教科书式的 **one adapter = hypothetical seam**；③ `_coerce_tools`/`_coerce_messages`：
-   两份逐字相同的 4 行函数（见 duplication 扫描）。
-3. **为可测性抽出的纯函数 vs 真正藏 bug 的调用点？** `_canonical_digest`/`canonicalHeader`/
-   `headerEquals` 是纯的、可测的；真正的 bug 曾藏在 `capture_pre_llm` 的 fold-key/计数器时序里——
-   注释自证："此前先 +1 导致 key 恒为新 step，fold 分支不可达"。`_step_counter`/`_last_headers`/
-   `_resume_run_step`/`_last_step_id` 四个并行状态结构**没有 locality**，分散在 `__init__`/
-   `mark_resume`/`forget_run`/`capture_pre_llm` 四处。已修复且有注释钉住，本轮不 story，记一笔。
-4. **哪里 leak 过 seam？** ① **pydantic forward-ref 缺陷泄漏**：`lca_kernel/events/payloads/model_visible.py`
-   的 `AssistantRequestConfig`/`MessageDict`/`ToolCallDict`/`UsageDict` 只在 `TYPE_CHECKING` 块 stub 为
-   `Any`，字段却用字符串 forward-ref 声明——pydantic v2 不解析，缺陷泄漏到**两个**消费者：
-   `hook.py` 与 `fold_source.py` 各有一份 ~20 行 import-time `model_rebuild(force=True, _types_namespace=Any…)`
-   仪式，外加 `publisher.py` 的 eager import（`# noqa: F401` 自证 unused，纯为触发 hook 模块的副作用）。
-   缺陷的主人在 payloads 模块，补丁却住在消费者家里——**leaky seam** 实锤。② `_coerce_producer`
-   名字是 producer，却被 `subscribe(plugin=…)` 复用——命名泄漏，单点 cosmetic，不 story。
-   ③ `_canonical_digest` 内 `import json` 函数级导入（stdlib，无环风险，记一笔）。
-5. **哪些部分测不到 / 只能绕过 interface 测？** payloads 模块**无法独立测试**：不先 import hook 或
-   fold_source 触发 rebuild 副作用，直接实例化 payload 抛 `class-not-fully-defined`；
-   仪式是 import 顺序依赖的，测试"碰巧"通过取决于 conftest 的 import 顺序。这是 RA-024 的 testability gap。
+### Area B：brain/llm_turn
 
-### Area B — cron/proactive 双 tick 调度器
+1. **跳模块？** "一次 LLM turn"要跳：`execute_llm_turn` → `resolve_llm_turn_mode`（policy.py）→
+   `_stream_turn` / `_summarize_after_search` → `_handle_output_text_chunk`（内联 import
+   capability_bindings）→ `project_llm_response`。kwargs 袋（cursor/reasoner_prompt/history）
+   是约定式 seam，但那是 ADR spec section H 的显式设计（ContextVar 删除），属刻意，不立案。
+2. **shallow module？** `mode.py`（18 行，一个 StrEnum）+ `policy.py`（37 行，两个函数）——薄，
+   但 deletion test：删掉 → 模式判定逻辑散回 executor，**发散**，留着 earned。不立案。
+3. **纯函数藏 bug？** `project_llm_response` 内的 `getattr(call, "wire_status", None) or "ok"`
+   三处防御式读取——但 `NativeToolCall` 是 frozen dataclass，`wire_status/wire_reason/wire_raw_preview`
+   是**具名字段**（llm.py:24-46）。类型已保证，getattr 是死防御；更糟的是它暗示"字段可能不存在"，
+   而类型说"一定存在"——接口撒谎。小杠杆，不单独立案，记入本轮 learnings（诚实化候选）。
+4. **leaky seam？** `_handle_output_text_chunk` 每 chunk 一次函数内 import + `current_bindings_view()`
+   重解析 vocal_mode——capability_bindings 的 seam 形状可疑（per-chunk 重查），但 import 有缓存、
+   语义可能是"bindings 可热变"的刻意设计。无失败证据，不立案（记入观察）。
+5. **不可测试？** `_summarize_after_search` 与 `_stream_turn` 的"空响应恢复"是**两套不同形状**
+   （前者重 stream 3 次 `_POST_SEARCH_COMPLETE_RETRIES`，后者转 `llm.complete` 2 次
+   `_EMPTY_STREAM_COMPLETE_RETRIES`）——同一概念"LLM 空响应怎么办"两种恢复策略，分散在同一模块。
+   有收敛形状（统一恢复策略），但两处语义确有差异（summarize 本就是 non-stream），speculative
+   偏大，不立案；duplication 扫描亦只得 4 处语义各异的 retry loop（stream_event_manager /
+   casting），不成簇。
 
-1. **跳跃**：理解"一次 tick 如何互斥"现在只需读 `scheduler_file_lock.py`（收敛成功，locality 好）；
-   剩余跳跃在两调度器各自的 `_acquire_lock`/`release_lock` 直通对 vs `self._file_lock` 直接调用之间——
-   两层薄间接，理解"锁在哪"要多跳一次。
-2. **Shallow**：两个类里**逐字重复**的 `_acquire_lock`/`release_lock` 直通对——interface == implementation，
-   而真正的 seam（`SchedulerFileLock`）已经存在。另 `STALE_ABSOLUTE_CAP_S` 被两个 scheduler 模块
-   import 进 `__all__` 再经 `cron/__init__.py`、`proactive/__init__.py` 二次 re-export——
-   常量的主人是 `scheduler_file_lock`，两模块本体**零引用**（全仓 grep：除链条自身与定义处，零外部引用，
-   tests 亦无）。
-3. **纯函数 vs 调用点**：`next_run`（domain/cron）、`decide`（cognition/proactive）是纯的、有 locality；
-   bug 风险在 `_tick_locked` 的 `js` dict——`last_run_ms`/`attempts`/`next_retry_ms`/`last_error`
-   四个字符串 key 以字面量散落在 `_tick_locked`/`_run_job`/`_write_dead_letter`/`_prune` 四处，
-   state 记录没有自己的 module（无 locality）。无失败证据，speculative，本轮不 story，记一笔。
-4. **Leaky seam**：即上述 `STALE_ABSOLUTE_CAP_S` re-export 链——收敛 commit（8308bd07f）把实现收走了，
-   兼容垫片没带走。按 repo COMPAT 纪律（"兼容 shim 同 PR 可删"）本应在收敛时同删。
-5. **Testability**：`release_lock` 是公开面（`tests/integration/proactive/test_pipeline.py` 调 6 次），
-   `_acquire_lock` 是私有仅 tick 内用——不对称说明有机生长；state dict 的形状只能经 tick 集成测试
-   间接测，没有 interface。
+### Area C：body dispatch（persist-before-execute）
 
-### Area C — narrative fold 章节渲染
+1. **跳模块？** "journal 行上的 turn 是哪一轮"要跳：`simple_body.py:230`（读）→
+   `nodes/think/llm/invoke.py:104`（另一读）→ `harness/projection/agent_state.py:70`（唯一写方）
+   → `state.py:117`（`extra: dict[str, Any]` 无类型袋）。四跳才答得上来。
+2. **shallow module？** 两处读方各一行 `int(state.extra.get("current_turn", 0))`——接口（魔法字符串）
+   与实现一样复杂，deletion test：删掉任一处只是搬走约定，不收敛；**收敛点在给 turn 一个具名 seam**。
+3. **纯函数藏 bug？** 不适用（无为此抽出的纯函数）。
+4. **leaky seam？** **有，RA-029 的核心**：同一 `AgentState` 对象上，`step` 是具名字段
+   （`state.step`），`turn` 却是 `extra` 袋里的魔法字符串——同一 journal 行的两个维度，
+   一个 typed 一个 stringly，不对称 seam。写方（harness projection）与读方（cognition/body、
+   nodes/think）跨层靠字符串约定；`.get(..., 0)` 静默默认使"projection 没跑"变成 turn=0 的
+   脏行而非 fail-loud。`query.py` 里对袋内值做 `isinstance(value, int) and not isinstance(value, bool)`
+   防御，说明无类型袋以前咬过人。
+5. **不可测试？** "projection 缺席时 turn 回退到 0"今天只能靠"不跑 projection"测到——
+   接口上无 seam 可钉；具名化后可直接断言 seam 行为。
 
-1. **跳跃**：理解"fold 不可用时 narrative 显示什么"要读 5 个 `_render_*` 各自开头的 guard——
-   同一 `fold is None or fold.header is None` 仪式 ×5（标题各异）；理解单章实现要同时看 `fold.py`
-   与 `sections.py`（`_short` 是跨模块 import 的**私有**名字）。
-2. **Shallow**：5 个 guard 每个都是 `if …: return [f"…{_FOLD_NA}"]`——"本章的 N/A 策略"这个 interface
-   几乎等于一行 if 的 implementation；`_tool_name`/`_tool_description` 两份近乎相同的嵌套 Mapping
-   回退仪式（`function` 嵌套 key 的双层降级）。
-3. **纯函数 vs 调用点**：`_render_*` 全纯、可测性好；风险在 `_render_fold_chapters` 的 budget 截断手工会计
-   （`+1 for join newline`）——聚合器的字符会计没有 locality 到各章，但 budget 本就是聚合职责，不 story。
-4. **Leaky seam**：`from …sections import _short`——跨模块 import 私有名字，`_short` 的主人是 sections，
-   fold 应该走公开面或自有 helper；`FoldProvider` 类型别名定义在 fold.py（消费者侧）而非
-   `fold_source.py`（`FoldedModelVisible` 的生产者侧）——seam 放错边。
-5. **Testability**："fold 不可用→占位"是**一个**策略，却只能逐章测试（5 个测试钉同一策略）；
-   `_render_fold_chapters` 的聚合 interface 测不到单章 N/A 标题——策略没有单一测试面。
+## Runtime verification（mandatory，MockLLMAdapter，LLM_API_KEY=dummy）
 
-## Runtime verification（mandatory，真跑）
-
-环境：252，分支 `raphy/arch-20261008-0206`（== main `ca80cdd25`），`LLM_API_KEY=dummy`，MockLLMAdapter。
+沿用 `hidden_files/runtime-findings-20261007.md` 的配方（`Agent` + `ensure_default_ctx`）：
 
 | # | 场景 | 结果 |
 |---|------|------|
-| (a) | basic run：`ensure_default_ctx()` + `Agent(tools=[], llm=MockLLMAdapter()).run('smoke')` | ✅ completed |
-| (b) | tool-call run：CalcTool + OnceMock（首轮 tool_call，次轮收敛） | ✅ completed |
-| (c) | 同一 agent 连续两次 run | ✅ completed / completed |
-| **P0** | 非收敛 run：InfiniteMock（永远返回 tool_call）+ `max_steps=5` | ❌ **复现**：`await agent.run()` 直接抛 `lca.contracts.protocols.graph.errors.LoopObligationExceededError`（`phase.main.outer: edge 'act.main' → 'think.main' exhausted loop.maxIterations=24`），未返回 Result——与 2026-10-07 `runtime-findings-20261007.md` 一致，**未修复** |
+| A | basic run（`1+1等于几？`） | ✅ completed |
+| B | tool-call run（CalcTool，首轮 tool_call 次轮作答） | ✅ completed，工具执行 |
+| C | 同一 agent 两轮连续 run | ✅ completed / completed |
+| D | 非收敛 run（InfiniteMock + max_steps=5） | ✅ **failed Result，无抛错**——RA-023 修复生效（`LoopObligationExceededError` 被翻译进 `result.error`，日志 `status=failed max_steps=5`）|
 
-P0 新证据（本轮探针）：日志里框架自己记了
-`runtime_lifecycle … lifecycle_event=failed … status=failed max_steps=5`——框架**知道** run 失败了，
-但异常仍逃逸到调用方，没有翻译成 failed Result。另：`max_steps=5` 未在 5 步停下，
-graph 层 `loop.maxIterations=24` 先耗尽——**两套步数限制脱节**（agent 层 max_steps vs graph 层 loop bound）。
+**新发现（运行时，非静态）：** 健康 run 的 `anomaly_detector` 噪音比 10-07 记录的更严重——
+单轮 healthy run 数十条 `stalled`（sequence 只要跳号>1 就报，但 spine 多生产者/过滤本就跳号）、
+`collision`（span_id 如 `lca-seq-00000007` 在关联事件间复用，并非"同一 span 开两次"）、
+`cycle`（`runtime.reducer.apply` 连续出现 2 次就报，但它每事件必跑一次，consecutive_count=2
+是构造性误报）。检测器的事件/span/序列模型与 spine 实际语义对不上→ RA-030。
 
-## Duplication scan（secondary，friction walk 之后）
+## Duplication 副扫描
 
-- `hook.py`：`_coerce_tools`/`_coerce_messages` 逐字相同（4 行 ×2）→ 并入 RA-024
-- `step-{n:03d}` 派生 ×4：`hook._step_id_for` / `lca/plugins/primitive/llm_call/invoke.py:116` /
-  `lca/nodes/think/llm/invoke.py:190` / `lca/cognition/brain/reasoner/reasoner.py:232`；
-  其中 llm_call 与 reasoner 的 cursor→step_id 回退仪式（含 `step-unknown-{template_id}`）**逐字相同 7 行** → RA-025
-- `STALE_ABSOLUTE_CAP_S` re-export 链 4 处（2 scheduler 模块 + 2 包 `__init__`），零外部引用 → RA-026
-- `fold.py` N/A guard 仪式 ×5 → RA-027
-- `_acquire_lock`/`release_lock` 直通对 ×2 模块 → RA-026
-- 明确**不收敛**：bus.py 内部 helpers 各司其职；两 scheduler 的 tick 主体语义不同
- （cron：worker 槽/排队/重试；proactive：裁决/投递/死信）——强行收敛是 speculative
+- `for attempt in range(_*_RETRIES)` 4 处：语义各异（publish 重试 / post-search 重流 /
+  空流转 complete / casting），各有独立常量与 body——不成"同一仪式"簇，不立案。
+- `pid_alive` 非 owner 直调：全仓只剩 user_cli.py:207 一处——反向佐证 RA-028（leak 是孤例）。
+- `int(state.extra.get("current_turn", 0))` 2 处：是 RA-029 本体，不另立案。
+- 本轮 duplication  story：0（quota 要求至少一个 friction 非 duplication 故事——满足，三个全是 friction）。
 
 ## Candidate table
 
 | id | Files | Problem | Solution | Benefits（locality + leverage） | Strength |
 |----|-------|---------|----------|-------------------------------|----------|
-| RA-023 | `lca/agent/cognitive_agent.py`（run 路径）, `lca/framework/graph/interpreter.py` | 非收敛 run（真实 LLM 常见）直接把 `LoopObligationExceededError` 抛给调用方，拿不到 Result；`max_steps` 与 graph 层 `loop.maxIterations` 两套步数限制脱节（max_steps=5 实际跑了 24 次 graph 迭代） | 在 `Agent.run()` 建异常翻译 seam：graph 层机制错误 → failed Result（带 error 事实），`CancelledError` 继续透传；spike 定 max_steps 与 loop bound 的对齐方式（二选一：agent 层把 max_steps 翻译成 graph bound，或 run 内按 max_steps 主动终止） | **locality**：终止契约收进 run() 一处，调用方不再各自 try/except graph 内部错误；**leverage**：所有上层（Team pipeline、cron worker、handoff）免费获得 fail-closed | **Strong** |
-| RA-024 | `lca_kernel/events/payloads/model_visible.py`, `lca/plugins/events/hooks/model_visible/hook.py`, `lca/infrastructure/observability/replay/fold_source.py`, `lca/plugins/events/publishers/model_visible/publisher.py` | payloads 模块的 forward-ref 缺陷（TYPE_CHECKING stub 为 Any，字段字符串引用）泄漏到两个消费者：hook.py 与 fold_source.py 各有一份 ~20 行 import-time rebuild 仪式；publisher.py 的 eager import（`noqa: F401`）纯为触发副作用 | 缺陷在源头自愈：payloads 模块内一次 `model_rebuild(_types_namespace=Any)`（PR-0 shim，注记 delete-when：`lca_kernel.events.types` 真实类型落地）；删两处消费者仪式 + publisher 的 eager import；顺手收敛 `_coerce_tools`/`_coerce_messages` | **locality**：Any-pinning 住在类型的主人家里，消费者不再为别人的缺陷做 import-time 手术；**leverage**：未来第 3 个 payload 消费者 0 仪式；payloads 模块可独立测试 | **Worth exploring** |
-| RA-025 | `lca/plugins/events/hooks/model_visible/hook.py`（`_step_id_for`）, `lca/plugins/primitive/llm_call/invoke.py`, `lca/nodes/think/llm/invoke.py`, `lca/cognition/brain/reasoner/reasoner.py` | `step-{n:03d}` 约定四处独立派生；llm_call 与 reasoner 的 cursor→step_id 回退仪式（含 `step-unknown-{template_id}`）逐字相同 7 行——改格式要改四处，漏一处 fold key 对不上 | 给 step_id 格式一个 seam（如 contracts 层的 `step_id_for(n)` + `step_id_from_cursor(cursor, template_id)`），四处调用；spike 定落点（`lca/contracts/atoms/ids` 随 `new_id`，或 cursor 附近） | **locality**：step_id 形态单源，fold key/hook key/reasoner key 不再各自拼字符串；**leverage**：下次改格式（如下划线变体之争）只改一处 | **Worth exploring** |
-| RA-026 | `lca/infrastructure/cron/scheduler.py`, `lca/infrastructure/proactive/scheduler.py`, `lca/infrastructure/cron/__init__.py`, `lca/infrastructure/proactive/__init__.py` | lca-1000 第 0520 轮把文件锁收敛进 `SchedulerFileLock`，但收尾没做完：两调度器各留逐字相同的 `_acquire_lock`/`release_lock` 直通对；`STALE_ABSOLUTE_CAP_S` 被 4 处 re-export（2 模块 + 2 包 `__init__`），全仓零外部引用（含 tests） | 删私有的 `_acquire_lock` 直通（tick 内直调 `self._file_lock.acquire`）；`release_lock` 是公开面（test_pipeline.py 用 6 次）**保留**；删 4 处 `STALE_ABSOLUTE_CAP_S` re-export（`scheduler_file_lock` 自身保留） | **locality**：锁的 seam 只剩 `SchedulerFileLock` + 公开的 `release_lock`，无薄间接层；**leverage**：小，但这是"收敛做完"的诚实收尾，避免后人误以为旧路径还活着 | **Worth exploring** |
-| RA-027 | `lca/infrastructure/observability/journal/step/narrative_writer/fold.py`（+ `sections.py` 的 `_short`） | 5 个 `_render_*` 章节各重复 `fold is None or fold.header is None` 的 N/A guard（同一策略，5 个测试面）；`from …sections import _short` 跨模块 import 私有名字；`FoldProvider` 类型别名定义在消费者侧 | 章节注册表 + 单一 driver：`_chapter(title, render_body)`，driver 统一做 None-guard 与 N/A 标题；`_short` 公开化或 fold 自有；`FoldProvider` 搬到 `fold_source.py`（生产者侧） | **locality**："fold 不可用→占位"策略一处定义、一处测试；**leverage**：加第 6 章节不再复制 guard | **Worth exploring** |
+| RA-028 | `lca/infrastructure/host_runtime/providers/user_cli.py`, `lca/infrastructure/cli/services/daemon/daemon.py` | RA-014 把 DaemonService 立为 daemon-lifecycle 唯一 owner 并委托了 start/stop，但**观察路径仍绕行**：`_report_daemon_status` 直读 pid 文件（自家路径推导 `user.state_dir/connect.pid` vs DaemonService 的 sudo 读 `/home/<user>/.lca/connect.pid`——两套推导可分歧 + 特权不对称）；`_report_kernel_serve_status` 对 `DaemonService.state()` 已算好的 gateway check 再做一次 `http_ready` 探测；`heal()` 手写 stop+start 而 DaemonService 有 `restart()` | `status()` 的 daemon/gateway 部分改从 `self._daemon_service().state()` 投影（CLI-deployed 检查留 provider）；删 `_report_daemon_status`/`_report_kernel_serve_status` 私有推导与 `pid_alive` import；`heal()` 走 seam 的 restart 形状 | **locality**：daemon 状态计算只剩 lifecycle owner 手里一处；**leverage**：未来 daemon 健康信号（source drift、`next_action`）免费流进 provider status；status 可经注入的 fake DaemonService 测试（"interface is the test surface"） | **Worth exploring** |
+| RA-029 | `lca/harness/projection/agent_state.py`, `lca/cognition/body/executor/simple_body.py`, `lca/nodes/think/llm/invoke.py`, `lca/contracts/models/core/state/state.py` | journal 维度 `turn` 靠魔法字符串 `"current_turn"` 在无类型 `AgentState.extra` 袋里流转：1 写方 + 2 读方，各带静默 `.get(..., 0)`；而同一对象上的兄弟维度 `state.step` 是具名字段——不对称 seam；写方改键名/漏写时 journal 静默写 turn=0 脏行 | 给 turn 具名 seam（`AgentState.current_turn` 由 projection 填充，或 contracts 层 `turn_of(state)`，对标 RA-025 的 `step_id_for`）；两读方改走 seam；静默 0 默认收进 seam 做显式决策（session-bound 缺席则 fail-loud，unbound 单测才 0） | **locality**："turn 从哪来"一处定义；**leverage**：拼写错误变类型错误；turn 传播可端到端钉测试；`extra` 袋的其余 key 不动（scope 外） | **Worth exploring** |
+| RA-030 | `lca/plugins/observability/spine/derivers/anomaly.py` | 检测器的模型与 spine 实际语义对不上，健康 run 数十条误报：`_check_stalled` 见跳号就报（多生产者本就跳号）；`_check_collision` 见 span_id 重复就报（关联事件复用 span_id 是正常）；`_check_cycle` 在 `runtime.reducer.apply` 连续 2 次就报（它每事件必跑，构造性误报）。操作员被训练成无视 detector，真异常会被淹没 | 按实际语义重调模型：stalled 按生产者分别追踪序列或显式允许跳号；collision 只在"同一 span_id 并发 open 两次"时报（复用 `_check_stuck` 的 open-span 表）；cycle 区分 per-event EP 与 per-turn EP（per-EP 基线）；阈值保持公开具名 | **locality**："何为异常"的定义与现实在一处对齐；**leverage**：detector 从噪音变可信信号；"健康 run 零告警"可写成回归测试 | **Worth exploring** |
 
 ## Top recommendation
 
-**先做 RA-023**。它是本轮唯一的 Strong，也是两次运行时验证（10-07 findings + 本轮复现）钉住的真 P0：
-真实 LLM 不收敛是生产常见情况，框架内部已经知道 run 失败了（日志 `status=failed`），却把 graph 内部
-错误抛给业务调用方——调用方拿不到 Result，整个应用崩。这是"fail-closed"纪律在最关键的 seam
-（`Agent.run()`）上的缺口。RA-024 是第二顺位：leaky seam + testability gap 的教科书案例，
-修完后 payloads 模块第一次可独立测试。RA-025/026/027 是诚实的收敛收尾，按优先级 1-2 排。
+**先做 RA-028**。它是三者中最干净的 leaky seam：RA-014 已经把"谁拥有 daemon 生命周期"
+的组织结论写好了（DaemonService），只是观察路径漏网——"删掉私有推导，复杂度收敛进 owner"
+的 deletion test 是三者中最脆的。且它有具体的分歧 hazard（两套 pid 路径推导 + 直读/sudo
+读特权不对称），不是纯美学。RA-029 第二：不对称 seam 的证据确凿（`state.step` typed vs
+`turn` stringly 并排两行），修法小而明确。RA-030 第三：证据最生动（运行时亲眼所见的数十条
+误报），但 detector 阈值是行为变更，需要先定"何为正常"的基线，spike 成分稍大。
 
 ## Self-grilling
 
-### RA-023 — run() 非收敛异常翻译 + max_steps 对齐
+### RA-028 — CLIProvider daemon 观察路径改走 DaemonService seam
 
-- **Constraints**：`Agent.run()` 的公开契约是"返回 Result"（调用方不处理 graph 内部错误类型）；
-  `asyncio.CancelledError` 必须继续透传（取消语义不可吞）；`max_steps` 的用户语义（"最多 N 步"）不能
-  被悄悄放宽；interpreter 抛 `LoopObligationExceededError` 是机制层的合法行为（ADR 未禁止），
-  约束只在"谁翻译"不在"抛不抛"。
-- **Dependencies**：上游 `lca/agent/cognitive_agent.py:242`（run 只 catch CancelledError）；
-  下游 `lca/framework/graph/interpreter.py:387`（raise 点）；调用方：Team pipeline、cron worker、
-  handoff dispatcher——全部期望 Result。seam 移动后这些调用方**删** try/except 而非加。
-- **Shape of the deepened module**：run() 内建"终止翻译"：`except (LoopObligationExceededError, …)`
-  → 构造 failed Result（error 字段带 plan/edge/taken 事实，原异常进日志/回执，不丢诊断）；
-  max_steps 对齐二选一（spike 定）：（a）agent 层把 max_steps 换算成 graph loop bound 注入；
-  （b）run 循环内按 max_steps 主动 break 并合成 failed Result。seam 后面是 Result 构造器，
-  前面是调用方契约。
-- **Test survival**：现有 run 返回 Result 的测试必须全绿；新测试 = 10-07 findings 的 InfiniteMock
-  repro（`max_steps=5`）：断言返回 `status=failed` 的 Result 且**不抛**；另加 max_steps 生效测试
-  （实际步数 ≤ max_steps，或文档化两套限制的换算关系）。
-- **Deletion test verdict**：**concentrates**。删掉翻译 seam → 每个调用方各自 try/except graph 内部
-  错误类型（发散）；留着 → 终止语义一处定义。
+- **Constraints**：`Provider.status() -> StatusReport` / `heal(CheckResult) -> bool` 契约不变；
+  `user=None` 时 status 跳过 daemon 检查的行为不变；`test_private_pid_alive_replica_is_gone` 与
+  `test_kernel_serve_status_converges_on_http_ready` 的 pin 语义不违背（后者钉的是"不用 bespoke
+  curl 探针"，改走 `state()` 是更进一步的收敛，不开倒车）；RA-014 的"lifecycle owner"结论不重审。
+- **Dependencies**：上游 `DaemonService.state() -> ServiceState`（checks 含 daemon/gateway/cli/cli_sync，
+  读 pid 经 sudo）；下游 `CLIProvider.status()` 的调用方（HostEnvironment / doctor 链）——seam 移动后
+  它们拿到的 StatusReport 条目名可能变化（"daemon"/"kernel_serve" → state 的 check 名），需同步。
+  `heal` 的 bool 返回要从 ServiceState 映射（`is_running`）。
+- **Shape of the deepened module**：`status()` 内 `if self.user:` 分支改调
+  `self._daemon_service().state()`，把其 `daemon`/`gateway` check 投影成 StatusReport 条目；
+  `CLI-deployed` 检查保留（provider 属主）；`heal()` 调 `self._daemon_service().restart()` 并映射
+  bool。seam 后面是 pid 文件/sudo/探测细节，前面是 Provider 契约。
+- **Test survival**：现有 `test_cli_provider_daemon_delegation.py` 全绿（start/stop 委托测试不受影响）；
+  新测试：注入 fake DaemonService（`state()` 返回 canned ServiceState），磁盘无 pid 文件时
+  `status()` 仍正确报告——这是今天写不出来的测试（testability gap 的钉子）。
+- **Deletion test verdict**：**concentrates**。删掉 `_report_daemon_status`/`_report_kernel_serve_status`
+  → daemon 状态计算只剩 DaemonService.state() 一处；留着 → 两套推导永久并存。
 
-### RA-024 — payload forward-ref 在源头自愈
+### RA-029 — turn 具名 seam
 
-- **Constraints**：pydantic v2 行为不可改；`AssistantRequestConfig` 等四名在 PR-0 前恒为 `Any`
-  （TYPE_CHECKING 块是 mypy --strict 的 stub）；ADR-0185 §3.3 的 payload 字段语义不变；
-  `lca_kernel` 不能反向依赖 `lca`（层向）。
-- **Dependencies**：上游 `lca_kernel/events/payloads/model_visible.py`（两 payload 类）；
-  下游 hook.py（import-time ritual）、fold_source.py（import-time ritual）、publisher.py
-  （eager side-effect import）。改完后三处下游**删代码**，零行为变更。
-- **Shape of the deepened module**：payloads 模块尾部 `_self_heal_forward_refs()`：
-  对两 payload 类做一次 `model_rebuild(force=True, _types_namespace={四个名: Any})`，
-  失败记 debug 日志不挡 import（沿用现有 INTENTIONAL 语义）；注释写 delete-when
-  （`lca_kernel.events.types` 真实类型落地即删）。seam 后面是 pydantic 的 quirk，
-  前面是"import 即用"的干净模块。
-- **Test survival**：现有 hook/fold_source/publisher 测试全绿（行为零变更）；
-  新测试：**不 import 任何消费者**、只 `import lca_kernel.events.payloads.model_visible`
-  就直接实例化两 payload 类——这是今天写不出来的测试（testability gap 的钉子）。
-- **Deletion test verdict**：**concentrates**。workaround 从 3 个消费者收进 1 个类型主人；
-  删掉自愈 → 回到每消费者一份仪式（现状）。
+- **Constraints**：journal 行的 `(turn, step)` 二元维度语义不变；`state.extra` 袋不动（其余 key
+  各有 owner，scope 外）；projection 缺席的 unbound 单测仍要能跑（0 默认保留，但收进 seam 显式化）。
+- **Dependencies**：写方 `harness/projection/agent_state.py:70`（`session.created.v1` /
+  `turn.started.v1` 投影）；读方 `simple_body.py:230`、`invoke.py:104`；`AgentState` 定义
+  （`contracts/models/core/state/state.py`）。若选 `AgentState.current_turn` 字段方案，
+  注意 `AgentState` 可能是 frozen dataclass——字段加法 vs accessor 二选一 spike 定。
+- **Shape of the deepened module**：二选一（spike 定）：(a) `AgentState` 加 `current_turn: int | None`
+  可空字段，projection 填充，读方 `state.current_turn if ... else <seam默认>`；
+  (b) contracts 层 `turn_of(state) -> int` accessor（对标 RA-025 `step_id_for`），内部封装
+  袋读 + 默认策略。seam 后面是"projection 设没设"的知识，前面是两个读方。
+- **Test survival**：现有 persist/dispatch/session 测试全绿；新测试：projection 跑完后
+  `dispatch_tool_calls` 的 journal 行 turn 正确（端到端钉传播链）；另钉"袋缺席时 seam 的显式默认"。
+- **Deletion test verdict**：**concentrates**。"turn 从哪来"从 3 处魔法字符串收进 1 个 seam。
 
-### RA-025 — step_id `step-{n:03d}` 单源
+### RA-030 — anomaly detector 模型对齐 spine 语义
 
-- **Constraints**：`step-NNN` 字符串形态是 fold key/hook key 的匹配依据，字节形态不能变；
-  `step-unknown-{template_id}` 回退语义保留；`step_{n:03d}` 下划线变体（journal_fold 缺省、
-  writable_matrix）**不在 scope**（不同 surface，可能 load-bearing，本轮只观察）。
-- **Dependencies**：四处调用点（hook / llm_call / nodes/think / reasoner）；落点二选一
-  （spike 定）：`lca/contracts/atoms/ids`（随 `new_id`，底层无反向依赖）或 cursor 附近。
-  `_step_id_for` 的 docstring（"与 LoopCursor step_id 形态一致"）是约定唯一的文字记载，
-  收敛时把这句话搬进新 seam 的 docstring。
-- **Shape of the deepened module**：`step_id_for(step_index: int) -> str`（纯格式）+
-  `step_id_from_cursor(cursor, template_id: str) -> str`（cursor 缺席/异常 → 回退串，
-  收掉 llm_call 与 reasoner 的逐字 7 行）。seam 后面是 `:03d` 格式串，前面是四个调用点。
-- **Test survival**：现有 step_id 相关测试（fold key 匹配、hook 测试）全绿；
-  新测试：`step_id_for(3) == "step-003"` + `step_id_from_cursor(None, "t") == "step-unknown-t"`——
-  约定第一次有直接测试面。
-- **Deletion test verdict**：**concentrates**。格式知识从四处收进一处；删掉 → 回到改格式改四处。
-
-### RA-026 — 调度器收敛收尾
-
-- **Constraints**：`release_lock` 是公开面（test_pipeline.py 用 6 次），**保留**；
-  `SchedulerFileLock` 的语义（stale 收割记 warning）不动；ADR-0263 §9 不动。
-- **Dependencies**：两 scheduler 的 tick()（`_acquire_lock` 唯一调用方）；
-  `STALE_ABSOLUTE_CAP_S` 的 4 处 re-export——grep 证零外部引用，删无波及。
-- **Shape**：tick 内直调 `self._file_lock.acquire(now_ms)`；删两模块的 `_acquire_lock`；
-  删 4 处 re-export（模块 `__all__` 与包 `__init__` 同步清）。
-- **Test survival**：cron/proactive 调度器测试全绿；`grep -rn STALE_ABSOLUTE_CAP_S` 只剩
-  `scheduler_file_lock.py` 自身。
-- **Deletion test verdict**：**concentrates**（删的是薄间接层与死垫片，不是搬移）。
-
-### RA-027 — fold 章节 N/A 策略单源
-
-- **Constraints**：5 章节的 N/A 标题文案**逐字保留**（viewer 快照可能 pin 住）；
-  `char_budget` 截断语义不动；`_render_fold_chapters` 的聚合签名不动。
-- **Dependencies**：上游 `fold.py` 5 个 `_render_*`；下游 `writer._render_step`（调聚合函数）；
-  `sections._short`（私有，被跨模块 import）。
-- **Shape of the deepened module**：`_chapter(na_title: str, body: Callable[[FoldedModelVisible], list[str]])`
-  driver——None-guard 与 N/A 标题一处做，各章只给 body；`_short` 公开化（改名 `short_text`）
-  或 fold 自有 `_truncate`；`FoldProvider` 搬 `fold_source.py`。
-- **Test survival**：现有 narrative 测试全绿（文案逐字）；新测试：driver 级——
-  传 None 得 5 章 N/A 标题（一个测试钉整个策略，替代 5 个逐章测试）。
-- **Deletion test verdict**：**concentrates**。"fold 不可用→占位"从 5 处收进 1 处。
+- **Constraints**：8 个 detector 的 kind 名不变（下游可能按 kind 订阅）；阈值保持公开具名
+  （design §7.5.4.1）；`on_event` 的 fail-contained 语义（FD-2）不动；`bind_anomaly_sink` 不动。
+- **Dependencies**：上游 spine 事件流（EventRecord 的 sequence/span_id/execution_point 产生方）——
+  改模型前先确认"跳号正常""span_id 复用正常"是 spine 的**契约**而非巧合（读 spine 的 span/sequence
+  产生代码钉住）；下游 anomaly sink 消费者（日志/订阅方）——误报减少是纯收益。
+- **Shape of the deepened module**：`_check_stalled`：按 `(producer, sequence)` 分别追踪或显式
+  gap 容忍；`_check_collision`：复用 `_open_spans` 表，只在 span_id 已 open 未 close 时重复出现才报；
+  `_check_cycle`：EP 分两类（per-event 如 reducer.apply / per-turn），per-event 类要求更高
+  consecutive_count 或直接豁免。seam 后面是"何为正常"的基线，前面是 8 个 check 的统一形状。
+- **Test survival**：现有 anomaly deriver 测试全绿；新测试：用真实 healthy run 的事件流形状
+  （跳号序列、复用 span_id、per-event EP）喂 detector，断言零误报——这是今天写不出来的测试。
+- **Deletion test verdict**：**concentrates**。"何为异常"的定义从操作员的脑子里收进 detector。
 
 ## 丢弃（有证据）
 
-- `ConsumerHandle.unregister` no-op 占位：bus.py docstring 明说"框架不提供退订路径"——刻意设计，非 friction。
-- `_coerce_producer` 被 subscribe 复用：命名小瑕疵，单点、无杠杆，不开 story。
-- bus.py 的 ambient trace_id 三件套（set/reset/current）：与 `_resolve_trace_id` 解析链同模块是**好**的
-  locality，搬出去是发散。
-- `ProactiveScheduler` 的 stringly-typed `js` state dict：真 friction（key 字面量散四处、无 module），
-  但无失败证据，fix 形状 speculative——记入 patterns，留待未来有 bug 时立案。
-- `ModelVisibleHook` 的四并行状态结构（counter/headers/resume/last_step_id）：过去出过 fold-key bug
-  但已修复且注释钉住，无新证据，不开 story。
-- `run(None)` 的 TypeError、`NativeToolCall.arguments` 传 str 的晦涩报错（10-07 findings P2）：
-  真问题但属小 fail-loud 缺口，杠杆低于本轮 5 个——defer 给 iter-quality lane，不在本轮立案。
-- `step_{n:03d}` 下划线变体（journal_fold 缺省 / writable_matrix）：观察到，未立案（不同 surface，
-  可能 load-bearing）。
-- before_publish/after_dispatch 占位：hypothetical seam，按 YAGNI 应删——但它是 ADR-0185 PR-3 的
-  显式计划（"0 改动切换"），删了是跟 ADR 对着干；记入 patterns，PR-3 落地或流产时再议。
+- `NativeToolCall` 映射里的三处 `getattr(..., "wire_status", None) or "ok"` 死防御：类型是 frozen
+  dataclass 具名字段，getattr 永不 fallback——接口诚实化小瑕疵，单函数内、无杠杆，不开 story
+  （记入 learnings：以后 friction walk 见到"类型保证 vs 防御式读取"矛盾可直接按诚实化修）。
+- `_handle_output_text_chunk` 的函数内 import + per-chunk `current_bindings_view()` 重查：
+  可能是"bindings 可热变"的刻意设计，无失败证据，不立案，记观察。
+- `_summarize_after_search` vs `_stream_turn` 的两套空响应恢复（重 stream 3 次 vs 转 complete 2 次）：
+  语义确有差异（summarize 本是 non-stream），收敛形状 speculative，不立案。
+- retry loop 4 处（stream_event_manager / executor ×2 / casting）：各有独立常量与 body，
+  不是同一仪式，不成簇。
+- `ProactiveScheduler.js` state dict（patterns 已有）：本轮未新增证据，维持 speculative。
+- `ModelVisibleHook.before_publish`/`after_dispatch` 占位（patterns 已有）：ADR-0185 PR-3 未决，维持。
+- `run(None)` TypeError / `NativeToolCall.arguments` 传 str 晦涩报错（10-07 P2）：defer 给
+  iter-quality lane，本轮未立案（patterns 已有）。
+- `CLIProvider.provision()` 内 `self.run` 与裸 `subprocess.run` 混用：同一方法的两处 tsc 调用
+  走了不同进程 seam——真不一致，但属单方法内 hygiene，杠杆不足以单独立 story；RA-028 优化轮可顺手收敛。
+- Round 7 评估曾以"RA-014/015 已做"整体避开 user_cli.py：本轮 RA-028 只取**观察路径**
+  （status/heal），与 RA-014/015 的 start/stop lifecycle scope 正交，不属重审——此区分已在本
+  assessment 顶部 Scope 注记，避免后人误判为重复立案。
