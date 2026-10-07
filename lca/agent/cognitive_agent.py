@@ -32,6 +32,7 @@ from lca.contracts.models.team.partial.buffer import (
 from lca.contracts.models.team.role.team import RoleProfile
 from lca.contracts.models.team.run.context import RunContext
 from lca.contracts.protocols import AgentUnit, Runtime
+from lca.contracts.protocols.graph.errors import LoopObligationExceededError
 from lca.contracts.protocols.perceive.capabilities import HasHooks
 from lca.infrastructure.observability import (
     BoundObservability,
@@ -56,6 +57,32 @@ def _task_as_text(task: str | AgentMessage) -> str:
     if isinstance(task, AgentMessage):
         return agent_message_as_text(task)
     return task
+
+
+def _loop_obligation_failed_result(
+    err: LoopObligationExceededError,
+    *,
+    scope: RunScope,
+    partial_output: str,
+) -> Result:
+    """Translate a non-converging graph run into a fail-closed Result.
+
+    Preserves the mechanism facts (plan / edge / bound / taken iterations)
+    on ``Result.error`` and ``Result.extra`` instead of swallowing them.
+    ``Result.budget_used`` stays the zero Budget per the Result contract
+    ("non-COMPLETED runs carry the zero Budget").
+    """
+    result = Result.failed(f"{type(err).__name__}: {err}")
+    result.trace_id = scope.trace_id or ""
+    result.total_steps = err.taken or 0
+    result.output = partial_output or None
+    result.extra["loop_obligation"] = {
+        "plan_id": err.plan_id,
+        "edge": {"source": err.source, "target": err.target},
+        "max_iterations": err.max_iterations,
+        "taken": err.taken,
+    }
+    return result
 
 
 class CognitiveAgent(AgentUnit):
@@ -245,6 +272,19 @@ class CognitiveAgent(AgentUnit):
             finish_error = "canceled"
             iteration_outcome = "cancelled"
             raise
+        except LoopObligationExceededError as err:
+            # RA-023: the interpreter reports non-convergence by raising;
+            # the agent layer translates it into a failed Result
+            # (fail-closed) instead of letting a graph-internal error type
+            # escape run(). asyncio.CancelledError above still propagates
+            # untouched; other exceptions keep the fail-loud behavior below.
+            finish_status = TaskStatus.FAILED.value
+            finish_output = drain_run_partial()
+            finish_error = f"{type(err).__name__}: {err}"
+            iteration_outcome = "failure"
+            return _loop_obligation_failed_result(
+                err, scope=scope, partial_output=finish_output
+            )
         except Exception as err:
             finish_status = TaskStatus.FAILED.value
             finish_output = drain_run_partial()

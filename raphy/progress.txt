@@ -650,3 +650,41 @@
   四个场景，见上表）。
 - Commit：`chore: [raphy] assess - 5 architecture candidates`（未 push）。
 ---
+
+## 2026-10-08 02:40 - RA-023
+
+- **实现**：`CognitiveAgent._run_lifecycle_body` 建异常翻译 seam：`except LoopObligationExceededError`
+  → `_loop_obligation_failed_result()` 合成 failed Result（status=FAILED，error 带
+  `LoopObligationExceededError: plan/edge/taken` 事实，`extra["loop_obligation"]` 存
+  {plan_id, edge{source,target}, max_iterations, taken}，total_steps=taken，budget_used 保持零值
+  Budget（Result 契约：非 COMPLETED 即零值）；`asyncio.CancelledError` 仍在前置分支透传，
+  其他异常保持原 fail-loud（记 AgentRunFinished failed 后 re-raise）。
+- **max_steps 对齐（spike 结论）**：选评估二选一的方案 (a)——agent/runtime 层把 max_steps 翻译成
+  graph loop bound。新纯函数 `lca/framework/graph/loop_budget.py::clamp_loop_bounds(plan, max_steps)`，
+  `DeclarativeExecution.execute` 在 `lift_graph_spec` 后调用：每条 loop edge 的有效 bound =
+  `min(plan.loop.maxIterations, state.budget.max_steps)`，只收紧不放松。选 (a) 不选 (b) 的原因：
+  run() 的 execute() 是单次 await，agent 层无法在中途计数步数主动 break；graph 层是唯一能观察
+  loop take 的地方——复用现有 LoopObligationExceededError 机制而非另造步数计数器。
+  Frozen plan 用 model_copy，bindings 持有的编译产物不动。
+- **文件**：`lca/agent/cognitive_agent.py`（import + except 分支 + helper）、
+  `lca/loop/driver.py`（import + execute 内 clamp 3 行）、
+  新 `lca/framework/graph/loop_budget.py`（48 行）、
+  新 `tests/framework/graph/test_loop_budget.py`（5）、
+  新 `tests/agent/test_cognitive_agent_run_translation.py`（4）。
+- **验证**：E2E 复跑 10-07 P0 探针（InfiniteMock + max_steps=5）：`await agent.run()` 现在**返回**
+  `status=failed` 的 Result 不再抛（修复前：抛 LoopObligationExceededError，跑了 24 次 graph 迭代）；
+  框架日志仍自记 `lifecycle_event=failed status=failed max_steps=5`。9 新测试全绿；ruff 全绿；
+  `tests/agent + tests/framework/graph + tests/loop` 回归：227 passed，4 个 pre-existing 红
+  （test_gate_chain_annotations_resolve x1 + test_ports TestDedupInvariantHolds x3，干净树基线即红，
+  与本改动无关，未动）。
+- **Learnings for future iterations:**
+  - graph 层的 `EdgeLoopObligation.budget: "run.steps"` 只是 lift 期校验的声明字符串，
+    运行时无人消费——max_steps 与 loop bound 脱节的根因；不要假设声明即执行。
+  - Plan/PlanEdge/EdgeLoopObligation 全是 frozen pydantic：per-run 改 bound 必须 model_copy，
+    不能原地改；且 Plan 有"edge 引用已知节点"的 model_validator，单元测试造 Plan 要配齐节点。
+  - `_run_lifecycle_body` 的异常路径不碰 self 属性——translation seam 的单元测试可用
+    `CognitiveAgent.__new__` 裸实例 + fake execute 直接钉住，无需组装 Runtime。
+  - 252 上跑探针脚本要用 `PYTHONPATH=/home/lichao/layered-cognitive-agent`（裸 python3 找不到 lca 包；
+    pytest 能跑是因为 conftest/rootdir 路径）。
+---
+
