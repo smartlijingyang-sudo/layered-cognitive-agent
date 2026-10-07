@@ -81,7 +81,7 @@ def normalize_for_fingerprint(value: object) -> object | None:
         return value
     if isinstance(value, Mapping):
         normalized_mapping: dict[str, object] = {}
-        for key in sorted(value, key=lambda item: str(item)):
+        for key in sorted(value, key=str):
             if not isinstance(key, str):
                 return None
             normalized_value = normalize_for_fingerprint(value[key])
