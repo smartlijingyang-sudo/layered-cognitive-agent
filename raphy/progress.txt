@@ -1,404 +1,45 @@
-# Raphy Progress Log
-Started: 2026-10-06 (assess session)
-
 ## Codebase Patterns
-- Semantic-change safety: before trusting caller tests to pin a semantic, corpus-diff the REAL production literals (contracts event tables, kernel payload maps) old-vs-new. Test fixtures may use legacy shapes that pass under both semantics and give false confidence (RA-005: debug tests used unprefixed eps, production emits spine.-prefixed).
-- The codebase has an established "converge N identical X into one shared Y" idiom (git: ba2ad56c6 converged 8 `_fail` builders into `tools._shared.fail_observation`; 2a2059cca converged 5 `_emit` closures into `events.emit_fact_event`; 9fecd23a0 deduped `_latest_run` into `domain.latest_run`). New convergence stories should follow this exact shape: extract, delegate, grep-verify single call site, pin behavior with tests.
-- Assistant event emitters use a no-emitter-fallback seam: `if self._emit is None: log.info('<scope>.ep.no_emitter', ...)` else `self._emit(EVENT, payload.to_dict())`. The log scope string differs per caller (assistant.catalog / assistant.tool_overlay / assistant.skill_overlay) and must be preserved as a parameter, not hardcoded, when converging.
-- `tools._shared.fail_observation` is NOT behavior-identical to the `_fail` methods in `delegate_tool.py` (different Observation construction: payload=None/error=/extra= vs payload dict). Do not conflate them.
-- Round 2 (ralph) owns: DecisionGates flattening, Ingest pipeline, ContextFiles shims, Read Runs micro-dirs, full regression. `lca/cognition/memory/` is frozen per Round 2 AP-01. Raphy stories must not touch these.
-- Test commands: `uv run pytest <path> --no-cov -q`; lint: `uv run ruff check` on touched files.
-- `@plugin` discovery is per-module-single-setup (`profile/resolve/resolve.py` reads `getattr(module, "setup", None)` and id-checks it against the bundle entry): a table-driven loop inside ONE module cannot expose N registrations -- only the last survives. Converge plugin shells via a factory called once per thin module, never via a loop in one module. Gate-probe the discovery mechanism before choosing the shape (RA-008). Branch for this work: `raphy/arch-optimize` (created from main by the first optimize iteration).
+
+（raphy 轮共享的模式/禁区登记，供后续 assess/optimize 轮参考）
+
+- **禁区（ralph Round 2 领地 + 冻结区）：** DecisionGates、Ingest、ContextFiles shims、
+  Read Runs micro-dirs（`plugins/transport/webserver/read/runs/`）、MemoryTools directory seam
+  （`infrastructure/tools/assistant/`）、`lca/cognition/memory/`（Round 2 AP-01 冻结）。
+- **禁区（活跃迁移领地）：** lca-1000 轮（`contracts/event.py` PILOT 事件分类法、
+  `plugins/transport/webserver/` 退休 stub 删除）；iter lanes 2026-10-07 刚动过
+  `DelegationCacheHit` 接线，RA-012 开工前先 `git log` 确认无并发修改。
+- **禁区（他人工作）：** `gate_chain_strategy.py` 绝不动（2026-10-07 09:00 轮事故：
+  误 `git checkout --quiet .` 抹掉他人未提交改动；铁律：绝不以任何命令丢弃他人未提交内容）。
+- **刻意规则：** CLI surface 不 import contracts（`projection.py:22-23` 注释）；
+  `CursorRecord` 类级 `_cursor` 是 ADR-0185 spec section H 显式 DI；
+  `_snapshot_from_state` 是包内刻意 internal seam（防两 cursor 实现漂移）。
+- **已收敛 idiom：** "converge N identical X"（RA-001/RA-002/RA-008 及 iter-quality 的
+  `_TURN_ENDED`、`add_observer_hook` 守卫、`_session_id`/`_turn_of` 等）；新 duplication
+  候选先确认真有簇（`CacheConfig(enabled=False)` 全仓一处 → 不开 story）。
 
 ---
 
-## 2026-10-06 - ASSESS (fresh session)
+## Round 3 — assess (2026-10-07 09:30, branch raphy/arch-20261007-0930)
 
-**Skill used:** `skills/improve-codebase-architecture/SKILL.md` (Explore + Present phases).
-
-**Scoping (YAGNI):** Walked `git log --oneline` back ~40 commits (all 2026-10-06). Hot spots: test pinning across `tests/` (guard branches, fake alignment), `lca/infrastructure/assistant/` + `lca/infrastructure/tools/` convergence refactors, `lca/contracts/observability/cursor/`, `lca/plugins/transport/webserver/`, cron dedupe. Read `CONTEXT.md` domain glossary before judging. Avoided ralph Round 2 areas.
-
-**Candidates presented:**
-
-| Files | Problem | Solution | Benefits | Strength |
-|---|---|---|---|---|
-| `lca/plugins/domain/assistant/catalog/events.py`, `lca/plugins/assistant/tool/overlay.py`, `lca/plugins/assistant/skill/overlay/overlay.py` | 7 `_emit_*` methods share an identical no-emitter-fallback seam (None check + log.info + emit); fallback logic edited in 3 files today means 3 edits | Extract one shared seam taking the log scope as a parameter; all 7 delegate to it | Locality: fallback behavior lives in one module; leverage: future event types get the seam for free; testable through the single seam | **Strong** |
-| `lca/infrastructure/tools/collaboration/delegate_tool.py` (L127, L213) | Two character-identical `_fail(self, start, message)` methods in two tool classes of the same module | Extract module-level `_fail_observation(start, message)`; both classes call it | Locality: Observation construction in one place; matches the ba2ad56c6 idiom | **Strong** |
-| `lca/plugins/events/hooks/model_visible/adapter.py` (`_emit_lifecycle_pre/post/fail`) | Three functions repeat `step = hook._step_counter` + deferred `lifecycle_emit` import + single call | Unify behind one dispatch seam | Less duplication than it looks (different signatures/targets); only if the unified seam is genuinely simpler | **Worth exploring** |
-
-**Top recommendation:** RA-001 first. It is the largest instance of the codebase's own convergence idiom (7 methods, 3 files, one seam), passes the deletion test cleanly, and its acceptance criteria are mechanically verifiable (grep for single `ep.no_emitter` call site). RA-002 is the same idiom at smaller scale. RA-003 is the weakest — flagged as droppable if the seam doesn't simplify.
-
-**Stories written to `raphy/prd.json`:** RA-001 (P1), RA-002 (P2), RA-003 (P3). All `passes: false`. Branch: `raphy/arch-optimize`.
-
-**Learnings for future iterations:**
-- When converging, always diff the supposedly-identical bodies field by field first (RA-002 vs `tools._shared.fail_observation` looked the same until the Observation kwargs were compared).
-- The `## Codebase Patterns` section above is the shared memory; add genuinely reusable idioms only.
----
-
-## 2026-10-06 21:5x - RA-001 (fresh session)
-- Converged 9 no-emitter-fallback `_emit` methods into one shared seam
-  `lca/plugins/assistant/events/_events.py::emit_assistant_ep_or_log(emit_fn, scope, event, payload)`.
-  Story listed 7 (domain/catalog x3, tool/overlay x1, skill/overlay x3); evolve._emit and
-  jobs._emit were the same seam shape (event+Mapping instead of payload.to_dict()) and
-  criterion 5 demanded a single `ep.no_emitter` call site repo-wide, so all 9 now delegate.
-- Seam home chosen: `_events.py` — all 5 caller files already imported from it, zero new
-  import edges, no plugin->plugin cycle. Follows the `emit_fact_event` convergence idiom
-  (2a2059cca) in the same module, including the Chinese docstring style.
-- Per-caller log scope preserved as a parameter: assistant.catalog / assistant.tool_overlay /
-  assistant.skill_overlay / assistant.evolve / assistant.jobs — emitted `<scope>.ep.no_emitter`
-  event string unchanged. `payload.to_dict()` still passed by the 7 typed-payload callers;
-  evolve/jobs pass their Mapping through (seam does `dict(payload)` internally, identical).
-- Removed now-unused `import structlog` + module logger from domain/catalog/events.py
-  (ruff --fix added the blank line); other 4 files still use their loggers elsewhere.
-- Files changed: lca/plugins/assistant/events/_events.py (+seam),
-  lca/plugins/domain/assistant/catalog/events.py, lca/plugins/assistant/tool/overlay.py,
-  lca/plugins/assistant/skill/overlay/overlay.py, lca/plugins/assistant/evolve/evolve.py,
-  lca/plugins/assistant/jobs/jobs.py, raphy/prd.json, raphy/progress.txt
-- Verified: grep `ep.no_emitter` -> single code call site (in the seam); zero remaining
-  inline `if self._emit[(_fn)] is None` blocks in converged files.
-- Tests: 237 passed (test_catalog/test_tool_overlay/test_skill_overlay/test_evolve/test_jobs
-  + 3 architecture invariant suites + deploy/test_lca_assistant_events), `uv run ruff check`
-  clean on all 6 touched files.
-- **Learnings for future iterations:**
-  - When a story says "N identical X", grep the whole repo for the pattern string before
-    scoping — the assess session found 7, the seam string `ep.no_emitter` revealed 2 more
-    (evolve/jobs) that criterion 5 required converging anyway.
-  - Seam-signature trick: take the already-normalized form (`Mapping` payload dict) as the
-    parameter, not the pre-normalization object — lets typed-payload and dict callers share
-    one seam without overloads.
-  - structlog logger name moves with the log call into the seam module; only the event
-    string is the observable contract — no test asserted on logger names here, but check
-    before assuming.
----
-
-## 2026-10-06 21:49 - RA-002 (fresh session)
-- Converged two character-identical `_fail` methods in
-  lca/infrastructure/tools/collaboration/delegate_tool.py into one module-level
-  helper `_fail_observation(start, message)`. Both TeamCastTool and
-  HandoffToPeerTool call sites redirected; both `def _fail` methods deleted
-  (grep confirms only the helper definition remains).
-- Helper docstring explicitly warns it is NOT behavior-identical to
-  tools._shared.fail_observation (different payload shape) to prevent future
-  conflation — the assess session's key gotcha for this story.
-- Files changed: lca/infrastructure/tools/collaboration/delegate_tool.py
-  (+12/-22), raphy/prd.json, raphy/progress.txt
-- Verified: `uv run pytest tests/infrastructure/tools/ --no-cov -q` -> 150 passed;
-  `uv run ruff check` clean on the touched file. Observation payload shape
-  unchanged (method body moved verbatim).
-- **Learnings for future iterations:**
-  - When a story's grep criterion uses a substring pattern (`def _fail`), the new
-    helper name (`_fail_observation`) will still match it — verify with the full
-    line context, not just the count.
-  - Mechanical moves (method -> module function, body verbatim) need no new
-    behavior-pinning test; the existing suite passing is sufficient evidence.
----
-
-## 2026-10-06 21:5x - RA-003 (fresh session) - DROPPED
-- Investigated unifying `_emit_lifecycle_pre/post/fail` in
-  lca/plugins/events/hooks/model_visible/adapter.py behind one dispatch seam.
-  Verdict: **dropped, not forced** — the three phases need genuinely different seams.
-- Evidence:
-  - pre: `(hook, kwargs)` -> `_model_identity(kwargs)` -> `request_model(turn, step, provider, model)`
-  - post: `(hook, response)` -> `_tool_calls_payload` + text/usage extraction ->
-    `complete_model(turn, step, usage, content, tool_calls)`; carries a behavior-critical
-    docstring (appending here duplicates every turn in derive_messages) that must stay
-    with the phase, not a generic seam.
-  - fail: `(hook, error)` -> `fail_model(turn, step, error)` direct passthrough.
-  - Shared scaffolding is 2 lines of idiom (`step = hook._step_counter` + deferred import),
-    and the three deferred imports bind DIFFERENT names — not even the import is shared.
-  - A unified seam would need getattr string-dispatch or Callable+**kwargs threading:
-    explicit, type-safe direct calls traded for indirection. Deletion test fails.
-  - Closed phase set (exactly pre/post/fail); no future-phase leverage.
-- No code changed. Targeted tests: 229 passed, 1 pre-existing unrelated failure
-  (tests/scenario/profile/test_profile_resolve_boot.py — lca_kernel.boot.boot missing
-  attribute, zero tracked modifications in tree, unrelated to model_visible).
-- prd.json: RA-003 `"dropped": true` with reason in notes; `passes` left false per
-  the no-fake-pass rule.
-- **Learnings for future iterations:**
-  - "Same shape" != "same seam": diff the imported names and call signatures before
-    claiming duplication — here the imports differed, which kills the unification case.
-  - A docstring that documents a behavioral trap (double-append) is load-bearing;
-    converging the function would orphan or dilute it. Check for such docstrings
-    before converging.
-  - When the assess session flags a story "worth exploring / droppable", the explore
-    step is real work: investigate, decide, record — dropping with evidence is a
-    completed iteration, not a skipped one.
----
-
----
-
-## 2026-10-06 23:3x - ASSESS Round 2 (fresh session, hardened prompt 9d379ffe2)
-
-**背景：** 用户 23:02 质疑首轮评估太浅 → `raphy-assess.md` 硬化（强制 friction walk 5 问必答、self-grilling、
-diversity quota）。23:00 轮开跑时旧 prompt 已被主 agent 换成新版（commit 直接落在
-`raphy/arch-20261006-2301` 分支上）；本轮评估零产物提交过，直接按新 prompt 做深挖（= 用户要的"重跑深挖"，
-一次迭代、一次提交，不做两次）。
-
-**Skill:** `skills/improve-codebase-architecture/SKILL.md`（Explore + Present；helper skills 不存在，按 prompt 内嵌词汇表执行）。
-
-**Scoping (YAGNI):** `git log --oneline -40 --name-only -- lca/` 热点计数。排除 ralph Round 2 领地
-（`tools/assistant/memory_tools.py`="MemoryTools directory seam"、`webserver/read/runs/`="Read Runs micro-dirs"、
-`memory/contextfiles/`="ContextFiles shims"）、`lca/cognition/memory/` 冻结（AP-01）、首轮已收敛的
-`plugins/assistant/*`。三区并行精读：composer（`lca/plugins/composer/`）、CLI 投影
-（`_shared/projection.py` + `observation/debug_graph.py`）、daemon（`cli/services/daemon/daemon.py`）。
-
-**Stories written:** RA-004（P1 Strong：删 `debug_graph._load_events` 私有复刻——丢 `isinstance` 守卫的真 bug）、
-RA-006（P2 Strong：daemon "单活"不变量无 owner，`_kill_existing` 接缝）、RA-008（P3 Strong：
-三 provider 壳表驱动，先测 `@plugin` 发现机制）、RA-005（P4 Worth exploring：projection 两张域表统一，
-**禁 import contracts**）、RA-007（P5 Worth exploring：`_spawn` 脚本模板泄漏）、RA-009（P6 Worth exploring：
-`llm._inner` 接缝硬化，含 spike）。Diversity quota：5/6 来自 friction walk，仅 RA-008 为 duplication 类。
-
-**Learnings for future iterations:**
-- CLI surface 不 import contracts 是刻意规则（projection.py:22-23 注释）：看到"镜像"先读注释。
-- 共享接缝的私有复刻会静默腐烂（丢守卫）；import 名门限的治理脚本看不见它。
-- "sleep(0.5) restart" = 不变量无 owner 的症状：给不变量找家，不调大 sleep。
-- `@plugin` 动态注册先测发现机制再收敛。
-- 简报路径可能错（`plugins/composition/composer` 实为 `plugins/composer`）：story Files 以实测为准。
----
-
-## 2026-10-06 23:54 - RA-004
-- Deleted the `debug_graph._load_events` private fork
-  (lca/infrastructure/cli/commands/observation/debug_graph.py:46-62); both
-  `debug_graph_cmd` and `debug_graph_command` now call the shared
-  `load_spine_events` from `lca/infrastructure/cli/commands/_shared/projection.py`.
-- The shared loader already had the `isinstance(obj, dict)` guard
-  (projection.py:95-96) the fork dropped; path resolution (cwd-relative
-  `traces/`) and fail-soft semantics (missing file / bad JSON -> []) are
-  identical, so the two call sites needed no other change. `import json` stays
-  (json.dumps in render_human/register); `spine_filename_for_run_cwd` import
-  stays (used in the 'no spine at' error message). The fork's "raw JSON dicts,
-  not EventRecord" docstring promise is preserved: the shared loader returns
-  tolerant SpineRow dicts with the same shape tolerance.
-- Fixed `scripts/lca-cli-shape.py` docstring drift: the documented shared-loader
-  API list now includes `load_spine_facts` (SHARED_PROJECTION_NAMES already had it).
-- Tests: `tests/infrastructure/cli/test_debug_graph.py` now imports the shared
-  loader instead of the private function; added regression test
-  `test_debug_graph_skips_non_dict_spine_lines` (spine.jsonl with `42` and
-  `[1, 2]` valid-JSON non-dict lines -> `lca-ops debug-graph` exits 0).
-- Bug evidence: replaying the deleted fork's exact loop against a spine with a
-  `42` line raised `AttributeError: 'int' object has no attribute 'get'` inside
-  build_debug_graph -- the assessment was correct, story not mis-assessed.
-- Verified: `uv run pytest tests/infrastructure/cli/test_debug_graph.py
-  tests/infrastructure/cli/test_projection.py --no-cov -q` -> 15 passed;
-  `uv run ruff check` clean on all touched files; grep 'json.loads' in
-  debug_graph.py -> 0. No contracts import added to CLI surface.
-- Files changed: lca/infrastructure/cli/commands/observation/debug_graph.py,
-  tests/infrastructure/cli/test_debug_graph.py, scripts/lca-cli-shape.py,
-  raphy/prd.json, raphy/progress.txt
-- **Learnings for future iterations:**
-  - When a private fork "looks like" the shared loader, the bug-relevant delta
-    is often a single dropped guard line -- diff the two loops line-by-line
-    before scoping (here the isinstance guard was the entire bug).
-  - The regression test drives the full typer command (CliRunner invoke on
-    `app`), not the loader function -- pins the user-visible contract
-    (exit 0), not the internal seam.
-  - A repo-wide `git grep` for the deleted symbol is the reliable straggler
-    check (here: only the test file; docs/assessment/prose mentions stay).
----
-## 2026-10-07 00:40 - RA-005 (fresh session)
-- Unified the two domain-prefix tables in `lca/infrastructure/cli/commands/_shared/projection.py` into one `_DOMAIN_PREFIXES` table (13 families; "graph" now defined once) with one match seam `_matches_domain` (substring). Deleted `_EP_PREFIX_FAMILIES`.
-- Semantic chosen: substring, NOT pure startswith -- documented in the module with two reasons: (1) it reproduces contracts' `debug_run_family_for_key` exactly, keeping the mirror rule honest (CLI classification agrees with contracts classification; no contracts import per the deliberate rule); (2) production execution_points are "spine."-prefixed ("spine.body.tool.execute.start", "spine.cognition.prompt_assembler.assemble.end", "spine.phase_graph.node.start") -- pure startswith would silently drop them all from their domains.
-- Real disagreement fixed (not theoretical): `load_spine_facts(("graph",))` used startswith and missed "spine.phase_graph.*" events that `filter_by_domain("graph")` (substring) counted on the same run; both now share `_matches_domain` and agree by construction.
-- `filter_by_domain` behavior unchanged (criterion 4): debug caller tests (test_runs_debug.py, test_runs_debug_health.py) green before and after the change -- no behavior change to record. The story's hinted direction (switch filter_by_domain to startswith) was rejected on evidence: it would zero out domain counts on real "spine."-prefixed data.
-- Files changed: lca/infrastructure/cli/commands/_shared/projection.py, raphy/prd.json, raphy/progress.txt
-- Verified: grep `_EP_PREFIX_FAMILIES` -> only the historical comment mention remains; production-ep spot check via import: spine.body.tool.execute.start->tool, spine.cognition.prompt_assembler.assemble.end->prompt, spine.phase_graph.node.start->graph.
-- Tests: 36 passed (test_projection.py + test_runs_debug.py + test_runs_debug_health.py + test_run_replay_graph_timeline.py + test_trace_show_graph_facts.py, LLM_API_KEY=dummy, --no-cov -q); `uv run ruff check` clean on projection.py.
-- **Learnings for future iterations:**
-  - When a story says "change X's semantics, run the caller's tests to confirm no change", first check whether the tests CAN detect the change: the debug tests used legacy unprefixed eps ("phase_graph.node.start") while production emits "spine."-prefixed ones, so they passed under both semantics. Corpus-diffing real execution_point literals (contracts/event.py + lca_kernel payload maps) old-vs-new caught what the tests could not.
-  - `ep.startswith(p) or p in ep` collapses to `p in ep` -- the startswith disjunct is dead code. The same redundancy lives in contracts' debug_run_family_for_key; the CLI mirror copied it faithfully.
-  - Mid-session the main tree gained another worker's uncommitted edit (lca/framework/graph/strategies/gate_chain_strategy.py, 00:32). Committed only my three files by explicit path and left theirs untouched -- deviated from prompt step 9's "commit the rest" because sweeping others' work is forbidden.
----
-
-
-## 2026-10-07 01:15 - RA-006 (fresh session)
-- Gave the single-daemon invariant an owner: `DaemonService._kill_existing(pattern,
-  timeout=10.0)` — sudo pkill (PR #40 behavior kept, `Sudo.run` timeout=10) then
-  poll `pid_alive` (service.py primitive) on the pid recorded in connect.pid until
-  dead, bounded by timeout with 0.2s interval. `stop()` and `restart()` both go
-  through it; `restart()` no longer uses `time.sleep(0.5)`.
-- `node.*index.js.*connect` is now module-level `_CONNECT_PROC_PATTERN` in daemon.py
-  (single source; assessment's suggested name landed as-is), used by daemon.py's
-  stop/_spawn and imported by `host_runtime/providers/user_cli.py`
-  start_daemon/stop_daemon (same object; user_cli stop_daemon flow otherwise untouched).
-  Intra-L0 edge, no importlinter contract conflict, no import cycle
-  (daemon.py never imports host_runtime at module level).
-- Files changed: lca/infrastructure/cli/services/daemon/daemon.py,
-  lca/infrastructure/host_runtime/providers/user_cli.py,
-  tests/infrastructure/cli/test_daemon_kill_existing.py (new: restart waits for
-  pid_alive true->false before start; no-pid-file skips wait; pattern identity),
-  tests/infrastructure/cli/test_daemon_stop_uses_sudo.py (extended:
-  sudo.read_text.return_value=None pins the wait-skip), raphy/prd.json,
-  raphy/progress.txt.
-- Tests: `pytest tests/ -k daemon --no-cov -q` -> 14 passed, 1 skipped
-  (reconnect_resilience needs node/npm toolchain, env skip pre-existing);
-  `ruff check` clean on all touched files (one I001 auto-fixed: 2 blank lines
-  collapsed after the import block by the constant insertion).
-- **Learnings for future iterations:**
-  - `_read_user_pid` returns a MagicMock-derived pid under a MagicMock Sudo
-    (`int(MagicMock()) == 1`): tests exercising `stop()` must set
-    `sudo.read_text.return_value` explicitly, or the wait loop runs the full timeout.
-  - ruff isort treats a comment+assignment directly after the import block as part
-    of the block layout — `ruff check --fix` collapses the blank line; check `git
-    diff` after to confirm it only touched whitespace there.
-  - `user_cli.py` had a pre-existing `ruff format` drift (double blank line after
-    module docstring); left untouched to keep the diff minimal — format drift is
-    not this lane's job unless introduced by the change.
----
-
-## 2026-10-07 02:40 - RA-006 (fresh session: re-assessment + re-apply)
-- Fresh-session re-assessment of the undocumented revert (e63ecee9c): the
-  interrupted rounds revert reason was never recorded. Reviewed 822bbfad0
-  against all 6 acceptance criteria: `_kill_existing(pattern, timeout=10.0)`
-  seam (sudo pkill + poll pid_alive on connect.pid, 0.2s interval,
-  deadline-bounded), stop()/restart() both routed through it, sleep(0.5) gone,
-  `_CONNECT_PROC_PATTERN` shared daemon.py<->user_cli.py (same object,
-  intra-L0, no import cycle since daemon.py never imports host_runtime).
-  All criteria met; tests were green at implementation time. No evidence the
-  story was mis-assessed; no honest drop rationale exists. Verdict: the
-  revert was spurious -> re-apply is recovery, not thrash.
-- Re-applied via `git revert --no-commit e63ecee9c` (byte-identical restore
-  of 822bbfad0: 6 files, diff stat matches exactly), then re-verified on the
-  current tree: `pytest tests/ -k daemon --no-cov -q` -> 15 passed;
-  `ruff check` clean on all touched files. prd.json passes=true, progress
-  RA-006 section restored, this entry appended.
-- **Learnings for future iterations:**
-  - An undocumented revert of a green, criteria-meeting implementation is
-    thrash, not recovery. The recovery rule covers interrupted-round
-    residue, not silently rolling back verified work. If a story looks
-    wrong, produce evidence and set `dropped: true` with reason in notes --
-    never a bare revert + reopen.
-  - Revert-of-revert is the exact tool for restoring a spuriously reverted
-    implementation: verify diff-stat equality against the original commit
-    before committing, and always re-run the story acceptance tests since
-    the tree moved underneath (here: 15 passed vs 14+1skip at original time).
----
-
-## 2026-10-07 03:38 - RA-007 (fresh session)
-- Extracted `_spawn` shell-script generation into pure
-  `lca/infrastructure/cli/services/daemon/start_script.py::render_start_script(config, gateway_ws_url)`.
-  `DaemonService._spawn` now only writes the rendered output and launches it.
-- `DaemonConfig` gained two fields: `token` (default single-sourced from
-  `host_runtime/config.py:47` `KernelServeConfig.token` via
-  `model_fields["token"].default` — the story text wrongly cited
-  `cli/config/config.py:47`; assessment.md had the right path) and
-  `cli_dir` (default `/opt/lca`); `DaemonService._cli_dir` now reads
-  `config.cli_dir` so `/opt/lca` has one source too.
-- The `--token lca-local-host` literal in daemon.py is gone; all PATH /
-  LCA_PYTHON / PYTHONPATH / cli_js segments derive from `config.cli_dir`.
-- `user_cli.py`'s `_write_start_script` is a *different* template (venv_dir,
-  managed_path, VIRTUAL_ENV, token already from config) — out of scope, untouched.
-- Byte-equivalence verified: captured old `_spawn` output (HEAD worktree, mocked
-  sudo) vs new renderer for default config → byte-identical, 409 bytes.
-- NEW tests `tests/infrastructure/cli/test_daemon_start_script.py` (5): configured
-  token used / literal gone; log path + PATH entries pinned; custom cli_dir/user/
-  workspace respected; default token single-sourced (value + field-default equality);
-  full default script shape characterization.
-- Files changed: lca/infrastructure/cli/config/config.py,
-  lca/infrastructure/cli/services/daemon/daemon.py,
-  lca/infrastructure/cli/services/daemon/start_script.py (new),
-  tests/infrastructure/cli/test_daemon_start_script.py (new),
-  raphy/prd.json, raphy/progress.txt
-- Verified: `pytest tests/ -k daemon --no-cov -q` -> 20 passed (15 existing + 5 new);
-  `ruff check` clean on all 4 touched files (2 initial S105/S106 in the test fixed
-  with `# noqa`, matching repo convention).
-- **Learnings for future iterations:**
-  - Story file/line citations can be wrong (RA-007 cited cli/config.py:47, reality is
-    host_runtime/config.py:47): always re-derive paths with grep before implementing;
-    the assessment.md Phase-3 section had the corrected path.
-  - `model_fields["token"].default` reads another pydantic model's field default
-    without instantiating it — the clean way to single-source a default across
-    modules without moving the original literal.
-  - Byte-equivalence check pattern for template extractions: HEAD worktree +
-    MagicMock sudo + `Path.exists` patched for the pre-check, capture `write_text`
-    args, diff against the new renderer. Proves "behavior unchanged" mechanically.
-  - ruff S105/S106 fires on token-looking literals in tests too; repo convention is
-    `# noqa: S105` with the existing comment style.
----
-
-## NOTE (residual, NOT committed this round)
-- `lca/framework/graph/strategies/gate_chain_strategy.py` has an uncommitted
-  residual from the 02:00 round (deletes the `_DecisionLike` Protocol, -12/+1).
-  Related tests: 31 passed, 1 failed
-  (`test_every_strategy_module_annotation_resolves`, `NameError: PortRegistry`)
-  — the failure reproduces on clean HEAD, i.e. pre-existing and unrelated.
-  Per the recovery rule (red -> do not touch), the residual stays uncommitted.
-  Next round: re-run the gate_chain tests; only commit as recover if fully green.
----
-
-## 2026-10-07 03:30 - RA-008 (fresh session)
-- Converged the three near-identical composer provider shells
-  (think/brain_provider.py, perceive/provider.py, act/body_provider.py) into
-  one factory: `lca/plugins/composer/_provider_factory.py::_register_composer_plugin`
-  called once per provider module. Each thin module is now ~15 lines:
-  module docstring + factory call with (plane_key, plane_noun, interface,
-  grants, composer_cls) data + `__all__`.
-- GATE PROBE first (acceptance criterion 1): built a throwaway module with a
-  table-driven loop generating three `@plugin` registrations; profile resolve
-  (`lca/harness/profile/resolve/resolve.py:294-298`) does
-  `getattr(module, "setup", None)` -- ONE attribute per module, and then
-  requires `definition.spec.id == bundle entry id`. Result: only the LAST
-  loop iteration is discoverable; 2 of 3 bundle entries would fail the id
-  check. Gate FAILED as the story anticipated -> used the story's own
-  fallback shape (factory called 3 times, one thin module per provider).
-- Parity verified mechanically: extracted PluginDefinition for all three
-  providers from the pre-change tree and the post-change tree and compared
-  field by field (id, provides, description, authority grants, observability
-  descriptors, ownership reads/emits, Config/setup docstrings) -- IDENTICAL.
-- New tests `tests/composer/test_composer_provider_factory.py` (4 tests):
-  discovery yields original ids/provides keys; setup() provides the correct
-  composer instance per plugin id (the previously untested blind spot);
-  observability descriptors stay id-derived; authority grants preserved per
-  provider (perceive keeps context.read).
-- Files changed: lca/plugins/composer/_provider_factory.py (new),
-  lca/plugins/composer/think/brain_provider.py,
-  lca/plugins/composer/perceive/provider.py,
-  lca/plugins/composer/act/body_provider.py,
-  tests/composer/test_composer_provider_factory.py (new),
-  raphy/prd.json, raphy/progress.txt
-- Tests: `LLM_API_KEY=dummy uv run pytest tests/composer/ --no-cov -q` ->
-  68 passed (incl. booted web-profile tests exercising the bundle end to
-  end); `uv run ruff check` + `ruff format --check` clean on all touched
-  files (one TC002 fix: cordis import moved to TYPE_CHECKING).
-- **Learnings for future iterations:**
-  - `@plugin` discovery is per-module-single-setup: never converge N plugin
-    shells into one module + loop; the factory-per-thin-module shape is the
-    ceiling. Gate-probe the discovery mechanism BEFORE choosing the shape.
-  - The story said "three" shells but a FOURTH sibling exists
-    (collaboration/team_provider.py); it takes `TeamComposer(PlanBoundAgentAssembler())`
-    and implements `TeamGraphComposer`, so it is out of this story's scope --
-    left untouched. Always grep for siblings, then decide scope explicitly.
-  - Booted-kernel tests need `LLM_API_KEY=dummy` in env or they fail with the
-    fail-loud credentials error -- not a regression signal.
----
-
-## 2026-10-07 04:30 - RA-009 (fresh session)
-
-- Hardened the composer/observability seam in `lca/plugins/composer/think/brain.py`:
-  `instrument_llm` now reads the public `TelemetryLLMAdapter.inner` property instead
-  of the private `._inner` attribute (line 65), and the deferred local import of
-  `ModelVisibleHookAdapter` became a top-level import with a comment documenting
-  the spike finding.
-- SPIKE (load-bearing part of the story): the assessment assumed a composer<->events
-  import cycle was real ("延迟 import 事出有因"). Verified empirically it does NOT
-  exist: `model_visible.adapter` imports only contracts-level modules, and the
-  `lca/plugins/events` package `__init__` is docstring-only, so a top-level import
-  in brain.py loads cleanly (`import lca.plugins.composer.think.brain` green).
-  The deferred import was defensive history, not a cycle-avoidance necessity.
-- Behavior unchanged: layering (ModelVisibleHookAdapter → TelemetryLLMAdapter → inner)
-  and the idempotent re-wrap semantics of `instrument_llm` are preserved; the seam
-  is now contractual (public property + top-level import) instead of private access
-  + function-local import.
-- Files changed: `lca/plugins/composer/think/brain.py`, `raphy/prd.json`, `raphy/progress.txt`
-- Verified: no remaining `_inner` reads in brain.py; single top-level
-  `ModelVisibleHookAdapter` import; `uv run pytest tests/ -k 'hook_resolution or brain'`
-  → 77 passed (1 failure in test_brain_prompt_catalog_capability.py is pre-existing
-  red at HEAD, verified in an isolated worktree, unrelated to this change);
-  `uv run ruff check` on the touched file passes.
-- **Learnings for future iterations:**
-  - Assessment guesses about import cycles must be verified by actually moving the
-    import, not trusted: RA-009's "cycle is real" constraint was disproven by the spike.
-  - Public unwrap primitives may already exist (`.inner` property on both
-    TelemetryLLMAdapter and handles adapters) — grep for them before designing a new one.
-  - When a failing acceptance-criteria test is suspected pre-existing, verify with a
-    detached worktree at HEAD, not by reasoning about it.
----
+- 按硬化版 `raphy-assess.md` 执行：读 `skills/improve-codebase-architecture/SKILL.md`；
+  friction walk 精读三区（session 插件群 / loop_cursor 包 / 委派缓存+body 执行器），5 问必答；
+  self-grilling 写进 assessment.md；diversity quota 满足（3 friction + 1 duplication）。
+- 热点来源：`git log -60`（`cli/commands` 12、`tools/assistant` 11→禁区、`webserver` 8→lca-1000 领地、
+  `session/*`、`loop_cursor` 3、`cognition/body/executor` 3）。
+- 产出 4 个 stories（`passes: false`），续号 RA-010~013：
+  - RA-010（P1, Worth exploring）：StdProjectionHost 监听触发语义三处不一致
+    （文档"变化通知" vs 实现 per-drive 全量回调 vs 测试 :348 钉死）→ 三方对齐。
+  - RA-011（P2, Worth exploring）：`loop_cursor/projection/` vs `projections/` 一字之差
+    同级模块互引 → 合并或改名。
+  - RA-012（P3, Worth exploring）：`cached_delegation_observation` 经函数内局部 import
+    够到 loop 层与 session 层 → spike 后契约化接缝（RA-009 同款纪律）；开工前确认 iter lanes 无并发修改。
+  - RA-013（P4, Worth exploring）：`SimpleBody.dispatch_tool_calls` 4 处 `EffectReceipt`
+    内联构造 → 模块级 `_receipt` helper。
+- 丢弃 6 个候选（有证据）：`DelegationCacheHit` vs `TeamDelegationCacheHit` 收敛
+  （lca-1000 试点迁移中）；`_snapshot_from_state` 包内私有共享（刻意 seam）；
+  `CursorRecord` 类级状态（ADR 背书）；双发射（ADR-0037 刻意）；`CacheConfig` 单点；
+  `LoopCursorFactory` 文档漂移（hygiene 级）。
+- 本轮未跑测试（assess 轮只做评估；optimize 轮按各 story 验收标准跑）。
+- Commit：`raphy: assess round 2026-10-07-0930 (4 stories)`（未 push）。
+  commit 后已 `checkout main`（防 iter lanes 的 commit 落到 raphy 分支）。
+- raphy-last-assess.txt 已更新（本机时间戳）。

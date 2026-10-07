@@ -1,7 +1,7 @@
 {
  "project": "LCA Raphy Architecture Optimization",
- "branchName": "raphy/arch-20261006-2301",
- "description": "Continuous architecture deepening for the LCA cognitive-agent codebase via the raphy fresh-session loop. Round 1 (2026-10-06, old prompt): RA-001/RA-002 converged, RA-003 dropped with evidence. Round 2 (2026-10-06, hardened prompt 9d379ffe2 after user challenged shallow assessment): mandatory friction walk over composer / CLI projection / daemon; RA-004..RA-009 below. Out of scope: ralph Round 2 areas (DecisionGates, Ingest, ContextFiles shims, Read Runs micro-dirs, MemoryTools directory seam) and lca/cognition/memory/ (frozen per Round 2 AP-01). CLI surface must not import from contracts (deliberate rule, projection.py:22-23).",
+ "branchName": "raphy/arch-20261007-0930",
+ "description": "Continuous architecture deepening for the LCA cognitive-agent codebase via the raphy fresh-session loop. Round 1 (2026-10-06, old prompt): RA-001/RA-002 converged, RA-003 dropped with evidence. Round 2 (2026-10-06, hardened prompt): RA-004..RA-009 all done (merged to main 2026-10-07, merge 1b1526a94). Round 3 (2026-10-07, hardened prompt): friction walk over session plugins, loop_cursor, delegation/body executor; RA-010..RA-013 below. Out of scope: ralph Round 2 areas (DecisionGates, Ingest, ContextFiles shims, Read Runs micro-dirs, MemoryTools directory seam), lca/cognition/memory/ (frozen per Round 2 AP-01), CLI surface must not import contracts (deliberate rule), gate_chain_strategy.py (hands-off: another party's uncommitted work + pre-existing red test).",
  "userStories": [
   {
    "id": "RA-001",
@@ -148,6 +148,66 @@
    "priority": 6,
    "passes": true,
    "notes": "Source: improve-codebase-architecture skill assessment Round 2 2026-10-06 (Worth exploring, friction walk Q4). Solution undetermined this round - the spike is load-bearing. | DONE 2026-10-07: spike found NO composer<->events import cycle (top-level import verified green); used existing public TelemetryLLMAdapter.inner property instead of _inner."
+  },
+  {
+   "id": "RA-010",
+   "title": "Resolve StdProjectionHost listener-fire semantics: docs promise change-notification, impl fires per drive",
+   "description": "As an LCA maintainer, I want one canonical, agreed semantics for StdProjectionHost listener notification, so subscribers and future code stop guessing whether 'change notification' means per-drive fire or change-gated fire.",
+   "acceptanceCriteria": [
+    "One canonical semantics is chosen and documented in subscribe_changes + the class docstring of lca/infrastructure/observability/loop_cursor/projection/host.py: either 'fires on every drive' or 'fires only when at least one deriver state changed'",
+    "Implementation, docstrings, and tests/observability/loop_cursor/test_projection_host.py agree on that semantics (no test pins a contradicting one; test line 348 currently asserts per-drive fire)",
+    "If change-gated is chosen: drive() computes the changed key set (prev_state != new_state per deriver) and _fire_listeners runs only when it is non-empty; a NEW test asserts no listener fire when apply returns identical state",
+    "If per-drive is kept: docstrings stop saying 'changes' (subscribe_changes / class docstring reworded), keeping the pinned behavior",
+    "uv run pytest tests/observability/loop_cursor/test_projection_host.py --no-cov -q passes; uv run ruff check passes on touched files",
+    "Do NOT change FlushReport, restore(), unregister() semantics"
+   ],
+   "priority": 1,
+   "passes": false,
+   "notes": "Source: raphy assess Round 3 2026-10-07 (Worth exploring, friction walk B-Q3). Evidence: subscribe_changes docstring '订阅 view_snapshot() 变化' + class docstring '变更通知' vs drive() unconditional _fire_listeners ('为简单实现,每次 drive 后全量回调') vs test_projection_host.py:348 'listener should fire on drive'. Deletion test: the 'what counts as a change' decision gets one owner (drive) instead of living half in docs, half in impl."
+  },
+  {
+   "id": "RA-011",
+   "title": "Disambiguate loop_cursor/projection/ (host) vs projections/ (deriver definitions)",
+   "description": "As an LCA maintainer (or AI agent navigating the tree), I want exactly one loop_cursor submodule holding deriver definitions, so I stop confusing the two one-letter-apart modules.",
+   "acceptanceCriteria": [
+    "One of: fold projections/* into projection/ (e.g. projection/derivers.py) or rename projections/ to a load-bearing name; exactly one loop_cursor submodule holds deriver definitions",
+    "All import sites updated: projection/host.py, projections/__init__.py, projections/defaults.py, lca/plugins/observability/providers/projection_host/standard.py",
+    "The TYPE_CHECKING-only import of projection.host in defaults.py is re-examined as part of the fold (no silent cycle re-introduced)",
+    "No behavioral change: uv run pytest tests/observability/loop_cursor/ --no-cov -q passes; uv run ruff check passes on touched files",
+    "Repo-wide grep for the old module path returns 0"
+   ],
+   "priority": 2,
+   "passes": false,
+   "notes": "Source: raphy assess Round 3 2026-10-07 (Worth exploring, friction walk B-Q1). Evidence: host.py:26 imports projections.defaults at runtime; defaults.py:38 references projection.host under TYPE_CHECKING. Pure AI-navigability fix; import-path change only."
+  },
+  {
+   "id": "RA-012",
+   "title": "Spike: contractize the delegation cache-hit commit seam (deferred loop/session imports)",
+   "description": "As an LCA maintainer, I want the delegation cache-hit commit seam to be explicit instead of reaching into the loop and session layers through function-local imports, so the layer edges are honest and the commit path is testable through its interface.",
+   "acceptanceCriteria": [
+    "SPIKE first (part of this story): read lca/cognition/body/actions/action_handlers.py and lca/plugins/events/publishers/delegation_cache/plugin.py call sites; determine whether commit_delegation_cache_hit + session resolution can be injected explicitly at those call sites",
+    "If feasible: cached_delegation_observation in lca/infrastructure/delegation/cache.py takes the commit seam as an explicit parameter (or a small protocol); the function-local imports of lca.loop.commit.delegation_journal and lca.infrastructure.session.bindings are gone from cache.py",
+    "If not feasible: document in cache.py's module docstring exactly which import cycle the deferred import dodges, and add a test that pins that cycle cannot be reintroduced at module level",
+    "uv run pytest tests/ -k 'delegation' --no-cov -q passes; uv run ruff check passes on touched files",
+    "Do NOT change the dual-emission semantics (team.delegation.cache_hit spine fact + journal DelegationCacheHit); coordinate with iter lanes, which wired DelegationCacheHit emission on 2026-10-07"
+   ],
+   "priority": 3,
+   "passes": false,
+   "notes": "Source: raphy assess Round 3 2026-10-07 (Worth exploring, friction walk C-Q1). RA-009 class (non-deletion, seam contractization); follows the same spike-first discipline that proved the RA-009 assessment's import-ring assumption wrong. Constraints: ADR-0194 P1-16 territory."
+  },
+  {
+   "id": "RA-013",
+   "title": "Converge the four EffectReceipt constructions in SimpleBody.dispatch_tool_calls behind a small receipt seam",
+   "description": "As an LCA maintainer, I want the EffectReceipt construction shape in dispatch_tool_calls to live in one helper, so adding a future receipt field or error code is a one-place edit.",
+   "acceptanceCriteria": [
+    "A module-local helper (e.g. _receipt(call, outcome, error_code=None)) exists in lca/cognition/body/executor/simple_body.py; all four inline EffectReceipt constructions in dispatch_tool_calls delegate to it",
+    "provider='body.dispatch_tool_calls' and invocation_id=call.call_id appear exactly once each (in the helper)",
+    "The four idempotency_key shapes (':persist_assistant', ':persist_result', bare call_id) are preserved exactly",
+    "Behavior preserved: uv run pytest tests/ -k 'dispatch_tool_calls or simple_body' --no-cov -q passes; uv run ruff check passes on the touched file"
+   ],
+   "priority": 4,
+   "passes": false,
+   "notes": "Source: raphy assess Round 3 2026-10-07 (Worth exploring, friction walk C-Q5 + duplication scan). The round's single duplication-class story per diversity quota; follows the codebase's established 'converge N identical X' idiom (RA-001/RA-002)."
   }
  ]
 }
