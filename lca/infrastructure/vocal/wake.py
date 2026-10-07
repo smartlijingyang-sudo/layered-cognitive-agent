@@ -43,10 +43,10 @@ class WakeClassifier:
                 subagent_id=subagent_id,
                 priority=priority,
             )
-        else:  # PEER_AGENT
-            return WakeContext(
-                source=src,
-                is_silence_allowed=False,
-                requires_reply_first=False,
-                priority=priority,
-            )
+        # PEER_AGENT
+        return WakeContext(
+            source=src,
+            is_silence_allowed=False,
+            requires_reply_first=False,
+            priority=priority,
+        )

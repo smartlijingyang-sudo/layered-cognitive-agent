@@ -77,8 +77,7 @@ class _DebugTraceCommand:
         elif plugin_graph:
             print(inspector.plugin_interaction_graph())
             return 0
-        else:
-            report = inspector.inspect_trace(focus=focus)  # type: ignore[arg-type]
+        report = inspector.inspect_trace(focus=focus)  # type: ignore[arg-type]
         print(
             json.dumps(
                 {

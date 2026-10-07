@@ -99,8 +99,7 @@ def otel_safe_attributes(attributes: dict[str, Any]) -> dict[str, Any]:
             out[key] = value
         elif value is None:
             continue
-        else:
-            out[key] = json.dumps(value, ensure_ascii=False, default=json_default)
+        out[key] = json.dumps(value, ensure_ascii=False, default=json_default)
     return out
 
 

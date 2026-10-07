@@ -90,12 +90,11 @@ class BrowserSubagent:
                     action_type=action.action_type,
                     success=True,
                 )
-            else:
-                return BrowserActionResult(
-                    action_type=action.action_type,
-                    success=True,
-                    text_content=f"Executed action {action.action_type}",
-                )
+            return BrowserActionResult(
+                action_type=action.action_type,
+                success=True,
+                text_content=f"Executed action {action.action_type}",
+            )
         finally:
             # 3. 动作完成后立即释放单屏桌面锁
             if self.lock_manager is not None:
