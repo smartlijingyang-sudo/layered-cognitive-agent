@@ -989,3 +989,20 @@
 - 验证结果: 无代码改动，无需验证门。扫描脚本 3 个全部 exit 0；开工/收工工作区干净（main，nothing to commit）。
 - commit: 无代码 commit；本台账单独 docs commit（沿用 0520 `docs(lca-1000): 第0520轮台账` 模式）。
 - 备注: 只 commit docs/notes/lca-1000/ledger.md（`git commit -- <path>` 显式路径）；并发会话在 01:16 落了 e51902b07（redundant else 清理），其文件全程未触碰；本轮扫描（01:35）已覆盖该提交，无新组。教训：ssh252 的每条外层输出都带分支 banner 与 MOTD，管道/重定向时先用 grep/wc 确认 payload；scan 输出跨机器比对前先提取 group hash 集合再 diff（行号/行文漂移误报）。
+
+
+## 第0522轮 (2026-10-08 03:03-03:13 CST)
+- 改了什么: 无代码改动。**本轮未发现新的实质机会**（依据 body 规则 4：不硬凑 trivial commit）。
+- 依据 skill 哪一节: SKILL.md Deletion test + LANGUAGE.md（load-bearing knowledge / interface 即 test surface / Two adapters = real seam）+ DEEPENING.md Seam discipline——见候选清单的驳回依据。
+- 关键设计决策（夜间跳过 grilling，记台账）: 本轮首次完整裁决 companion `standalone.py` vs `client.py` 镜像组（connect_and_run 106 行全等等 6 组），**驳回并建档 B-092**——`standalone.py` 是刻意零依赖的可下载部署产物（ADR-0246 CONV-INSTALL：GET /api/device/download/companion.py 下发到用户机器，Python 3.10+ 裸跑，不得 import LCA 仓库）；与 `client.py` 的全等代码不是 shallow 重复而是部署约束下的刻意镜像（deletion test：删 standalone 侧，复杂度在"用户机器无仓库"约束处重现；LANGUAGE.md "Two adapters = real seam"——两 adapter 正是 seam 两面，收敛即毁部署 seam）。
+- 候选清单（本轮 explore：AST 同体扫描（自建归一化：8397 函数/243 组，含嵌套函数；因归一化与 0517–0521 基线不同，逐组人工裁决而非 hash diff）+ dead-code 扫描（2608 私有定义 → refs==1 真死 17 候选）+ 同名异体扫描（sndb，290 组，名集合与 0521 逐成员一致）+ deslop 清单 + raphy RA-024..027 新鲜 diff 复查）:
+  1. companion standalone/client 6 组（connect_and_run 53×2、pair 28×2、dispatch_tool 22×2、auto_pair 21×2、_run_command 18×2、load_token 16×2）—— 驳回（见上，B-092 建档）。
+  2. `setup` ×47/×11/×11/×5、`node_execute` ×4/×3、`register` ×4 —— 驳回：框架 node/plugin seam（graph 节点样板；删后复杂度回到框架接线处）。
+  3. `session_stats.py#153` vs `session_turn_outline.py#187` setup 全等 16 行 —— 驳回：同名 plugin setup seam（0513 判例延续）。
+  4. dead 17 真死候选（`_RoleConfig`、`_coerce_dev_mode`、`_composio_root`、`_names_unique`、`_tupleize`、`_validate_*` ×12）—— 驳回：与 0519–0521 逐成员一致，全部为既往判例（`_RoleConfig` docstring 明确保留意图 "anchor plugin typing"；其余 pydantic `@field_validator`/`@model_validator`/`@classmethod` 或 typer `@callback` 的框架按名调用假阳性）；`_static_protocol_check` ×2 不再出现（被 raphy RA 重构移除，0519 判例已闭合）。
+  5. raphy RA-024（model_visible payload `_self_heal_forward_refs` + INTENTIONAL guard + Delete-when 标记）、RA-025（`step_id_for`/`step_id_from_cursor` 新 seam）、RA-027（`_chapter` 驱动 + `short_text` 公开化 + FoldProvider 搬生产者侧）—— 驳回：全部是 02:47 刚合并的刻意设计，有明确设计依据；不 re-litigate 并发会话的新鲜工作。
+  6. `routes.py:34` `_ws_placeholder`（0517 deferred"不同死桩，需 grilling"）—— 本轮确证后**驳回/不动**：docstring 明确声明"Sentinel handler… Present only so the path can appear in a RouteSpec tuple"，是 ADR-0200 §4.3 wire invariant（spec §3.2）的文档化刻意设计，属 load-bearing interface 知识（沿用 0518 `_static_protocol_check` 静态锚点判例：有依据的不动）。
+  7. deslop：TODO/FIXME/HACK/XXX 全树零可行动项（0517 基线延续）；"自承 dead" 注释均为语义词（dead run/dead lock/dead holder）；唯一 noqa F401（cli/cli.py:28 steps import）docstring 明确声明 side-effect registry 接线依据，不动；440 处 `except Exception` 抽查（tick 循环/transport/MCP 边界）均为边界 guard 设计，无无依据防御；叙事性注释无新增。
+- 验证结果: 无代码改动，无需验证门。扫描脚本 exit 0（ast0522/dead0522/dead0522b/sndb0522）；开工/收工工作区干净（main，ahead 27，未 push，no-push 规则在；d3547bcc8 raphy merge @02:49 在本轮 explore 范围内）。
+- commit: 无代码 commit；本台账单独 docs commit（沿用 0520/0521 `docs(lca-1000): 第0522轮台账` 模式）。
+- 备注: 只 commit docs/notes/lca-1000/ledger.md（`git commit -- <path>` 显式路径）；并发会话本轮期间无新落盘（raphy merge 02:49 早于本轮开工）。注意：252 /tmp 发现 02:05 生成的 sndb0522.py（疑为 02:03 轮次中断残留），ledger 无 0522 条目、无相关 commit，确认无状态需修复；scan/dead 脚本输出已存 252 /tmp；B-092（companion 镜像组 dropped）已记 backlog.md 后续轮免复查。教训：scp 被远端 MOTD banner 挡（Received message too long）——脚本传输用分块 cat > / >> stdin 重定向；ssh252 heredoc 外层会被吃；跨机器脚本归一化差异时 hash diff 失效，改人工逐组裁决。
