@@ -157,14 +157,14 @@ class _FakeSafeExecutor:
         return await tool.execute(args)
 
 
-def _state(step: int = 0, turn: int = 0) -> AgentState:
-    """Build an AgentState with ``current_turn`` stored in ``state.extra``.
+def _state(step: int = 0, turn: int | None = 0) -> AgentState:
+    """Build an AgentState with the typed ``current_turn`` seam populated.
 
-    ``AgentState`` does not have a top-level ``turn`` attribute; the
-    per-call turn lives at ``state.extra["current_turn"]`` (set by the
-    ``turn.started.v1`` projection in ``harness.projection.agent_state``).
-    ``history`` is a ``@property`` alias over ``control_turns`` and is not
-    a constructor kwarg — pass nothing.
+    ``turn`` goes through the ``AgentState.current_turn`` field (set by the
+    ``turn.started.v1`` projection in ``harness.projection.agent_state``);
+    pass ``turn=None`` for a state whose projection never ran (fail-loud
+    path). ``history`` is a ``@property`` alias over ``control_turns`` and
+    is not a constructor kwarg — pass nothing.
     """
     from lca.contracts.models.core.policy.budget import create_budget
 
@@ -174,7 +174,7 @@ def _state(step: int = 0, turn: int = 0) -> AgentState:
         budget=create_budget(max_steps=10),
     )
     state.step = step
-    state.extra["current_turn"] = turn
+    state.current_turn = turn
     return state
 
 
@@ -473,3 +473,76 @@ def test_failed_tool_execution_persists_result_and_reports_execution_failed() ->
         "surface/assistant_message",
         SURFACE_TOOL_RESULT_TYPE,
     ]
+
+
+def test_turn_propagates_from_projection_to_journal_rows() -> None:
+    """RA-029 end-to-end: the ``turn.started.v1`` projection populates the
+    typed seam, and ``dispatch_tool_calls`` carries it onto the journal rows
+    (no ``state.extra["current_turn"]`` stringly lookup anywhere in between)."""
+    from lca.contracts.harness.tasks.session import SessionEvent
+    from lca.contracts.models.core.state.state import turn_of
+    from lca.harness.projection.agent_state import AgentStateProjection
+
+    projection = AgentStateProjection()
+    state = projection.apply(
+        projection.init(),
+        SessionEvent(
+            type="turn.started.v1", seq=1, time=0,
+            data={"turn": 3}, session_id="run-test",
+        ),
+    )
+    assert state.current_turn == 3
+    assert turn_of(state) == 3
+
+    session = _FlakySession(fail_after=10**6)  # never fail
+    writer = RunSessionWriter(session=session)
+    recorder = _Recorder()
+    tool = _FakeTool(name="echo", recorder=recorder)
+    registry = _FakeToolRegistry(tools={"echo": tool})
+    body = SimpleBody(
+        tool_registry=registry,  # type: ignore[arg-type]
+        safe_executor=_FakeSafeExecutor(),  # type: ignore[arg-type]
+        transport_registry=None,  # type: ignore[arg-type]
+        action_registry=None,  # type: ignore[arg-type]
+        writer=writer,
+    )
+
+    receipts = asyncio.run(
+        body.dispatch_tool_calls(decision=_decision_with_one_tool_call(), state=state)
+    )
+    assert len(receipts) == 1
+    assert receipts[0].outcome is EffectOutcome.SUCCEEDED
+
+    rows = [
+        e
+        for e in session.events
+        if e.type in ("surface/assistant_message", SURFACE_TOOL_RESULT_TYPE)
+    ]
+    assert [e.data["turn"] for e in rows] == [3, 3]
+
+
+def test_dispatch_with_unpopulated_turn_fails_loud() -> None:
+    """RA-029: a session-bound state whose projection never ran must not
+    silently persist turn=0 rows."""
+    import pytest
+
+    session = _FlakySession(fail_after=10**6)  # never fail
+    writer = RunSessionWriter(session=session)
+    recorder = _Recorder()
+    tool = _FakeTool(name="echo", recorder=recorder)
+    registry = _FakeToolRegistry(tools={"echo": tool})
+    body = SimpleBody(
+        tool_registry=registry,  # type: ignore[arg-type]
+        safe_executor=_FakeSafeExecutor(),  # type: ignore[arg-type]
+        transport_registry=None,  # type: ignore[arg-type]
+        action_registry=None,  # type: ignore[arg-type]
+        writer=writer,
+    )
+
+    with pytest.raises(ValueError, match="current_turn"):
+        asyncio.run(
+            body.dispatch_tool_calls(
+                decision=_decision_with_one_tool_call(), state=_state(turn=None)
+            )
+        )
+    assert recorder.calls == []

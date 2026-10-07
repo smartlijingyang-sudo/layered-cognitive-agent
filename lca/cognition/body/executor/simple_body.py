@@ -19,7 +19,7 @@ from lca.contracts.models.core.execution.result import (
     ToolExecutionError,
     UnregisteredActionError,
 )
-from lca.contracts.models.core.state.state import AgentState
+from lca.contracts.models.core.state.state import AgentState, turn_of
 from lca.contracts.models.session.call_id import CallId
 from lca.contracts.models.session.tool_error import ToolError
 from lca.contracts.models.team.role.team import RetryPolicy
@@ -217,17 +217,16 @@ class SimpleBody(Body):
         so callers can route through the same composition seam.
 
         ``state`` carries the current ``step`` directly; the per-call
-        ``turn`` is read from ``state.extra["current_turn"]`` (set by the
-        ``session.created.v1`` / ``turn.started.v1`` projection in
-        ``harness.projection.agent_state``). Both default to ``0`` when
-        ``state`` is ``None`` or the slot is unset, so single-shot tests
-        without a session-bound agent still produce a deterministic
-        turn/step on the journal rows.
+        ``turn`` is read through the typed ``turn_of`` seam (populated by the
+        ``turn.started.v1`` projection in ``harness.projection.agent_state``).
+        ``turn_of(None)`` is ``0`` so single-shot tests without a
+        session-bound agent still produce a deterministic turn/step on the
+        journal rows; a bound state with an unpopulated turn fails loud.
         """
-        # ``AgentState`` exposes ``step`` directly; the matching ``turn`` is
-        # carried in ``state.extra["current_turn"]`` (projection-driven;
-        # may be absent before the first ``turn.started.v1`` event).
-        turn = int(state.extra.get("current_turn", 0)) if state is not None else 0
+        # ``turn`` travels through the typed ``turn_of`` seam (RA-029):
+        # ``None`` state -> 0 (unbound single-shot); bound state with an
+        # unpopulated turn -> fail-loud instead of silent turn=0 rows.
+        turn = turn_of(state)
         step = state.step if state is not None else 0
         if self.writer is None:
             raise ToolExecutionError(

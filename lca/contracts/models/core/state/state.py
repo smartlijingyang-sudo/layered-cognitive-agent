@@ -112,6 +112,12 @@ class AgentState:
     working_memory: dict[str, Any] = field(default_factory=dict)
     retrieved_context: list[Any] = field(default_factory=list)
     step: int = 0
+    # RA-029: journal turn dimension as a typed field, next to the typed
+    # ``step`` sibling -- not the untyped ``extra["current_turn"]`` stringly
+    # slot. Sole writer: the ``turn.started.v1`` projection in
+    # ``harness.projection.agent_state``. ``None`` = projection has not
+    # populated it yet (fail-loud via :func:`turn_of`).
+    current_turn: int | None = None
     checkpoints: list[StateSnapshot] = field(default_factory=list)
     status: TaskStatus = TaskStatus.WORKING
     extra: dict[str, Any] = field(default_factory=dict)
@@ -171,3 +177,23 @@ class AgentState:
     @history.setter
     def history(self, value: list[Turn]) -> None:
         self.control_turns = value
+
+
+def turn_of(state: AgentState | None) -> int:
+    """Read the journal turn dimension through the typed seam (RA-029).
+
+    ``None`` state = unbound single-shot (no session, no turn) -> ``0``.
+    A session-bound state whose ``turn.started.v1`` projection never ran
+    (``current_turn is None``) is a contract violation -> fail-loud, so a
+    renamed key or a skipped projection can never again silently write
+    turn=0 journal rows. Mirrors RA-025's ``step_id_for`` single-source
+    discipline for the turn dimension.
+    """
+    if state is None:
+        return 0
+    if state.current_turn is None:
+        raise ValueError(
+            "AgentState.current_turn is not set: the turn.started.v1 projection "
+            "in harness.projection.agent_state did not populate this state"
+        )
+    return int(state.current_turn)

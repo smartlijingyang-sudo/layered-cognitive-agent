@@ -96,7 +96,7 @@ class _FakeInner(LLMAdapter):
 def _state() -> AgentState:
     state = AgentState(trace_id="trace-llm-adapter", task="", budget=Budget())
     state.step = 3
-    state.extra["current_turn"] = 7
+    state.current_turn = 7
     return state
 
 

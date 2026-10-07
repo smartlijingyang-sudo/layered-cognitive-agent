@@ -67,7 +67,7 @@ class AgentStateProjection:
         elif event_type == "turn.started.v1":
             # Reset step counter for new turn
             if "turn" in data:
-                state.extra["current_turn"] = data["turn"]
+                state.current_turn = data["turn"]
 
         elif event_type == "step.ended.v1":
             # Increment step counter

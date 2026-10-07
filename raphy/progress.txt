@@ -885,3 +885,31 @@
   - 被删代码的旧测试（`test_kernel_serve_status_converges_on_http_ready`）不硬留：
     删代码的同时把它的"钉住意图"（收敛在 http_ready 语义）翻译成新 seam 的投影测试。
 ---
+
+## 2026-10-08 06:00 - RA-029
+- journal `turn` 维度具名化：`AgentState` 新增 `current_turn: int | None = None`
+  具名字段（紧邻 `step` 兄弟字段）；contracts 层新增 `turn_of(state)` 访问器
+  （对标 RA-025 `step_id_for`）：`turn_of(None)==0`（unbound single-shot 显式决策），
+  bound state 未填充则 `ValueError` fail-loud（生产 turn 1-based，None 无歧义）。
+  写方（`harness/projection/agent_state.py`）改赋 `state.current_turn`；两读方
+  （`simple_body.dispatch_tool_calls`、`nodes/think/llm/invoke.py`）改走 `turn_of`；
+  telemetry adapter 无需改（读的是 turn kwarg）。`lca/` 与 `tests/` 再无
+  `extra["current_turn"]` 代码读取（仅注释提及）。
+- Files changed: `lca/contracts/models/core/state/state.py`,
+  `lca/harness/projection/agent_state.py`,
+  `lca/cognition/body/executor/simple_body.py`, `lca/nodes/think/llm/invoke.py`,
+  `tests/contracts/test_agent_state_shape.py`（4 个 turn_of 契约测试）,
+  `tests/integration/test_persist_before_execute.py`（projection→dispatch→journal
+  turn==3 端到端 + fail-loud dispatch 测试；fixture 迁到 seam）,
+  `tests/think/llm/test_invoke.py`, `tests/unit/observability/adapters/test_telemetry_llm_adapter.py`
+  （fixtures 迁到 seam）, `raphy/prd.json`（RA-029 passes=true + learnings）
+- **Learnings for future iterations:**
+  - "具名 field + 访问器" beats 裸 field：field 解决拼写错误变类型错误，
+    访问器收编默认语义（silent-0 → 显式 fail-loud/0 决策）；以后 stringly 袋
+    维度收敛都按这个两件套做。
+  - 迁移 fixture 时注意 em-dash 等不可见字符（persist fixture docstring 里是 `—` 不是 `--`），
+    精确匹配失败先 `cat -A` 看原文。
+  - `tests/harness/test_seam_provider_locality.py::test_baseline_capability_set_matches`
+    在 RA-029 前 commit 同样红（PR-10 baseline 过期 vs `writable.matrix.default`
+    插件）——与 turn 无关，已验证 pre-existing，本轮不碰（非 RA-029 范围）。
+---
