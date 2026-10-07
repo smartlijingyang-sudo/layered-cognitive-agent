@@ -15,11 +15,9 @@
 
 from __future__ import annotations
 
-import contextlib
 import json
 import logging
 import os
-import socket
 import time
 from collections.abc import Callable
 from datetime import UTC, datetime
@@ -34,11 +32,13 @@ from lca.contracts.models.proactive.worthiness import (
     VerdictKind,
 )
 from lca.infrastructure.proactive.deliverer import ProactiveDeliverer
+from lca.infrastructure.scheduler_file_lock import (
+    STALE_ABSOLUTE_CAP_S,
+    SchedulerFileLock,
+)
 
 _log = logging.getLogger(__name__)
 
-# ADR-0263 §9②：stale 绝对上限 90 分钟。
-STALE_ABSOLUTE_CAP_S = 90 * 60
 # ADR-0263 §9③：重试退避 1min / 5min / 15min。
 RETRY_BACKOFF_S: tuple[int, ...] = (60, 300, 900)
 MAX_ATTEMPTS = 3
@@ -61,7 +61,9 @@ class ProactiveScheduler:
         default_interval_s: int = 3600,
         policy: ProactivePolicy | None = None,
     ) -> None:
-        self._lock_dir = Path(lock_dir)
+        self._file_lock = SchedulerFileLock(
+            lock_dir, name="proactive", default_interval_s=default_interval_s
+        )
         self._state_dir = Path(state_dir)
         self._job_source = job_source
         self._deliverer = deliverer
@@ -220,47 +222,13 @@ class ProactiveScheduler:
             return "failed"
         return "delivered"
 
-    # ---- 文件锁（ADR-0263 §9①②） ----
-
-    @property
-    def _lock_file(self) -> Path:
-        return self._lock_dir / "proactive.lock"
+    # ---- 文件锁（ADR-0263 §9①②）：实现见 SchedulerFileLock ----
 
     def _acquire_lock(self, now_ms: int) -> bool:
-        self._lock_dir.mkdir(parents=True, exist_ok=True)
-        owner = f"{socket.gethostname()}:{os.getpid()}"
-        try:
-            with open(self._lock_file, "x", encoding="utf-8") as f:
-                json.dump({"owner": owner, "mtime_ms": now_ms}, f)
-            return True
-        except FileExistsError:
-            pass
-        try:
-            with open(self._lock_file, encoding="utf-8") as f:
-                lock = json.load(f)
-        except (OSError, ValueError):
-            lock = {}
-        mtime_ms = int(lock.get("mtime_ms", 0) or 0)
-        stale_after_s = min(
-            self._default_interval_s * 2.0,
-            STALE_ABSOLUTE_CAP_S,
-        )
-        if now_ms - mtime_ms > stale_after_s * 1000:
-            _log.warning(
-                "proactive.lock_stale_reaped owner=%s age_s=%d",
-                lock.get("owner"),
-                (now_ms - mtime_ms) // 1000,
-            )
-            try:
-                self._lock_file.unlink()
-            except OSError:
-                return False
-            return self._acquire_lock(now_ms)
-        return False
+        return self._file_lock.acquire(now_ms)
 
     def release_lock(self) -> None:
-        with contextlib.suppress(OSError):
-            self._lock_file.unlink()
+        self._file_lock.release()
 
     # ---- 状态与死信 ----
 

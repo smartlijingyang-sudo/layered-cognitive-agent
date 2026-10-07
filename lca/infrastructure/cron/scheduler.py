@@ -1,8 +1,9 @@
 """CronScheduler：ADR-0268 §7、§8 的 tick 调度器（P3）。
 
 职责：``tick(now)`` 遍历 assistant home 下的 ``cron/*.json`` 定义，按
-``next_run`` 的 ``due`` 启动 worker；文件锁互斥 + 心跳 + stale 收割复用
-:class:`lca.infrastructure.proactive.scheduler.ProactiveScheduler` 的模式；
+``next_run`` 的 ``due`` 启动 worker；文件锁互斥 + 心跳 + stale 收割由
+:class:`lca.infrastructure.scheduler_file_lock.SchedulerFileLock` 提供
+（与 ``ProactiveScheduler`` 共享实现）；
 同一 ``job_id`` 运行中的 run 不杀，排队槽只留最新一次，旧排队项记
 ``superseded`` + ``not_sent``。
 
@@ -14,10 +15,7 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
-import json
 import logging
-import os
-import socket
 import uuid
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
@@ -38,11 +36,12 @@ from lca.domain.cron.worker_context import (
     WorkerProductContext,
     assemble_worker_context,
 )
+from lca.infrastructure.scheduler_file_lock import (
+    STALE_ABSOLUTE_CAP_S,
+    SchedulerFileLock,
+)
 
 _log = logging.getLogger(__name__)
-
-# ADR-0263 §9②：stale 绝对上限 90 分钟，与主动消息调度器一致。
-STALE_ABSOLUTE_CAP_S = 90 * 60
 
 # ``agent`` 执行与 ``space_action`` 重试耗尽后的最长自然超时（ADR-0268 §7）。
 _MAX_TIMEOUT_S = 86400
@@ -78,7 +77,9 @@ class CronScheduler:
         handoff_dispatcher: ScheduledHandoffDispatcher | None = None,
     ) -> None:
         self._store = store
-        self._lock_dir = Path(lock_dir)
+        self._file_lock = SchedulerFileLock(
+            lock_dir, name="cron", default_interval_s=default_interval_s
+        )
         self._workspace_path = workspace_path
         self._worker_runner = worker_runner
         self._default_interval_s = default_interval_s
@@ -364,42 +365,13 @@ class CronScheduler:
             run_id=run_id,
         )
 
-    # ---- 文件锁（ADR-0263 §9①②，与 ProactiveScheduler 同模式） ----
-
-    @property
-    def _lock_file(self) -> Path:
-        return self._lock_dir / "cron.lock"
+    # ---- 文件锁（ADR-0263 §9①②）：实现见 SchedulerFileLock ----
 
     def _acquire_lock(self, now_ms: int) -> bool:
-        self._lock_dir.mkdir(parents=True, exist_ok=True)
-        owner = f"{socket.gethostname()}:{os.getpid()}"
-        try:
-            with open(self._lock_file, "x", encoding="utf-8") as f:
-                json.dump({"owner": owner, "mtime_ms": now_ms}, f)
-            return True
-        except FileExistsError:
-            pass
-        try:
-            with open(self._lock_file, encoding="utf-8") as f:
-                lock = json.load(f)
-        except (OSError, ValueError):
-            lock = {}
-        mtime_ms = int(lock.get("mtime_ms", 0) or 0)
-        stale_after_s = min(self._default_interval_s * 2.0, STALE_ABSOLUTE_CAP_S)
-        if now_ms - mtime_ms > stale_after_s * 1000:
-            _log.warning(
-                "cron.lock_stale_reaped owner=%s age_s=%d",
-                lock.get("owner"),
-                (now_ms - mtime_ms) // 1000,
-            )
-            with contextlib.suppress(OSError):
-                self._lock_file.unlink()
-            return self._acquire_lock(now_ms)
-        return False
+        return self._file_lock.acquire(now_ms)
 
     def release_lock(self) -> None:
-        with contextlib.suppress(OSError):
-            self._lock_file.unlink()
+        self._file_lock.release()
 
 
 __all__ = [
