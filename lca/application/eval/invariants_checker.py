@@ -126,7 +126,7 @@ def check_turn_invariants(
             failures.append(str(err))
 
     return InvariantCheckResult(
-        passed=len(failures) == 0,
+        passed=not failures,
         failures=failures,
     )
 
@@ -154,6 +154,6 @@ def run_scenario_mock_invariants(scenario: DialogueScenario) -> InvariantCheckRe
 
     return InvariantCheckResult(
         scenario_id=scenario.id,
-        passed=len(all_failures) == 0,
+        passed=not all_failures,
         failures=all_failures,
     )

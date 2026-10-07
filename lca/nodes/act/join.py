@@ -97,7 +97,7 @@ class ActJoinExecutor:
                 f"instances or None, got {type(receipts_value).__name__}"
             )
 
-        if len(receipts) == 0:
+        if not receipts:
             return NodeOutput(port_values={})
         if len(receipts) == 1:
             return NodeOutput(

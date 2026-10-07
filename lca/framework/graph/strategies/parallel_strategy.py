@@ -41,7 +41,7 @@ class ParallelStrategy(NodeStrategy):
         if self.child_runner is None or self.reducer is None:
             raise RuntimeError("ParallelStrategy.execute called without child_runner or reducer")
         children = context.node_config.get("children")
-        if not isinstance(children, (list, tuple)) or len(children) == 0:
+        if not isinstance(children, (list, tuple)) or not children:
             raise RuntimeError(
                 f"ParallelStrategy at {context.node_id!r}: "
                 f"node_config['children'] must be a non-empty sequence of plan_refs"

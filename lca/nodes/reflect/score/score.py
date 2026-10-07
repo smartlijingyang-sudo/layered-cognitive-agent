@@ -97,7 +97,7 @@ def _extract_procedural_candidate(
     files = obs_extra.get("generated_files") or ()
 
     # Trigger condition: multi-step tool sequence (>=2) or deliverable files produced
-    if len(tool_sequence) >= 2 or len(files) > 0:
+    if len(tool_sequence) >= 2 or files:
         candidate_id = new_id("cand_proc")
         return ProceduralMemoryCandidate(
             candidate_id=candidate_id,

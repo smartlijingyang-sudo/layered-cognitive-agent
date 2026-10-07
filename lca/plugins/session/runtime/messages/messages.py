@@ -54,7 +54,7 @@ def derive_event_message(event: SessionEvent | Mapping[str, Any]) -> dict[str, A
         message = data.get("message")
         if isinstance(message, Mapping):
             content = message.get("content")
-            if isinstance(content, list) and len(content) == 0:
+            if isinstance(content, list) and not content:
                 return None
             return dict(message)
         content = data.get("content")

@@ -134,7 +134,7 @@ class Plan(BaseModel):
     @model_validator(mode="after")
     def _one_entry(self) -> Plan:
         entries = [n.id for n in self.nodes if n.entry]
-        if len(self.nodes) > 0 and len(entries) != 1:
+        if self.nodes and len(entries) != 1:
             raise ValueError(
                 f"plan {self.id!r}: exactly one entry node required, got {len(entries)}"
             )

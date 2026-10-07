@@ -121,7 +121,7 @@ def _auto_inject_freeform(params: dict[str, Any]) -> None:
         if not isinstance(q, dict):
             continue
         opts = q.get("options")
-        if not isinstance(opts, list) or len(opts) == 0:
+        if not isinstance(opts, list) or not opts:
             q["options"] = [_FREEFORM_OPTION, _FREEFORM_OPTION]
             continue
         if len(opts) < 2:

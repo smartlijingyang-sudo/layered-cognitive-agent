@@ -65,7 +65,7 @@ def _resolve_terminate_ports(schema: NodeIOSchema) -> tuple[PortName, PortName, 
     declared; falls back to the legacy default names otherwise.
     """
     required = schema.required_inputs()
-    decision_port = required[0] if len(required) >= 1 else PortName(_DEFAULT_DECISION_PORT)
+    decision_port = required[0] if required else PortName(_DEFAULT_DECISION_PORT)
     act_outcome_port = required[1] if len(required) >= 2 else PortName(_DEFAULT_ACT_OUTCOME_PORT)
     terminal_port = (
         schema.outputs[0].name if schema.outputs else PortName(_DEFAULT_TERMINAL_OUTCOME_PORT)
