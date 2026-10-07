@@ -69,7 +69,7 @@ def classify_error(error_message: str, status_code: int | None = None) -> Degrad
     msg_lower = error_message.lower()
 
     # Permission errors: precisely identifiable
-    if status_code == 403 or status_code == 401:
+    if status_code in (403, 401):
         return DegradationKind.PERMISSION
     permission_markers = [
         "permission",
