@@ -78,10 +78,7 @@ class ExecutionSpace:
                     f"{normalized_workspace!r} 子树内（I-A5 隔离硬边界）"
                 )
             normalized_acl.append(normalized)
-        if not isinstance(self.acl_paths, tuple):
-            object.__setattr__(self, "acl_paths", tuple(normalized_acl))
-        else:
-            object.__setattr__(self, "acl_paths", tuple(normalized_acl))
+        object.__setattr__(self, "acl_paths", tuple(normalized_acl))
 
 
 def materialize_assistant_workspace(
