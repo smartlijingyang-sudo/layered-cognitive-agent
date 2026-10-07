@@ -1,19 +1,3 @@
-\S
-Kernel \r on an \m
-\344\275\240\346\255\243\345\234\250\344\275\277\347\224\250\351\200\232\345\256\235\345\244\247\346\250\241\345\236\213\344\270\223\347\224\250\346\234\215\345\212\241\345\231\250\357\274\232
-\350\265\204\346\272\220\357\274\2328 \346\240\270\357\274\210vCPU\357\274\21164 GiB    GPU\357\274\232NVIDIA L20
-\351\203\250\347\275\262\346\234\215\345\212\241\357\274\232
-\351\200\232\345\256\235\346\234\211\350\212\222\346\231\272\350\203\275\345\212\251\346\211\213-\347\224\237\344\272\247\347\216\257\345\242\203
-\350\207\252\345\273\272AI\345\244\247\346\250\241\345\236\213-AI\345\233\242\351\230\237\346\265\213\350\257\225\344\275\277\347\224\250
-test-gitlab-AI\345\233\242\351\230\237\346\265\213\350\257\225\344\275\277\347\224\250
-On branch raphy/arch-20261007-0930
-Changes not staged for commit:
-  (use "git add <file>..." to update what will be committed)
-  (use "git restore <file>..." to discard changes in working directory)
-	modified:   lca/infrastructure/observability/loop_cursor/projection/host.py
-	modified:   tests/observability/loop_cursor/test_projection_host.py
-
-no changes added to commit (use "git add" and/or "git commit -a")
 ## Codebase Patterns
 
 （raphy 轮共享的模式/禁区登记，供后续 assess/optimize 轮参考）
@@ -169,3 +153,110 @@ no changes added to commit (use "git add" and/or "git commit -a")
     `invocation_id=call.call_id` 是 `safe_executor.execute` 的 kwarg，
     与 receipt 无关——grep 计数前先看上下文。
 ---
+
+---
+
+## Round 4 — assess (2026-10-07 16:30, branch raphy/arch-20261007-1630)
+
+- 按硬化版 `raphy-assess.md` 执行：读 `skills/improve-codebase-architecture/SKILL.md`；
+  `git log -60` 定热点；friction walk 精读三区（host_runtime providers+daemon /
+  journal narrative_writer / harness profile/plan），5 问必答；duplication 副扫描；
+  self-grilling 写进 assessment.md；diversity quota 满足（1 friction + 1 duplication）。
+- 热点来源：`git log -60`（`host_runtime/providers/user_cli.py` ×3、
+  narrative_writer fold.py、profile/plan declarations ×2 但已废弃→转 projection）。
+  `scripts/snapshot_capability_tree.py` 读后判定为工具胶水，无模块可深挖，丢弃。
+- 产出 2 个 stories（`passes: false`），续号 RA-014~015：
+  - RA-014（P1, **Strong**）：connect daemon 双套生命周期 ——
+    `DaemonService`（lca-ops 路径，有 RA-006 单活接缝 + 3 组测试）vs
+    `CLIProvider.start/stop_daemon`（host_runtime 路径，零测试、私有复刻
+    `_pid_alive`、curl 探活）；只靠 import 私有常量 `_CONNECT_PROC_PATTERN`
+    维系；RA-006 单活不变量在 CLIProvider 路径上不生效 →
+    DaemonService 成为唯一 owner，CLIProvider 委托，只保留 artifact 部署。
+  - RA-015（P2, Worth exploring）：`CLIProvider` 内两处 tempfile→sudo cp→
+    unlink→chmod/chown 特权文件仪式（`_ensure_wrapper` / `_write_start_script`）
+    收敛为 `_stage_privileged_file` 小 seam。
+- 丢弃（有证据）：narrative_writer（ADR-0164/0185 刻意拆分，pure render +
+  fold_provider seam）；`plugin_metadata.py`（有文档的 legacy 合并 seam，
+  deletion test 通过）；`run_sudo` 相对路径 sudo.pass 的 cwd 隐式契约
+  （speculative，无已证 bug）；`ItemStatus.ERROR` 闲置。
+- **Learnings for future iterations:**
+  - `CLIProvider` 这类"部署脚本型" provider 天然零测试 —— 动它无回归包袱，
+    是 raphy 重构的低风险高杠杆目标；反过来，它的 bug 也无测试兜底，
+    评估时优先看这类"无测试+双实现"组合。
+  - 跨接缝 import 私有常量（`_CONNECT_PROC_PATTERN`）是比重复更强的坏味道：
+    字符串 single source 了，行为没有 —— 评估时把"注释自称 single source"
+    当作重点核查对象。
+
+## 2026-10-07 17:30 - RA-014
+
+- connect daemon 生命周期收敛为单一 owner：`CLIProvider.start_daemon/stop_daemon`
+  委托给 `DaemonService`（显式接缝 composition），CLIProvider 只保留 artifact 部署
+  （provision/status/heal）；`HostEnvironment` 调用点零改动，外部行为不变。
+- 缝合法：`CLIProvider.__init__` 新增可选 `daemon` 注入（测试注入 fake）；
+  未注入时经模块级 `_daemon_service_for(config, user)` 懒构造，把 host_runtime
+  config 形状映射到 DaemonService（DaemonConfig user/cli_dir/token/ws_url；
+  health_url 重新拆为 host/port/path，探活目标与 status 报告的 URL 同一端点；
+  drift state dir 复用 cwd 相对的 `.lca-ops`，与 lca-ops 路径共享同一 CLI
+  漂移基线；sudo 复用 `.lobehub-stack/sudo.pass`，cwd 契约与 Provider.run_sudo 一致）。
+- `_CONNECT_PROC_PATTERN` 去私有化：daemon.py 新增公开 `CONNECT_PROC_PATTERN`
+  （旧私有名为 legacy alias，现有测试继续绿），user_cli 的私有跨接缝 import 删除。
+- `CLIProvider._pid_alive` 删除，改调共享 `service.pid_alive`（"converge N identical X" idiom）。
+- `_report_kernel_serve_status` 的 `curl -sf` 子进程探活删除，收敛到 `http_ready`
+  seam（与 DaemonService 同一探活；devices.online 计数细节随之消失，status 文案改为 reachable）。
+- 既有测试 `test_connect_proc_pattern_is_single_source` 按新契约更新：
+  断言公开常量为单一来源 + user_cli 不再携带私有 import（评估的耦合测试本身即被收敛对象）。
+- 新增 `tests/infrastructure/host_runtime/test_cli_provider_daemon_delegation.py`
+ （10 测试）：委托路径（start/stop/heal 经 mock seam）、STOPPED→False 映射、
+  user=None 旧契约（start False / stop True，不触 seam）、`_pid_alive` 消失、
+  kernel_serve 经 http_ready（钉住 url+timeout 参数）、`_daemon_service_for` 的
+  config 映射（user/cli_dir/token/ws_url/health_url 同源）。
+- Files changed:
+  - `lca/infrastructure/host_runtime/providers/user_cli.py`（委托+删除私有实现，222→~190 行）
+  - `lca/infrastructure/cli/services/daemon/daemon.py`（常量去私有化+内部改用公开名）
+  - `tests/infrastructure/cli/test_daemon_kill_existing.py`（单源测试按新契约更新）
+  - `tests/infrastructure/host_runtime/test_cli_provider_daemon_delegation.py`（新增）
+  - `raphy/prd.json`（RA-014 passes=true）、`raphy/progress.txt`
+- 测试：`tests/infrastructure/cli/ -k 'daemon'` 10 passed；新委托测试 10 passed；
+  `ruff check` 4 文件全过；架构/约定测试中仅 `test_file_line_count_limit` 红——
+  系 RA-010 遗留（host.py 258>250），与本轮改动无关，按契约记录不碰。
+- **Learnings for future iterations:**
+  - 评估建议的"heal 经委托 mock 钉住"测试实现时发现：`_daemon_service()` 的
+    user=None 守卫若放在 seam 解析后，注入的 mock 会绕过旧契约——守卫必须
+    在 start/stop_daemon 入口先行，保持"user=None 时零副作用"不变。
+  - DaemonService 构造即 `StateStore.__init__` 做 `mkdir(exist_ok)`：state_dir
+    选用户 `.lca` 会在真实部署流里遇到 deployer 不可写目录（WorkspaceProvider
+    已 chown 给用户）——operator state 必须走 operator 拥有的目录；本轮选了
+    与 lca-ops 共享的 cwd 相对 `.lca-ops`，drift 基线天然单一。
+  - DaemonService.start() 带 gateway 健康门控（最多等 20s）：旧 start_daemon
+    只 sleep 3s 就 pgrep，gateway 挂掉时旧代码会返回 True（daemon 随即因
+    ECONNREFUSED 崩溃）——收敛后返回 False 更诚实，这是"行为收敛"而非
+    "行为变更"，但要在 commit body 里写明。
+  - ssh252 里 `~` 展开正常，但 `&& md5sum ~/...` 写在引号外会跑在本机——
+    远程/本地命令边界用引号划清，验证路径一律写绝对路径。
+  - ruff S101 禁生产代码用 assert：用仓库既有风格 `raise AssertionError(...)`。
+  - 耦合本身被测试钉住时（test_connect_proc_pattern_is_single_source），
+    收敛故事必须同步更新该测试——测试是契约，不是化石。
+
+---
+## 2026-10-07 17:35 - RA-015
+
+- 在 `lca/infrastructure/host_runtime/providers/user_cli.py` 新增模块私有 seam
+  `_stage_privileged_file(run_sudo, content, dest, *, owner=None, mode=None)`：
+  tempfile → sudo cp → unlink → chmod/chown 仪式只存在于此一处；
+  `_ensure_wrapper` 改走该 seam（行为不变：cp → chmod +x → unlink，无 chown）。
+- 新增 `tests/infrastructure/host_runtime/test_stage_privileged_file.py`
+  （4 个测试）：fake run_sudo 钉住调用序列（owner+mode / 均缺省两分支）、
+  断言 staging tempfile 已被 unlink（unlink 纪律）、`_ensure_wrapper` 委托 +
+  已存在时跳过。
+- 测试：`tests/infrastructure/host_runtime/` 14/14 全绿；`ruff check` 两文件全绿。
+- **Learnings for future iterations:**
+  - 评估时认定的"两处重复"可能被同一分支的前序 story 先行消灭（RA-014 删了
+    `_write_start_script`）：optimize 开工前先 `git show` 确认重复仍存在，别
+    机械执行 story 字面要求；剩余的单仪式仍值得命名成 seam。
+  - 仪式类收敛的 seam 签名首参接可调用对象（`run_sudo` 注入）而非 self 方法：
+    测试可零依赖钉住序列，且与 codebase 的 fake-injection 惯例一致
+    （RA-014 的 daemon fake 同款）。
+  - 本仓库 ruff isort 把 `from collections.abc import Callable` 排在
+    `import subprocess/tempfile` 之后——按 ruff --fix 为准，别手排。
+---
+
