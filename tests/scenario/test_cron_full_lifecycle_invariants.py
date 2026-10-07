@@ -461,14 +461,14 @@ async def test_inv_cron_06_file_lock_safety(tmp_path: Path) -> None:
     now_ms = int(now.timestamp() * 1000)
 
     # 1. 实例 1 获取锁应当成功
-    assert daemon1._scheduler._acquire_lock(now_ms) is True
+    assert daemon1._scheduler._file_lock.acquire(now_ms) is True
 
     # 2. 锁被持有期间，实例 2 尝试获取同一锁必须失败
-    assert daemon2._scheduler._acquire_lock(now_ms) is False
+    assert daemon2._scheduler._file_lock.acquire(now_ms) is False
 
     # 3. 实例 1 释放锁
     daemon1._scheduler.release_lock()
 
     # 4. 释放后，实例 2 再次获取锁应当成功
-    assert daemon2._scheduler._acquire_lock(now_ms) is True
+    assert daemon2._scheduler._file_lock.acquire(now_ms) is True
     daemon2._scheduler.release_lock()

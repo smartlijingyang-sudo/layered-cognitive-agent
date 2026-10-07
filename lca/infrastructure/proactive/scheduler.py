@@ -32,10 +32,7 @@ from lca.contracts.models.proactive.worthiness import (
     VerdictKind,
 )
 from lca.infrastructure.proactive.deliverer import ProactiveDeliverer
-from lca.infrastructure.scheduler_file_lock import (
-    STALE_ABSOLUTE_CAP_S,
-    SchedulerFileLock,
-)
+from lca.infrastructure.scheduler_file_lock import SchedulerFileLock
 
 _log = logging.getLogger(__name__)
 
@@ -75,7 +72,7 @@ class ProactiveScheduler:
 
     def tick(self, now_ms: int | None = None) -> TickReport:
         now_ms = now_ms if now_ms is not None else int(time.time() * 1000)
-        if not self._acquire_lock(now_ms):
+        if not self._file_lock.acquire(now_ms):
             return TickReport(tick_at_ms=now_ms, lock_acquired=False)
 
         # 锁由 tick 自管理：正常结束释放，崩溃残留靠 mtime 心跳 + stale 收割。
@@ -224,9 +221,6 @@ class ProactiveScheduler:
 
     # ---- 文件锁（ADR-0263 §9①②）：实现见 SchedulerFileLock ----
 
-    def _acquire_lock(self, now_ms: int) -> bool:
-        return self._file_lock.acquire(now_ms)
-
     def release_lock(self) -> None:
         self._file_lock.release()
 
@@ -290,6 +284,5 @@ __all__ = [
     "DEAD_LETTER_TTL_S",
     "MAX_ATTEMPTS",
     "RETRY_BACKOFF_S",
-    "STALE_ABSOLUTE_CAP_S",
     "ProactiveScheduler",
 ]

@@ -411,7 +411,7 @@ def _extract_step_section(markdown: str, step_index: int) -> str:
 
 
 def test_tool_description_truncated_at_60_chars(tmp_path: Path) -> None:
-    """tool description 渲染时 _short 截断到 60 字符(防止章节过长)。"""
+    """tool description 渲染时 short_text 截断到 60 字符(防止章节过长)。"""
 
     long_desc = "D" * 200
 
@@ -499,3 +499,65 @@ def test_default_fold_provider_returns_none_when_no_run_dir(tmp_path: Path) -> N
     """
     writer = StepNarrativeWriter(Path(""))
     assert writer.fold_provider("run_x", "step-001") is None
+
+
+# ── RA-027: _chapter N/A 降级驱动 ──────────────────────────────────────────
+
+
+def test_chapter_driver_none_fold_renders_five_na_titles() -> None:
+    """driver 级：fold=None 时五个 _render_* 逐字输出 5 章 N/A 标题。"""
+    from lca.infrastructure.observability.journal.step.narrative_writer.fold import (
+        _render_context_items,
+        _render_prompt_sections,
+        _render_reasoning_per_step,
+        _render_skills_activated,
+        _render_tools_sent,
+    )
+
+    got = [
+        _render_tools_sent(None),
+        _render_skills_activated(None),
+        _render_prompt_sections(None),
+        _render_context_items(None),
+        _render_reasoning_per_step(None),
+    ]
+    assert got == [
+        ["**🧰 Tools sent to model(0)** — _N/A (fold SSOT 不可用)_"],
+        ["**🎯 Skills activated(0)** — _N/A (fold SSOT 不可用)_"],
+        ["**📚 Sections in prompt(0)** — _N/A (fold SSOT 不可用)_"],
+        ["**💬 Context items(0)** — _N/A (fold SSOT 不可用)_"],
+        ["**🧠 Reasoning per step** — _N/A (fold SSOT 不可用)_"],
+    ]
+
+
+def test_chapter_driver_header_none_degrades() -> None:
+    """fold.header=None 与 fold=None 同一路降级（同一守卫）。"""
+    from types import SimpleNamespace
+
+    from lca.infrastructure.observability.journal.step.narrative_writer.fold import (
+        _render_tools_sent,
+    )
+
+    assert _render_tools_sent(SimpleNamespace(header=None)) == [
+        "**🧰 Tools sent to model(0)** — _N/A (fold SSOT 不可用)_"
+    ]
+
+
+def test_chapter_driver_body_called_when_fold_available() -> None:
+    """fold 可用时 driver 调 body，不走 N/A。"""
+    from types import SimpleNamespace
+
+    from lca.infrastructure.observability.journal.step.narrative_writer.fold import (
+        _chapter,
+    )
+
+    seen: list[str] = []
+
+    def body(fold: object) -> list[str]:
+        seen.append("called")
+        return ["ok"]
+
+    fold = SimpleNamespace(header=SimpleNamespace())
+    assert _chapter("**T**", body, fold) == ["ok"]
+    assert seen == ["called"]
+    assert _chapter("**T**", body, None) == ["**T** — _N/A (fold SSOT 不可用)_"]

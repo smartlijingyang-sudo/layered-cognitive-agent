@@ -9,7 +9,6 @@ from lca.infrastructure.proactive.scheduler import (
     DEAD_LETTER_TTL_S,
     MAX_ATTEMPTS,
     RETRY_BACKOFF_S,
-    STALE_ABSOLUTE_CAP_S,
     ProactiveScheduler,
 )
 
@@ -18,7 +17,6 @@ __all__ = [
     "MAX_ATTEMPTS",
     "PROACTIVE_TURN",
     "RETRY_BACKOFF_S",
-    "STALE_ABSOLUTE_CAP_S",
     "SURFACE_ASSISTANT_MESSAGE",
     "ProactiveDeliverer",
     "ProactiveScheduler",

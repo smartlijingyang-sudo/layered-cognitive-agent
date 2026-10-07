@@ -1,8 +1,8 @@
 """ADR-0185 fold 章节渲染器 —— 从 FoldedModelVisible 派生 5 个章节
 (🧰 Tools / 🎯 Skills / 📚 Sections / 💬 Context items / 🧠 Reasoning)。
 
-fold = None 时每个子渲染器显式降级到 N/A 占位;``FoldProvider`` seam
-类型也在此定义。渲染结果由 ``writer._render_step`` 组装进 narrative。
+fold = None 时每个子渲染器经 ``_chapter`` 驱动显式降级到 N/A 占位;
+``FoldProvider`` seam 类型定义在 ``fold_source``（生产者侧）。渲染结果由 ``writer._render_step`` 组装进 narrative。
 """
 
 from __future__ import annotations
@@ -11,21 +11,31 @@ from collections.abc import Callable, Mapping
 from typing import TYPE_CHECKING
 
 from lca.infrastructure.observability.journal.step.narrative_writer.sections import (
-    _short,
+    short_text,
 )
 
 if TYPE_CHECKING:
     from lca.infrastructure.observability.replay.fold_source import FoldedModelVisible
 
-# Fold provider seam —— 每 step 调一次;返回 None 表示 fold SSOT 不可用,
-# narrative 应优雅降级到 N/A 占位(不抛错、不影响其它章节)。test 用 mock
-# callable 注入;production 走默认 ``fold_model_visible``(读 spine.jsonl)。
-FoldProvider = Callable[[str, str], "FoldedModelVisible | None"]
-
 # ── Fold 章节(ADR-0185 PR-3.1 narrative 增强) ── ──
 
 _FOLD_NA = "_N/A (fold SSOT 不可用)_"
 """fold_provider 返回 None 时的占位串;章节数 / 标题保留,内容降级。"""
+
+
+def _chapter(
+    na_title: str,
+    body: Callable[[FoldedModelVisible], list[str]],
+    fold: FoldedModelVisible | None,
+) -> list[str]:
+    """五章 N/A 降级驱动：fold 不可用时渲染逐字 N/A 标题占位，否则调 body。
+
+    五个 ``_render_*`` 的 ``fold is None or fold.header is None`` 守卫收敛于此；
+    body 只处理 fold 可用的真值路径（fold.header 非 None）。
+    """
+    if fold is None or fold.header is None:
+        return [f"{na_title} — {_FOLD_NA}"]
+    return body(fold)
 
 
 def _tool_name(tool: object) -> str:
@@ -61,8 +71,10 @@ def _render_tools_sent(fold: FoldedModelVisible | None) -> list[str]:
     fold = None ⇒ 整段显示 N/A 占位(不抛错)。
     tools 为空 ⇒ 标题后显式「(空,本 step 未下发工具)」。
     """
-    if fold is None or fold.header is None:
-        return [f"**🧰 Tools sent to model(0)** — {_FOLD_NA}"]
+    return _chapter("**🧰 Tools sent to model(0)**", _tools_sent_body, fold)
+
+
+def _tools_sent_body(fold: FoldedModelVisible) -> list[str]:
     tools = fold.header.tools or ()
     lines = [f"**🧰 Tools sent to model({len(tools)})**"]
     if not tools:
@@ -70,7 +82,7 @@ def _render_tools_sent(fold: FoldedModelVisible | None) -> list[str]:
         return lines
     for tool in tools:
         name = _tool_name(tool)
-        desc = _short(_tool_description(tool), 60)
+        desc = short_text(_tool_description(tool), 60)
         if desc:
             lines.append(f"- `{name}` — {desc}")
         else:
@@ -84,8 +96,10 @@ def _render_skills_activated(fold: FoldedModelVisible | None) -> list[str]:
     manifest 缺 / skill_router 未启用 ⇒ 显式标注「SkillRouter 未启用」。
     有 catalog 但无激活 ⇒ 标注「无匹配 (catalog=N)」。
     """
-    if fold is None or fold.header is None:
-        return [f"**🎯 Skills activated(0)** — {_FOLD_NA}"]
+    return _chapter("**🎯 Skills activated(0)**", _skills_activated_body, fold)
+
+
+def _skills_activated_body(fold: FoldedModelVisible) -> list[str]:
     manifest = fold.manifest or {}
     if "activated_skill_ids" not in manifest and "available_skills_count" not in manifest:
         return ["**🎯 Skills activated** — SkillRouter 未启用或本 step 未触发 prompt assembler"]
@@ -110,8 +124,10 @@ def _render_prompt_sections(fold: FoldedModelVisible | None) -> list[str]:
     字段:name + text_chars + content_digest 前 16(碰撞足够区分)。
     sections 缺失 ⇒ 标注「未携带 section trace(reasoner 降级路径)」。
     """
-    if fold is None or fold.header is None:
-        return [f"**📚 Sections in prompt(0)** — {_FOLD_NA}"]
+    return _chapter("**📚 Sections in prompt(0)**", _prompt_sections_body, fold)
+
+
+def _prompt_sections_body(fold: FoldedModelVisible) -> list[str]:
     manifest = fold.manifest or {}
     sections = manifest.get("sections")
     if sections is None:
@@ -121,7 +137,7 @@ def _render_prompt_sections(fold: FoldedModelVisible | None) -> list[str]:
     lines = [f"**📚 Sections in prompt({len(sections)})**"]
     for section in sections:
         if not isinstance(section, Mapping):
-            lines.append(f"- {_short(section, 100)}")
+            lines.append(f"- {short_text(section, 100)}")
             continue
         name = section.get("name", "<unnamed>")
         text_chars = section.get("text_chars")
@@ -142,8 +158,10 @@ def _render_context_items(fold: FoldedModelVisible | None) -> list[str]:
 
     每项 kind + payload_preview[:120];无 manifest 路径 ⇒ 标注降级。
     """
-    if fold is None or fold.header is None:
-        return [f"**💬 Context items(0)** — {_FOLD_NA}"]
+    return _chapter("**💬 Context items(0)**", _context_items_body, fold)
+
+
+def _context_items_body(fold: FoldedModelVisible) -> list[str]:
     manifest = fold.manifest or {}
     items = manifest.get("context_manifest_items")
     if items is None:
@@ -151,10 +169,10 @@ def _render_context_items(fold: FoldedModelVisible | None) -> list[str]:
     lines = [f"**💬 Context items({len(items)})**"]
     for item in items:
         if not isinstance(item, Mapping):
-            lines.append(f"- {_short(item, 120)}")
+            lines.append(f"- {short_text(item, 120)}")
             continue
         kind = item.get("kind", "<unknown>")
-        preview = _short(item.get("payload_preview", ""), 120)
+        preview = short_text(item.get("payload_preview", ""), 120)
         if preview:
             lines.append(f"- `{kind}` — {preview}")
         else:
@@ -168,8 +186,10 @@ def _render_reasoning_per_step(fold: FoldedModelVisible | None) -> list[str]:
     fold.assistant 为 None ⇒ 标注「assistant payload 缺失」;空字符串
     视为「模型直接调用工具 / 无文字回复」。
     """
-    if fold is None or fold.header is None:
-        return [f"**🧠 Reasoning per step** — {_FOLD_NA}"]
+    return _chapter("**🧠 Reasoning per step**", _reasoning_per_step_body, fold)
+
+
+def _reasoning_per_step_body(fold: FoldedModelVisible) -> list[str]:
     assistant = fold.assistant
     if assistant is None:
         return ["**🧠 Reasoning per step** — assistant payload 缺失(post hook 未跑 / skip)"]

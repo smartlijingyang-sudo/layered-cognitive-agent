@@ -40,7 +40,7 @@ _OUTCOME_ICON: dict[str | None, str] = {
 }
 
 
-def _short(value: object, limit: int = 80) -> str:
+def short_text(value: object, limit: int = 80) -> str:
     """安全截断, 用于 markdown 表格里。"""
     if value is None:
         return ""
@@ -75,7 +75,7 @@ def _render_context(step: JournalStep) -> list[str]:
         return ["**上下文**: _(未填)_", ""]
     ctx = step.context_before
     lines = ["**上下文**:"]
-    lines.append(f"- objective: `{_short(ctx.objective, 200)}`")
+    lines.append(f"- objective: `{short_text(ctx.objective, 200)}`")
     if ctx.attachments:
         att_names = ", ".join(f"`{a.name}` ({a.size_bytes} B)" for a in ctx.attachments)
         lines.append(f"- attachments: {att_names}")
@@ -85,14 +85,14 @@ def _render_context(step: JournalStep) -> list[str]:
         prefix = "..." if len(ctx.prior_summary_chain) > 3 else ""
         lines.append(f"- prior_summary_chain ({len(ctx.prior_summary_chain)} 条):")
         for s in recent:
-            lines.append(f"  - {_short(s, 200)}")
+            lines.append(f"  - {short_text(s, 200)}")
         if prefix:
             lines.append(f"  - {prefix}")
     if ctx.cumulative_files:
         files = ", ".join(f"`{Path(f).name}`" for f in ctx.cumulative_files)
         lines.append(f"- cumulative_files: {files}")
     if ctx.extra:
-        extra_str = ", ".join(f"{k}={_short(v, 40)}" for k, v in ctx.extra.items())
+        extra_str = ", ".join(f"{k}={short_text(v, 40)}" for k, v in ctx.extra.items())
         lines.append(f"- extra: {extra_str}")
     return lines
 
@@ -105,12 +105,12 @@ def _render_thinking(trace: ThinkingTrace) -> list[str]:
     if trace.decision:
         lines.append(f"- decision: `{trace.decision}`")
     if trace.reasoning:
-        lines.append(f"- reasoning: {_short(trace.reasoning, 400)}")
+        lines.append(f"- reasoning: {short_text(trace.reasoning, 400)}")
     if trace.raw_response_preview:
-        lines.append(f"- response_preview: {_short(trace.raw_response_preview, 400)}")
+        lines.append(f"- response_preview: {short_text(trace.raw_response_preview, 400)}")
     if trace.tool_call is not None:
         tc = trace.tool_call
-        lines.append(f"- tool_call (decision): `{tc.name}` ({_short(tc.arguments_summary, 100)})")
+        lines.append(f"- tool_call (decision): `{tc.name}` ({short_text(tc.arguments_summary, 100)})")
     return lines
 
 
@@ -119,7 +119,7 @@ def _render_tool_call(call: ToolCallRecord) -> list[str]:
         "**工具调用**:",
         f"- name: `{call.name}`",
         f"- invocation_id: `{call.invocation_id}`",
-        f"- arguments_summary: {_short(call.arguments_summary, 200)}",
+        f"- arguments_summary: {short_text(call.arguments_summary, 200)}",
     ]
 
 
@@ -129,29 +129,29 @@ def _render_tool_result(result: ToolResult) -> list[str]:
     ]
     lines.append(f"- latency_ms: {result.latency_ms}")
     if result.delta_summary:
-        lines.append(f"- delta_summary: {_short(result.delta_summary, 200)}")
+        lines.append(f"- delta_summary: {short_text(result.delta_summary, 200)}")
     if result.stdout_head:
-        lines.append(f"- stdout_head: `{_short(result.stdout_head, 200)}`")
+        lines.append(f"- stdout_head: `{short_text(result.stdout_head, 200)}`")
     lines.append(f"- stdout_chars_total: {result.stdout_chars_total}")
     if result.stdout_truncated:
         lines.append("- stdout_truncated: True")
     if result.stderr:
-        lines.append(f"- stderr: `{_short(result.stderr, 300)}`")
+        lines.append(f"- stderr: `{short_text(result.stderr, 300)}`")
     if result.files_created:
         files = ", ".join(f"`{f}`" for f in result.files_created)
         lines.append(f"- files_created: {files}")
     if result.error:
-        lines.append(f"- error: `{_short(result.error, 300)}`")
+        lines.append(f"- error: `{short_text(result.error, 300)}`")
     return lines
 
 
 def _render_reflect(reflect: ReflectTrace) -> list[str]:
     lines = ["**反思**:"]
-    lines.append(f"- summary: {_short(reflect.summary, 200)}")
+    lines.append(f"- summary: {short_text(reflect.summary, 200)}")
     if reflect.verdict:
         lines.append(f"- verdict: `{reflect.verdict}`")
     if reflect.extra:
-        extra = ", ".join(f"{k}={_short(v, 60)}" for k, v in reflect.extra.items())
+        extra = ", ".join(f"{k}={short_text(v, 60)}" for k, v in reflect.extra.items())
         lines.append(f"- extra: {extra}")
     return lines
 
@@ -174,7 +174,7 @@ def _render_spans(spans: tuple[SpanRecord, ...]) -> list[str]:
             f"- `{sample.kind}` × {len(collapsed)} 条 token 增量（已合并 / 详见 evidence）"
         )
     for s in others:
-        bullets.append(f"- `{s.kind}` @ {_format_ts(s.started_at)}: {_short(s.summary, 120)}")
+        bullets.append(f"- `{s.kind}` @ {_format_ts(s.started_at)}: {short_text(s.summary, 120)}")
     summary = f"诊断 ({len(spans)} spans"
     if collapsed:
         summary += f"，{len(collapsed)} 条 token 已 coalesce"

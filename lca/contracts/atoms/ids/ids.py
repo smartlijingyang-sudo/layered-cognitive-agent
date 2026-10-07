@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import UTC, datetime
-from typing import NewType
+from typing import Any, NewType
 
 # uuid4 hex 截取长度：12 位 hex = 48 bit 随机性，碰撞概率极低且 id 简短
 _ID_SUFFIX_LEN: int = 12
@@ -76,6 +76,34 @@ def new_delegation_id() -> DelegationId:
 def new_invocation_id() -> InvocationId:
     """生成品牌化 invocation ID。"""
     return InvocationId(new_id("inv"))
+
+
+# ── step_id 约定（RA-025）：fold key / hook key / reasoner key 单源 ──
+
+
+def step_id_for(step_index: int) -> str:
+    """派生 ``step-{step_index:03d}`` 形态的 step_id。
+
+    与 :class:`LoopCursor` 的 step_id 形态一致（ADR-0168 §D7 + ADR-0169 D7
+    step_id 约定 3 位零填充；cursor.snapshot.step_id 与各调用点派生同一形式）。
+    ``step-NNN`` 字节形态是 fold key / hook key 匹配的依据，不得改变。
+    """
+    return f"step-{step_index:03d}"
+
+
+def step_id_from_cursor(cursor: Any, template_id: str) -> str:
+    """从 cursor 派生 step_id；cursor 缺席/异常时回退。
+
+    cursor 缺席（None）或读取 ``cursor.snapshot.step_index`` 抛错时，
+    返回 ``step-unknown-{template_id}``（原 llm_call / reasoner 的逐字
+    7 行回退仪式收敛于此）。
+    """
+    if cursor is None:
+        return f"step-unknown-{template_id}"
+    try:
+        return step_id_for(cursor.snapshot.step_index + 1)
+    except Exception:
+        return f"step-unknown-{template_id}"
 
 
 def remaining_seconds(deadline: datetime, *, now: datetime | None = None) -> float:

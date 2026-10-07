@@ -24,6 +24,7 @@ from lca.contracts.protocols.runtime.runtime.composition import (
 )
 from lca.framework.graph.adapter import PhaseRunCursor
 from lca.framework.graph.interpreter import InterpretationResult, PlanInterpreter
+from lca.framework.graph.loop_budget import clamp_loop_bounds
 from lca.runtime.support.checkpoint_resolution import DeclarativeCheckpoint
 from lca.runtime.support.runtime_bindings import DeclarativeRuntimeBindings
 
@@ -290,6 +291,16 @@ class DeclarativeExecution:
         else:
             graph_spec = self._load_v2_graph_spec(plan)
         plan_obj = lift_graph_spec(graph_spec)
+        # RA-023: translate the run budget into the graph loop bound.
+        # ``max_steps`` only ever tightens the plan's own caps (min rule,
+        # never loosens); the interpreter still fail-louds via
+        # ``LoopObligationExceededError`` when the effective bound is
+        # exhausted, and the agent layer translates that into a failed
+        # Result. ``budget`` may be absent on duck-typed test fakes.
+        budget = getattr(state, "budget", None)
+        plan_obj = clamp_loop_bounds(
+            plan_obj, max_steps=getattr(budget, "max_steps", None)
+        )
         interpreter = self._bindings.new_interpreter(journal=self._journal)
         # v2 has no ``resume`` method; seed the traversal manually when
         # a checkpoint cursor is supplied.

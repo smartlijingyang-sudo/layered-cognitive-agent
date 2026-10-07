@@ -36,10 +36,7 @@ from lca.domain.cron.worker_context import (
     WorkerProductContext,
     assemble_worker_context,
 )
-from lca.infrastructure.scheduler_file_lock import (
-    STALE_ABSOLUTE_CAP_S,
-    SchedulerFileLock,
-)
+from lca.infrastructure.scheduler_file_lock import SchedulerFileLock
 
 _log = logging.getLogger(__name__)
 
@@ -99,7 +96,7 @@ class CronScheduler:
         ``lock_acquired=False`` 的摘要，不执行任何调度。
         """
         now_ms = int(now.timestamp() * 1000)
-        if not self._acquire_lock(now_ms):
+        if not self._file_lock.acquire(now_ms):
             return CronTickReport(tick_at=now, lock_acquired=False)
 
         due = started = queued = superseded = 0
@@ -367,15 +364,11 @@ class CronScheduler:
 
     # ---- 文件锁（ADR-0263 §9①②）：实现见 SchedulerFileLock ----
 
-    def _acquire_lock(self, now_ms: int) -> bool:
-        return self._file_lock.acquire(now_ms)
-
     def release_lock(self) -> None:
         self._file_lock.release()
 
 
 __all__ = [
-    "STALE_ABSOLUTE_CAP_S",
     "CronScheduler",
     "CronTickReport",
 ]

@@ -44,6 +44,7 @@ import logging
 from collections.abc import Iterable, Mapping
 from typing import TYPE_CHECKING, Any
 
+from lca.contracts.atoms.ids.ids import step_id_for
 from lca.contracts.mechanisms.content.addressable import sha256_hex
 from lca.contracts.observability.cursor.loop_cursor_payloads import ToolSchema
 from lca_kernel.events.fold.fold import EpochHeader, canonicalHeader, headerEquals
@@ -58,29 +59,8 @@ if TYPE_CHECKING:
 
 _log = logging.getLogger(__name__)
 
-# payloads_model_visible forward-ref ``AssistantRequestConfig`` / ``MessageDict``
-# / ``ToolCallDict`` / ``UsageDict`` 在 TYPE_CHECKING 块定义为 ``Any``,pydantic v2
-# 不会自动从 module globals 解析 + 复合 forward-ref(tuple["X", ...])在
-# 普通 rebuild 下也不收口。本模块 import 时一次性 rebuild,显式提供
-# ``_types_namespace`` 把 forward-ref 链钉到 Any。
-# (对齐 PR-0 注释 "PR-0 在 lca_kernel.events.types 落地" 后续工作)
-
-_rebuild_ns = {
-    "AssistantRequestConfig": Any,
-    "MessageDict": Any,
-    "ToolCallDict": Any,
-    "UsageDict": Any,
-}
-for _payload_cls in (
-    SpineLlmRequestHeaderPayload,
-    SpineLlmRequestHeaderAssistantPayload,
-):
-    try:
-        _payload_cls.model_rebuild(force=True, _types_namespace=_rebuild_ns)
-    except Exception as exc:  # INTENTIONAL: 失败仅记日志,publish 主路径不挡
-        _log.debug("payload_model_rebuild_skip: %s", exc)
-del _payload_cls, _rebuild_ns
-
+# RA-024: forward-ref 自愈已收进 lca_kernel/events/payloads/model_visible
+# 模块内（_self_heal_forward_refs），本模块不再做 import-time rebuild。
 
 def _sha256_hex(data: bytes) -> str:
     return f"sha256:{sha256_hex(data)}"
@@ -105,24 +85,8 @@ def _canonical_digest(header: EpochHeader) -> str:
     return _sha256_hex(encoded)
 
 
-def _step_id_for(step_index: int) -> str:
-    """``step-{step_index:03d}`` —— 与 :class:`LoopCursor` step_id 形态一致。
-
-    ADR-0168 §D7 + ADR-0169 D7 step_id 约定 3 位零填充;cursor.snapshot.step_id
-    与本 hook 派生同一形式。
-    """
-    return f"step-{int(step_index):03d}"
-
-
-def _coerce_tools(raw: Any) -> tuple[Any, ...]:
-    """kwargs.tools → tuple;非 list/tuple 输入 → ()。"""
-    if isinstance(raw, (list, tuple)):
-        return tuple(raw)
-    return ()
-
-
-def _coerce_messages(raw: Any) -> tuple[Any, ...]:
-    """kwargs.messages → tuple;非 list/tuple 输入 → ()。"""
+def _coerce_sequence(raw: Any) -> tuple[Any, ...]:
+    """kwargs.tools / kwargs.messages → tuple;非 list/tuple 输入 → ()。"""
     if isinstance(raw, (list, tuple)):
         return tuple(raw)
     return ()
@@ -233,7 +197,7 @@ class ModelVisibleHook:
         - payload 构造 / publish 抛错 → 吞错 + log(warning),返回 ``None``(L10)。
         - fold 检查通过并 publish 成功 → ``self._step_counter`` 自增(纯内存);
           fold 跳过分支不增(同 step 重试 attempt,不新开步)。
-        - fold 比对锚点为该 run 上次 publish 的 header(``_step_id_for`` 当前
+        - fold 比对锚点为该 run 上次 publish 的 header(``step_id_for`` 当前
           计数器对应的 step),而非本次待派生的新 step。
         """
         system_text = system_prompt_text or ""
@@ -241,20 +205,20 @@ class ModelVisibleHook:
         current = EpochHeader(
             config=kwargs.get("config"),
             system=system_text or None,
-            tools=_coerce_tools(kwargs.get("tools")),
+            tools=_coerce_sequence(kwargs.get("tools")),
         )
         current = canonicalHeader(current)
 
         # fold 比对锚点:该 run 上次 publish 的 header。计数器在 fold 检查
         # 之后、publish 路径上才 +1 —— fold 跳过不新开步(方法 docstring 语义)。
         # 此前先 +1 导致 key 恒为新 step,fold 分支不可达。
-        fold_key = (run_id, _step_id_for(self._step_counter))
+        fold_key = (run_id, step_id_for(self._step_counter))
         previous = self._last_headers.get(fold_key)
         previous_digest = _canonical_digest(previous) if previous is not None else None
 
         # 本次待 publish 的 step(resume 标记比对 + payload 用)。计数器在
         # publish 成功后才真正 +1(失败/吞错不推进,不烧 step 号)。
-        step_id = _step_id_for(self._step_counter + 1)
+        step_id = step_id_for(self._step_counter + 1)
         key = (run_id, step_id)
 
         is_resume = key in self._resume_run_step
@@ -266,7 +230,7 @@ class ModelVisibleHook:
             return None  # fold 优化:同 header 不发,不推进计数器
         reason = "change"
 
-        messages = _coerce_messages(kwargs.get("messages"))
+        messages = _coerce_sequence(kwargs.get("messages"))
         manifest = kwargs.get("manifest")
 
         ref: EventRef | None
@@ -340,7 +304,7 @@ class ModelVisibleHook:
         if step_id is None:
             # 异常路径:该 run 此前无 pre publish(pre 抛错被吞或未调)——仍
             # publish,header_digest 为空(ADR-0185 §3.3 必填语义)。
-            step_id = _step_id_for(self._step_counter)
+            step_id = step_id_for(self._step_counter)
             digest = ""
         else:
             key = (run_id, step_id)

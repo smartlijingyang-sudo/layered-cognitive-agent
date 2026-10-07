@@ -11,7 +11,8 @@ semantic inspect 投影。fold 重建见 PR-0 落地的 :mod:`lca_kernel.events.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Literal
+import logging
+from typing import TYPE_CHECKING, Any, Literal
 
 from pydantic import ConfigDict
 
@@ -31,8 +32,6 @@ ReasonType = Literal["initial", "resume", "change", "series"]
 if TYPE_CHECKING:
     # PR-0 在 ``lca_kernel/events/types.py`` 落地以下占位类型；本 PR
     # 仅 stub 让 mypy --strict 通过；pydantic 在 PR-0 落地后按真实类型解析。
-    from typing import Any
-
     AssistantRequestConfig = Any
     MessageDict = Any
     ToolCallDict = Any
@@ -123,3 +122,35 @@ __all__ = [
     "SpineLlmRequestHeaderAssistantPayload",
     "SpineLlmRequestHeaderPayload",
 ]
+
+_log = logging.getLogger(__name__)
+
+
+def _self_heal_forward_refs() -> None:
+    """Pin the four PR-0 forward-ref stubs to ``Any`` at import time.
+
+    PR-0 shim: ``AssistantRequestConfig`` / ``MessageDict`` /
+    ``ToolCallDict`` / ``UsageDict`` are stubbed as ``Any`` inside the
+    ``TYPE_CHECKING`` block above (real types land in
+    ``lca_kernel.events.types``), so pydantic v2 cannot resolve the
+    string forward-refs on the payload fields. Rebuild once here — at
+    the defect's owner — instead of once per consumer.
+
+    Delete-when: real types land in ``lca_kernel.events.types`` — then
+    drop the ``TYPE_CHECKING`` stubs, the string forward-refs, and this
+    function together.
+    """
+    ns = {
+        "AssistantRequestConfig": Any,
+        "MessageDict": Any,
+        "ToolCallDict": Any,
+        "UsageDict": Any,
+    }
+    for cls in (SpineLlmRequestHeaderPayload, SpineLlmRequestHeaderAssistantPayload):
+        try:
+            cls.model_rebuild(force=True, _types_namespace=ns)
+        except Exception as exc:  # INTENTIONAL: 失败仅记日志,import 不挡
+            _log.debug("payload_forward_ref_self_heal_skip: %s", exc)
+
+
+_self_heal_forward_refs()

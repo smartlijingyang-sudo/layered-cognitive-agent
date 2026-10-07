@@ -37,6 +37,41 @@
   属 `lca_kernel.events.session.session`，勿收进 session 包做 single
   source（RA-017 的层向论证不适用；Round 4 "注释自称 single source"教训）。
 
+- **model_visible payload forward-ref 缺陷位（RA-024 认领，optimize 前勿动）：**
+  `lca_kernel/events/payloads/model_visible.py` 的四名（AssistantRequestConfig /
+  MessageDict / ToolCallDict / UsageDict）只在 TYPE_CHECKING 块 stub 为 Any，
+  字段字符串引用 pydantic v2 不解析；`hook.py` 与 `fold_source.py` 各有一份
+  import-time rebuild 仪式，`publisher.py` 的 eager import（`noqa: F401`）
+  纯为触发副作用。修法是源头自愈，不是第三处仪式。
+- **step_id `step-{n:03d}` 四处独立派生（RA-025 认领）：** `hook._step_id_for` /
+  `plugins/primitive/llm_call/invoke.py:116` / `nodes/think/llm/invoke.py:190` /
+  `cognition/brain/reasoner/reasoner.py:232`；后两者连 `step-unknown-{template_id}`
+  回退仪式都逐字相同。另有 `step_{n:03d}` 下划线变体（journal_fold 缺省 /
+  writable_matrix）疑似漂移，**未立案**（不同 surface，可能 load-bearing）。
+- **SchedulerFileLock 收敛残留（RA-026 认领）：** 两调度器各留逐字相同的
+  `_acquire_lock`/`release_lock` 直通对（`release_lock` 公开，被
+  `tests/integration/proactive/test_pipeline.py` 用 6 次，保留；`_acquire_lock`
+  私有，可删）；`STALE_ABSOLUTE_CAP_S` 4 处 re-export（2 模块 + 2 包 `__init__`）
+  零外部引用（含 tests）。
+- **fold.py 五章 N/A guard 同一仪式（RA-027 认领）：** 5 个 `_render_*` 各重复
+  `fold is None or fold.header is None`；另 `from …sections import _short`
+  跨模块 import 私有名字（leaky seam）；`FoldProvider` 类型别名放错边（消费者侧）。
+- **P0 已钉（RA-023 认领，最高优）：** `LoopObligationExceededError` 逃逸
+  `Agent.run()`（2026-10-07 findings + 10-08 本轮复现两次）；框架日志自记
+  `status=failed max_steps=5` 却不翻译成 Result；`max_steps` 与 graph
+  `loop.maxIterations=24` 脱节。optimize 实现前**不要**在 `cognitive_agent.py`
+  加 try/except 凑合——要的是 Result 翻译 + 步数对齐，不是吞错。
+- **运行时验证基线（2026-10-08，MockLLMAdapter，LLM_API_KEY=dummy）：**
+  basic run / tool-call run / 同一 agent 双 run 全 completed；P0 复现仍在。
+  `run(None)` TypeError 与 `NativeToolCall.arguments` 传 str 的晦涩报错
+  （10-07 P2）defer 给 iter-quality lane，本轮未立案。
+- **`ModelVisibleHook.before_publish`/`after_dispatch` 占位：** hypothetical seam
+  （为 PR-3 bus pipeline 保留），按 YAGNI 应删，但 ADR-0185 PR-3 显式计划了
+  "0 改动切换"——跟 ADR 对着干不开 story；PR-3 落地或流产时再议。
+- **`ProactiveScheduler` 的 `js` state dict：** `last_run_ms`/`attempts`/
+  `next_retry_ms`/`last_error` 四 key 字面量散四处，无 module——真 friction
+  但无失败证据，speculative，留待有 bug 时立案。
+
 ---
 
 ## Round 6 — assess (2026-10-07 23:15, branch raphy/arch-20261007-2315)
@@ -580,3 +615,186 @@
     接缝缺失 fail-loud，符合 codebase fail-loud 纪律；评估只说"显式接缝"，
     未定默认行为，实现时按纪律补上（已记入 prd notes delta）。
 ---
+
+## Round 7 — assess (2026-10-08 02:06, branch raphy/arch-20261008-0206)
+
+- 按硬化版 `raphy-assess.md` 执行：读 `skills/improve-codebase-architecture/SKILL.md`；
+  `git log -70` 定热点；CONTEXT.md（13 行）已读，无增补；friction walk 精读三区
+  （event bus 721 行 + model_visible hook 380 行 + publisher 147 行全文 /
+  scheduler_file_lock 97 行 + cron/proactive scheduler 381/295 行全文 /
+  narrative fold.py 216 行全文，5 问必答）；mandatory runtime verification 真跑；
+  duplication 副扫描；self-grilling 写进 assessment.md；diversity quota 满足
+  （4 friction + 1 runtime，无纯 duplication story）。
+- 运行时验证（252，LLM_API_KEY=dummy，MockLLMAdapter）：basic run ✅ completed；
+  tool-call run ✅ completed；同一 agent 双 run ✅✅；**P0 复现** ❌：
+  InfiniteMock + max_steps=5 → `LoopObligationExceededError` 逃逸出 `agent.run()`，
+  未返回 Result（与 10-07 findings 一致，未修复；新证据：框架日志自记 status=failed
+  却不翻译）。
+- 产出 5 个 stories（`passes: false`），续号 RA-023~027：
+  - RA-023（P0, **Strong**）：`Agent.run()` 建异常翻译 seam——graph 机制错误 →
+    failed Result（CancelledError 仍透传）；spike 定 max_steps 与 loop bound 对齐。
+  - RA-024（P1, Worth exploring）：model_visible payload forward-ref 在源头自愈；
+    删 hook.py/fold_source.py 两处 rebuild 仪式 + publisher eager import；
+    收敛 `_coerce_tools`/`_coerce_messages`。
+  - RA-025（P1, Worth exploring）：`step-{n:03d}` 四处派生收进一个 seam
+    （`step_id_for` + `step_id_from_cursor`，spike 定落点）；下划线变体明确 out of scope。
+  - RA-026（P2, Worth exploring）：调度器收敛收尾——删 `_acquire_lock` 直通对
+    （`release_lock` 公开保留）+ 4 处 `STALE_ABSOLUTE_CAP_S` re-export。
+  - RA-027（P2, Worth exploring）：fold.py 五章 N/A guard 收进 chapter driver；
+    `_short` 去私有化；`FoldProvider` 搬生产者侧。
+- 丢弃（有证据）：`ConsumerHandle.unregister` no-op（刻意设计）；bus trace_id 三件套
+  （好 locality）；`_coerce_producer` 命名（cosmetic）；proactive `js` state dict
+  （speculative）；hook 四并行状态（已修复有注释）；10-07 P2 两项（defer iter-quality）；
+  下划线 step_id 变体（未立案）；before_publish/after_dispatch 占位（ADR-0185 PR-3 计划）。
+- 本轮未跑全量测试（assess 轮只做评估；唯一的"跑"是 mandatory runtime verification
+  四个场景，见上表）。
+- Commit：`chore: [raphy] assess - 5 architecture candidates`（未 push）。
+---
+
+## 2026-10-08 02:40 - RA-023
+
+- **实现**：`CognitiveAgent._run_lifecycle_body` 建异常翻译 seam：`except LoopObligationExceededError`
+  → `_loop_obligation_failed_result()` 合成 failed Result（status=FAILED，error 带
+  `LoopObligationExceededError: plan/edge/taken` 事实，`extra["loop_obligation"]` 存
+  {plan_id, edge{source,target}, max_iterations, taken}，total_steps=taken，budget_used 保持零值
+  Budget（Result 契约：非 COMPLETED 即零值）；`asyncio.CancelledError` 仍在前置分支透传，
+  其他异常保持原 fail-loud（记 AgentRunFinished failed 后 re-raise）。
+- **max_steps 对齐（spike 结论）**：选评估二选一的方案 (a)——agent/runtime 层把 max_steps 翻译成
+  graph loop bound。新纯函数 `lca/framework/graph/loop_budget.py::clamp_loop_bounds(plan, max_steps)`，
+  `DeclarativeExecution.execute` 在 `lift_graph_spec` 后调用：每条 loop edge 的有效 bound =
+  `min(plan.loop.maxIterations, state.budget.max_steps)`，只收紧不放松。选 (a) 不选 (b) 的原因：
+  run() 的 execute() 是单次 await，agent 层无法在中途计数步数主动 break；graph 层是唯一能观察
+  loop take 的地方——复用现有 LoopObligationExceededError 机制而非另造步数计数器。
+  Frozen plan 用 model_copy，bindings 持有的编译产物不动。
+- **文件**：`lca/agent/cognitive_agent.py`（import + except 分支 + helper）、
+  `lca/loop/driver.py`（import + execute 内 clamp 3 行）、
+  新 `lca/framework/graph/loop_budget.py`（48 行）、
+  新 `tests/framework/graph/test_loop_budget.py`（5）、
+  新 `tests/agent/test_cognitive_agent_run_translation.py`（4）。
+- **验证**：E2E 复跑 10-07 P0 探针（InfiniteMock + max_steps=5）：`await agent.run()` 现在**返回**
+  `status=failed` 的 Result 不再抛（修复前：抛 LoopObligationExceededError，跑了 24 次 graph 迭代）；
+  框架日志仍自记 `lifecycle_event=failed status=failed max_steps=5`。9 新测试全绿；ruff 全绿；
+  `tests/agent + tests/framework/graph + tests/loop` 回归：227 passed，4 个 pre-existing 红
+  （test_gate_chain_annotations_resolve x1 + test_ports TestDedupInvariantHolds x3，干净树基线即红，
+  与本改动无关，未动）。
+- **Learnings for future iterations:**
+  - graph 层的 `EdgeLoopObligation.budget: "run.steps"` 只是 lift 期校验的声明字符串，
+    运行时无人消费——max_steps 与 loop bound 脱节的根因；不要假设声明即执行。
+  - Plan/PlanEdge/EdgeLoopObligation 全是 frozen pydantic：per-run 改 bound 必须 model_copy，
+    不能原地改；且 Plan 有"edge 引用已知节点"的 model_validator，单元测试造 Plan 要配齐节点。
+  - `_run_lifecycle_body` 的异常路径不碰 self 属性——translation seam 的单元测试可用
+    `CognitiveAgent.__new__` 裸实例 + fake execute 直接钉住，无需组装 Runtime。
+  - 252 上跑探针脚本要用 `PYTHONPATH=/home/lichao/layered-cognitive-agent`（裸 python3 找不到 lca 包；
+    pytest 能跑是因为 conftest/rootdir 路径）。
+---
+
+
+## 2026-10-08 03:00 - RA-024
+
+- **实现**：`lca_kernel/events/payloads/model_visible.py` 尾部新增 `_self_heal_forward_refs()`——
+  对两 payload 类做一次 `model_rebuild(force=True, _types_namespace={四个名: Any})`，失败记
+  debug 日志不挡 import（沿用 INTENTIONAL 语义）；注释写清 PR-0 shim + delete-when
+  （`lca_kernel.events.types` 真实类型落地即删，与 stub/type-checking 块一起删）。
+  删掉 `hook.py` 与 `fold_source.py` 的两份 ~20 行 import-time rebuild 仪式
+  （fold_source 顺带删掉仪式专用的 `import typing as _typing`），删掉 `publisher.py` 的
+  eager `from ...hooks.model_visible import hook as _hook_module  # noqa: F401`
+  副作用 import（`_build_hook` 的函数内 lazy import 保留）。
+  收敛 `hook.py` 逐字相同的 `_coerce_tools`/`_coerce_messages` 为 `_coerce_sequence(raw)`，
+  两个调用点同步改；`reasoner.py` 的同名 `_coerce_tools` 签名不同（Sequence[Tool]|ForkedTools），
+  不是同一 seam，未动。
+- **文件**：`lca_kernel/events/payloads/model_visible.py`、
+  `lca/plugins/events/hooks/model_visible/hook.py`、
+  `lca/infrastructure/observability/replay/fold_source.py`、
+  `lca/plugins/events/publishers/model_visible/publisher.py`、
+  新 `tests/lca_kernel/events/test_model_visible_self_heal.py`（2）。
+- **验证**：54 测试全绿（hook 22 + publisher + fold 架构/e2e/narrative + payload typing + self-heal 2）；
+  ruff 全绿（S603 按仓库惯例 `# noqa: S603` 注记固定可执行文件+静态探针源码）。
+  新测试之一是 fresh-interpreter subprocess：只 import payloads 模块就实例化两类——
+  评估时"写不出来的测试"，现在是 testability gap 关闭的钉子。
+- **Learnings for future iterations:**
+  - 评估自述的"leaky seam"修法成立：自愈搬进源头模块后，三个消费者的 import-time 副作用
+    代码全部可删，零行为变更（54 测试背书）。
+  - 同名不同签名的 helper（reasoner._coerce_tools）不是收敛对象——"verbatim-identical"
+    是收敛的前提，名字相同不算。
+  - TYPE_CHECKING 块里的 `from typing import Any` 在模块级已有 Any 后是冗余的，顺手清掉，
+    保持 stub 块干净。
+---
+
+
+## 2026-10-08 03:20 - RA-025
+
+- **实现**：`lca/contracts/atoms/ids/ids.py` 新增 `step_id_for(step_index: int) -> str`
+ （纯格式 `step-{n:03d}`；`_step_id_for` 的"与 LoopCursor step_id 形态一致"docstring 注记搬进新
+  seam）+ `step_id_from_cursor(cursor, template_id: str) -> str`（cursor 缺席/异常 →
+  `step-unknown-{template_id}`）。四处调用点全部收敛：hook.py 删 `_step_id_for`（3 处改调
+  `step_id_for`，docstring 提及同步改）；llm_call/invoke.py 与 reasoner.py 的逐字 7 行回退仪式
+  → `step_id_from_cursor(cursor, render.trace.template_id)`；nodes/think/llm/invoke.py 保留其特有的
+  `state.step` 回退链，只把格式串换成 `step_id_for(step)`。
+- **spike 落点**：选 `lca/contracts/atoms/ids`（随 `new_id`），不选 cursor 附近——cursor 住在
+  `infrastructure/observability/loop_cursor`，`cognition/brain` 反向依赖它是层向错误；
+  contracts 是四个调用点（plugins ×2、nodes、cognition）都能无环 import 的最底层，
+  且 step-NNN 形态本就是跨层约定（fold key/hook key/reasoner key），属契约层知识。
+- **文件**：`lca/contracts/atoms/ids/ids.py`、`lca/plugins/events/hooks/model_visible/hook.py`、
+  `lca/plugins/primitive/llm_call/invoke.py`、`lca/nodes/think/llm/invoke.py`、
+  `lca/cognition/brain/reasoner/reasoner.py`、新 `tests/contracts/atoms/test_step_id.py`（6）。
+- **验证**：字节形态前后一致（`step_id_for(3)=="step-003"` 等 6 新测试全绿）；73 回归全绿
+  （hook/step_tree/h7/contracts）；ruff 全绿。`step_{n:03d}` 下划线变体（journal_fold 缺省 /
+  writable_matrix）确认为不同 surface 的漂移，按 AC 只记录未动。
+- **Learnings for future iterations:**
+  - 收敛"逐字相同"时先确认语义也相同：nodes/think 的派生有 `state.step` 回退链，
+    与 llm_call/reasoner 的 7 行仪式不是同一形状——只收敛格式串，不硬套 from_cursor。
+  - 新 seam 落点用层向论证（谁可以 import 谁）而非"离概念近"，结论更硬。
+---
+
+
+## 2026-10-08 03:35 - RA-026
+
+- **实现**：删两调度器的私有 `_acquire_lock` 直通（tick 内直调 `self._file_lock.acquire(now_ms)`）；
+  公开 `release_lock()` 保留。删 4 处 `STALE_ABSOLUTE_CAP_S` re-export（2 scheduler 模块的
+  import + `__all__`、2 包 `__init__` 的 import + `__all__`）；常量仍由
+  `lca/infrastructure/scheduler_file_lock.py` 拥有。收尾 grep：`STALE_ABSOLUTE_CAP_S` 只剩
+  owner 文件内 3 处（定义/使用/`__all__`），`_acquire_lock` 全仓零引用。
+- **与评估的差异**：评估写"全仓零外部引用（含 tests）"指的是 `STALE_ABSOLUTE_CAP_S`（属实）；
+  但 `_acquire_lock` 私有方法被 2 个测试文件 4 处直接调用（test_pipeline.py 的锁竞争测试 x1、
+  test_cron_full_lifecycle_invariants.py x3）——评估漏了这处波及。处理：测试改钉到
+  `sched._file_lock.acquire(...)`；直通是逐字 delegate，行为完全相同，测试意图（锁竞争语义）不变。
+- **文件**：`lca/infrastructure/cron/scheduler.py`、`lca/infrastructure/proactive/scheduler.py`、
+  `lca/infrastructure/cron/__init__.py`、`lca/infrastructure/proactive/__init__.py`、
+  `tests/integration/proactive/test_pipeline.py`、
+  `tests/scenario/test_cron_full_lifecycle_invariants.py`。
+- **验证**：37 测试全绿（cron + proactive pipeline + lifecycle invariants）；ruff 全绿。
+- **Learnings for future iterations:**
+  - "删私有方法"类 story 动手前必须全仓 grep 方法名——私有 ≠ 无调用方，测试常直接调私有方法。
+    评估的"零引用"断言要复核，不能只信。
+---
+
+
+## 2026-10-08 03:55 - RA-027
+
+- **实现**：`narrative_writer/fold.py` 五个 `_render_*` 的
+  `fold is None or fold.header is None` 守卫收进单一 driver
+  `_chapter(na_title, body, fold)`（fold 不可用 → 逐字 N/A 标题占位，否则调 body）；
+  每个 `_render_*` 剩一行 `_chapter` 调用 + docstring，真值体搬进 `_`*`_body` helper。
+  5 章 N/A 标题逐字保留；`_render_fold_chapters` 签名与 `char_budget` 截断语义未动。
+  leaky seam：`sections._short` 公开化为 `short_text`（def + 15 内部调用；fold.py 4 处、
+  writer.py 9 处调用同步改名）。`FoldProvider` 别名搬到 `fold_source.py`（生产者侧）；
+  writer.py 与包 `__init__` 改从生产者侧 import；包公开 surface
+  （`FoldProvider`、`StepNarrativeWriter`）不变。
+- **与评估的差异**：`_short` 选了公开化为 `short_text` 而非 fold 自有 helper——sections.py
+  本就是 markdown 截断 helper 的属主，改名无重复逻辑；driver 实际签名是三元
+  `_chapter(na_title, body, fold)`（fold 必须传入，评估的二元写法是简写）。
+  另：writer.py 也在 import `_short`（评估只提了 fold.py），一并改名。
+- **文件**：`narrative_writer/fold.py`、`sections.py`、`writer.py`、`__init__.py`、
+  `replay/fold_source.py`、`tests/observability/spine/derivers/test_narrative_fold_chapters.py`
+  （+3 新测试）。
+- **验证**：3 新 driver 级测试全绿（5×`_render_*(None)` 逐字 N/A 标题；header=None 同路降级；
+  fold 可用时调 body）；41 回归全绿（fold chapters + writer + sections + all-tool-calls）；
+  19 消费者测试全绿（deriver plugins + cli journal steps）；ruff 全绿
+  （中途 I001 import 排序用 `--fix` 修好）。
+- **Learnings for future iterations:**
+  - "leaky seam 私有 import"动手前 grep 全仓 import 方——writer.py 也是 `_short` 的调用方，
+    评估只数了 fold.py；改名类操作必须覆盖所有调用方。
+  - pytest 同一次调用传了不存在的目录会导致"no tests ran"零收集（exit 0 静默）；
+    传参前确认路径存在，目录与文件混传本就按红线分开跑。
+---
+
