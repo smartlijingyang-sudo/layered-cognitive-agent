@@ -221,8 +221,8 @@
         "Behavior preserved: HostEnvironment.provision()/destroy() external behavior unchanged; uv run pytest tests/infrastructure/cli/ -k 'daemon' --no-cov -q passes (test_daemon_kill_existing, test_daemon_stop_uses_sudo, test_daemon_start_script); uv run ruff check passes on touched files"
       ],
       "priority": 1,
-      "passes": false,
-      "notes": "Source: raphy assess Round 4 2026-10-07 (Strong, friction walk A). Two live lifecycle implementations for the same daemon process (node dist/index.js connect): DaemonService via lca-ops ServiceRegistry (owns RA-006 _kill_existing seam + 3 test groups) vs CLIProvider.start/stop_daemon via HostEnvironment (zero tests, private _pid_alive replica, curl probe). ADR-0119 decision 4 (services managed by lca-ops) supports consolidation. CLIProvider has no tests, so refactoring carries no pinned-behavior risk."
+      "passes": true,
+      "notes": "Source: raphy assess Round 4 2026-10-07 (Strong, friction walk A). Two live lifecycle implementations for the same daemon process (node dist/index.js connect): DaemonService via lca-ops ServiceRegistry (owns RA-006 _kill_existing seam + 3 test groups) vs CLIProvider.start/stop_daemon via HostEnvironment (zero tests, private _pid_alive replica, curl probe). ADR-0119 decision 4 (services managed by lca-ops) supports consolidation. CLIProvider has no tests, so refactoring carries no pinned-behavior risk. [done 2026-10-07 17:30] start_daemon/stop_daemon delegate to injected/lazy DaemonService via _daemon_service_for (composition); _pid_alive deleted -> service.pid_alive; curl probe -> http_ready; _CONNECT_PROC_PATTERN de-privatized to CONNECT_PROC_PATTERN in daemon.py (private import in user_cli gone); 10 new delegation contract tests green; 10 story daemon tests green."
     },
     {
       "id": "RA-015",

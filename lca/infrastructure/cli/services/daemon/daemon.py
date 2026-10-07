@@ -30,10 +30,14 @@ from lca.infrastructure.cli.state.state import ChangeReport, StateStore
 from lca.infrastructure.cli.sudo.sudo import Sudo
 
 # pkill/pgrep match pattern for the sandbox-user connect daemon node process.
-# Single source shared by DaemonService and
-# host_runtime.providers.user_cli.CLIProvider (start_daemon/stop_daemon);
-# a change to the daemon command line only needs one edit.
-_CONNECT_PROC_PATTERN = "node.*index.js.*connect"
+# Public shared surface (RA-014): the single source for the daemon
+# command-line fingerprint, owned by this module. DaemonService consumes it
+# internally; host_runtime no longer reaches for the private name — the
+# lifecycle seam (DaemonService itself) is the delegation contract.
+CONNECT_PROC_PATTERN = "node.*index.js.*connect"
+
+# Legacy alias: existing daemon tests import the private name.
+_CONNECT_PROC_PATTERN = CONNECT_PROC_PATTERN
 
 
 class DaemonService:
@@ -144,7 +148,7 @@ class DaemonService:
 
     def stop(self) -> ServiceState:
         """Stop the daemon."""
-        self._kill_existing(_CONNECT_PROC_PATTERN)
+        self._kill_existing(CONNECT_PROC_PATTERN)
 
         self._sudo.rm(self._user_state / "connect.pid")
 
@@ -430,7 +434,7 @@ class DaemonService:
 
         time.sleep(1)
         pid_result = subprocess.run(
-            ["pgrep", "-u", owner, "-f", _CONNECT_PROC_PATTERN],
+            ["pgrep", "-u", owner, "-f", CONNECT_PROC_PATTERN],
             capture_output=True,
             text=True,
             timeout=5,

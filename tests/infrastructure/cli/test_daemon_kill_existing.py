@@ -84,8 +84,14 @@ def test_kill_existing_without_recorded_pid_skips_wait(tmp_path: Path, monkeypat
 
 
 def test_connect_proc_pattern_is_single_source() -> None:
-    """daemon.py and user_cli.py share the identical match string object."""
+    """daemon.py owns the single public match string (RA-014).
+
+    The private cross-seam import in user_cli.py is gone: host_runtime no
+    longer reaches for the private name — the lifecycle seam (DaemonService)
+    is the delegation contract.
+    """
     import lca.infrastructure.host_runtime.providers.user_cli as user_cli_module
 
-    assert _CONNECT_PROC_PATTERN == "node.*index.js.*connect"
-    assert user_cli_module._CONNECT_PROC_PATTERN is _CONNECT_PROC_PATTERN
+    assert daemon_module.CONNECT_PROC_PATTERN == "node.*index.js.*connect"
+    assert _CONNECT_PROC_PATTERN is daemon_module.CONNECT_PROC_PATTERN
+    assert not hasattr(user_cli_module, "_CONNECT_PROC_PATTERN")

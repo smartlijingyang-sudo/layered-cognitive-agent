@@ -186,3 +186,55 @@
   - 跨接缝 import 私有常量（`_CONNECT_PROC_PATTERN`）是比重复更强的坏味道：
     字符串 single source 了，行为没有 —— 评估时把"注释自称 single source"
     当作重点核查对象。
+
+## 2026-10-07 17:30 - RA-014
+
+- connect daemon 生命周期收敛为单一 owner：`CLIProvider.start_daemon/stop_daemon`
+  委托给 `DaemonService`（显式接缝 composition），CLIProvider 只保留 artifact 部署
+  （provision/status/heal）；`HostEnvironment` 调用点零改动，外部行为不变。
+- 缝合法：`CLIProvider.__init__` 新增可选 `daemon` 注入（测试注入 fake）；
+  未注入时经模块级 `_daemon_service_for(config, user)` 懒构造，把 host_runtime
+  config 形状映射到 DaemonService（DaemonConfig user/cli_dir/token/ws_url；
+  health_url 重新拆为 host/port/path，探活目标与 status 报告的 URL 同一端点；
+  drift state dir 复用 cwd 相对的 `.lca-ops`，与 lca-ops 路径共享同一 CLI
+  漂移基线；sudo 复用 `.lobehub-stack/sudo.pass`，cwd 契约与 Provider.run_sudo 一致）。
+- `_CONNECT_PROC_PATTERN` 去私有化：daemon.py 新增公开 `CONNECT_PROC_PATTERN`
+  （旧私有名为 legacy alias，现有测试继续绿），user_cli 的私有跨接缝 import 删除。
+- `CLIProvider._pid_alive` 删除，改调共享 `service.pid_alive`（"converge N identical X" idiom）。
+- `_report_kernel_serve_status` 的 `curl -sf` 子进程探活删除，收敛到 `http_ready`
+  seam（与 DaemonService 同一探活；devices.online 计数细节随之消失，status 文案改为 reachable）。
+- 既有测试 `test_connect_proc_pattern_is_single_source` 按新契约更新：
+  断言公开常量为单一来源 + user_cli 不再携带私有 import（评估的耦合测试本身即被收敛对象）。
+- 新增 `tests/infrastructure/host_runtime/test_cli_provider_daemon_delegation.py`
+ （10 测试）：委托路径（start/stop/heal 经 mock seam）、STOPPED→False 映射、
+  user=None 旧契约（start False / stop True，不触 seam）、`_pid_alive` 消失、
+  kernel_serve 经 http_ready（钉住 url+timeout 参数）、`_daemon_service_for` 的
+  config 映射（user/cli_dir/token/ws_url/health_url 同源）。
+- Files changed:
+  - `lca/infrastructure/host_runtime/providers/user_cli.py`（委托+删除私有实现，222→~190 行）
+  - `lca/infrastructure/cli/services/daemon/daemon.py`（常量去私有化+内部改用公开名）
+  - `tests/infrastructure/cli/test_daemon_kill_existing.py`（单源测试按新契约更新）
+  - `tests/infrastructure/host_runtime/test_cli_provider_daemon_delegation.py`（新增）
+  - `raphy/prd.json`（RA-014 passes=true）、`raphy/progress.txt`
+- 测试：`tests/infrastructure/cli/ -k 'daemon'` 10 passed；新委托测试 10 passed；
+  `ruff check` 4 文件全过；架构/约定测试中仅 `test_file_line_count_limit` 红——
+  系 RA-010 遗留（host.py 258>250），与本轮改动无关，按契约记录不碰。
+- **Learnings for future iterations:**
+  - 评估建议的"heal 经委托 mock 钉住"测试实现时发现：`_daemon_service()` 的
+    user=None 守卫若放在 seam 解析后，注入的 mock 会绕过旧契约——守卫必须
+    在 start/stop_daemon 入口先行，保持"user=None 时零副作用"不变。
+  - DaemonService 构造即 `StateStore.__init__` 做 `mkdir(exist_ok)`：state_dir
+    选用户 `.lca` 会在真实部署流里遇到 deployer 不可写目录（WorkspaceProvider
+    已 chown 给用户）——operator state 必须走 operator 拥有的目录；本轮选了
+    与 lca-ops 共享的 cwd 相对 `.lca-ops`，drift 基线天然单一。
+  - DaemonService.start() 带 gateway 健康门控（最多等 20s）：旧 start_daemon
+    只 sleep 3s 就 pgrep，gateway 挂掉时旧代码会返回 True（daemon 随即因
+    ECONNREFUSED 崩溃）——收敛后返回 False 更诚实，这是"行为收敛"而非
+    "行为变更"，但要在 commit body 里写明。
+  - ssh252 里 `~` 展开正常，但 `&& md5sum ~/...` 写在引号外会跑在本机——
+    远程/本地命令边界用引号划清，验证路径一律写绝对路径。
+  - ruff S101 禁生产代码用 assert：用仓库既有风格 `raise AssertionError(...)`。
+  - 耦合本身被测试钉住时（test_connect_proc_pattern_is_single_source），
+    收敛故事必须同步更新该测试——测试是契约，不是化石。
+
+---
