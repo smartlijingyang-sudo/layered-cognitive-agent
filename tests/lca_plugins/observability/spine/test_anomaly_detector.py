@@ -222,14 +222,36 @@ def test_check_stuck_does_not_trip_for_recent_spans() -> None:
 # ── detector behaviour: _check_stalled (sequence gap) ────────────────
 
 
-def test_check_stalled_trips_on_sequence_gap() -> None:
-    """A sequence jump greater than 1 indicates a stalled stream."""
+def test_check_stalled_trips_on_huge_sequence_gap() -> None:
+    """A forward jump beyond STALLED_GAP_ALLOWANCE indicates a stalled stream."""
     from lca.plugins.observability.spine.derivers.anomaly import AnomalyDetector
 
     detector = AnomalyDetector()
     detector._last_sequence = 5
-    event = _make_event(sequence=10)
+    event = _make_event(sequence=5 + AnomalyDetector.STALLED_GAP_ALLOWANCE + 1)
     assert detector._check_stalled(event) is True
+
+
+def test_check_stalled_silent_on_healthy_gap() -> None:
+    """RA-030: the multi-producer spine legitimately skips sequences --
+    small gaps (healthy max 69 across runtime scenarios) must not trip."""
+    from lca.plugins.observability.spine.derivers.anomaly import AnomalyDetector
+
+    detector = AnomalyDetector()
+    detector._last_sequence = 100
+    assert detector._check_stalled(_make_event(sequence=102)) is False
+    detector._last_sequence = 100
+    assert detector._check_stalled(_make_event(sequence=169)) is False
+
+
+def test_check_stalled_silent_on_sequence_reset() -> None:
+    """RA-030: a non-positive jump means a new sequence domain --
+    re-baseline, don't trip."""
+    from lca.plugins.observability.spine.derivers.anomaly import AnomalyDetector
+
+    detector = AnomalyDetector()
+    detector._last_sequence = 500
+    assert detector._check_stalled(_make_event(sequence=3)) is False
 
 
 def test_check_stalled_does_not_trip_on_contiguous_sequence() -> None:
@@ -264,21 +286,97 @@ def test_check_state_machine_violation_trips_on_phase_orphan_without_reason() ->
 # ── detector behaviour: _check_collision (duplicate span_id) ─────────
 
 
-def test_check_collision_trips_when_span_id_reappears() -> None:
+def test_check_collision_trips_on_concurrent_double_open() -> None:
+    """RA-030: a .start for an already-open span_id is a genuine collision."""
+    from datetime import UTC, datetime
+
     from lca.plugins.observability.spine.derivers.anomaly import AnomalyDetector
 
     detector = AnomalyDetector()
-    detector._seen_span_ids.add("lca-span-00000042")
-    event = _make_event(span_id="lca-span-00000042")
+    detector._open_spans["lca-span-00000042"] = datetime(
+        2026, 9, 1, 12, 0, 0, tzinfo=UTC
+    )
+    event = _make_event(
+        span_id="lca-span-00000042", execution_point="think.gate.start"
+    )
     assert detector._check_collision(event) is True
 
 
-def test_check_collision_does_not_trip_for_new_span_id() -> None:
+def test_check_collision_does_not_trip_for_first_open() -> None:
+    """RA-030: the first .start of a span_id is normal."""
     from lca.plugins.observability.spine.derivers.anomaly import AnomalyDetector
 
     detector = AnomalyDetector()
-    event = _make_event(span_id="lca-span-00000043")
+    event = _make_event(
+        span_id="lca-span-00000043", execution_point="think.gate.start"
+    )
     assert detector._check_collision(event) is False
+
+
+def test_check_collision_does_not_trip_on_span_id_reuse() -> None:
+    """RA-030: span_id reuse across related (non-overlapping) events is
+    normal -- only .start while open trips."""
+    from datetime import UTC, datetime
+
+    from lca.plugins.observability.spine.derivers.anomaly import AnomalyDetector
+
+    detector = AnomalyDetector()
+    detector._open_spans["lca-span-00000042"] = datetime(
+        2026, 9, 1, 12, 0, 0, tzinfo=UTC
+    )
+    # related event carrying the same span_id but not a .start
+    event = _make_event(
+        span_id="lca-span-00000042", execution_point="think.gate.end"
+    )
+    assert detector._check_collision(event) is False
+
+
+def test_collision_trips_end_to_end_via_on_event() -> None:
+    """RA-030: full on_event path -- second concurrent .start emits one
+    collision record (and nothing else trips on these synthetic events)."""
+    from lca.plugins.observability.spine.derivers.anomaly import AnomalyDetector
+
+    detector = AnomalyDetector()
+    emitted: list[dict] = []
+    detector.bind_anomaly_sink(emitted.append)
+    detector.on_event(
+        _make_event(
+            run_id="r-1", span_id="lca-span-00000042",
+            execution_point="think.gate.start", sequence=1,
+        )
+    )
+    assert emitted == []
+    detector.on_event(
+        _make_event(
+            run_id="r-1", span_id="lca-span-00000042",
+            execution_point="phase_graph.node.start", sequence=2,
+        )
+    )
+    assert [p["kind"] for p in emitted] == ["collision"]
+
+
+def test_collision_resets_across_runs() -> None:
+    """RA-030: per-run sequence-derived span_ids (lca-seq-*) are reused by
+    the next run -- the on_event run reset must not mistake that for a
+    concurrent double-open."""
+    from lca.plugins.observability.spine.derivers.anomaly import AnomalyDetector
+
+    detector = AnomalyDetector()
+    emitted: list[dict] = []
+    detector.bind_anomaly_sink(emitted.append)
+    detector.on_event(
+        _make_event(
+            run_id="r-1", span_id="lca-seq-00000007",
+            execution_point="think.gate.start", sequence=7,
+        )
+    )
+    detector.on_event(
+        _make_event(
+            run_id="r-2", span_id="lca-seq-00000007",
+            execution_point="phase_graph.node.start", sequence=7,
+        )
+    )
+    assert emitted == []
 
 
 # ── detector behaviour: _check_orphan_side_effect ────────────────────
@@ -348,3 +446,66 @@ def test_anomaly_detector_class_constants_are_well_named() -> None:
     assert AnomalyDetector.CYCLE_WINDOW == 100
     assert AnomalyDetector.STUCK_THRESHOLD_S == 60
     assert pytest.approx(0.94) == AnomalyDetector.NEAR_BUDGET_RATIO
+    # RA-030: retuned thresholds stay public/named.
+    assert AnomalyDetector.STALLED_GAP_ALLOWANCE == 128
+    assert AnomalyDetector.CYCLE_BASELINE_DEFAULT == 2
+    assert AnomalyDetector.CYCLE_BASELINES["llm.stream.token"] == 10_000
+    assert AnomalyDetector.CYCLE_BASELINES["runtime.reducer.apply"] == 32
+    assert AnomalyDetector.CYCLE_BASELINES["body.tool.execute.end"] == 8
+
+
+# ── RA-030: per-EP cycle baselines ────────────────────────────────────
+
+
+def test_check_cycle_silent_for_per_event_ep_within_baseline() -> None:
+    """RA-030: runtime.reducer.apply fires once per event by construction --
+    short consecutive runs are healthy, not a loop."""
+    from lca.plugins.observability.spine.derivers.anomaly import AnomalyDetector
+
+    detector = AnomalyDetector()
+    tripped = [
+        detector._check_cycle(_make_event(execution_point="runtime.reducer.apply"))
+        for _ in range(10)
+    ]
+    assert tripped == [False] * 10
+
+
+def test_check_cycle_trips_for_per_event_ep_past_baseline() -> None:
+    """RA-030: even a per-event EP trips once its own baseline is crossed."""
+    from lca.plugins.observability.spine.derivers.anomaly import AnomalyDetector
+
+    detector = AnomalyDetector()
+    results = [
+        detector._check_cycle(_make_event(execution_point="runtime.reducer.apply"))
+        for _ in range(AnomalyDetector.CYCLE_BASELINES["runtime.reducer.apply"])
+    ]
+    assert results[-1] is True
+    assert all(r is False for r in results[:-1])
+
+
+def test_check_cycle_silent_for_token_streaming() -> None:
+    """RA-030: llm.stream.token repeats per token by construction -- a
+    100-token healthy response must not trip."""
+    from lca.plugins.observability.spine.derivers.anomaly import AnomalyDetector
+
+    detector = AnomalyDetector()
+    tripped = [
+        detector._check_cycle(_make_event(execution_point="llm.stream.token"))
+        for _ in range(100)
+    ]
+    assert not any(tripped)
+
+
+def test_check_cycle_default_baseline_still_tight() -> None:
+    """RA-030: EPs without a named baseline keep the tight default of 2."""
+    from lca.plugins.observability.spine.derivers.anomaly import AnomalyDetector
+
+    detector = AnomalyDetector()
+    assert (
+        detector._check_cycle(_make_event(execution_point="think.gate.end"))
+        is False
+    )
+    assert (
+        detector._check_cycle(_make_event(execution_point="think.gate.end"))
+        is True
+    )

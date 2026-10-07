@@ -913,3 +913,47 @@
     在 RA-029 前 commit 同样红（PR-10 baseline 过期 vs `writable.matrix.default`
     插件）——与 turn 无关，已验证 pre-existing，本轮不碰（非 RA-029 范围）。
 ---
+
+## 2026-10-08 06:20 - RA-029 (follow-up)
+- fail-loud 上线后 4-scenario 实测直接炸出真相：`AgentStateProjection`
+  在 `lca/` 生产代码里从未被实例化（writer 自 2026-09-15 起就是 dead code），
+  live carrier 的 turn 永远是静默 0。补线：`begin_turn()` 改返回 emitted turn
+  （unbound 时 `None`）；`runtime_loop` 在 `begin_turn()` 后把返回值反射到
+  `state.current_turn`（无 session 时显式 0 = unbound single-shot 默认）。
+  4-scenario 全 complete，journal 行 turn=1。
+- Files changed: `lca/infrastructure/session/emit/lifecycle_emit.py`,
+  `lca/runtime/loop/runtime_loop.py`,
+  `tests/infrastructure/session/test_begin_turn.py`（new）
+- **Learnings for future iterations:**
+  - 触及 live 路径的 story，**先 runtime-verify 再 commit**——本轮是先 commit
+    后实测，白白多了一个 follow-up commit。
+  - "1 writer + N readers" 这类断言必须验证 writer 真的喂到 reader（grep 实例化，
+    或实测），不能只看读写点数量。
+
+## 2026-10-08 06:35 - RA-030
+- anomaly detector 按实测数据重调模型（非拍脑袋）：4-scenario 实测修前
+  A/B/C1/C2/D 分别 37/278/193/188/356 条误报。forensics 结论：
+  ① span_id 是 per-run 序列派生（`lca-seq-*`）且永不 close——跨 run 复用连
+  "naive 新模型"都误报 → `on_event` 按 `run_id` 重置全部有状态
+  （sequence/open spans/cycle 计数器）；`_check_collision` 只在".start 遇到
+  已 open span"时报，复用 `_check_stuck` 的表（`on_event` 里 collision 排到
+  stuck 前面，否则当前事件自己的 `.start` 已入库）；② `_check_stalled`
+  改 `STALLED_GAP_ALLOWANCE=128`（健康最大 gap 69，~2x headroom）+ 非正跳变
+  重定基线不报；③ `_check_cycle` 按 EP 设基线：`llm.stream.token`=10000
+  （streaming 即健康形状）、`runtime.reducer.apply`=32（健康最大 ~8）、
+  `body.tool.execute.end`=8，默认仍 2。修后 5 个 scenario run **零误报**。
+  阈值保持公开具名（`test_anomaly_detector_class_constants_are_well_named` 已扩展）。
+- Files changed: `lca/plugins/observability/spine/derivers/anomaly.py`,
+  `tests/lca_plugins/observability/spine/test_anomaly_detector.py`,
+  `raphy/prd.json`（RA-030 passes=true + learnings）
+- **Learnings for future iterations:**
+  - 阈值类 story 必须先实测再定数：本轮的 128/10000/32/8 全部来自
+    4-scenario 实测分布（max gap 69、token 连续 112、reducer 连续 ~8），
+    不是评估时拍的。
+  - "复用某表"要检查时序：collision 复用 `_check_stuck` 的表必须排在
+    stuck 前面，否则当前事件的 `.start` 已入库、首开即误报——单测里
+    `test_collision_trips_end_to_end_via_on_event` 把顺序钉住了。
+  - 长寿 detector（跨 run 存活）的状态必须按 run 划界，否则 per-run 派生
+    的 id（span/sequence）必然跨 run 误报；以后写 detector 先问"状态的
+    生命周期跟哪个域对齐"。
+---

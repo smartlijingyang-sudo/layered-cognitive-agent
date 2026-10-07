@@ -17,12 +17,15 @@ record on the ``anomaly`` channel of its subscriber contract.
 Detector catalogue (must stay aligned with ``I16``):
 
 * ``near_timeout`` — ``duration_ms > declared.timeout_ms * 0.94``
-* ``cycle`` — same ``execution_point`` repeated within ``CYCLE_WINDOW`` events
+* ``cycle`` — same ``execution_point`` repeated consecutively beyond its
+  per-EP baseline (``CYCLE_BASELINES``, default ``CYCLE_BASELINE_DEFAULT``)
 * ``stuck`` — open span older than ``STUCK_THRESHOLD_S`` seconds
-* ``stalled`` — sequence gap greater than 1 (skipped sequences)
+* ``stalled`` — forward sequence jump beyond ``STALLED_GAP_ALLOWANCE``
 * ``state_machine_violation`` — ``pop_span`` without matching ``push_span``
 * ``near_budget`` — ``budget_consumed > budget_at_entry * 0.94``
-* ``collision`` — same ``span_id`` appearing twice in the stream
+* ``collision`` — a ``.start`` opening an already-open ``span_id`` within
+  the same run (concurrent double-open); span_id reuse across
+  non-overlapping or cross-run spans is normal
 * ``orphan_side_effect`` — ``phase='orphan'`` but payload carries a tool_call
 
 The deriver is wrapped with the project ``@plugin`` decorator under
@@ -41,7 +44,7 @@ from __future__ import annotations
 import logging
 from collections import deque
 from datetime import UTC, datetime
-from typing import Any
+from typing import Any, ClassVar
 
 from lca.contracts.observability.canonical_digest import canonical_digest
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
@@ -101,6 +104,27 @@ class AnomalyDetector(Deriver):
     CYCLE_WINDOW: int = 100
     STUCK_THRESHOLD_S: int = 60
     NEAR_BUDGET_RATIO: float = 0.94
+    # RA-030: the spine is multi-producer and this deriver sees a filtered
+    # stream, so small sequence gaps are normal. Healthy max gap across the
+    # 4 runtime scenarios is 69 (mock runs); the allowance sits at ~2x
+    # headroom. Only absurd forward jumps trip.
+    STALLED_GAP_ALLOWANCE: int = 128
+    # RA-030: per-EP consecutive-repeat baselines for cycle detection.
+    # EPs that repeat by construction get a high baseline; everything else
+    # keeps the tight default of 2 (a phase EP repeating back-to-back is
+    # still the 2026-09-16 tight-loop signal).
+    CYCLE_BASELINE_DEFAULT: int = 2
+    CYCLE_BASELINES: ClassVar[dict[str, int]] = {
+        # Fires once per streamed token: a response of N tokens is N
+        # consecutive events by construction. Only an absurd run trips.
+        "llm.stream.token": 10_000,
+        # Fires once per processed event by construction; consecutive runs
+        # happen when events are applied in batches (healthy max ~8).
+        "runtime.reducer.apply": 32,
+        # Multi-tool fan-out completes tools back-to-back; consecutive
+        # execution ends are normal up to typical fan-out widths.
+        "body.tool.execute.end": 8,
+    }
 
     def __init__(self) -> None:
         # Rolling window of recent execution_points for cycle detection.
@@ -114,10 +138,13 @@ class AnomalyDetector(Deriver):
         self._last_point: str | None = None
         # Last observed sequence number for stalled detection.
         self._last_sequence: int | None = None
-        # Open spans keyed by span_id; populated by ``_check_stuck``.
+        # Open spans keyed by span_id; populated by ``_check_stuck`` and
+        # read by ``_check_collision`` (RA-030: concurrent double-open).
+        # Scoped to the current run -- reset in ``on_event`` on run change.
         self._open_spans: dict[str, datetime] = {}
-        # Span ids already seen; collision detection.
-        self._seen_span_ids: set[str] = set()
+        # Run scoping for all stateful detectors (RA-030): sequence/span/
+        # cycle state is per-run; a new run_id re-baselines everything.
+        self._last_run_id: str | None = None
         # Optional anomaly sink (Profile boot may inject one).
         self._anomaly_sink: Any | None = None
 
@@ -160,11 +187,13 @@ class AnomalyDetector(Deriver):
             self._last_point = point
             self._consecutive_count = 1
         self._recent_points.append(point)
-        # Trip on the SECOND consecutive repeat: the first emission of
-        # an EP is not a loop signal; the second consecutive emission
-        # is the smallest evidence of a tight loop, surfaced loud
-        # before the run burns more budget on it.
-        return self._consecutive_count >= 2 and point in self._recent_points
+        # RA-030: per-EP baseline. EPs that repeat by construction
+        # (llm.stream.token, runtime.reducer.apply, ...) only trip past
+        # their own baseline; other EPs keep the tight default: the second
+        # consecutive emission is the smallest evidence of a tight loop,
+        # surfaced loud before the run burns more budget on it.
+        baseline = self.CYCLE_BASELINES.get(point, self.CYCLE_BASELINE_DEFAULT)
+        return self._consecutive_count >= baseline and point in self._recent_points
 
     def _check_stuck(self, event: EventRecord) -> bool:
         """Trip when an open span has aged past ``STUCK_THRESHOLD_S`` seconds.
@@ -190,12 +219,22 @@ class AnomalyDetector(Deriver):
         return False
 
     def _check_stalled(self, event: EventRecord) -> bool:
-        """Trip when the sequence advances by more than 1 (skipped sequences)."""
+        """Trip when the sequence jumps forward beyond ``STALLED_GAP_ALLOWANCE``.
+
+        RA-030: the spine is multi-producer and this deriver observes a
+        filtered stream, so small gaps are legitimate (healthy max 69).
+        A non-positive jump means a new sequence domain -- re-baseline,
+        don't trip (run changes are additionally normalized by the
+        ``on_event`` run reset).
+        """
         last = self._last_sequence
         self._last_sequence = event.sequence
         if last is None:
             return False
-        return event.sequence - last > 1
+        gap = event.sequence - last
+        if gap <= 0:
+            return False
+        return gap > self.STALLED_GAP_ALLOWANCE
 
     def _check_state_machine_violation(self, event: EventRecord) -> bool:
         """Trip when ``pop_span`` is observed without a matching ``push_span``.
@@ -221,12 +260,18 @@ class AnomalyDetector(Deriver):
         return consumed > at_entry * self.NEAR_BUDGET_RATIO
 
     def _check_collision(self, event: EventRecord) -> bool:
-        """Trip when a ``span_id`` reappears after being seen once already."""
-        span_id = event.span_id
-        if span_id in self._seen_span_ids:
-            return True
-        self._seen_span_ids.add(span_id)
-        return False
+        """Trip only when a ``.start`` opens an already-open ``span_id``.
+
+        RA-030: reuses ``_check_stuck``'s open-span table -- this check runs
+        *before* ``_check_stuck`` in ``on_event`` order, so a span opened by
+        the current event itself is not in the table yet. Span_id reuse
+        across related (non-overlapping) events, and across runs (the table
+        is run-scoped via the ``on_event`` reset), is normal and no longer
+        trips.
+        """
+        if not event.execution_point.endswith(".start"):
+            return False
+        return event.span_id in self._open_spans
 
     def _check_orphan_side_effect(self, event: EventRecord) -> bool:
         """Trip when ``phase='orphan'`` but the payload carries a tool_call."""
@@ -242,14 +287,27 @@ class AnomalyDetector(Deriver):
         anomaly (per kind) is forwarded so a single broken payload
         cannot flood downstream subscribers.
         """
+        # RA-030: the detector is long-lived across runs; sequence/span/
+        # cycle state is per-run. A new run_id re-baselines everything so
+        # cross-run span_id / sequence reuse is never mistaken for an
+        # anomaly.
+        if event.run_id != self._last_run_id:
+            self._last_run_id = event.run_id
+            self._last_sequence = None
+            self._open_spans.clear()
+            self._last_point = None
+            self._consecutive_count = 0
         check_methods = [
             ("near_timeout", self._check_near_timeout),
             ("cycle", self._check_cycle),
+            # collision before stuck: _check_collision reads the open-span
+            # table that _check_stuck populates, so it must see the table
+            # *before* the current event's own .start is registered.
+            ("collision", self._check_collision),
             ("stuck", self._check_stuck),
             ("stalled", self._check_stalled),
             ("state_machine_violation", self._check_state_machine_violation),
             ("near_budget", self._check_near_budget),
-            ("collision", self._check_collision),
             ("orphan_side_effect", self._check_orphan_side_effect),
         ]
         for kind, fn in check_methods:
