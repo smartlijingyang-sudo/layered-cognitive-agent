@@ -14,7 +14,7 @@ from datetime import UTC, datetime
 from typing import Any
 
 from lca.contracts.observability.cursor.loop_cursor import CursorSnapshot
-from lca.infrastructure.observability.loop_cursor.projections.metrics_projection import (
+from lca.infrastructure.observability.loop_cursor.projection_derivers.metrics_projection import (
     MetricsProjection,
     MetricsState,
 )

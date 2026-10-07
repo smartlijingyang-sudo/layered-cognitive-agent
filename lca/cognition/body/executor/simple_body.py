@@ -14,7 +14,7 @@ from lca.cognition.body.emit.observation_surface import (
 from lca.contracts.atoms.enums.enums import ActionType
 from lca.contracts.atoms.semantic.keys import OBS_DEGRADED_FROM
 from lca.contracts.harness.act.effect_receipt import EffectOutcome, EffectReceipt
-from lca.contracts.models.core.execution.decision import Decision, Observation
+from lca.contracts.models.core.execution.decision import Decision, Observation, ToolCall
 from lca.contracts.models.core.execution.result import (
     ToolExecutionError,
     UnregisteredActionError,
@@ -44,6 +44,27 @@ def _default_no_cache() -> Any:
     from lca.contracts.models.team.role.team import CacheConfig
 
     return CacheConfig(enabled=False, ttl_s=0)
+
+
+def _receipt(
+    call: ToolCall,
+    outcome: EffectOutcome,
+    idempotency_key: str,
+    error_code: str | None = None,
+) -> EffectReceipt:
+    """Build the ``EffectReceipt`` shape owned by ``dispatch_tool_calls``.
+
+    ``invocation_id`` and ``provider`` live here exactly once; the per-site
+    ``idempotency_key`` shapes and ``error_code`` strings stay at the call
+    sites, verbatim.
+    """
+    return EffectReceipt(
+        invocation_id=call.call_id,
+        outcome=outcome,
+        idempotency_key=idempotency_key,
+        provider="body.dispatch_tool_calls",
+        error_code=error_code,
+    )
 
 
 def _observation_content(observation: Observation) -> str:
@@ -243,11 +264,10 @@ class SimpleBody(Body):
             )
         except Exception:
             return [
-                EffectReceipt(
-                    invocation_id=call.call_id,
-                    outcome=EffectOutcome.FAILED,
-                    idempotency_key=f"{call.call_id}:persist_assistant",
-                    provider="body.dispatch_tool_calls",
+                _receipt(
+                    call,
+                    EffectOutcome.FAILED,
+                    f"{call.call_id}:persist_assistant",
                     error_code=_PERSISTENCE_FAILURE_REASON,
                 )
                 for call in decision.tool_calls
@@ -261,11 +281,10 @@ class SimpleBody(Body):
             tool = self.tool_registry.get(call.tool_name)
             if tool is None:
                 receipts.append(
-                    EffectReceipt(
-                        invocation_id=call.call_id,
-                        outcome=EffectOutcome.FAILED,
-                        idempotency_key=call.call_id,
-                        provider="body.dispatch_tool_calls",
+                    _receipt(
+                        call,
+                        EffectOutcome.FAILED,
+                        call.call_id,
                         error_code=f"tool_not_registered:{call.tool_name}",
                     )
                 )
@@ -297,11 +316,10 @@ class SimpleBody(Body):
                 )
             except Exception:
                 receipts.append(
-                    EffectReceipt(
-                        invocation_id=call.call_id,
-                        outcome=EffectOutcome.FAILED,
-                        idempotency_key=f"{call.call_id}:persist_result",
-                        provider="body.dispatch_tool_calls",
+                    _receipt(
+                        call,
+                        EffectOutcome.FAILED,
+                        f"{call.call_id}:persist_result",
                         error_code=_PERSISTENCE_FAILURE_REASON,
                     )
                 )
@@ -310,20 +328,18 @@ class SimpleBody(Body):
             # 5. Per-call success/failure.
             if observation.success:
                 receipts.append(
-                    EffectReceipt(
-                        invocation_id=call.call_id,
-                        outcome=EffectOutcome.SUCCEEDED,
-                        idempotency_key=call.call_id,
-                        provider="body.dispatch_tool_calls",
+                    _receipt(
+                        call,
+                        EffectOutcome.SUCCEEDED,
+                        call.call_id,
                     )
                 )
             else:
                 receipts.append(
-                    EffectReceipt(
-                        invocation_id=call.call_id,
-                        outcome=EffectOutcome.FAILED,
-                        idempotency_key=call.call_id,
-                        provider="body.dispatch_tool_calls",
+                    _receipt(
+                        call,
+                        EffectOutcome.FAILED,
+                        call.call_id,
                         error_code="tool_execution_failed",
                     )
                 )
