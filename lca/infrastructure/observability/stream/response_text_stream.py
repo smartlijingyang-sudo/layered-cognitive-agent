@@ -67,7 +67,7 @@ def extract_user_facing_answer(raw: str) -> str | None:
         return None
 
     decoded = _decode_json_string_content(text, match.end())
-    return decoded if decoded else None
+    return decoded or None
 
 
 class ResponseTextStreamExtractor:

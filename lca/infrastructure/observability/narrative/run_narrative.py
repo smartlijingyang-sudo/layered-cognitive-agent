@@ -156,7 +156,7 @@ def _wrap_keep_newlines(text: str, *, width: int) -> list[str]:
             out.append("")
             continue
         out.extend(wrap_words(para, width))
-    return out if out else [""]
+    return out or [""]
 
 
 def is_milestone_span(span: SpanView) -> bool:

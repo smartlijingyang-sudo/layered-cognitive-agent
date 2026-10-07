@@ -121,7 +121,7 @@ def run_request_to_intent(
     options = options_raw if isinstance(options_raw, dict) else dict(options_raw)
 
     assistant_id_raw = getattr(request, "assistant_id", None)
-    assistant_id: str | None = assistant_id_raw if assistant_id_raw else None
+    assistant_id: str | None = assistant_id_raw or None
 
     request_device_id = getattr(request, "device_id", "") or ""
 
