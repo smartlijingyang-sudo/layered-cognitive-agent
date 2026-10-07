@@ -124,8 +124,6 @@ class PluginShapeDoctor:
 
         try:
             raw = self._invoke_script()
-        except RuntimeError:
-            raise
         except FileNotFoundError as exc:
             findings.append(
                 DoctorFinding(
