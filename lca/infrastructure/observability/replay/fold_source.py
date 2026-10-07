@@ -19,7 +19,6 @@ ADR-0185 PR-4 收口:旧 ``<run_dir>/model_visible/`` 旁路读取已删除,
 from __future__ import annotations
 
 import logging
-import typing as _typing
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 from pathlib import Path
@@ -39,27 +38,8 @@ from lca_kernel.events.spine.runtime import SpineEventRecord
 
 _log = logging.getLogger(__name__)
 
-# Pydantic forward-ref rebuild:对齐 :mod:`lca.plugins.events.hooks.model_visible.hook`
-# 的 `_rebuild_ns` 处理。``AssistantRequestConfig`` / ``ToolCallDict`` 等
-# forward-ref 在 PR-0 stub 为 ``Any``;pydantic v2 默认不自动 rebuild,
-# 这里显式 force-rebuild 一次,保证 ``model_validate`` 不抛
-# ``class-not-fully-defined``(双模块各自 import 时的副作用)。
-_rebuild_ns = {
-    "AssistantRequestConfig": _typing.Any,
-    "MessageDict": _typing.Any,
-    "ToolCallDict": _typing.Any,
-    "UsageDict": _typing.Any,
-}
-for _payload_cls in (
-    SpineLlmRequestHeaderPayload,
-    SpineLlmRequestHeaderAssistantPayload,
-):
-    try:
-        _payload_cls.model_rebuild(force=True, _types_namespace=_rebuild_ns)
-    except Exception as exc:  # INTENTIONAL: rebuild 失败仅记日志;主路径不挡
-        _log.debug("fold_source: payload_model_rebuild_skip: %s", exc)
-del _payload_cls, _rebuild_ns, _typing
-
+# RA-024: forward-ref 自愈已收进 lca_kernel/events/payloads/model_visible
+# 模块内（_self_heal_forward_refs），本模块不再做 import-time rebuild。
 
 @dataclass(frozen=True)
 class FoldedModelVisible:

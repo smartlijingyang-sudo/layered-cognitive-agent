@@ -58,29 +58,8 @@ if TYPE_CHECKING:
 
 _log = logging.getLogger(__name__)
 
-# payloads_model_visible forward-ref ``AssistantRequestConfig`` / ``MessageDict``
-# / ``ToolCallDict`` / ``UsageDict`` 在 TYPE_CHECKING 块定义为 ``Any``,pydantic v2
-# 不会自动从 module globals 解析 + 复合 forward-ref(tuple["X", ...])在
-# 普通 rebuild 下也不收口。本模块 import 时一次性 rebuild,显式提供
-# ``_types_namespace`` 把 forward-ref 链钉到 Any。
-# (对齐 PR-0 注释 "PR-0 在 lca_kernel.events.types 落地" 后续工作)
-
-_rebuild_ns = {
-    "AssistantRequestConfig": Any,
-    "MessageDict": Any,
-    "ToolCallDict": Any,
-    "UsageDict": Any,
-}
-for _payload_cls in (
-    SpineLlmRequestHeaderPayload,
-    SpineLlmRequestHeaderAssistantPayload,
-):
-    try:
-        _payload_cls.model_rebuild(force=True, _types_namespace=_rebuild_ns)
-    except Exception as exc:  # INTENTIONAL: 失败仅记日志,publish 主路径不挡
-        _log.debug("payload_model_rebuild_skip: %s", exc)
-del _payload_cls, _rebuild_ns
-
+# RA-024: forward-ref 自愈已收进 lca_kernel/events/payloads/model_visible
+# 模块内（_self_heal_forward_refs），本模块不再做 import-time rebuild。
 
 def _sha256_hex(data: bytes) -> str:
     return f"sha256:{sha256_hex(data)}"
@@ -114,15 +93,8 @@ def _step_id_for(step_index: int) -> str:
     return f"step-{int(step_index):03d}"
 
 
-def _coerce_tools(raw: Any) -> tuple[Any, ...]:
-    """kwargs.tools → tuple;非 list/tuple 输入 → ()。"""
-    if isinstance(raw, (list, tuple)):
-        return tuple(raw)
-    return ()
-
-
-def _coerce_messages(raw: Any) -> tuple[Any, ...]:
-    """kwargs.messages → tuple;非 list/tuple 输入 → ()。"""
+def _coerce_sequence(raw: Any) -> tuple[Any, ...]:
+    """kwargs.tools / kwargs.messages → tuple;非 list/tuple 输入 → ()。"""
     if isinstance(raw, (list, tuple)):
         return tuple(raw)
     return ()
@@ -241,7 +213,7 @@ class ModelVisibleHook:
         current = EpochHeader(
             config=kwargs.get("config"),
             system=system_text or None,
-            tools=_coerce_tools(kwargs.get("tools")),
+            tools=_coerce_sequence(kwargs.get("tools")),
         )
         current = canonicalHeader(current)
 
@@ -266,7 +238,7 @@ class ModelVisibleHook:
             return None  # fold 优化:同 header 不发,不推进计数器
         reason = "change"
 
-        messages = _coerce_messages(kwargs.get("messages"))
+        messages = _coerce_sequence(kwargs.get("messages"))
         manifest = kwargs.get("manifest")
 
         ref: EventRef | None

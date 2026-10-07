@@ -688,3 +688,35 @@
     pytest 能跑是因为 conftest/rootdir 路径）。
 ---
 
+
+## 2026-10-08 03:00 - RA-024
+
+- **实现**：`lca_kernel/events/payloads/model_visible.py` 尾部新增 `_self_heal_forward_refs()`——
+  对两 payload 类做一次 `model_rebuild(force=True, _types_namespace={四个名: Any})`，失败记
+  debug 日志不挡 import（沿用 INTENTIONAL 语义）；注释写清 PR-0 shim + delete-when
+  （`lca_kernel.events.types` 真实类型落地即删，与 stub/type-checking 块一起删）。
+  删掉 `hook.py` 与 `fold_source.py` 的两份 ~20 行 import-time rebuild 仪式
+  （fold_source 顺带删掉仪式专用的 `import typing as _typing`），删掉 `publisher.py` 的
+  eager `from ...hooks.model_visible import hook as _hook_module  # noqa: F401`
+  副作用 import（`_build_hook` 的函数内 lazy import 保留）。
+  收敛 `hook.py` 逐字相同的 `_coerce_tools`/`_coerce_messages` 为 `_coerce_sequence(raw)`，
+  两个调用点同步改；`reasoner.py` 的同名 `_coerce_tools` 签名不同（Sequence[Tool]|ForkedTools），
+  不是同一 seam，未动。
+- **文件**：`lca_kernel/events/payloads/model_visible.py`、
+  `lca/plugins/events/hooks/model_visible/hook.py`、
+  `lca/infrastructure/observability/replay/fold_source.py`、
+  `lca/plugins/events/publishers/model_visible/publisher.py`、
+  新 `tests/lca_kernel/events/test_model_visible_self_heal.py`（2）。
+- **验证**：54 测试全绿（hook 22 + publisher + fold 架构/e2e/narrative + payload typing + self-heal 2）；
+  ruff 全绿（S603 按仓库惯例 `# noqa: S603` 注记固定可执行文件+静态探针源码）。
+  新测试之一是 fresh-interpreter subprocess：只 import payloads 模块就实例化两类——
+  评估时"写不出来的测试"，现在是 testability gap 关闭的钉子。
+- **Learnings for future iterations:**
+  - 评估自述的"leaky seam"修法成立：自愈搬进源头模块后，三个消费者的 import-time 副作用
+    代码全部可删，零行为变更（54 测试背书）。
+  - 同名不同签名的 helper（reasoner._coerce_tools）不是收敛对象——"verbatim-identical"
+    是收敛的前提，名字相同不算。
+  - TYPE_CHECKING 块里的 `from typing import Any` 在模块级已有 Any 后是冗余的，顺手清掉，
+    保持 stub 块干净。
+---
+

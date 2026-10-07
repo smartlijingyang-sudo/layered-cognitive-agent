@@ -47,13 +47,8 @@ from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import
 )
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 
-# Eager import 让 hook 模块的 module-level forward-ref rebuild 在 publisher
-# import 时跑(测试 / 业务方直接调 SpineLlmRequestHeaderPayload 不再需要
-# 先 model_rebuild)。
-from lca.plugins.events.hooks.model_visible import (  # noqa: F401
-    hook as _hook_module,
-)
-
+# RA-024: forward-ref 自愈已收进 lca_kernel/events/payloads/model_visible
+# 模块内；不再需要为触发 hook 模块副作用而 eager import。
 
 class _Config(BaseModel):
     model_config = {"extra": "forbid"}
