@@ -25,8 +25,15 @@ from lca.infrastructure.cli.service.service import (
     http_ready,
     pid_alive,
 )
+from lca.infrastructure.cli.services.daemon.start_script import render_start_script
 from lca.infrastructure.cli.state.state import ChangeReport, StateStore
 from lca.infrastructure.cli.sudo.sudo import Sudo
+
+# pkill/pgrep match pattern for the sandbox-user connect daemon node process.
+# Single source shared by DaemonService and
+# host_runtime.providers.user_cli.CLIProvider (start_daemon/stop_daemon);
+# a change to the daemon command line only needs one edit.
+_CONNECT_PROC_PATTERN = "node.*index.js.*connect"
 
 
 class DaemonService:
@@ -50,7 +57,7 @@ class DaemonService:
         self._state = StateStore(state_dir)
         self._root = root
         self._sudo = sudo
-        self._cli_dir = Path("/opt/lca")
+        self._cli_dir = Path(self._config.cli_dir)
         self._user_state = Path(f"/home/{self._config.user}/.lca")
 
     @property
@@ -112,25 +119,40 @@ class DaemonService:
 
         return ServiceState(status=ServiceStatus.STOPPED, detail="process died")
 
-    def stop(self) -> ServiceState:
-        """Stop the daemon."""
-        # Kill by user process match. Must run via sudo: the invoking user
-        # cannot signal sandbox-user's processes, and a silent pkill failure
-        # leaves a stale daemon running after restart (two daemons fight over
-        # the same device id, the old one crashes on gateway outage).
+    def _kill_existing(self, pattern: str, timeout: float = 10.0) -> None:
+        """Kill existing daemon processes matching ``pattern``, then wait until gone.
+
+        Owns the "exactly one live daemon" invariant: a bare pkill is racy —
+        the old process may still be shutting down when start() spawns the new
+        one, and two daemons fight over the same device id (the PR #40 crash).
+        pkill still goes through sudo (PR #40 behavior kept): the invoking user
+        cannot signal sandbox-user's processes, and a silent pkill failure
+        leaves a stale daemon running.
+        """
+        pid = self._read_user_pid()
         self._sudo.run(
-            ["pkill", "-u", self._config.user, "-f", "node.*index.js.*connect"],
+            ["pkill", "-u", self._config.user, "-f", pattern],
             timeout=10,
         )
+        if pid is None:
+            return
+        deadline = time.monotonic() + timeout
+        while pid_alive(pid):
+            if time.monotonic() >= deadline:
+                break
+            time.sleep(0.2)
+
+    def stop(self) -> ServiceState:
+        """Stop the daemon."""
+        self._kill_existing(_CONNECT_PROC_PATTERN)
 
         self._sudo.rm(self._user_state / "connect.pid")
 
         return ServiceState(status=ServiceStatus.STOPPED)
 
     def restart(self) -> ServiceState:
-        """Restart the daemon."""
+        """Restart the daemon, confirming the old process is dead before spawning."""
         self.stop()
-        time.sleep(0.5)
         return self.start()
 
     # ── Setup ─────────────────────────────────────────────────────────
@@ -393,19 +415,7 @@ class DaemonService:
             return None
 
         start_script = self._user_state / "start.sh"
-        script_content = f"""#!/bin/sh
-export PATH="/opt/lca/venv/bin:/usr/local/bin:/usr/bin:/bin"
-export LCA_PYTHON="/opt/lca/venv/bin/python3"
-export PYTHONPATH="/opt/lca/python"
-export HOME=/home/{owner}
-cd {self._config.workspace}
-exec node {cli_js} connect \\
-  --gateway {self._kernel_serve_ws_url} \\
-  --workspace {self._config.workspace} \\
-  --token-type serviceToken \\
-  --token lca-local-host \\
-  >> "${{HOME}}/.lca/daemon.log" 2>&1
-"""
+        script_content = render_start_script(self._config, self._kernel_serve_ws_url)
         if not self._sudo.write_text(start_script, script_content, owner=owner):
             return None
         self._sudo.run(["chmod", "755", str(start_script)])
@@ -420,7 +430,7 @@ exec node {cli_js} connect \\
 
         time.sleep(1)
         pid_result = subprocess.run(
-            ["pgrep", "-u", owner, "-f", "node.*index.js.*connect"],
+            ["pgrep", "-u", owner, "-f", _CONNECT_PROC_PATTERN],
             capture_output=True,
             text=True,
             timeout=5,

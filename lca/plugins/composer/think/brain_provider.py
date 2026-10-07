@@ -2,65 +2,15 @@
 
 from __future__ import annotations
 
-from pydantic import BaseModel, ConfigDict
-
-from lca.contracts.atoms.control.slot import ControlSlot
-from lca.contracts.atoms.functional.group import FunctionalGroup
-from lca.contracts.atoms.scope.scope import Scope
-from lca.contracts.harness.composition.plugin_contract import (
-    ArchitectureContract,
-    AuthorityContract,
-    EvidenceContract,
-    LifecycleContract,
-    PluginContract,
-    PluginIdentity,
-)
-from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import (
-    OwnershipDeclaration,
-)
-from lca.harness.plugin_api import PluginContext, PluginKind, plugin
+from lca.plugins.composer._provider_factory import _register_composer_plugin
 from lca.plugins.composer.think.brain_composer import BrainComposer
 
-
-class Config(BaseModel):
-    """Strict configuration for the built-in brain composer provider."""
-
-    model_config = ConfigDict(extra="forbid")
-
-
-@plugin(
-    id="lca-plan-brain-composer",
-    provides=["composer.brain"],
-    requires=[],
-    implements=["AgentGraphComposer"],
-    layer="L4",
-    effects="none",
-    description="Plan-bound cognitive composer with a narrow think-cluster interface.",
-    test_suite="tests/composer/test_composer_consumes_compiled_capability.py",
-    kind=PluginKind.PROVIDER,
-    contract=PluginContract(
-        identity=PluginIdentity(version="v1"),
-        architecture=ArchitectureContract(
-            group=FunctionalGroup.G10_COMPOSITION, control_slots=(ControlSlot.OBSERVE_WILDCARD,)
-        ),
-        lifecycle=LifecycleContract(allowed_scopes=(Scope.RUN,)),
-        authority=AuthorityContract(grants=("plugin.serve",)),
-        observability=EvidenceContract(
-            descriptors=("lca-plan-brain-composer.checked", "lca-plan-brain-composer.served")
-        ),
-    ),
-    relations=(),
-    ownership=OwnershipDeclaration(
-        reads=("composer.brain",),
-        emits=("composer.brain.checked",),
-        state_mutation="forbidden",
-    ),
+setup, Config = _register_composer_plugin(
+    plane_key="brain",
+    plane_noun="cognitive",
+    interface="think-cluster",
+    grants=("plugin.serve",),
+    composer_cls=BrainComposer,
 )
-async def setup(ctx: PluginContext, config: Config) -> None:
-    """Provide only the profile-selected cognitive graph composer."""
-
-    del config
-    ctx.provide("composer.brain", BrainComposer())
-
 
 __all__ = ["Config", "setup"]

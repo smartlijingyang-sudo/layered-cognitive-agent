@@ -22,6 +22,7 @@ from dataclasses import dataclass
 from typing import Any, Literal
 
 from lca.contracts.atoms.enums.enums import FinishReason
+from lca.infrastructure.observability.stream.response_text_stream import _decode_json_string_content
 
 # 诊断预览上限，防止超大 raw 污染 journal / Decision.extra
 _RAW_PREVIEW_MAX = 2000
@@ -123,7 +124,7 @@ def extract_partial_json_string(raw: str, key: str) -> str | None:
     rest = raw[colon + 1 :].lstrip()
     if not rest.startswith('"'):
         return None
-    return _decode_json_string_prefix(rest, 1)
+    return _decode_json_string_content(rest, 1)
 
 
 def recover_partial_tool_arguments(raw: str) -> dict[str, Any]:
@@ -151,30 +152,6 @@ def recover_partial_tool_arguments(raw: str) -> dict[str, Any]:
         if value is not None:
             out[key] = value
     return out
-
-
-def _decode_json_string_prefix(source: str, start: int) -> str:
-    parts: list[str] = []
-    escaped = False
-    for ch in source[start:]:
-        if escaped:
-            if ch == "n":
-                parts.append("\n")
-            elif ch == "t":
-                parts.append("\t")
-            elif ch == "r":
-                parts.append("\r")
-            else:
-                parts.append(ch)
-            escaped = False
-            continue
-        if ch == "\\":
-            escaped = True
-            continue
-        if ch == '"':
-            break
-        parts.append(ch)
-    return "".join(parts)
 
 
 def resolve_tool_arguments(

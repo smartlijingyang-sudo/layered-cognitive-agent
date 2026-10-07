@@ -24,6 +24,8 @@ def test_stop_kills_daemon_via_sudo(tmp_path: Path) -> None:
         root=tmp_path,
         sudo=sudo,
     )
+    # No pid file recorded -> _kill_existing skips the wait-for-exit poll.
+    sudo.read_text.return_value = None
 
     svc.stop()
 

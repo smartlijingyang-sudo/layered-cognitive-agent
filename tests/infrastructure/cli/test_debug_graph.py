@@ -79,10 +79,10 @@ def fake_run_dir(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
 
 def test_build_debug_graph_extracts_nodes_reducer_llm_and_root_cause(fake_run_dir: Path) -> None:
     """Pure-function contract: nodes + reducer_sequence + llm_calls + anomalies."""
-    from lca.infrastructure.cli.commands.observation.debug_graph import _load_events
+    from lca.infrastructure.cli.commands._shared.projection import load_spine_events
 
     run_id = "run_test_debug_graph"
-    events = _load_events(run_id)
+    events = load_spine_events(run_id)
     report = build_debug_graph(events)
 
     assert report["node_count"] == 2
@@ -143,3 +143,47 @@ def test_debug_graph_missing_run_reports_error(fake_run_dir: Path) -> None:
     result = runner.invoke(app, ["debug-graph", "run_does_not_exist"])
     # CliRunner sometimes swallows typer.Exit; rely on stderr message instead
     assert "no spine at" in (result.output + (result.stderr or ""))
+
+
+def test_debug_graph_skips_non_dict_spine_lines(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """spine.jsonl 里混入有效 JSON 但非 dict 的行（如 42）时 debug-graph 退出码为 0。
+
+    回归测试 (RA-004)：旧的私有 _load_events 是共享 load_spine_events
+    的复刻，丢了 isinstance(obj, dict) 守卫；非 dict 行在
+    build_debug_graph 里 ev.get 触发 AttributeError。统一走共享
+    loader 后该行被跳过，命令正常退出。
+    """
+    monkeypatch.chdir(tmp_path)
+    run_id = "run_test_non_dict_line"
+    run_dir = tmp_path / "traces" / "runs" / run_id
+    run_dir.mkdir(parents=True)
+    spine = run_dir / f"{run_id}.spine.jsonl"
+    spine.write_text(
+        "\n".join(
+            [
+                json.dumps(
+                    {
+                        "event_id": "x:1",
+                        "execution_point": "kernel.run.start",
+                        "payload": {"run_id": run_id},
+                    }
+                ),
+                "42",  # 有效 JSON，非 dict：旧私有 loader 会把它传给 build_debug_graph 导致 AttributeError
+                "[1, 2]",  # 也是有效 JSON 非 dict
+                json.dumps(
+                    {
+                        "event_id": "x:9",
+                        "execution_point": "kernel.run.stop",
+                        "payload": {"run_id": run_id, "outcome": "success"},
+                    }
+                ),
+            ]
+        ),
+        encoding="utf-8",
+    )
+    runner = CliRunner()
+    result = runner.invoke(app, ["debug-graph", run_id])
+    assert result.exit_code == 0, result.output
+    assert f"=== debug-graph run_id={run_id} ===" in result.output
