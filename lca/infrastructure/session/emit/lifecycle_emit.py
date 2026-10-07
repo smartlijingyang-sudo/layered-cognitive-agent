@@ -43,11 +43,19 @@ def _append_catalog(event: Any) -> bool:
     return append_catalog_bound(event, actor=_LIFECYCLE_ACTOR) is not None
 
 
-def begin_turn(*, turn: int | None = None, reason: str = "user_input") -> None:
-    """``turn.started.v1`` — once per user-driven turn."""
+def begin_turn(*, turn: int | None = None, reason: str = "user_input") -> int | None:
+    """``turn.started.v1`` — once per user-driven turn.
+
+    Returns the emitted turn number (``turn or 1``), or ``None`` when no
+    session is bound and nothing was emitted. RA-029: the runtime loop
+    reflects the returned turn onto ``AgentState.current_turn`` so the
+    typed seam carries exactly the turn the journal records.
+    """
     if _session() is None:
-        return
-    _append_catalog(TurnStarted(turn=turn or 1))
+        return None
+    turn_no = turn or 1
+    _append_catalog(TurnStarted(turn=turn_no))
+    return turn_no
 
 
 def begin_step(*, turn: int | None = None, step: int) -> None:

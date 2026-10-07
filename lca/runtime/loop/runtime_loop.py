@@ -195,7 +195,12 @@ class CognitiveRuntime(Runtime):
         )
         try:
             reset_lifecycle()
-            begin_turn()
+            # RA-029: reflect the begun turn onto the typed carrier seam.
+            # turn_of() readers (think/llm.invoke, body dispatch) then see
+            # the same turn the journal's turn.started.v1 records; a
+            # session-less run keeps the explicit 0 single-shot default.
+            begun_turn = begin_turn()
+            state.current_turn = begun_turn if begun_turn is not None else 0
             session_reader = resolve_session_reader()
             run_writer: RunSessionWriter | None = None
             if session_reader is not None:
