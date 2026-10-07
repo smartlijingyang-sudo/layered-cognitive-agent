@@ -548,3 +548,35 @@
     绝不 `checkout` 切分支、不碰他人未提交内容；ssh252 输出头部 git 状态块
     是包装器注入的主工作目录状态，用 ZZMARK marker 定位真实输出。
 ---
+
+## 2026-10-07 23:48+ - RA-022（Round 6 optimize）
+
+- 实现：`lca/plugins/assistant/events/_events.py` 9 个 EP payload dataclass 收敛为
+  frozen dataclass base `_AssistantEPPayloadBase`
+  - Base：必含四字段（assistant_id / revision_seq / manifest_digest / actor）+
+    `__post_init__`（`_validate_required_fields(self, type(self).__name__)` +
+    `_validate_extra_fields()` hook）+ `to_dict`（`_required_dict` +
+    `_extra_items()` 接缝的真值 extras）；接缝默认 `NotImplementedError`
+    （fail-loud，不用空元组默认）。
+  - 9 个子类缩为：extra 字段声明 + `_extra_items()`（按原 to_dict key 顺序返回
+    `(key, value)` 对；`changes` 在接缝内转 `list`）+ 按需 `_validate_extra_fields`
+    覆盖（全部错误文案逐字保留）。各 EP docstring 原样保留。
+  - 验收证据：改动前/后 golden 对比——16 个 to_dict 用例（全字段+最小字段变体，
+    key 顺序计入）+ 10 个校验错误用例（四件套门×3、bool revision_seq、
+    各子类 extra 校验）全部字节一致（`GOLDEN_IDENTICAL`）。
+- 测试：`tests/plugins/assistant/`（test_catalog.py 覆盖部分 payload to_dict）
+  见下；`ruff check` 绿（`_events.py`）。
+- Files changed: `lca/plugins/assistant/events/_events.py`、
+  `raphy/prd.json`（RA-022 passes=true，notes 记录实现与评估的 3 点差异）、
+  `raphy/progress.txt`（本节）。
+- **Learnings for future iterations:**
+  - 收敛型 refactor 的"字节等价"证据标准：golden 抓改动前（to_dict 全变体 +
+    错误文案），改动后重跑 diff——比只跑现有测试更能钉住"形状不变"；
+    golden 脚本放 `~/.lca-worktrees/`（repo 外，验完即删，不进 commit）。
+  - dataclass 继承的 `__post_init__`：子类不定义即继承基类版本，hook 用
+    `self._validate_extra_fields()` 做模板方法；错误文案里类名字面量可用
+    `type(self).__name__` 替代，f-string 里的照抄原样即可字节一致。
+  - base 的 `_extra_items()` 默认抛 `NotImplementedError` 而非返回空元组：
+    接缝缺失 fail-loud，符合 codebase fail-loud 纪律；评估只说"显式接缝"，
+    未定默认行为，实现时按纪律补上（已记入 prd notes delta）。
+---

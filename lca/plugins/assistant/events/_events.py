@@ -11,7 +11,7 @@ procedure 草稿正文进 spine（ADR-0187 §3 D2 末段 + D9）。
 
 from __future__ import annotations
 
-from collections.abc import Callable, Mapping
+from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass
 from typing import Any
 
@@ -61,7 +61,45 @@ def _required_dict(payload: Any) -> dict[str, Any]:
 
 
 @dataclass(frozen=True)
-class AssistantCreatedEventPayload:
+class _AssistantEPPayloadBase:
+    """Assistant 域 EP payload 基类（frozen dataclass）。
+
+    收敛 9 个 EP payload 重复的三件事：必含四字段（``assistant_id`` /
+    ``revision_seq`` / ``manifest_digest`` / ``actor``，与
+    ``ASSISTANT_REQUIRED_FIELDS`` 对齐）、``__post_init__`` 的四件套守门、
+    ``to_dict``（四件套 + 真值 extra 字段）。子类只声明 extra 字段、按序列化
+    顺序实现 ``_extra_items()`` 接缝，并按需覆盖 ``_validate_extra_fields()``
+    做 extra 校验。``to_dict`` 输出与收敛前字节等价（key 顺序不变），
+    ADR-0187 §3 D8/D9 payload 闭集语义不变——第 10 个 payload 只需实现接缝。
+    """
+
+    assistant_id: str
+    revision_seq: int
+    manifest_digest: str
+    actor: str
+
+    def __post_init__(self) -> None:
+        _validate_required_fields(self, type(self).__name__)
+        self._validate_extra_fields()
+
+    def _validate_extra_fields(self) -> None:
+        """Hook：子类 extra 字段的附加校验（默认无）；fail-loud 纪律同基类门。"""
+
+    def _extra_items(self) -> Iterable[tuple[str, Any]]:
+        """接缝：按序列化顺序返回 extra ``(key, value)`` 对；子类必须实现。"""
+        raise NotImplementedError(f"{type(self).__name__} 必须实现 _extra_items()")
+
+    def to_dict(self) -> dict[str, Any]:
+        """按四件套必含字段 + 真值 extra 字段序列化；空字段不进 payload。"""
+        payload: dict[str, Any] = _required_dict(self)
+        for key, value in self._extra_items():
+            if value:
+                payload[key] = value
+        return payload
+
+
+@dataclass(frozen=True)
+class AssistantCreatedEventPayload(_AssistantEPPayloadBase):
     """``assistant.created`` EP payload（ADR-0187 §3 D8）。
 
     必含字段：``assistant_id`` / ``revision_seq`` / ``manifest_digest`` /
@@ -69,28 +107,18 @@ class AssistantCreatedEventPayload:
     :class:`catalog._AssistantCatalogImpl._emit_created` 守门；缺失字段抛 ``ValueError``。
     """
 
-    assistant_id: str
-    revision_seq: int
-    manifest_digest: str
-    actor: str
     home_path: str = ""
     template_id: str = ""
 
-    def __post_init__(self) -> None:
-        _validate_required_fields(self, "AssistantCreatedEventPayload")
-
-    def to_dict(self) -> dict[str, Any]:
-        """按四件套必含字段 + 额外字段序列化；空字段不进 payload。"""
-        payload: dict[str, Any] = _required_dict(self)
-        if self.home_path:
-            payload["home_path"] = self.home_path
-        if self.template_id:
-            payload["template_id"] = self.template_id
-        return payload
+    def _extra_items(self) -> Iterable[tuple[str, Any]]:
+        return (
+            ("home_path", self.home_path),
+            ("template_id", self.template_id),
+        )
 
 
 @dataclass(frozen=True)
-class AssistantBootstrapCompletedEventPayload:
+class AssistantBootstrapCompletedEventPayload(_AssistantEPPayloadBase):
     """``assistant.bootstrap.completed`` EP payload（ADR-0187 §3 D8）。
 
     引导式创建（``create`` 带 ``seed_user_md``）写 USER.md 后删除
@@ -98,70 +126,45 @@ class AssistantBootstrapCompletedEventPayload:
     对齐，缺失抛 ``ValueError``。
     """
 
-    assistant_id: str
-    revision_seq: int
-    manifest_digest: str
-    actor: str
     home_path: str = ""
 
-    def __post_init__(self) -> None:
-        _validate_required_fields(self, "AssistantBootstrapCompletedEventPayload")
-
-    def to_dict(self) -> dict[str, Any]:
-        """按四件套必含字段 + 额外字段序列化；空字段不进 payload。"""
-        payload: dict[str, Any] = _required_dict(self)
-        if self.home_path:
-            payload["home_path"] = self.home_path
-        return payload
+    def _extra_items(self) -> Iterable[tuple[str, Any]]:
+        return (("home_path", self.home_path),)
 
 
 @dataclass(frozen=True)
-class AssistantProfileRevisedEventPayload:
+class AssistantProfileRevisedEventPayload(_AssistantEPPayloadBase):
     """``assistant.profile.revised`` EP payload（ADR-0187 §3 D8 + ADR-0242 D6）。
 
     配置面任何变更（revise_profile / reimport / skill 删除）经唯一写入口
     落盘后发射；四个必含字段与 ``ASSISTANT_REQUIRED_FIELDS`` 对齐。
     """
 
-    assistant_id: str
-    revision_seq: int
-    manifest_digest: str
-    actor: str
     reason: str = ""
     """变更原因（工具语义 / ``"reimport"`` 等）；空 = 未提供。"""
     changes: tuple[str, ...] = ()
     """本次变更涉及的配置面文件名（如 ``("SOUL.md",)``），供审计。"""
 
-    def __post_init__(self) -> None:
-        _validate_required_fields(self, "AssistantProfileRevisedEventPayload")
-
-    def to_dict(self) -> dict[str, Any]:
-        payload: dict[str, Any] = _required_dict(self)
-        if self.reason:
-            payload["reason"] = self.reason
-        if self.changes:
-            payload["changes"] = list(self.changes)
-        return payload
+    def _extra_items(self) -> Iterable[tuple[str, Any]]:
+        return (
+            ("reason", self.reason),
+            ("changes", list(self.changes)),
+        )
 
 
 @dataclass(frozen=True)
-class AssistantSkillEvolvedProposedEventPayload:
+class AssistantSkillEvolvedProposedEventPayload(_AssistantEPPayloadBase):
     """``assistant.skill.evolved.proposed`` EP payload（ADR-0187 §3 D8 + D9）。
 
     只含提案元数据：candidate_id / skill_name / draft_digest；
     **禁止**草稿正文（procedure / SKILL 全文）进字段。
     """
 
-    assistant_id: str
-    revision_seq: int
-    manifest_digest: str
-    actor: str
     candidate_id: str
     skill_name: str
     draft_digest: str = ""
 
-    def __post_init__(self) -> None:
-        _validate_required_fields(self, "AssistantSkillEvolvedProposedEventPayload")
+    def _validate_extra_fields(self) -> None:
         if not self.candidate_id.strip():
             raise ValueError(
                 "AssistantSkillEvolvedProposedEventPayload.candidate_id 必须为非空字符串"
@@ -171,105 +174,88 @@ class AssistantSkillEvolvedProposedEventPayload:
                 "AssistantSkillEvolvedProposedEventPayload.skill_name 必须为非空字符串"
             )
 
-    def to_dict(self) -> dict[str, Any]:
-        payload: dict[str, Any] = _required_dict(self)
-        payload["candidate_id"] = self.candidate_id
-        payload["skill_name"] = self.skill_name
-        if self.draft_digest:
-            payload["draft_digest"] = self.draft_digest
-        return payload
+    def _extra_items(self) -> Iterable[tuple[str, Any]]:
+        return (
+            ("candidate_id", self.candidate_id),
+            ("skill_name", self.skill_name),
+            ("draft_digest", self.draft_digest),
+        )
 
 
 @dataclass(frozen=True)
-class AssistantSkillEvolvedPromotedEventPayload:
+class AssistantSkillEvolvedPromotedEventPayload(_AssistantEPPayloadBase):
     """``assistant.skill.evolved.promoted`` EP payload（ADR-0187 §3 D8 + D9）。
 
     0067 三闸通过并写入 ``{home}/skills/`` 后发射；只含提升元数据。
     """
 
-    assistant_id: str
-    revision_seq: int
-    manifest_digest: str
-    actor: str
     candidate_id: str
     skill_name: str
     approved_by: str
     artifact_digest: str = ""
 
-    def __post_init__(self) -> None:
-        _validate_required_fields(self, "AssistantSkillEvolvedPromotedEventPayload")
+    def _validate_extra_fields(self) -> None:
         for field_name in ("candidate_id", "skill_name", "approved_by"):
             if not str(getattr(self, field_name)).strip():
                 raise ValueError(
                     f"AssistantSkillEvolvedPromotedEventPayload.{field_name} 必须为非空字符串"
                 )
 
-    def to_dict(self) -> dict[str, Any]:
-        payload: dict[str, Any] = _required_dict(self)
-        payload["candidate_id"] = self.candidate_id
-        payload["skill_name"] = self.skill_name
-        payload["approved_by"] = self.approved_by
-        if self.artifact_digest:
-            payload["artifact_digest"] = self.artifact_digest
-        return payload
+    def _extra_items(self) -> Iterable[tuple[str, Any]]:
+        return (
+            ("candidate_id", self.candidate_id),
+            ("skill_name", self.skill_name),
+            ("approved_by", self.approved_by),
+            ("artifact_digest", self.artifact_digest),
+        )
 
 
 @dataclass(frozen=True)
-class AssistantJobRegisteredEventPayload:
+class AssistantJobRegisteredEventPayload(_AssistantEPPayloadBase):
     """``assistant.job.registered`` EP payload（ADR-0187 §3 D8 + D10）。"""
 
-    assistant_id: str
-    revision_seq: int
-    manifest_digest: str
-    actor: str
     job_id: str
     work_item_id: str
 
-    def __post_init__(self) -> None:
-        _validate_required_fields(self, "AssistantJobRegisteredEventPayload")
+    def _validate_extra_fields(self) -> None:
         if not self.job_id.strip():
             raise ValueError("AssistantJobRegisteredEventPayload.job_id 必须为非空字符串")
         if not self.work_item_id.strip():
             raise ValueError("AssistantJobRegisteredEventPayload.work_item_id 必须为非空字符串")
 
-    def to_dict(self) -> dict[str, Any]:
-        payload: dict[str, Any] = _required_dict(self)
-        payload["job_id"] = self.job_id
-        payload["work_item_id"] = self.work_item_id
-        return payload
+    def _extra_items(self) -> Iterable[tuple[str, Any]]:
+        return (
+            ("job_id", self.job_id),
+            ("work_item_id", self.work_item_id),
+        )
 
 
 @dataclass(frozen=True)
-class AssistantJobFiredEventPayload:
+class AssistantJobFiredEventPayload(_AssistantEPPayloadBase):
     """``assistant.job.fired`` EP payload（ADR-0187 §3 D8 + D10）。
 
     ``actor`` = Trigger 投递方（Phase 1 恒为 ``"manual"``）。
     """
 
-    assistant_id: str
-    revision_seq: int
-    manifest_digest: str
-    actor: str
     job_id: str
     work_item_id: str
     trigger_id: str
 
-    def __post_init__(self) -> None:
-        _validate_required_fields(self, "AssistantJobFiredEventPayload")
+    def _validate_extra_fields(self) -> None:
         for field_name in ("job_id", "work_item_id", "trigger_id"):
             if not str(getattr(self, field_name)).strip():
                 raise ValueError(f"AssistantJobFiredEventPayload.{field_name} 必须为非空字符串")
 
-    def to_dict(self) -> dict[str, Any]:
-        payload: dict[str, Any] = _required_dict(self)
-        payload["job_id"] = self.job_id
-        payload["work_item_id"] = self.work_item_id
-        payload["trigger_id"] = self.trigger_id
-        return payload
+    def _extra_items(self) -> Iterable[tuple[str, Any]]:
+        return (
+            ("job_id", self.job_id),
+            ("work_item_id", self.work_item_id),
+            ("trigger_id", self.trigger_id),
+        )
 
 
 @dataclass(frozen=True)
-class AssistantSkillInstalledEventPayload:
+class AssistantSkillInstalledEventPayload(_AssistantEPPayloadBase):
     """``assistant.skill.installed`` EP payload（ADR-0187 §3 D8 + D9）。
 
     发射时机：0067 三闸通过、包落盘 ``{home}/skills/`` 且 manifest
@@ -277,10 +263,6 @@ class AssistantSkillInstalledEventPayload:
     （id / digest / actor / state）,**不**携带 SKILL 全文。
     """
 
-    assistant_id: str
-    revision_seq: int
-    manifest_digest: str
-    actor: str
     skill_id: str
     skill_digest: str
     artifact_state: str
@@ -288,8 +270,7 @@ class AssistantSkillInstalledEventPayload:
     version: str = ""
     installed_at: str = ""
 
-    def __post_init__(self) -> None:
-        _validate_required_fields(self, "AssistantSkillInstalledEventPayload")
+    def _validate_extra_fields(self) -> None:
         if not self.skill_id or not self.skill_id.strip():
             raise ValueError("AssistantSkillInstalledEventPayload.skill_id 必须为非空字符串")
         if not self.skill_digest or not self.skill_digest.strip():
@@ -297,53 +278,43 @@ class AssistantSkillInstalledEventPayload:
         if not self.artifact_state or not self.artifact_state.strip():
             raise ValueError("AssistantSkillInstalledEventPayload.artifact_state 必须为非空状态值")
 
-    def to_dict(self) -> dict[str, Any]:
-        payload: dict[str, Any] = _required_dict(self)
-        payload["skill_id"] = self.skill_id
-        payload["skill_digest"] = self.skill_digest
-        payload["artifact_state"] = self.artifact_state
-        if self.source:
-            payload["source"] = self.source
-        if self.version:
-            payload["version"] = self.version
-        if self.installed_at:
-            payload["installed_at"] = self.installed_at
-        return payload
+    def _extra_items(self) -> Iterable[tuple[str, Any]]:
+        return (
+            ("skill_id", self.skill_id),
+            ("skill_digest", self.skill_digest),
+            ("artifact_state", self.artifact_state),
+            ("source", self.source),
+            ("version", self.version),
+            ("installed_at", self.installed_at),
+        )
 
 
 @dataclass(frozen=True)
-class AssistantSkillActivatedEventPayload:
+class AssistantSkillActivatedEventPayload(_AssistantEPPayloadBase):
     """``assistant.skill.activated`` EP payload（ADR-0187 §3 D8）。
 
     activate 是 run 级事实：不写 Home、不触发 ``revision_seq`` 变化；
     ``revision_seq`` / ``manifest_digest`` 取事件时刻 Home manifest 快照。
     """
 
-    assistant_id: str
-    revision_seq: int
-    manifest_digest: str
-    actor: str
     skill_id: str
     activation_id: str
     artifact_state: str = ""
     activated_at: str = ""
 
-    def __post_init__(self) -> None:
-        _validate_required_fields(self, "AssistantSkillActivatedEventPayload")
+    def _validate_extra_fields(self) -> None:
         if not self.skill_id or not self.skill_id.strip():
             raise ValueError("AssistantSkillActivatedEventPayload.skill_id 必须为非空字符串")
         if not self.activation_id or not self.activation_id.strip():
             raise ValueError("AssistantSkillActivatedEventPayload.activation_id 必须为非空字符串")
 
-    def to_dict(self) -> dict[str, Any]:
-        payload: dict[str, Any] = _required_dict(self)
-        payload["skill_id"] = self.skill_id
-        payload["activation_id"] = self.activation_id
-        if self.artifact_state:
-            payload["artifact_state"] = self.artifact_state
-        if self.activated_at:
-            payload["activated_at"] = self.activated_at
-        return payload
+    def _extra_items(self) -> Iterable[tuple[str, Any]]:
+        return (
+            ("skill_id", self.skill_id),
+            ("activation_id", self.activation_id),
+            ("artifact_state", self.artifact_state),
+            ("activated_at", self.activated_at),
+        )
 
 
 def emit_fact_event(event: str, payload: Mapping[str, Any]) -> Any:
