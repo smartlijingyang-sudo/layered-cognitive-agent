@@ -162,8 +162,8 @@
     "Do NOT change FlushReport, restore(), unregister() semantics"
    ],
    "priority": 1,
-   "passes": false,
-   "notes": "Source: raphy assess Round 3 2026-10-07 (Worth exploring, friction walk B-Q3). Evidence: subscribe_changes docstring '订阅 view_snapshot() 变化' + class docstring '变更通知' vs drive() unconditional _fire_listeners ('为简单实现,每次 drive 后全量回调') vs test_projection_host.py:348 'listener should fire on drive'. Deletion test: the 'what counts as a change' decision gets one owner (drive) instead of living half in docs, half in impl."
+   "passes": true,
+   "notes": "Source: raphy assess Round 3 2026-10-07 (Worth exploring, friction walk B-Q3). Evidence: subscribe_changes docstring '订阅 view_snapshot() 变化' + class docstring '变更通知' vs drive() unconditional _fire_listeners ('为简单实现,每次 drive 后全量回调') vs test_projection_host.py:348 'listener should fire on drive'. Deletion test: the 'what counts as a change' decision gets one owner (drive) instead of living half in docs, half in impl. Implemented 2026-10-07 (optimize round): chose change-gated (option a). drive() now accumulates a `changed` flag via `new_state != prev_state` per deriver and only calls _fire_listeners() when non-empty; snapshots still update on every drive. subscribe_changes + class docstring now document the canonical change-gated semantics; the old '每次 drive 后全量回调（未来可扩展为 diff-based）' hedge is gone."
   },
   {
    "id": "RA-011",

@@ -1,3 +1,19 @@
+\S
+Kernel \r on an \m
+\344\275\240\346\255\243\345\234\250\344\275\277\347\224\250\351\200\232\345\256\235\345\244\247\346\250\241\345\236\213\344\270\223\347\224\250\346\234\215\345\212\241\345\231\250\357\274\232
+\350\265\204\346\272\220\357\274\2328 \346\240\270\357\274\210vCPU\357\274\21164 GiB    GPU\357\274\232NVIDIA L20
+\351\203\250\347\275\262\346\234\215\345\212\241\357\274\232
+\351\200\232\345\256\235\346\234\211\350\212\222\346\231\272\350\203\275\345\212\251\346\211\213-\347\224\237\344\272\247\347\216\257\345\242\203
+\350\207\252\345\273\272AI\345\244\247\346\250\241\345\236\213-AI\345\233\242\351\230\237\346\265\213\350\257\225\344\275\277\347\224\250
+test-gitlab-AI\345\233\242\351\230\237\346\265\213\350\257\225\344\275\277\347\224\250
+On branch raphy/arch-20261007-0930
+Changes not staged for commit:
+  (use "git add <file>..." to update what will be committed)
+  (use "git restore <file>..." to discard changes in working directory)
+	modified:   lca/infrastructure/observability/loop_cursor/projection/host.py
+	modified:   tests/observability/loop_cursor/test_projection_host.py
+
+no changes added to commit (use "git add" and/or "git commit -a")
 ## Codebase Patterns
 
 （raphy 轮共享的模式/禁区登记，供后续 assess/optimize 轮参考）
@@ -16,6 +32,10 @@
 - **已收敛 idiom：** "converge N identical X"（RA-001/RA-002/RA-008 及 iter-quality 的
   `_TURN_ENDED`、`add_observer_hook` 守卫、`_session_id`/`_turn_of` 等）；新 duplication
   候选先确认真有簇（`CacheConfig(enabled=False)` 全仓一处 → 不开 story）。
+- **change-gated listener 判定（RA-010）：** 用 ``!=``（值语义）判 deriver state
+  变化，与 ``ProjectionRegistry._drive_unit`` 同款纪律；reducer 纯度（返回等值
+  新对象）下 ``!=`` 不误报，``is not`` 会误报——默认 deriver 全是 frozen
+  dataclass，``!=`` 天然正确。
 
 ---
 
@@ -43,3 +63,37 @@
 - Commit：`raphy: assess round 2026-10-07-0930 (4 stories)`（未 push）。
   commit 后已 `checkout main`（防 iter lanes 的 commit 落到 raphy 分支）。
 - raphy-last-assess.txt 已更新（本机时间戳）。
+
+---
+
+## 2026-10-07 11:30 - RA-010
+
+- 落定 StdProjectionHost listener 语义为 change-gated（评估二选一中的 (a)）：
+  `drive()` 内逐 deriver 比较 `new_state != prev_state` 累积 changed，
+  仅非空时调 `_fire_listeners()`；snapshots 每次 drive 照常更新（view 语义不动）。
+- `subscribe_changes` 与类 docstring 现文档化 canonical 语义；删掉
+  "每次 drive 后全量回调（未来可扩展为 diff-based）" 的对冲表述；
+  `_fire_listeners` 的"变化时通知"docstring 终于名副其实。
+- Files changed:
+  - `lca/infrastructure/observability/loop_cursor/projection/host.py`
+    （drive 变更门控 + 三处 docstring）
+  - `tests/observability/loop_cursor/test_projection_host.py`
+    （`test_subscribe_changes_disposer` 断言文案对齐新语义；
+    新增 `test_subscribe_changes_no_fire_when_state_unchanged`）
+  - `raphy/prd.json`（RA-010 passes=true）、`raphy/progress.txt`
+- 测试：`tests/observability/loop_cursor/` 122 passed（含新测试）；
+  `ruff check` 两文件全过；另 `tests/lca_kernel/events/test_bus_delivery_receipt.py`
+  21 passed（异常恢复轮残留 docs-only 的相关测试）。
+- **Learnings for future iterations:**
+  - 评估称"测试 :348 钉死 per-drive"不完全准确：该测试用默认 deriver
+    （apply 必变 state），change-gated 下照样通过——"测试钉死某语义"要看
+    场景是否真覆盖无变化分支，不能只看断言文案。
+  - 评估给的兄弟实现路径是包目录（`projection_registry/projection_registry.py`），
+    但 `!=` 纪律属实（`_drive_unit:272`），可直接对齐。
+  - deriver 纯 reducer 风格（返回等值新对象，如 `_CostState(...)`）下必须用
+    `!=`（值语义）判变化，`is not` 会误报——默认 deriver 全是 frozen dataclass，
+    `!=` 天然正确。
+  - 生产侧 `subscribe_changes` 零订阅者、`.drive(` 零生产调用方：语义收紧零
+    blast radius；但这也意味着该语义目前只被测试消费——未来接生产调用方时
+    以本次落定的 change-gated 为准。
+---
