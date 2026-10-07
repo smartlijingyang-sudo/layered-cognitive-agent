@@ -746,3 +746,25 @@
   - 新 seam 落点用层向论证（谁可以 import 谁）而非"离概念近"，结论更硬。
 ---
 
+
+## 2026-10-08 03:35 - RA-026
+
+- **实现**：删两调度器的私有 `_acquire_lock` 直通（tick 内直调 `self._file_lock.acquire(now_ms)`）；
+  公开 `release_lock()` 保留。删 4 处 `STALE_ABSOLUTE_CAP_S` re-export（2 scheduler 模块的
+  import + `__all__`、2 包 `__init__` 的 import + `__all__`）；常量仍由
+  `lca/infrastructure/scheduler_file_lock.py` 拥有。收尾 grep：`STALE_ABSOLUTE_CAP_S` 只剩
+  owner 文件内 3 处（定义/使用/`__all__`），`_acquire_lock` 全仓零引用。
+- **与评估的差异**：评估写"全仓零外部引用（含 tests）"指的是 `STALE_ABSOLUTE_CAP_S`（属实）；
+  但 `_acquire_lock` 私有方法被 2 个测试文件 4 处直接调用（test_pipeline.py 的锁竞争测试 x1、
+  test_cron_full_lifecycle_invariants.py x3）——评估漏了这处波及。处理：测试改钉到
+  `sched._file_lock.acquire(...)`；直通是逐字 delegate，行为完全相同，测试意图（锁竞争语义）不变。
+- **文件**：`lca/infrastructure/cron/scheduler.py`、`lca/infrastructure/proactive/scheduler.py`、
+  `lca/infrastructure/cron/__init__.py`、`lca/infrastructure/proactive/__init__.py`、
+  `tests/integration/proactive/test_pipeline.py`、
+  `tests/scenario/test_cron_full_lifecycle_invariants.py`。
+- **验证**：37 测试全绿（cron + proactive pipeline + lifecycle invariants）；ruff 全绿。
+- **Learnings for future iterations:**
+  - "删私有方法"类 story 动手前必须全仓 grep 方法名——私有 ≠ 无调用方，测试常直接调私有方法。
+    评估的"零引用"断言要复核，不能只信。
+---
+

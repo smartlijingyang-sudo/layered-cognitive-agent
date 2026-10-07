@@ -139,7 +139,7 @@ def test_lock_contention_second_tick_skipped():
     sched2, store2 = _make_scheduler(tmp, [job])
     store2.create("sess-3")
     # sched1 模拟崩溃进程：只拿锁不走 tick（锁不释放）
-    assert sched1._acquire_lock(1_000_000) is True
+    assert sched1._file_lock.acquire(1_000_000) is True
     try:
         r = sched2.tick(now_ms=1_000_000 + 1_000)
         assert r.lock_acquired is False

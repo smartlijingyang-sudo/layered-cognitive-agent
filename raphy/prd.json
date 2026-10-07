@@ -389,9 +389,9 @@
     "Post-change grep: STALE_ABSOLUTE_CAP_S appears only in scheduler_file_lock.py; cron/proactive scheduler tests green; ruff check clean"
    ],
    "priority": 2,
-   "passes": false,
+   "passes": true,
    "branchName": "raphy/arch-20261008-0206",
-   "notes": "Strength: Worth exploring. Friction-walk Area B: the convergence commit (8308bd07f) moved the implementation but left the compat shims, against the repo COMPAT discipline ('compat shim deletable in the same PR'). Evidence: full-repo grep shows zero references to STALE_ABSOLUTE_CAP_S outside the chain itself (tests included). Deletion test: concentrates (removes thin indirection, not relocation)."
+   "notes": "Strength: Worth exploring. Friction-walk Area B: the convergence commit (8308bd07f) moved the implementation but left the compat shims, against the repo COMPAT discipline ('compat shim deletable in the same PR'). Evidence: full-repo grep shows zero references to STALE_ABSOLUTE_CAP_S outside the chain itself (tests included). Deletion test: concentrates (removes thin indirection, not relocation).\nDONE 2026-10-08 (optimize session): deleted the private _acquire_lock passthrough in CronScheduler and ProactiveScheduler (tick() now calls self._file_lock.acquire(now_ms) directly); public release_lock() KEPT. Deleted the 4-site STALE_ABSOLUTE_CAP_S re-export chain (2 scheduler modules + 2 package __init__s, import + __all__ entries); post-change grep: STALE_ABSOLUTE_CAP_S appears only in lca/infrastructure/scheduler_file_lock.py (owner). _acquire_lock has zero references repo-wide. Note: assessment claimed zero test references, but 2 test files called the private passthrough (test_pipeline.py x1, test_cron_full_lifecycle_invariants.py x3); re-pinned them to sched._file_lock.acquire(...) — behaviorally identical (passthrough was a verbatim delegate), lock-contention test intent unchanged. Tests: 37 passed (cron + proactive pipeline + lifecycle invariants suites); ruff clean."
   },
   {
    "id": "RA-027",
