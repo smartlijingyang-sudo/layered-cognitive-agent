@@ -21,7 +21,7 @@ async def _run_doctor() -> None:
 
     print(f"✓ Config file: {config_path}")
     servers = load_mcp_servers(config_path)
-    print(f"✓ Configured servers: {list(servers.keys())}\n")
+    print(f"✓ Configured servers: {list(servers)}\n")
 
     manager = MCPHub(servers)
     print("Connecting and discovering tools from MCP servers...")

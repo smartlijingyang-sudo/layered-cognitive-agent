@@ -52,7 +52,7 @@ class InMemoryEventDescriptorRegistry(EventDescriptorRegistry):
         return tuple(self._by_name.values())
 
     def all_type_names(self) -> Iterable[str]:
-        return tuple(self._by_name.keys())
+        return tuple(self._by_name)
 
     def register(self, descriptor: EventDescriptor, *, replace: bool = False) -> None:
         existing = self._by_name.get(descriptor.type_name)

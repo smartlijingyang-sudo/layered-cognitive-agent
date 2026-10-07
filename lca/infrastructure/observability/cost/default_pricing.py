@@ -71,7 +71,7 @@ class DefaultCostPricingTable(CostPricingTable):
         return _DEFAULT_PRICING_REF
 
     def list_refs(self) -> tuple[str, ...]:
-        return tuple(self._tables.keys())
+        return tuple(self._tables)
 
     def register_pricings(self, pricing_ref: str, pricings: list[ModelPricing]) -> None:
         """新增一个 ``pricing_ref`` 版本;不影响历史成本。"""

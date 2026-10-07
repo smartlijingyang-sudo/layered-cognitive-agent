@@ -125,7 +125,7 @@ def expand_env_refs(
                 ):
                     return SecretStr(raw)
                 return raw
-            if set(node.keys()) <= {"literal"} and "literal" in node:
+            if set(node) <= {"literal"} and "literal" in node:
                 return node["literal"]
             return {
                 key: walk(value, f"{field_path}.{key}" if field_path else key)

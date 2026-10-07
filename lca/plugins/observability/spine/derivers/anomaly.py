@@ -334,7 +334,7 @@ class AnomalyDetector(Deriver):
             return {
                 "reason": event.reason,
                 "tool_call_keys": sorted(
-                    (payload.get("tool_call") or {}).keys()
+                    (payload.get("tool_call") or {})
                     if isinstance(payload.get("tool_call"), dict)
                     else []
                 ),

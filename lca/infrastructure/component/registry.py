@@ -65,7 +65,7 @@ class NamedRegistry(NamedRegistryProtocol, Generic[_T]):
         return impl
 
     def list(self) -> _StrList:
-        return list(self._entries.keys())
+        return list(self._entries)
 
     def __contains__(self, name: str) -> bool:
         return name in self._entries
@@ -131,4 +131,4 @@ class ComponentRegistry:
         return registry.list() if registry is not None else []
 
     def list_categories(self) -> _StrList:
-        return sorted(self._registries.keys())
+        return sorted(self._registries)

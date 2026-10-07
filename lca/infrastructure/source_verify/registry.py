@@ -85,7 +85,7 @@ class SourceRegistry:
         return None
 
     def source_ids(self) -> tuple[str, ...]:
-        return tuple(self._entries.keys())
+        return tuple(self._entries)
 
     def __len__(self) -> int:
         return len(self._entries)

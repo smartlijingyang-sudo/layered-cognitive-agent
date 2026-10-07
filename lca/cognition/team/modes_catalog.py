@@ -49,7 +49,7 @@ MODE_DEFINITIONS: Final[dict[str, ModeDefinition]] = {
     ),
 }
 
-ALL_MODES: Final[tuple[str, ...]] = tuple(MODE_DEFINITIONS.keys())
+ALL_MODES: Final[tuple[str, ...]] = tuple(MODE_DEFINITIONS)
 
 MODE_HELP: Final[dict[str, str]] = {
     key: definition.help_text for key, definition in MODE_DEFINITIONS.items()

@@ -80,7 +80,7 @@ async def setup(ctx: PluginContext, config: Config) -> None:
     retrieval_policy_factory = ctx.require(MEMORY_RETRIEVAL_POLICY.key)
 
     def build_simple_memory(**kwargs: object) -> MemorySystem:
-        if {"policy", "compaction", "retrieval"} & kwargs.keys():
+        if {"policy", "compaction", "retrieval"} & set(kwargs):
             raise TypeError(
                 "memory policies are selected by the active profile, not create() arguments"
             )

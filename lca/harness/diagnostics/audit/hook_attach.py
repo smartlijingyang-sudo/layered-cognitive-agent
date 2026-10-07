@@ -219,7 +219,7 @@ def format_report(
     for finding in findings:
         by_kind.setdefault(finding.kind, []).append(finding)
 
-    for kind in sorted(by_kind.keys()):
+    for kind in sorted(by_kind):
         kind_findings = by_kind[kind]
         lines.append(f"[{kind}] ({len(kind_findings)} finding(s))")
         for finding in kind_findings:

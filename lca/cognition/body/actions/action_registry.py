@@ -50,7 +50,7 @@ class ActionRegistry(NamedRegistry[Action], ActionRegistryProtocol):
 
     def allowed_action_types(self) -> list[str]:
         """返回所有已注册的 action_type 集合 —— Prompt / Schema / 测试的唯一事实来源。"""
-        return sorted(self._entries.keys())
+        return sorted(self._entries)
 
     def is_registered(self, action_type: str) -> bool:
         """判断 action_type 是否已注册。"""

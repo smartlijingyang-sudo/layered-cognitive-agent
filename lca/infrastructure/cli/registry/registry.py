@@ -37,7 +37,7 @@ class ServiceRegistry:
 
     def names(self) -> list[str]:
         """Get all service names."""
-        return list(self._services.keys())
+        return list(self._services)
 
     def unhealthy(self) -> list[Service]:
         """Get services that are not RUNNING."""

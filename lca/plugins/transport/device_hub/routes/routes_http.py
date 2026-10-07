@@ -134,7 +134,7 @@ async def agent_run(request: Request) -> JSONResponse:
         _auth_from_body(request, body)
     except AuthError as exc:
         return JSONResponse({"error": str(exc)}, status_code=401, headers=cors_headers())
-    _log.info("agent_run_requested", body_keys=list(body.keys()))
+    _log.info("agent_run_requested", body_keys=list(body))
     return JSONResponse(
         {"success": True, "operationId": "", "status": "accepted"},
         headers=cors_headers(),

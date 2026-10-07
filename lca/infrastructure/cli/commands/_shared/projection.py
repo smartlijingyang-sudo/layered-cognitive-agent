@@ -198,7 +198,7 @@ def summarize_outputs(
     lines: list[str] = []
     for k, v in outputs.items():
         if isinstance(v, dict):
-            sub_keys = list(v.keys())[:4]
+            sub_keys = list(v)[:4]
             sample: list[str] = []
             for sk in sub_keys:
                 sv = v.get(sk)
