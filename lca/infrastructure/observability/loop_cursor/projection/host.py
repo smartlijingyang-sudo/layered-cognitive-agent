@@ -31,6 +31,11 @@ from lca.infrastructure.observability.spine.event.record import EventRecord
 log = logging.getLogger(__name__)
 
 
+def _snapshot(state: Any, seq: int, last_record: EventRecord | None) -> LoopProjectionSnapshot:
+    # LoopProjectionSnapshot 构造收敛点:monotonic 恒为 True(ADR-0170 D2)。
+    return LoopProjectionSnapshot(state=state, seq=seq, last_record=last_record, monotonic=True)
+
+
 @dataclass(frozen=True)
 class FlushReport:
     """flush_all 执行结果(ADR-0170 D2)。
@@ -89,18 +94,10 @@ class StdProjectionHost:
             self._disposed.discard(key)
             seed = definition.init()
             self._states[key] = seed
-            self._snapshots[key] = LoopProjectionSnapshot(
-                state=seed,
-                seq=0,
-                last_record=None,
-                monotonic=True,
-            )
+            self._snapshots[key] = _snapshot(seed, 0, None)
 
             def _dispose() -> None:
-                self._disposed.add(key)
-                self._definitions.pop(key, None)
-                self._states.pop(key, None)
-                self._snapshots.pop(key, None)
+                self._do_dispose(key)
 
             return ProjectionToken(key=key, dispose=_dispose)
 
@@ -123,6 +120,15 @@ class StdProjectionHost:
             self._states.pop(key, None)
             self._snapshots.pop(key, None)
 
+    def _active_targets(self) -> list[tuple[str, LoopProjectionDefinition, Any]]:
+        # drive / flush_all 共享的 active deriver 快照:锁内取三元组(key, definition, state)。
+        with self._lock:
+            return [
+                (k, d, self._states[k])
+                for k, d in self._definitions.items()
+                if k not in self._disposed
+            ]
+
     # ── 驱动(2):drive / view_snapshot ───────────────────────────
     def drive(self, snapshot: CursorSnapshot, record: EventRecord) -> None:
         """对所有 active deriver 调 apply(state, snapshot, record)。
@@ -137,11 +143,7 @@ class StdProjectionHost:
         Host 默认清单保证不订阅;由调用方在 drive 前过滤(也由测试断言)。
         """
         with self._lock:
-            targets = [
-                (k, d, self._states[k])
-                for k, d in self._definitions.items()
-                if k not in self._disposed
-            ]
+            targets = self._active_targets()
         changed = False
         for key, definition, prev_state in targets:
             try:
@@ -158,12 +160,7 @@ class StdProjectionHost:
                 changed = True
             with self._lock:
                 self._states[key] = new_state
-                self._snapshots[key] = LoopProjectionSnapshot(
-                    state=new_state,
-                    seq=record.sequence,
-                    last_record=record,
-                    monotonic=True,
-                )
+                self._snapshots[key] = _snapshot(new_state, record.sequence, record)
         # 变更门控:仅当有 deriver 状态变化时通知 listeners
         # (subscribe_changes 的"变化"承诺;原先"每次 drive 后全量回调"已收敛)
         if changed:
@@ -243,12 +240,7 @@ class StdProjectionHost:
                     )
                     continue
                 self._states[key] = restored
-                self._snapshots[key] = LoopProjectionSnapshot(
-                    state=restored,
-                    seq=base_seq,
-                    last_record=None,
-                    monotonic=True,
-                )
+                self._snapshots[key] = _snapshot(restored, base_seq, None)
             _ = header  # reserved;keep for caller-supplied metadata
             _ = cut  # reserved;replay cutoff not yet consumed by reset-to-init restore
 
@@ -263,11 +255,7 @@ class StdProjectionHost:
 
         started_ms = time.monotonic_ns()
         with self._lock:
-            targets = [
-                (k, d, self._states[k])
-                for k, d in self._definitions.items()
-                if k not in self._disposed
-            ]
+            targets = self._active_targets()
         completed: list[str] = []
         failed: list[tuple[str, BaseException]] = []
         for key, definition, state in targets:
