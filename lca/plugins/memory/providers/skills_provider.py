@@ -32,7 +32,11 @@ class Config(BaseModel):
     requires=["skills"],
     implements=[SkillPackageInstaller],
     layer="L0",
-    effects="none",
+    # resolve_skill_store() runs ensure_bundled_skills, which install_package's
+    # every repo skills/ pack into the global store root. Declaring "none" made
+    # that write invisible to the effects audit, which is how a unit test ended
+    # up rewriting the production ~/.lca/skills undetected.
+    effects="filesystem",
     description="Register SkillPackageInstaller providers on the SkillsService Definition.",
     test_suite="tests/scenario/plugin/test_plugin_tree_single_owner.py",
     kind=PluginKind.PROVIDER,
