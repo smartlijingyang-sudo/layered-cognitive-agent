@@ -132,6 +132,23 @@ class TestDecodeCreateRunAssistantId:
         assert decoded.assistant_id == "asst_explicit"
 
     @pytest.mark.asyncio
+    async def test_string_agent_resolves_assistant(self, file_store: LocalFileStore) -> None:
+        class _Ownership:
+            def assistant_id_for_agent(self, agent_id: str) -> str | None:
+                return "asst_from_agent" if agent_id == "agt_x" else None
+
+        decoded = await decode_create_run(
+            {"messages": _messages(), "agent": "agt_x"},
+            ctx=None,
+            file_store=file_store,
+            resolve_mode=_resolve_mode,
+            ownership=_Ownership(),
+        )
+        assert isinstance(decoded, CreateRunRequest)
+        assert decoded.assistant_id == "asst_from_agent"
+        assert decoded.agent.agent_id == "agt_x"
+
+    @pytest.mark.asyncio
     async def test_unmapped_agent_keeps_legacy_empty(self, file_store: LocalFileStore) -> None:
         class _Ownership:
             def assistant_id_for_agent(self, agent_id: str) -> str | None:
