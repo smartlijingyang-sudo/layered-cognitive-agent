@@ -266,7 +266,6 @@ class ModelVisibleHookAdapter(LLMAdapter):
             response = await self._inner.complete(prompt, **kwargs)
         except Exception as exc:
             if attrs is not None:
-                pass
                 try:
                     _emit_lifecycle_fail(self._hook, str(exc))
                 except Exception as fail_exc:  # INTENTIONAL: L10 + D5 不挡业务

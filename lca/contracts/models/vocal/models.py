@@ -50,9 +50,7 @@ class SendMessagePayload(BaseModel):
     def validate_payload_semantics(self) -> "SendMessagePayload":
         if self.type == VocalMessageType.TEXT and not self.content:
             raise ValueError("type='text' 时 content 字段不能为空")
-        if self.type == VocalMessageType.WIDGET and (
-            not self.options or len(self.options) < 1 or len(self.options) > 6
-        ):
+        if self.type == VocalMessageType.WIDGET and (not self.options or len(self.options) > 6):
             raise ValueError("type='widget' 时 options 必须包含 1 到 6 个选项")
         if self.type == VocalMessageType.SECRET_REQUEST and not self.secret_key:
             raise ValueError("type='secret_request' 时 secret_key 字段不能为空")
