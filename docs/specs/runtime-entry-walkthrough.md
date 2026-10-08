@@ -327,13 +327,13 @@ def __init__(self, bindings: DeclarativeRuntimeBindings) -> None:
 
 ### 7.1 binding 本身
 
-`lca/runtime/runtime_bindings.py:111-189`（节选）：
+`lca/runtime/support/runtime_bindings.py:135-163`（节选，v2）：
 
 ```python
 @dataclass(frozen=True, slots=True)
 class DeclarativeRuntimeBindings:
     plan: CompiledRunPlan | None                  # 编译好的图
-    phase_executors: Mapping[str, PhaseExecutor]  # 每个阶段对应的执行器
+    node_executors: Mapping[str, NodeExecutor]      # 每个图节点对应的执行器
     capabilities: RuntimePhaseCapabilities        # Brain / Body / Memory / PerceiveHub
     reducer: Reducer
     hooks: HookRegistry
@@ -353,28 +353,23 @@ class DeclarativeRuntimeBindings:
     lifecycle_publisher: RuntimeLifecyclePublisher | None
 ```
 
-`assemble(...)` 工厂把 `phase_executors` 用 `MappingProxyType(dict(...))` 冻结（`runtime_bindings.py:170`）——**runtime 启动期没有任何路径能改写 phase 映射**。这正是 [ADR-0075](../adr/0075-declarative-phase-graph-and-minimal-trusted-kernel.md) "trust the kernel, freeze the plan" 的实现机制。[^frozen-mapping]
+`assemble(...)` 工厂把 `node_executors` 用 `MappingProxyType(dict(...))` 冻结（`runtime_bindings.py:193`）——**runtime 启动期没有任何路径能改写 node 映射**。这正是 [ADR-0075](../adr/0075-declarative-phase-graph-and-minimal-trusted-kernel.md) "trust the kernel, freeze the plan" 的实现机制。[^frozen-mapping]
 
 ### 7.2 计划可用性校验（binding 的入口闸）
 
-`runtime_bindings.py:194-205`：
+`lca/runtime/support/runtime_bindings.py:236-242`（v2）：
 
 ```python
 def require_executable_plan(self) -> CompiledRunPlan:
-    if self.plan is None or not self.phase_executors:
+    """Return the selected plan once the bindings carry its node executors."""
+    if self.plan is None or not self.node_executors:
         raise ValueError(
-            "DeclarativeRuntimeBindings requires a compiled_plan and phase_executors."
-        )
-    required = {binding.executor_capability for binding in self.plan.phase_bindings}
-    missing = sorted(required.difference(self.phase_executors))
-    if missing:
-        raise ValueError(
-            "DeclarativeRuntimeBindings is missing phase executors: " + ", ".join(missing)
+            "DeclarativeRuntimeBindings requires a compiled_plan and node_executors."
         )
     return self.plan
 ```
 
-行为：**拿计划声明的每一个 `executor_capability` 与已注册的 `phase_executors` 求差集**。缺任何一个就 fail-closed。这是 `CognitiveRuntime.run` 第 (4) 步实际抛错的源头。
+行为：**断言 `plan` 与 `node_executors` 双非空**，缺任一就 fail-closed。这是 `CognitiveRuntime.run` 入口闸抛错的源头。v1 的 `phase_bindings` 缺口差集校验已随 ADR-0221 P3 退役（`CompiledRunPlan` 不再暴露 `phase_bindings`，节点绑定走冻结的 `node_executors` 映射）。
 
 ### 7.3 `new_driver()` —— 把 binding 变成 carrier adapter
 
@@ -554,7 +549,7 @@ HTTP POST /runs
 - **MTK**（minimal Trusted Core / 最小可信内核）—— 编译器 + 校验器 + 解释器 + Reducer + Effect Gateway 这套稳定机制。
 - **phase** —— 7 个语义阶段之一（perceive / think / act / reflect / remember / stop + 可选 observe 类横切）。
 - **node** —— phase graph 里一个具体节点（带 id 与 binding）。
-- **executor_capability** —— `phase_bindings` 里出现的 ability key，运行时 binding 用它去 `phase_executors` 字典里查实现。
+- **executor_capability** —— 节点绑定的 ability key（v1 为 `phase_bindings` 条目）；v2（ADR-0221 P3）`phase_bindings` 已退役，运行时经冻结的 `node_executors` 映射查实现。
 - **`require_executable_plan()`** —— binding 暴露的"plan 是否可执行"反向校验。`CognitiveRuntime.run/resume` 的入口闸。
 - **`DeclarativeRuntimeBindings`**（公共 alias: `RuntimeBindings`，[ADR-0110 D5](../adr/0110-plugin-contract-unification-and-naming-convergence.md)） —— 不可变运行闭包；唯一持有 `CompiledRunPlan` 的运行时对象。
 - **`plan_ref`** —— `CompiledRunPlan` 的 SHA-256 短摘要，跨进程身份证。
