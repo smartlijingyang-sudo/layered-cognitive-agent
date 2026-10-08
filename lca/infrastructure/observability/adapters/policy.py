@@ -95,7 +95,7 @@ def otel_safe_attributes(attributes: dict[str, Any]) -> dict[str, Any]:
     """OTel 只接受原语；嵌套值用 stdlib ``json.dumps`` 压成字符串。"""
     out: dict[str, Any] = {}
     for key, value in attributes.items():
-        if isinstance(value, (bool, int, float, str)):
+        if isinstance(value, (int, float, str)):
             out[key] = value
         elif value is None:
             continue
@@ -134,11 +134,11 @@ class AttributePolicy:
     def _prepare_value(self, key: str, value: Any) -> Any:
         if value is None:
             return None
-        if hasattr(value, "value") and not isinstance(value, (str, int, float, bool)):
+        if hasattr(value, "value") and not isinstance(value, (str, int, float)):
             value = value.value  # 枚举归一
         if isinstance(value, str):
             return self._prepare_str(key, value)
-        if isinstance(value, (int, float, bool)):
+        if isinstance(value, (int, float)):
             return value
         if isinstance(value, dict):
             return {str(k): self._prepare_value(str(k), v) for k, v in value.items()}

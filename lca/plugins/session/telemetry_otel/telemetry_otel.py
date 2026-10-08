@@ -343,7 +343,7 @@ def _otel_attributes(record: TelemetryRecord) -> dict[str, Any]:
     """合并身份属性 + channel；值强制为 OTel 允许的原语（str/int/float/bool）。"""
     attrs: dict[str, Any] = {"telemetry.channel": record.channel}
     for key, value in record.attributes.items():
-        attrs[str(key)] = value if isinstance(value, (str, int, float, bool)) else str(value)
+        attrs[str(key)] = value if isinstance(value, (str, int, float)) else str(value)
     return attrs
 
 

@@ -44,7 +44,7 @@ def _to_jsonable(value: Any) -> Any:
     not recognize stays a ``TypeError`` so silent loss of structure can't
     sneak through.
     """
-    if value is None or isinstance(value, (bool, int, float, str)):
+    if value is None or isinstance(value, (int, float, str)):
         return value
     if isinstance(value, BaseModel):
         return _to_jsonable(value.model_dump(mode="python"))

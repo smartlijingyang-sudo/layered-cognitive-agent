@@ -122,7 +122,7 @@ def _extract_attributes(payload: object) -> dict[str, Any]:
         return {}
     out: dict[str, Any] = {}
     for key, value in payload.items():
-        if isinstance(value, (str, int, float, bool)) or value is None:
+        if isinstance(value, (str, int, float)) or value is None:
             out[str(key)] = value
     return out
 

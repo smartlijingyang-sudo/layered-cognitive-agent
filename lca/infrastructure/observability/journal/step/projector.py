@@ -28,7 +28,7 @@ def to_jsonable(obj: Any) -> Any:
         return {k: to_jsonable(v) for k, v in obj.items()}
     if isinstance(obj, (list, tuple)):
         return [to_jsonable(v) for v in obj]
-    if isinstance(obj, (str, int, float, bool, type(None))):
+    if isinstance(obj, (str, int, float, type(None))):
         return obj
     return repr(obj)
 

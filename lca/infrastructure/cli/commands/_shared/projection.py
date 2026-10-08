@@ -202,7 +202,7 @@ def summarize_outputs(
             sample: list[str] = []
             for sk in sub_keys:
                 sv = v.get(sk)
-                if isinstance(sv, (str, int, float, bool)):
+                if isinstance(sv, (str, int, float)):
                     sample.append(f"{sk}={_safe_repr(sv, 40)}")
                 elif isinstance(sv, list):
                     sample.append(f"{sk}=list[{len(sv)}]")

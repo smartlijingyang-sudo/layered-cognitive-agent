@@ -124,7 +124,7 @@ def _json_safe(value: Any) -> Any:
     closures — so anything without a JSON form degrades to its ``repr``: the
     value stays attributable instead of the terminal event vanishing.
     """
-    if value is None or isinstance(value, (bool, int, float, str)):
+    if value is None or isinstance(value, (int, float, str)):
         return value
     if isinstance(value, Enum):
         return value.value
