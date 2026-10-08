@@ -50,11 +50,15 @@ class DiskSkillPackageStore(SkillPackageInstaller, SkillPackageStore):
     def __init__(self, settings: SkillSettings | None = None) -> None:
         self._settings = settings if settings is not None else get_skill_settings()
         self._root: Path = expand_user_path(self._settings.cache_dir)
-        self._root.mkdir(parents=True, exist_ok=True)
+        # RA-078: 构造不再触碰文件系统；mkdir 推迟到首次写盘（_ensure_root）。
 
     @property
     def root(self) -> Path:
         return self._root
+
+    def _ensure_root(self) -> None:
+        """RA-078: 首次写盘时建根目录（幂等）；读路径永不建目录。"""
+        self._root.mkdir(parents=True, exist_ok=True)
 
     def list_installed(self) -> tuple[SkillIndexEntry, ...]:
         entries: list[SkillIndexEntry] = []
@@ -187,6 +191,7 @@ class DiskSkillPackageStore(SkillPackageInstaller, SkillPackageStore):
         )
         digest = content_hash(skill_md_text.encode("utf-8"))
 
+        self._ensure_root()  # RA-078: 首次写盘点
         dest = self._root / sid
         resources_dir = dest / _RESOURCES
         if dest.exists():

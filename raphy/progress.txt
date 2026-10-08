@@ -1957,3 +1957,27 @@
  （merged store 解析 global-skill 返回 None）。未动，留给相关 lane。
 - Tests: test_http_importer_references.py 5 passed；tests/infrastructure/skills +
   overlay/invariants/materialize_link/merged_store 共 135 passed。ruff 全过。
+
+## 2026-10-09 06:02 CST - RA-078
+
+- Done: DiskSkillPackageStore 构造与 mkdir 分离 —— __init__ 不再触碰文件系统，
+  新增 _ensure_root() 在 install_package 顶部显式调用（读路径 list_installed/get
+  本来就不建目录，update_package_meta 只写已存在的包目录，均不动）。
+  get_skill_settings() 去掉 @lru_cache(maxsize=1)，每次调用按当前 env 重新解析。
+- global_store_factory 简化（按 acceptance 记入 commit body）：
+  overlay 构造注释里"构造会 mkdir 全局根"的前提已消失，工厂缝保留的理由只剩
+  settings 延迟解析 + 测试可整体替换；re-link 仍是唯一读全局库的动作，
+  _default_global_store 仍是唯一的 get_skill_settings() 调用点（架构 invariant
+  测试 test_global_store_reachable_only_through_one_read_seam 照旧通过）。
+- Learnings:
+  - 去 memo 后 conftest 的 cache_clear 仪式直接删掉（两处），_isolate_skill_store
+    只剩 env 隔离 —— "load-bearing 的仪式"是最好的删除候选：71515dace 的教训
+    本质是"正确性依赖记得调一个函数"，去 memo 是根治。
+  - RA-058 的 pin（test_resolve_skill_store_writes_nothing）被加强为
+    `assert not store_root.exists()` —— 原断言 _pack_dirs==[] 在目录不存在时会
+    抛 FileNotFoundError，正好逼出更强的"构造零触碰"语义。
+  - install_package 原本就靠 resources_dir.mkdir(parents=True) 建树，_ensure_root()
+    只是把"首次写盘点"显式化；boot 行为不变（materialize_bundled_skills 仍是
+    唯一的显式写步骤）。
+- Tests: 新 pin 文件 + factory 6 passed；skills/overlay/global_link/
+  materialize_link/invariants/isolation/merged_store 共 159 passed。ruff 全过。

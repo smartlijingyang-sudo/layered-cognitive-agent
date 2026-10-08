@@ -1122,8 +1122,8 @@
       "branchName": "raphy/arch-20261009-0107",
       "description": "As an LCA maintainer, I want constructing a store handle to never touch the filesystem, so construction timing stops being an implicit correctness precondition. Evidence (Round 13, skills zone): disk/store.py::__init__ does self._root.mkdir(parents=True, exist_ok=True) — constructing a 'store handle' touches the FS, which is why overlay needs a factory-of-factories (global_store_factory; overlay.py L99-101 comment documents the motivation). settings/settings.py::get_skill_settings has @lru_cache(maxsize=1) making settings process-global mutable state; the 71515dace fix called cache_clear 'load bearing' — test isolation correctness depends on remembering to clear a memoization cache. The real hazards ('when was the store constructed / which settings got cached') all live in call timing, not in any function logic.",
       "id": "RA-078",
-      "notes": "Source: Round 13 friction walk (Worth exploring; no-locality — hazard in call timing).",
-      "passes": false,
+      "notes": "Source: Round 13 friction walk (Worth exploring; no-locality — hazard in call timing). | Implemented 2026-10-09: DiskSkillPackageStore __init__ no longer mkdirs (RA-058 resolve stays pure; _ensure_root() runs at the top of install_package); get_skill_settings() de-memoized (lru_cache removed, fresh parse per call); overlay global_store_factory comment updated (factory kept for lazy settings + injection, no longer for mkdir-avoidance); conftest load-bearing cache_clear ritual deleted. Pins: strengthened test_factory_pure_resolve (root not even created) + new test_skill_settings_no_global_memo.",
+      "passes": true,
       "priority": 3,
       "title": "Separate DiskSkillPackageStore construction from mkdir; contain the settings lru_cache"
     },

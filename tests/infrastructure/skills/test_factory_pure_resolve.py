@@ -27,7 +27,8 @@ def test_resolve_skill_store_writes_nothing(tmp_path: Path, monkeypatch) -> None
     store_root = Path(get_skill_settings().cache_dir)
     store = resolve_skill_store()
     assert Path(store._root) == store_root
-    assert _pack_dirs(store_root) == []
+    # RA-078: 构造连根目录都不建（mkdir 推迟到首次写盘）。
+    assert not store_root.exists()
 
 
 def test_materialize_bundled_skills_writes_packs() -> None:

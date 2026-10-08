@@ -111,8 +111,9 @@ class _AssistantSkillOverlayImpl(AssistantSkillOverlay):
         self._catalog = catalog
         self._emit = event_emitter
         self._url_importer_factory = url_importer_factory or _default_url_importer
-        # 注入的是工厂而非实例:构造 DiskSkillPackageStore 会 mkdir 全局根,
-        # 没有 global_link 条目的 Home 不该因此触碰全局库。
+        # RA-078: 构造 DiskSkillPackageStore 已不再触碰文件系统（mkdir 推迟到
+        # 首次写盘），工厂缝保留的理由只剩：settings 延迟到首次使用时解析、
+        # 测试可整体替换。re-link 是唯一读全局库的动作。
         self._global_store_factory = global_store_factory or _default_global_store
 
     # ── 公开面 ────────────────────────────────────────────────────────
