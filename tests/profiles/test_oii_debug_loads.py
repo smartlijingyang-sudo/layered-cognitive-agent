@@ -33,7 +33,12 @@ def test_oii_debug_loads_without_error() -> None:
         "bundles/base.yaml",
         "bundles/web-app.yaml",
         "bundles/scenario-cordis-creator.yaml",
-        "bundles/declarative-phase-graph.yaml",
+        "bundles/outer/phase_main.yaml",
+        "bundles/think/think_subgraph.yaml",
+        "bundles/act/act_subgraph.yaml",
+        "bundles/perceive/perceive_subgraph.yaml",
+        "bundles/reflect/reflect_subgraph.yaml",
+        "bundles/remember/remember_subgraph.yaml",
         "bundles/loop_cursor.spine_default.yaml",
         "bundles/loop_cursor.spine_debug.yaml",
     )
