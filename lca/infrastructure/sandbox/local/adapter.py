@@ -112,7 +112,9 @@ class LocalSandboxAdapter(Sandbox):
         # auto-detect (mount_namespace_enabled: env var, else probe).
         self._mount_namespace_override = mount_namespace
         # Guest paths stay on SANDBOX_MOUNT_ROOT so prompts/tools agree with
-        # Onlyboxes. When host_root differs, shell commands are rewritten.
+        # Onlyboxes. When host_root differs, shell commands are translated:
+        # string rewriting in virtual mode, kernel bind mount in per-exec
+        # mount-namespace mode (todo-81 (c)).
         self._layout = layout if layout is not None else GuestLayout.from_root(SANDBOX_MOUNT_ROOT)
         self._sessions: dict[str, Path] = {}
         self._ensure_tree(Path(host_root))
