@@ -1094,8 +1094,8 @@
       "branchName": "raphy/arch-20261009-0107",
       "description": "As an LCA maintainer, I want one traversal-safety policy for skill packages, so the real decision isn't split across call sites. Evidence (Round 13, skills zone): disk/store.py::safe_rel_path silently normalizes ('..'/empty/backslash stripped); store's read_resource/install_package USE it to normalize, but overlay/gating.py::_gate_package REJECTS anything where safe_rel_path(rel) != rel (SkillImportError). Same input 'resources/../SKILL.md': store silently rewrites, gate refuses. The pure function is well-tested (test_skill_reference_containment.py), but the actual security decision (normalize vs reject) lives at the call sites — and the two call sites disagree. Traversal bugs will hide in 'which call was chosen', not in the implementation.",
       "id": "RA-076",
-      "notes": "Source: Round 13 friction walk (Worth exploring; no-locality — security decision at call sites).",
-      "passes": false,
+      "notes": "Source: Round 13 friction walk (Worth exploring; no-locality — security decision at call sites). | Implemented 2026-10-09: converged on full-link fail-loud via is_canonical_rel_path/require_canonical_rel_path in disk/store.py; _gate_package uses the same predicate (keeps its SkillImportError type/message). Pins in tests/infrastructure/skills/test_skill_path_policy_convergence.py.",
+      "passes": true,
       "priority": 3,
       "title": "Converge the safe_rel_path security policy (normalize vs reject) to one predicate"
     },

@@ -32,7 +32,7 @@ from lca.contracts.protocols.memory.operational_skills import (
     SkillImportError,
     SkillPackage,
 )
-from lca.infrastructure.skills.disk.store import safe_rel_path, sanitize_skill_id
+from lca.infrastructure.skills.disk.store import is_canonical_rel_path, sanitize_skill_id
 
 _STAGING_DIR_NAME = ".staging"
 """Home 内 staging 子目录名(隐藏目录;``list_installed`` 跳过)。"""
@@ -68,7 +68,9 @@ def _gate_package(package: SkillPackage) -> CapabilityArtifact:
     if len(package.resource_paths) > SKILL_MAX_RESOURCES:
         raise SkillImportError("invariant 闸失败: 资源数超过上限")
     for rel in package.resource_paths:
-        if not rel or safe_rel_path(rel) != rel:
+        # RA-076: 与 store 安装/读取用同一 traversal-safety 谓词；
+        # 策略结果（同输入同拒/同收）由 tests pin 住。
+        if not is_canonical_rel_path(rel):
             raise SkillImportError(f"invariant 闸失败: 资源路径非法 {rel!r}")
 
     artifact = make_capability_artifact(

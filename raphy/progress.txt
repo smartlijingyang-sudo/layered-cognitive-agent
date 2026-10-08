@@ -1912,3 +1912,26 @@
   - heredoc `<<'PYEOF'` 经 `muse.exec` 时仍会被做一层反斜杠/引号转义(`\"\"\"` 会提前终结三引号):含三引号嵌套的脚本走"本地文件 + stdin 重定向",别走 heredoc。
   - 合并重复扫描时,先给旧函数写"行为快照"测试(旧的返回 `[]` 的标量写法等),再动手,保证行为一致。
 ---
+
+## 2026-10-09 05:48 CST - RA-076
+
+- Done: safe_rel_path 的 normalize-vs-reject 分歧收敛为单一谓词
+  `is_canonical_rel_path`（disk/store.py）+ fail-loud 版
+  `require_canonical_rel_path`。install_package / read_resource /
+  _read_resource_bytes 的三处静默归一化改为 fail-loud；
+  overlay/_gate_package 改用同一谓词（保留其 SkillImportError 域错误类型）。
+- Direction chosen: full-link fail-loud（评估的二选一之一）；另一个选项
+  normalize-and-record 被弃——静默重写正是本轮要消灭的隐患形状。
+- Learnings:
+  - read_resource 的 `resources/` 双形式（扁平名/带前缀）是 canonical 子集上的
+    API 便利，不是 traversal 策略 —— 收敛时只收 `safe_rel_path` 那一层，
+    `_to_resource_rel` 保留。
+  - zip/security.py 有一份私有的 `_safe_rel_path` 拷贝，但 extract_zip_bytes
+    已在入口处对 zip-slip 直接 raise，且输出天然 canonical；超出 RA-076 范围，
+    未动（RA-080 的 seam 也不碰 zip 路径）。
+  - pin 设计：corpus（8 个 canonical + 8 个非 canonical）同时跑 gate 与
+    store 两条路径，断言"同输入同拒/同收"；install 与 read 各自的 fail-loud
+    用 pytest.raises(SkillContractError) 钉住。
+- Tests: 新 pin 文件 32 passed；tests/infrastructure/skills +
+  test_skill_overlay.py + test_assistant_skill_overlay_invariants.py +
+  test_materialize_link_seam.py 共 131 passed。ruff 全过。

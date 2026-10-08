@@ -113,8 +113,10 @@ class DiskSkillPackageStore(SkillPackageInstaller, SkillPackageStore):
     def read_resource(self, skill_id: str, rel_path: str) -> str:
         package = self.get(skill_id)
         # resource_paths 存 ``resources/`` 前缀的 skill 根相对路径；
-        # 调用方可能传扁平名或带前缀名，统一归一化后检查。
-        normalized = _to_resource_rel(safe_rel_path(rel_path))
+        # 调用方可能传扁平名或带前缀名（双形式是 canonical 子集，保留）。
+        # RA-076: traversal 策略收敛 — 非 canonical 输入 fail-loud，
+        # 与 overlay/_gate_package 用同一谓词，不再静默归一化。
+        normalized = _to_resource_rel(require_canonical_rel_path(rel_path))
         if normalized not in package.resource_paths:
             raise SkillNotFoundError(
                 f"技能 {skill_id!r} 中不存在资源路径 {rel_path!r}（不在白名单内）"
@@ -133,7 +135,8 @@ class DiskSkillPackageStore(SkillPackageInstaller, SkillPackageStore):
 
     def _read_resource_bytes(self, skill_id: str, rel_path: str) -> bytes:
         # 物理布局: resources/<flat>；resource_paths 的 ``resources/`` 前缀在此剥离。
-        storage_rel = _strip_resources_prefix(safe_rel_path(rel_path))
+        # RA-076: traversal 策略收敛 — 非 canonical 输入 fail-loud。
+        storage_rel = _strip_resources_prefix(require_canonical_rel_path(rel_path))
         path = self._root / sanitize_skill_id(skill_id) / _RESOURCES / storage_rel
         if not path.is_file():
             raise SkillNotFoundError(f"资源文件不存在: {rel_path}")
@@ -188,17 +191,17 @@ class DiskSkillPackageStore(SkillPackageInstaller, SkillPackageStore):
 
         normalized_resources: list[str] = []
         for rel, data in sorted(resource_files.items()):
-            clean = safe_rel_path(rel)
-            if not clean:
-                continue
+            # RA-076: traversal 策略收敛 — 非 canonical key fail-loud，
+            # 与 overlay/_gate_package 用同一谓词；不再静默归一化/跳过。
+            require_canonical_rel_path(rel)
             if len(data) > SKILL_MAX_RESOURCE_BYTES:
-                raise ValueError(f"资源 {clean} 超过单文件上限")
+                raise ValueError(f"资源 {rel} 超过单文件上限")
             # 落盘用扁平相对路径；manifest 记录 ``resources/`` 前缀的声明路径。
-            storage_rel = _strip_resources_prefix(clean)
+            storage_rel = _strip_resources_prefix(rel)
             out_path = resources_dir / storage_rel
             out_path.parent.mkdir(parents=True, exist_ok=True)
             out_path.write_bytes(data)
-            normalized_resources.append(_to_resource_rel(clean))
+            normalized_resources.append(_to_resource_rel(rel))
 
         # ADR-0214 §7: 校验 references 列表里的所有路径必须落到 _root/<sid>/_RESOURCES
         # 或 _root/<sid>/(SKILL.md 同级) — 不存在就 fail-loud。
@@ -299,6 +302,27 @@ def safe_rel_path(name: str) -> str:
     cleaned = name.replace("\\", "/").strip().lstrip("/")
     parts = [p for p in cleaned.split("/") if p and p not in {".", ".."}]
     return "/".join(parts)
+
+
+def is_canonical_rel_path(name: str) -> bool:
+    """RA-076: 技能包相对路径的唯一 traversal-safety 谓词。
+
+    canonical ⟺ 非空且已是 ``safe_rel_path`` 的输出形状（无前导斜杠、
+    无反斜杠、无 ``.``/``..`` 段、无空段）。store 的安装/读取与
+    overlay ``_gate_package`` 收敛到同一谓词：非 canonical 输入一律
+    fail-loud，永不静默重写。
+    """
+    return bool(name) and safe_rel_path(name) == name
+
+
+def require_canonical_rel_path(name: str) -> str:
+    """RA-076: ``is_canonical_rel_path`` 的 fail-loud 版；违例抛 SkillContractError。"""
+    if not is_canonical_rel_path(name):
+        raise SkillContractError(
+            f"资源路径不是 canonical 形式（拒绝静默归一化）: {name!r} — "
+            "调用方先自行归一化，或显式用 safe_rel_path 转换。"
+        )
+    return name
 
 
 def _strip_resources_prefix(path: str) -> str:
