@@ -1083,3 +1083,17 @@
 - 验证结果: 无代码改动，无需验证门。扫描脚本全部 exit 0（ast0527/dead0527/dead0522b/sndb0527 确定性重跑）；开工/收工工作区 on main（并发会话的未提交改动始终不动）。
 - commit: 无代码 commit；本台账单独 docs commit（沿用 0521–0527 `docs(lca-1000): 第NNNN轮台账` 模式）。
 - 备注: 只 commit docs/notes/lca-1000/ledger.md（`git add` + `git commit -- <path>` 显式路径）。扫描输出存 252 /tmp（ast0528_out.txt、dead0528_out.txt、dead0528b_out.txt、sndb0528_out.txt）。
+
+
+## 第0529轮 (2026-10-09 01:33-01:47 CST)
+- 改了什么: 无代码改动。**本轮未发现新的实质机会**（依据 body 规则 4：不硬凑 trivial commit）。
+- 依据 skill 哪一节: SKILL.md Deletion test + LANGUAGE.md（load-bearing knowledge / Two adapters = real seam / 接口即测试面）+ DEEPENING.md Seam discipline —— 见候选清单的驳回依据。
+- 关键设计决策（夜间跳过 grilling，记台账）: 并发会话新鲜 diff（raphy 1b82c8a6a merge @01:09：todo-87 删除死函数 emit_context_manifested_for_state + v2 fact-plane 测试 pin）是刻意的死代码删除 + 契约锁定 —— 恰是 deslop 清单的实例（薄包装器 passthrough，删后复杂度不重现），但已由并发会话完成并 merge，不重复动、不 re-litigate（沿用 0522 RA 判例）。未提交改动 .agent/skills/airtap-automation/SKILL.md 属并发会话，按规则 5 绝不动（沿用 0528 判例）。
+- 候选清单（本轮 explore：AST 同体扫描重跑 8430 函数/243 组 + dead-code + 真死 17 + 同名异体 295 组 + deslop 清单 + 并发会话新鲜 diff 复查）:
+  1. AST 243 组 —— 组 hash（G 行）集合与 0523 基线（/tmp/ast0523.txt）逐成员一致，零新组（0522/0523 已逐组人工裁决）；函数数 8431→8430（-1，系 todo-87 删除 emit_context_manifested_for_state），无新组出现。
+  2. dead / dead-b —— 输出与 dead0528_out.txt / dead0528b_out.txt 逐字节一致；真死 17 与 0522–0528 裁决集合一致（_RoleConfig 静态锚点；框架按名调用或保留；_validate_* ×12 pydantic validator classmethod 假阳性）。
+  3. sndb —— 输出与 sndb0528_out.txt 逐字节一致（295 组，含 0527 新裁决的 5 组）。
+  4. deslop：TODO/FIXME/HACK/XXX 仅既往裁决项（compact_summary TODOs 字段语义、expander 中文示例 XXX、s3 ADR-0167 PR-10 占位）；except Exception lca/ 仍 442，无新增；noqa F401 仅 cli.py side-effect registry 老项；"自承 dead" 仅 ADR-0121 dead-code list 引用 / 2026-09-14 修剪注记等既往裁决；叙事性注释无新增。
+- 验证结果: 无代码改动，无需验证门。扫描脚本全部 exit 0（ast0527/dead0527/dead0522b/sndb0527 确定性重跑）；开工/收工工作区 on main（并发会话的未提交改动始终不动）。
+- commit: 无代码 commit；本台账单独 docs commit（沿用 0521–0528 `docs(lca-1000): 第NNNN轮台账` 模式）。
+- 备注: 只 commit docs/notes/lca-1000/ledger.md（`git add` + `git commit -- <path>` 显式路径）。扫描输出存 252 /tmp（ast0529_out.txt、dead0529_out.txt、dead0529b_out.txt、sndb0529_out.txt）。
