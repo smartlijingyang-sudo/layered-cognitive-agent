@@ -101,6 +101,9 @@
   每 chunk `current_bindings_view()`，可能是"bindings 可热变"刻意设计，无失败证据，
   观察中，未立案。
 
+- **`approval_requirement` 三名口径漂移（RA-031 认领）：** `act.authorize` 发 `approval_required`（bool）+ `approval_requirement`（ApprovalRequirement 对象）；yaml gate inputs 只列 `approval_required`；executor 读的却是 `approval_requirement` 且 `declared_inputs` 两个都不含——declared interface、yaml wiring、实现三方口径不一致；payload 有现成 contracts frozen 类型却用 `object` + getattr 鸭子类型。
+- **ambient evidence-store 解析仪式两处（RA-032 认领）：** `safe_executor._resolve_evidence_pair` 与 `approve_gate._route_refusal_to_evidence` 逐字相同的 "current_bound → evidence_binding().store → 无绑定 no-ref" 仪式；`runs/tools.py` 与 `fact_gateway` 的 `current_bound()` 是不同形状（fail-loud / journal 镜像），不收编。
+- **端口三方对齐检查（RA-031 教训）：** node 读端口时查三处——executor `declared_inputs`、yaml inputs、实际 `port_values.get` 调用；三处名字不一致即 declared interface 说谎。
 ---
 
 ## Round 6 — assess (2026-10-07 23:15, branch raphy/arch-20261007-2315)
@@ -957,3 +960,40 @@
     的 id（span/sequence）必然跨 run 误报；以后写 detector 先问"状态的
     生命周期跟哪个域对齐"。
 ---
+
+## Round 9 — assess (2026-10-08 09:20, branch raphy/arch-20261008-0118)
+
+- 按硬化版 `raphy-assess.md` 执行：读 `skills/improve-codebase-architecture/SKILL.md`；
+  `git log -60` 定热点；CONTEXT.md + ADR-0292 精读；friction walk 精读三区
+  （nodes/intervene approve_gate.py 380 行 + interrupt.py 140 行全文 /
+  tool_defer policy.py + session.py + tool_search.py 全文 /
+  plugins/observability/cli debug_trace_provider.py + debug_seam.py 全文，5 问必答）；
+  mandatory runtime verification 真跑；duplication 副扫描；self-grilling 写进
+  assessment.md；diversity quota 满足（2 friction，0 纯 duplication story）。
+- 热点来源：`lca/nodes/intervene/`（be4f52dd1/ca9a07a63 两笔 ADR-0292 feature，新鲜）；
+  `lca/infrastructure/tool_defer/`（Defer tool L1 深水区）；debug_trace_provider
+  （cf8d64a53 刚 pin explain_failure 路由）。RA-023~030 / iter lanes / ralph Round 2 /
+  lca-1000 / memory / gate_chain_strategy.py 领地全部避开。
+- 产出 2 个 stories（`passes: false`），续号 RA-031~032：
+  - RA-031（P1, **Strong**）：`act.approve.gate` 的 `approval_requirement` 端口声明 +
+    定型——`declared_inputs` 不含 executor 实际读的端口（yaml 列的却是另一个名字
+    `approval_required`，executor 不读）；`req: object | None` + getattr/hasattr 鸭子类型，
+    而 contracts 有现成 frozen `ApprovalRequirement`；静默降级分支（req-like 但缺
+    required → 回退到 §10 明言不可信的 `decision.needs_approval`）无类型保证。
+    违反 ADR-0235 "reads typed ports only" 明文规则。
+  - RA-032（P2, Worth exploring）：ambient evidence-store 解析收进一个 seam——
+    `safe_executor._resolve_evidence_pair` 与 `approve_gate._route_refusal_to_evidence`
+    逐字相同的 "current_bound → evidence_binding().store → 无绑定 no-ref" 仪式；
+    two = real；落点 `lca.infrastructure.observability`（层向论证：L2 nodes 不得
+    import cognition/body；runs/tools.py / fact_gateway 形状不同，out of scope）。
+- **Top 推荐 RA-031**：违反明文规则 + §10 是安全关键路径 + deletion test 最脆
+  （declared interface 说谎，测试只能"走私"端口值）。
+- **运行时验证**（MockLLMAdapter，LLM_API_KEY=dummy）：A basic ✅ completed /
+  B tool-call ✅ completed / C 同一 agent 双 run ✅✅；无 crash/hang/静默失败。
+  RA-023 非收敛路径未重跑（Round 8 05:15 已复测，本分支含其 merge）。
+- 丢弃（有证据）：`interrupt.py` spine_seq ambient fallback（可选端口的显式语义，
+  无说谎）；debug_trace_provider `_render_event` 零调用者（dead，机械清理无杠杆）；
+  tool_defer `_tool_to_spec` 重复（刻意层边）；ContextVar 三件套/`_classify_args`/
+  unknown parking（load-bearing ritual / 已收敛 / 事故后刻意 backstop）；双
+  `Config(BaseModel)`（cosmetic）；10-07 P2 两项（仍 defer iter-quality）。
+- Commit：`chore: [raphy] assess - 2 architecture candidates`（未 push）。

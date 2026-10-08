@@ -450,6 +450,36 @@
       "passes": true,
       "branchName": "raphy/arch-20261008-0506",
       "notes": "Strength: Worth exploring. Runtime verification (mandatory step): this round's mock-LLM runs emitted dozens of anomaly_detector warnings on HEALTHY completed runs — stalled (sequence gaps are normal: multiple producers/filters), collision (span_ids like lca-seq-00000007 are reused across related events, not unique per span), cycle (consecutive_count=2 on runtime.reducer.apply, which fires once per event by construction — a guaranteed false positive). Extends the 2026-10-07 P2 observation. Deletion test: concentrates (the 'what counts as anomalous' model belongs in the detector, not in operators' heads).\n\nLearnings (2026-10-08 optimize): retuned with measured data, not guesses. 4-scenario runtime verification BEFORE the fix: 37/278/193/188/356 false warnings on A/B/C1/C2/D. Forensics: (1) span_ids are per-run sequence-derived (lca-seq-*) and never closed -- cross-run reuse tripped both old and naive-new collision models; fix = run-scoped state reset in on_event (sequences, open spans, cycle counters) + collision only on .start-while-open via _check_stuck's table (collision ordered before stuck); (2) gaps: healthy max 69 -> STALLED_GAP_ALLOWANCE=128, plus non-positive-gap re-baseline; (3) cycle: per-EP baselines -- llm.stream.token=10_000 (streaming is the healthy shape), runtime.reducer.apply=32 (healthy max ~8), body.tool.execute.end=8, default stays 2. AFTER: zero anomaly warnings on all 5 scenario runs. Tests: 34 anomaly + 116 spine green; ruff clean. test_check_stalled_trips_on_sequence_gap became test_check_stalled_trips_on_huge_sequence_gap (old gap=5 no longer trips, as designed)."
+    },
+    {
+      "id": "RA-031",
+      "title": "Declare act.approve.gate's approval_requirement port and type its payload",
+      "description": "As an LCA operator, I want the approve gate's declared ports to match what it actually consumes, so the ADR-0292 section-10 grant check (a security-critical path) is driven through a typed interface instead of a smuggled port value plus duck-typing.",
+      "acceptanceCriteria": [
+        "ApproveGateExecutor.declared_inputs/declared_outputs include PortName(\"approval_requirement\"), matching what node_execute reads and echoes; bundles/act/act_subgraph.yaml gate inputs/outputs updated to match (spike first: confirm the runtime delivers edge outputs into port_values without validating declared_inputs, so declaring is behavior-preserving; spike also decides whether the yaml's approval_required bool input, currently unread by the executor, is historical residue or consumed elsewhere)",
+        "_grant_absence_refusal takes req: ApprovalRequirement | None (lca.contracts.models.core.execution.approval, frozen dataclass, already importable from contracts like Decision); getattr(req, \"required\", False) / hasattr(req, \"required\") duck-typing deleted; the None-fallback to decision.needs_approval made explicit (req.required if req is not None else decision.needs_approval)",
+        "Class docstring drops the stale \"pure transform\" claim and documents the two ADR-0292 seams honestly: the ambient TrustEnvelope read and the evidence-ledger write on the refused path",
+        "New tests: typed ApprovalRequirement(required=True) + ungranted tool + no TrustEnvelope bound -> refused routing to terminal.commit with approval_requirement echoed; ApprovalRequirement(required=False) -> decision.needs_approval governs; existing tests/contracts/test_adr0292_authorization_semantic_isolation.py + HITL e2e (test_act_subgraph_yaml_e2e, test_hitl_e2e_loop) green; ruff check clean"
+      ],
+      "priority": 1,
+      "passes": false,
+      "branchName": "raphy/arch-20261008-0118",
+      "notes": "Strength: Strong. Violates an explicit project rule (ADR-0235 'reads typed ports only'): the executor reads approval_requirement from port_values while declared_inputs=(decision, command); the yaml wires a different name (approval_required, unread). The fail-closed grant semantics currently rest on object + getattr - the type system could guarantee for free what duck-typing silently degrades (a req-like object missing 'required' falls back to the model self-reported needs_approval that ADR-0292 s10 declares untrustworthy). Deletion test: concentrates (what policy signal the gate needs moves from implementation + smuggled port values into the declared interface)."
+    },
+    {
+      "id": "RA-032",
+      "title": "Give the ambient evidence-store resolution one seam",
+      "description": "As an LCA maintainer, I want the 'resolve the evidence store from ambient observability, no-ref when unbound' ritual to live in one module, so the third consumer reuses it instead of hand-writing a third copy.",
+      "acceptanceCriteria": [
+        "New seam resolve_evidence_store() in lca.infrastructure.observability (both consumers already import current_bound from there; seam location chosen by layering: L2 nodes must not import cognition/body, so the seam cannot live in safe_executor): keeps the deferred import discipline, returns the store or None when unbound / store missing (same fail-soft contract as today), zero behavior change",
+        "approve_gate._route_refusal_to_evidence drops its inline ritual and calls the seam; safe_executor._resolve_evidence_pair delegates its store resolution to the seam while keeping its (store, policy) tuple shape",
+        "runs/tools.py and fact_gateway.py current_bound() uses are explicitly out of scope (different shapes: fail-loud CLI and journal mirror)",
+        "New tests pin: unbound -> None; fake bound with store -> store; fake bound without store -> None; existing safe_executor and ADR-0292 tests green; ruff check clean"
+      ],
+      "priority": 2,
+      "passes": false,
+      "branchName": "raphy/arch-20261008-0118",
+      "notes": "Strength: Worth exploring. Two = real: safe_executor._resolve_evidence_pair and approve_gate._route_refusal_to_evidence share the verbatim 'current_bound -> evidence_binding().store -> no-ref when unbound' ritual (the approve_gate docstring even says 'exactly like safe_executor._resolve_evidence_pair'). Deletion test: concentrates ('how to reach the evidence store from the ambient seam' becomes the observability package's own knowledge)."
     }
   ]
 }
