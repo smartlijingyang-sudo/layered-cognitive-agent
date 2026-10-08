@@ -873,8 +873,8 @@
    "branchName": "raphy/arch-20261009-0107",
    "description": "As an LCA operator, I want `doctor profile /abs/repo-a/profiles/x.yaml` to audit repo-a's plugins regardless of my shell cwd, so doctor output is actually about the diagnosed profile. Evidence (Round 13, doctor zone): plugin_shape.py L77-103 — __init__ defaults to Path.cwd(); run(profile_path) accepts the path then `del`s it, auditing the cwd's plugin tree. Run from /repo-b while diagnosing repo-a's profile: compile pass diagnoses repo-a, shape pass audits repo-b, both mixed into one report. Same command in different directories yields different findings — violating the module's own C8 determinism claim ('same profile_path + same inputs -> same findings'; cwd is an implicit input). Interface pretends input matters, implementation substitutes environment state: framework/environment leakage into the 'pure diagnosis' domain.",
    "id": "RA-060",
-   "notes": "Source: Round 13 friction walk (Strong; leaky seam — environment into domain).",
-   "passes": false,
+   "notes": "Source: Round 13 friction walk (Strong; leaky seam — environment into domain). Done 2026-10-09: run(profile_path) now derives the audited repo root via _locate_repo_root() — walk up from the profile for a repo marker (dir containing scripts/check_plugin_shape.py); fallback to the profile's own directory when no marker found (still input-derived, C8). Explicit repo_root wins; explicit check_script is never relocated. Removed the accept-and-del `del profile_path`. Tests: replaced the ignore-behavior pin with TestRepoRootDerivation (cwd != profile repo pin, explicit-wins, walk-up, outside-repo 901 naming profile dir). doctor suites: 301 passed.",
+   "passes": true,
    "priority": 2,
    "title": "Stop PluginShapeDoctor from auditing ambient cwd (derive repo root from profile_path)"
   },

@@ -1,5 +1,11 @@
 ## Codebase Patterns
 
+- **环境输入（cwd）绝不能冒充诊断输入（RA-060）：** `run(profile_path)` 接受参数又
+  `del` 掉、转去读 `Path.cwd()`，是典型的环境泄漏进纯诊断域。修法：repo root
+  必须从 profile_path 派生（walk-up 找 repo marker）或显式传入；找不到 marker
+  时回退到 profile 自己的目录（仍由输入派生，C8 确定性成立），绝不回退到 cwd。
+  显式传入的 repo_root/check_script 优先级最高，派生逻辑不得搬动它们。
+
 - **能力探测走已声明的方法，不要给 Protocol 加实现细节属性（RA-059）：**
   想在 Protocol 上声明 `root: Path` 会逼 merged store 撒谎（它没有单一 root）——
   正确做法是把调用方真正需要的操作做成 seam（`materialize_link`），默认
@@ -1763,4 +1769,12 @@
   - Design decision vs assessment: the AC allowed `root: Path` on the Protocol as an option, but the merged store has no single root — declaring the *operation* (`materialize_link`) instead of the *attribute* keeps both implementers honest. When a Protocol lacks a capability, check whether all implementers can truthfully provide it before declaring.
   - `_mark_global_link` was never imported by overlay.py (it lived inside `_link_global_package` in gating.py) — deleting a helper can surface a missing import at the call site; ruff F821 catches it, but check the import graph before assuming the name is available.
   - `os.path.samestat` on this runtime's Python does not accept path-like args (AttributeError on PosixPath.st_ino); use `os.path.samefile` for path arguments in inode-equality assertions.
+---
+---
+## 2026-10-09 05:25 - RA-060
+- Implemented: stopped PluginShapeDoctor from auditing the ambient cwd. `run(profile_path)` now derives the audited repo root via new `_locate_repo_root()`: walk up from the profile's location for a repo marker (a directory containing `scripts/check_plugin_shape.py` — the wrapped script, so the marker is definitionally the audited repo); when no marker is found, fall back to the profile's own directory (still input-derived, C8 determinism holds; the DOC-PS-901 missing-script finding then names an honest location instead of cwd). An explicitly passed `repo_root` wins over derivation; an explicitly passed `check_script` is never relocated. Removed the accept-and-`del` `del profile_path`; `__init__` tracks `_repo_root_explicit` / `_script_explicit`; `_invoke_script` takes the resolved `(script, repo_root)` instead of reading `self`. Class docstring updated (repo-located, profile-independent). Tests: replaced the old ignore-behavior pin with `TestRepoRootDerivation` — the AC pin (cwd=repo-b, profile in repo-a → findings carry repo-a's stub violation, no DOC-PS-901), explicit-repo_root-wins, nested-profile walk-up, and outside-repo profile → DOC-PS-901 naming the profile dir.
+- Files changed: lca/harness/diagnostics/doctor/plugin_shape.py, tests/harness/diagnostics/doctor/test_plugin_shape.py, raphy/prd.json, raphy/progress.txt
+- **Learnings for future iterations:**
+  - Facade tests stub the shape pass (`_RecordingStub`), so the derivation change didn't ripple there — but CLI/golden tests run the real pass; they stayed green (301 passed) because the walk-up finds the real repo marker from real profiles.
+  - When a `run(x)` parameter exists "for facade-shape parity", check whether the parity is load-bearing: here the facade actually passes profile_path through, so the parameter was a real input being discarded, not just a signature nicety.
 ---
