@@ -1,11 +1,9 @@
-"""Two-scope lookup in ``AssistantMergedSkillStore``.
+"""Home-only lookup in ``AssistantMergedSkillStore`` (ADR-0243 D1/I-B16).
 
-``get`` / ``read_resource`` / ``resource_files`` all follow one rule: try the
-assistant Home scope first, and only if it does not have the skill fall through
-to the global store. The global store's own ``SkillNotFoundError`` is the single
-authoritative miss — an assistant-scope miss must never surface. The three
-methods used to repeat that try/except/fall-through by hand; they now share one
-helper, so the behavior is pinned once here.
+``get`` / ``read_resource`` / ``resource_files`` 全部经 ``_lookup`` 只查
+assistant Home 范围（``{home}/skills/`` 是完整有效技能集）；全局
+``~/.lca/skills/`` 只是创建时硬链接物化的内容源，不再是运行时兜底层——
+assistant-scope miss 即抛 ``SkillNotFoundError``，绝不 fall through 到全局。
 """
 
 from __future__ import annotations
@@ -61,15 +59,6 @@ def _merged(tmp_path: Path) -> AssistantMergedSkillStore:
 def test_assistant_scope_hit_wins(tmp_path: Path) -> None:
     merged = _merged(tmp_path)
     assert merged.get("assistant-only").skill_id == "assistant-only"
-
-
-def test_assistant_scope_miss_falls_back_to_global(tmp_path: Path) -> None:
-    merged = _merged(tmp_path)
-    assert merged.get("global-skill").skill_id == "global-skill"
-    assert merged.read_resource("global-skill", "REFERENCE.md") == "ref"
-    # references 用 ``resources/`` 前缀声明；resource_files 返回带前缀的挂载键。
-    assert merged.resource_files("global-skill") == {"resources/REFERENCE.md": b"ref"}
-    assert merged.read_resource("global-skill", "resources/REFERENCE.md") == "ref"
 
 
 def test_both_scopes_missing_raises_once(tmp_path: Path) -> None:
