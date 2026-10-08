@@ -901,7 +901,7 @@
       "description": "As an LCA maintainer, I want the dead quarantine module gone, so the real isolation story (ADR-0067 triple-gate + artifact_state) isn't confused with a phantom one. Evidence (Round 13, skills zone): lca/infrastructure/skills/quarantine.py (109 lines, SkillQuarantineGate) has ZERO production importers repo-wide; only two test files import it. Its design intent (auto-crystallized skills quarantined pending review) was superseded by the ADR-0067 gates + artifact_state state machine, but the module and its green tests remain — tests vouching for dead code. Deletion test: removing module + test references changes nothing in production.",
       "id": "RA-062",
       "notes": "Source: Round 13 friction walk (Strong; deletion test).",
-      "passes": false,
+      "passes": true,
       "priority": 3,
       "title": "Delete the dead SkillQuarantineGate module (quarantine.py, zero production callers)"
     },

@@ -1801,3 +1801,12 @@
   - 删测试文件前先分辨"测命令的"和"测 infra 的"：前者随命令走，后者（如 journal round-trip）rehome 到 infra 自己的测试目录，别让真实 pin 陪葬。
   - `coding-agent-tools.yaml` 末行无换行符：python 的 `old in t` 断言对 EOF 文本要单独处理，sed 按行删更稳。
 ---
+
+## 2026-10-09 04:45 CST - RA-062
+- 删死模块 `lca/infrastructure/skills/quarantine.py`（SkillQuarantineGate）：grep 证实零生产调用者（preset/discovery 的 "quarantine" 是另一概念），唯一引用是两测试文件的 import。
+- Files changed: deleted `lca/infrastructure/skills/quarantine.py`；`tests/cognition/memory/test_tact_and_pitfall_shield.py`（删 import + test_skill_quarantine_gate_prevents_wild_growth + docstring 去名 + 删掉因此闲置的 Path import）；`tests/eval/test_cognitive_memory_deterministic_benchmark.py`（删 import + test_track_a_skill_quarantine_gate_prevents_wild_growth）。
+- **Learnings for future iterations:**
+  - 删死代码的测试时注意连带闲置 import：ruff 会拦 F401。删完测试先 ruff 再 pytest，别反过来。
+  - preset/discovery 的 "quarantined" 是另一个概念（broken preset 隔离加载），grep 同词必须逐条分辨语义，不能按词删。
+  - 约束确认：ADR-0067 的 gates 才是真故事（生产隔离语义），此模块是幻影隔离——删掉不影响任何生产路径。
+---

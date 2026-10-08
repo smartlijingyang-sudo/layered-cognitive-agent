@@ -1,10 +1,7 @@
-"""Tests for Task 5: MemoryTactFirewall, ToolPitfallShield, and SkillQuarantineGate."""
-
-from pathlib import Path
+"""Tests for Task 5: MemoryTactFirewall and ToolPitfallShield."""
 
 from lca.cognition.memory.guards.firewall import MemoryTactFirewall
 from lca.cognition.memory.types import SemanticClaim
-from lca.infrastructure.skills.quarantine import SkillQuarantineGate
 from lca.infrastructure.tools.shield.tool_shield import ToolPitfallShield
 
 
@@ -86,33 +83,3 @@ def test_tool_pitfall_shield_injects_redlines():
     assert guard_curl == ""
 
 
-def test_skill_quarantine_gate_prevents_wild_growth(tmp_path: Path):
-    """技能隔离待审门：新结晶的技能必须写入 quarantine 待审，严禁直接野蛮生长进 active 目录。"""
-    gate = SkillQuarantineGate(base_dir=tmp_path)
-
-    skill_slug = "auto-crypto-trader"
-    skill_content = """---
-name: auto-crypto-trader
-description: 自动加密货币高频交易脚本
----
-# Auto Crypto Trader
-"""
-    # 写入隔离区
-    quarantine_path = gate.quarantine_skill(
-        skill_slug=skill_slug,
-        skill_md=skill_content,
-        metadata={"complexity": 0.85, "reason": "auto_crystallized"},
-    )
-    assert quarantine_path.exists()
-    assert "quarantine" in str(quarantine_path)
-    assert skill_slug in gate.list_quarantined_skills()
-
-    # 验证此时 active 目录中不存在该技能
-    active_path = tmp_path / "skills" / skill_slug
-    assert not active_path.exists()
-
-    # 经过人工审查后晋级 (promote)
-    promoted_path = gate.promote_quarantined_skill(skill_slug)
-    assert promoted_path.exists()
-    assert (promoted_path / "SKILL.md").exists()
-    assert skill_slug not in gate.list_quarantined_skills()
