@@ -1,8 +1,13 @@
-"""v3 scenario config validation — every scenario YAML parses + covers the closed set.
+"""v3 scenario config validation — every scenario YAML parses + honors the contract.
 
-Spec §13: every scenario is a **configuration** over the closed
-primitive set.  No new loop stages, no new ActionTypes, no new event
-classes.  This test verifies each scenario file:
+v3 §13.5 describes **six** combinatorial use cases (Voyager / MemGPT /
+MetaGPT / LATS / Self-Improving / Devin-style — §13.5.1–13.5.6) as
+spec-level descriptions of primitive composition; it never declared a
+twelve-file closed set.  The scenario file contract lives in
+``bundles/scenario-*.yaml`` (see ADR-0107: scenario plugin modules were
+never implemented).
+
+This test verifies each scenario file:
 
 1. Parses as YAML.
 2. Names only PluginMeta-known bundles / plugins / tools.
@@ -24,7 +29,10 @@ from pathlib import Path
 import pytest
 import yaml
 
-SCENARIOS_DIR = Path(__file__).parent / "scenarios"
+# Scenario file contract: bundles/scenario-*.yaml at the repo root.
+# (tests/scenario/v3/scenarios/ never existed in git — see todo-91.)
+_REPO_ROOT = Path(__file__).resolve().parents[3]
+SCENARIOS_DIR = _REPO_ROOT / "bundles"
 
 # Closed primitive set (v3 §4.1).
 ALLOWED_ACTION_TYPES: frozenset[str] = frozenset(
@@ -36,7 +44,7 @@ NEVER_SHARED_LAYERS: frozenset[str] = frozenset({"working", "episodic"})
 
 
 def _scenario_files() -> list[Path]:
-    return sorted(SCENARIOS_DIR.glob("*.yaml"))
+    return sorted(SCENARIOS_DIR.glob("scenario-*.yaml"))
 
 
 def _parse(path: Path) -> dict:
@@ -135,11 +143,24 @@ def test_scenario_bundles_only_reference_v3_bundles(scenario_path: Path) -> None
             )
 
 
-def test_scenarios_directory_has_twelve_files() -> None:
-    """Sanity: we declared twelve scenarios in spec §13.5."""
-    assert len(_scenario_files()) == 12, (
-        f"Expected 12 scenarios, found {len(_scenario_files())}: "
-        f"{[p.name for p in _scenario_files()]}"
+def test_scenario_set_is_nonempty_and_lives_in_bundles() -> None:
+    """Sanity: the scenario contract set is non-empty and lives under ``bundles/``.
+
+    The scenario file contract is ``bundles/scenario-*.yaml``.  v3 §13.5 is
+    a spec-level description of six combinatorial use cases (Voyager /
+    MemGPT / MetaGPT / LATS / Self-Improving / Devin-style) — it never
+    declared a twelve-file closed set, and ``tests/scenario/v3/scenarios/``
+    never existed in git (see todo-91).
+    """
+    files = _scenario_files()
+    assert files, (
+        "expected at least one scenario contract under "
+        f"{SCENARIOS_DIR} (scenario-*.yaml), found none"
+    )
+    outside = [p.name for p in files if p.parent != SCENARIOS_DIR]
+    assert not outside, (
+        f"scenario files must live directly under bundles/, violators: {outside}; "
+        f"all scenario files: {[p.name for p in files]}"
     )
 
 
