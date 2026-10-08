@@ -190,9 +190,14 @@ def _multi_call_decision() -> Decision:
     )
 
 
-def _ctx(writer: Any, gateway: Any) -> NodeContext:
+# RA-042: node_execute resolves state via the typed-port-or-runtime seam;
+# the fake runtime carrier provides it the way NodeRuntimeView does in production.
+_DUMMY_STATE = object()
+
+
+def _ctx(writer: Any, gateway: Any, state: Any = _DUMMY_STATE) -> NodeContext:
     return NodeContext(
-        runtime=_Runtime(writer=writer, gateway=gateway, state=None),
+        runtime=_Runtime(writer=writer, gateway=gateway, state=state),
         budget={},
         metadata={"plan_ref": "act.subgraph", "node_id": "effect.execute"},
     )
@@ -217,7 +222,7 @@ async def test_effect_execute_appends_tool_result_surface() -> None:
 
     output = await EffectExecuteExecutor().node_execute(
         _ctx(writer, gateway),
-        NodeInput(port_values={"envelope": await _envelope()}),
+        NodeInput(port_values={"envelope": await _envelope(), "decision": _decision()}),
     )
 
     assert writer.tool_results, (
@@ -249,7 +254,7 @@ async def test_appended_call_id_matches_assistant_tool_call_id() -> None:
 
     await EffectExecuteExecutor().node_execute(
         _ctx(writer, gateway),
-        NodeInput(port_values={"envelope": await _envelope()}),
+        NodeInput(port_values={"envelope": await _envelope(), "decision": _decision()}),
     )
 
     row = writer.tool_results[0]
@@ -277,7 +282,7 @@ async def test_appended_content_is_clean_payload_not_repr() -> None:
 
     await EffectExecuteExecutor().node_execute(
         _ctx(writer, gateway),
-        NodeInput(port_values={"envelope": await _envelope()}),
+        NodeInput(port_values={"envelope": await _envelope(), "decision": _decision()}),
     )
 
     content = writer.tool_results[0]["content"]
@@ -301,7 +306,7 @@ async def test_failed_tool_still_appends_so_model_sees_error() -> None:
 
     await EffectExecuteExecutor().node_execute(
         _ctx(writer, gateway),
-        NodeInput(port_values={"envelope": await _envelope()}),
+        NodeInput(port_values={"envelope": await _envelope(), "decision": _decision()}),
     )
 
     assert writer.tool_results
@@ -329,7 +334,7 @@ async def test_unbound_writer_does_not_crash_execution() -> None:
 
     output = await EffectExecuteExecutor().node_execute(
         _ctx(None, gateway),
-        NodeInput(port_values={"envelope": await _envelope()}),
+        NodeInput(port_values={"envelope": await _envelope(), "decision": _decision()}),
     )
 
     assert output.port_values["receipts"][0].outcome is EffectOutcome.SUCCEEDED
@@ -427,7 +432,7 @@ async def test_dispatch_failure_still_answers_the_declared_call() -> None:
 
     output = await EffectExecuteExecutor().node_execute(
         _ctx(writer, gateway),
-        NodeInput(port_values={"envelope": await _envelope()}),
+        NodeInput(port_values={"envelope": await _envelope(), "decision": _decision()}),
     )
 
     assert output.port_values["receipts"][0].outcome is EffectOutcome.FAILED
@@ -482,6 +487,6 @@ async def test_unattributable_result_fails_loud() -> None:
     with pytest.raises(ToolResultAttributionError):
         await EffectExecuteExecutor().node_execute(
             _ctx(writer, gateway),
-            NodeInput(port_values={"envelope": bare}),
+            NodeInput(port_values={"envelope": bare, "decision": decision}),
         )
     assert writer.tool_results == []

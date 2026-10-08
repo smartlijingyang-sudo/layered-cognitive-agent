@@ -127,6 +127,11 @@ class CognitiveAgent(AgentUnit):
         task: str | AgentMessage,
         ctx: RunContext | None = None,
     ) -> Result:
+        # RA-046: fail loud at the entry — a None task used to travel deep
+        # into the runtime and die with an obscure TypeError inside
+        # objective_preview (None[:N]).
+        if task is None:
+            raise TypeError("Agent.run() task must be str | AgentMessage, got None")
         text = _task_as_text(task)
         role = self.role_profile.role
         scope, top_level = adopt_run_scope(role=role)

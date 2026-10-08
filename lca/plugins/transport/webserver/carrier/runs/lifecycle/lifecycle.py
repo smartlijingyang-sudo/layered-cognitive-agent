@@ -16,6 +16,10 @@ from lca.infrastructure.observability.facade.run.ambit import bind_run_ambit
 from lca.infrastructure.runtime_plane.bindings.bindings import plane_bindings_scope
 from lca.infrastructure.runtime_plane.resolve.resolve import PlaneBindingError
 from lca.infrastructure.workspace import run_workspace_scope
+from lca.plugins.events.publish_scope import (
+    bind_event_bridge,
+    unbind_event_bridge,
+)
 from lca.plugins.loop.driver.plugin import (
     _UnknownExecutionTargetError as _UnknownExecutionTargetError,
 )
@@ -95,17 +99,15 @@ class RunLifecycleCoordinator:
         )
 
         SpineContext.set_run(session.run_id)
-        publish_token: Any = None
+        # RA-044: the publish+observe bind ritual lives in the
+        # lca.plugins.events.publish_scope seam (no private imports here).
         bound_event_session = getattr(session, "event_session", None)
-        if (
-            bound_event_session is not None
-            and getattr(bound_event_session, "bridge", None) is not None
-        ):
-            from lca.plugins.events._session_observe import set_session
-            from lca.plugins.events.publishers._session_publish import set_publish_session
-
-            publish_token = set_publish_session(bound_event_session.bridge)
-            set_session(bound_event_session.bridge)
+        bridge = (
+            getattr(bound_event_session, "bridge", None)
+            if bound_event_session is not None
+            else None
+        )
+        publish_token = bind_event_bridge(bridge)
 
         emit_kernel_run_start(run_id=session.run_id, trace_id=session.trace_id)
         try:
@@ -207,12 +209,7 @@ class RunLifecycleCoordinator:
                 trace_id=session.trace_id,
             )
         finally:
-            if publish_token is not None:
-                from lca.plugins.events._session_observe import set_session
-                from lca.plugins.events.publishers._session_publish import reset_publish_session
-
-                reset_publish_session(publish_token)
-                set_session(None)
+            unbind_event_bridge(publish_token)
             emit_kernel_run_stop(
                 run_id=session.run_id,
                 outcome=run_outcome,
@@ -244,16 +241,11 @@ class RunLifecycleCoordinator:
             reset_bridge_spine_hook,
         )
 
-        spine_hook_token = None
-        publish_token = None
+        # RA-044: see execute() — same publish_scope seam.
         bound = session.event_session
-        if bound is not None and getattr(bound, "bridge", None) is not None:
-            from lca.plugins.events._session_observe import set_session
-            from lca.plugins.events.publishers._session_publish import set_publish_session
-
-            spine_hook_token = bind_bridge_spine_hook(bound.bridge)
-            publish_token = set_publish_session(bound.bridge)
-            set_session(bound.bridge)
+        bridge = getattr(bound, "bridge", None) if bound is not None else None
+        spine_hook_token = bind_bridge_spine_hook(bridge) if bridge is not None else None
+        publish_token = bind_event_bridge(bridge)
         try:
             bindings = session.bindings
             ambit = session.ambit
@@ -345,12 +337,7 @@ class RunLifecycleCoordinator:
         finally:
             if spine_hook_token is not None:
                 reset_bridge_spine_hook(spine_hook_token)
-            if publish_token is not None:
-                from lca.plugins.events._session_observe import set_session
-                from lca.plugins.events.publishers._session_publish import reset_publish_session
-
-                reset_publish_session(publish_token)
-                set_session(None)
+            unbind_event_bridge(publish_token)
             await self._finish_or_pause(session, workspace=None, success=success)
 
     @staticmethod

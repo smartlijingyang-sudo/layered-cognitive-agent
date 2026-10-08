@@ -1,6 +1,6 @@
 {
   "project": "LCA Raphy Architecture Optimization",
-  "branchName": "raphy/arch-20261008-1206",
+  "branchName": "raphy/arch-20261008-1505",
   "description": "Continuous architecture deepening for the LCA cognitive-agent codebase via the raphy fresh-session loop. Round 1 (2026-10-06, old prompt): RA-001/RA-002 converged, RA-003 dropped with evidence. Round 2 (2026-10-06, hardened prompt): RA-004..RA-009 all done (merged to main 2026-10-07, merge 1b1526a94). Round 3 (2026-10-07, hardened prompt): friction walk over session plugins, loop_cursor, delegation/body executor; RA-010..RA-013 below. Out of scope: ralph Round 2 areas (DecisionGates, Ingest, ContextFiles shims, Read Runs micro-dirs, MemoryTools directory seam), lca/cognition/memory/ (frozen per Round 2 AP-01), CLI surface must not import contracts (deliberate rule), gate_chain_strategy.py (hands-off: another party's uncommitted work + pre-existing red test). Round 10 (2026-10-08 12:06, branch raphy/arch-20261008-1206): RA-033..RA-041 below (3 Strong + 5 Worth exploring + 1 Speculative; all from friction walk, none duplication-class).",
   "userStories": [
     {
@@ -615,6 +615,83 @@
       "passes": true,
       "priority": 9,
       "title": "Move the _port_registry kernel-private key into a formal StrategyContext field"
+    },
+    {
+      "id": "RA-042",
+      "title": "Fix RA-033 regression: resolve effect.execute state via resolve_typed_port_or_runtime",
+      "description": "As an LCA maintainer, I want the tool-dispatch path to survive RA-033's envelope-metadata cleanup, so a model tool call actually executes instead of dying with DeclarativeValidationError PG-003 ('body.act handler requires typed state/decision kwargs'). Runtime-verified 2026-10-08: every run whose LLM returns a tool_call now fails with 'Agent 运行结束但未产生任何输出' and the tool never executes. Bisect pins the regression to RA-033 (7b38118ad): it removed the state/decision metadata smuggle and moved the handler to typed kwargs, but the `state` typed port has no graph producer — it arrives None at effect.execute while `decision` arrives fine. The shared lca/nodes/_resolve.py::resolve_typed_port_or_runtime seam (already used by think/decision/parse and think/history/assemble) is the established fix: typed port first, kernel runtime carrier fallback.",
+      "acceptanceCriteria": [
+        "effect.execute node_execute resolves `state` and `decision` via lca/nodes/_resolve.py::resolve_typed_port_or_runtime instead of bare input.port_values.get.",
+        "E2E repro passes: mock LLM returns one tool_call then text; a NoopTool that writes a marker file ends with status=completed and the marker file exists (was: status=failed, tool never executed).",
+        "Existing effect/act tests stay green, incl. tests/.../test_effect_execute_tool_result_surface.py and the act envelope mint tests.",
+        "ruff check clean on touched files."
+      ],
+      "priority": 1,
+      "passes": true,
+      "notes": "Source: Round 11 friction walk + mandatory runtime verification (Strong). Bisect: d5eed82c5 (2026-10-07 night, good) .. b6608bb58 (bad); RA-033 7b38118ad is the first bad commit (verified via marker-file repro at 7b38118ad^ = good, 7b38118ad = bad). DEBUG probes: node_execute ports decision=Decision(...) state=None; _dispatch caught PG-003. Deletion test: concentrates — the resolve seam already exists and is the documented pattern; deleting the fallback re-breaks every tool call. Constraints: no live objects back in envelope metadata (RA-033's core win stays); handler's PG-003 fail-loud stays. Dependencies: lca/nodes/_resolve.py (stable), NodeRuntimeView.state (host_wiring, verified exposes agent_state).\nDONE 2026-10-08 (optimize session): node_execute now resolves decision/state via lca/nodes/_resolve.py::resolve_typed_port_or_runtime (port first, kernel runtime carrier fallback) instead of bare input.port_values.get. E2E: mock-LLM tool_call run now completes and the tool executes (marker-file probe); basic/sequential/non-converging scenarios unchanged. Unit: 28 passed (test_effect_execute_tool_result_surface + test_registry_dispatch), 3 passed (test_tool_call_e2e cutover), 4 passed (test_envelope_n_to_n); ruff clean. Implementation vs assessment: as assessed, plus the surface-test file needed 8 call-site updates to the new resolve contract (decision on port, state on fake runtime carrier) — what the tests pin (attribution) is unchanged."
+    },
+    {
+      "id": "RA-043",
+      "title": "Wire RegistryEffectDispatcher active_decision/active_state into handler.handle",
+      "description": "As an LCA maintainer, I want RegistryEffectDispatcher.execute to honor its own documented typed-kwarg precedence, so constructor-captured state/decision are not silently dropped. The method computes active_decision = decision if decision is not None else self._decision with a comment claiming 'typed kwargs take precedence over the constructor-captured values', then passes the RAW decision/state to handler.handle — active_decision is dead code and there is no active_state at all.",
+      "acceptanceCriteria": [
+        "execute() computes active_state/active_decision (per-call kwarg wins, constructor-captured fallback) and passes THOSE to handler.handle.",
+        "A unit test pins the precedence: dispatcher constructed with a decision, execute() called with decision=None → handler receives the constructed one.",
+        "ruff check clean on touched files; existing dispatcher tests stay green."
+      ],
+      "priority": 2,
+      "passes": true,
+      "notes": "Source: Round 11 friction walk (Worth exploring). Found while tracing RA-042. Deletion test: concentrates — the precedence rule is currently stated in a comment but not implemented; implementing it removes a trap for the next caller. Constraints: handler.handle signature unchanged; per-call kwargs still win.\nDONE 2026-10-08 (optimize session): execute() now computes active_state/active_decision (per-call kwarg wins, constructor-captured fallback) and forwards THOSE to handler.handle instead of the raw kwargs. Two new pin tests: test_constructor_captured_kwargs_reach_handler and test_per_call_kwarg_still_wins_over_constructor. 21 passed (test_registry_dispatch), ruff clean; E2E tool-call run still completes with the tool executed. Implementation vs assessment: as assessed."
+    },
+    {
+      "id": "RA-044",
+      "title": "Give the carrier publish-session ContextVar ritual one seam",
+      "description": "As an LCA maintainer, I want one seam for the publish-session ContextVar bind/reset ritual in the carrier run lifecycle, so execute() and resume() cannot drift. RunLifecycleCoordinator.execute and .resume both inline the same ritual: from lca.plugins.events._session_observe import set_session / from lca.plugins.events.publishers._session_publish import set_publish_session / reset_publish_session, plus set_session(None) in finally. Two occurrences = a real seam per the deepening vocabulary, and both reach into private modules across the seam.",
+      "acceptanceCriteria": [
+        "One public context manager (e.g. in lca/plugins/events/) owns the bind and the reset; lifecycle.py no longer imports the private _session_observe / _session_publish modules inline.",
+        "Both execute() and resume() use it; behavior unchanged (bind before run, reset in finally).",
+        "Existing carrier lifecycle tests stay green; ruff clean."
+      ],
+      "priority": 3,
+      "passes": true,
+      "notes": "Source: Round 11 friction walk B (Worth exploring). Deletion test: concentrates — the ritual's pairing (bind/reset) is currently duplicated and easy to unpair. Constraints: resume()'s extra spine-hook binding is a separate ritual; keep it. The private modules stay private — the new seam is their public face.\nDONE 2026-10-08 (optimize session): new public seam lca/plugins/events/publish_scope.py with bind_event_bridge() / unbind_event_bridge(); RunLifecycleCoordinator.execute/.resume now route the ritual through it — no private _session_observe / _session_publish imports remain in lifecycle.py. New tests: tests/plugins/events/test_publish_scope.py (3 passed). Existing carrier tests 16 passed; ruff clean. Implementation vs assessment: bind/unbind functions instead of a context manager — both call sites bind before a large try and reset inside its finally BEFORE emit_kernel_run_stop, so a context manager would invert that order; the pairing still lives once in the seam."
+    },
+    {
+      "id": "RA-045",
+      "title": "Promote assistant Home spec resolution to a public require_assistant_spec seam",
+      "description": "As an LCA maintainer, I want one public seam for resolving an assistant's Home spec, so the fail-loud policy is stated once. Today it is the private _assistant_spec_for_run in runnable_assembly.py, imported cross-module by execution_environment.py (private name leaking across the seam), and the 'non-empty assistant_id requires a resolvable catalog entry' policy is restated with different error messages in _assistant_spec_for_run, _role_profile_for_assistant, and tools_from_scope.",
+      "acceptanceCriteria": [
+        "A public require_assistant_spec(scope, assistant_id) -> AssistantSpec (fail-loud, single error contract) is the only entry; the private cross-module import is gone.",
+        "assemble(), _role_profile_for_assistant(), tools_from_scope(), and execution_environment.prepare() all go through it; the divergent 'missing entry' messages converge.",
+        "Existing assistant/carrier tests stay green; ruff clean."
+      ],
+      "priority": 4,
+      "passes": true,
+      "notes": "Source: Round 11 friction walk B (Worth exploring). Deletion test: concentrates — deleting the seam would scatter four copies of the policy. Constraints: ADR-0242 D3/D4/D9 semantics unchanged; the no-assistant (empty id) path still returns None. Not in any 禁区.\nDONE 2026-10-08 (optimize session): _assistant_spec_for_run renamed to public require_assistant_spec in runnable_assembly.py, added to __all__, all 4 call sites + the cross-module import in execution_environment.py updated. New tests: test_require_assistant_spec.py (4 passed: empty id -> None, missing catalog -> RuntimeError, catalog miss -> None, hit -> spec). ruff clean (RUF022 __all__ sort + RUF043 raw regex fixed). Implementation vs assessment: as assessed; note the actual paths differ from the assessment draft (runnable_assembly.py, not contextfiles/assemble.py)."
+    },
+    {
+      "id": "RA-046",
+      "title": "Fail loud at the Agent.run() entry seam on non-str task input",
+      "description": "As an LCA user, I want Agent.run() to reject a non-str/AgentMessage task at the entry seam with a clear error instead of a deep TypeError. Runtime-verified 2026-10-07: await agent.run(None) crashes with TypeError: 'NoneType' object is not subscriptable inside team/profile.py objective_preview (text[:_OBJECTIVE_PREVIEW_MAX]). Empty string and 100KB inputs are handled gracefully; only None crashes.",
+      "acceptanceCriteria": [
+        "Agent.run(None) raises TypeError mentioning the expected (str | AgentMessage) type at the run() entry, before any graph work.",
+        "A test pins this; existing run tests stay green."
+      ],
+      "priority": 5,
+      "passes": true,
+      "notes": "Source: 2026-10-07 runtime findings P2-1 (Worth exploring). Runtime findings outrank static findings. Deletion test: concentrates — the entry seam is the one place every run crosses. Constraints: do not change the accepted types, only the failure mode.\nDONE 2026-10-08 (optimize session): CognitiveAgent.run() now raises TypeError('Agent.run() task must be str | AgentMessage, got None') at the entry when task is None — previously None flowed through _task_as_text into the runtime and died with an obscure TypeError inside objective_preview (None[:N]). New test: test_cognitive_agent_run_none_task.py (1 passed). ruff clean. Implementation vs assessment: as assessed."
+    },
+    {
+      "id": "RA-047",
+      "title": "Validate or coerce NativeToolCall.arguments at the contract seam",
+      "description": "As an LCA integrator, I want NativeToolCall to accept a JSON-string arguments (OpenAI convention) or fail with a clear message — not the current obscure ValueError from a deep dict() call. Runtime-verified 2026-10-07: NativeToolCall(call_id='c1', name='x', arguments='{\"a\": 1}') dies in decision.parse with 'dictionary update sequence element #0 has length 1; 2 is required'.",
+      "acceptanceCriteria": [
+        "NativeToolCall(arguments='<json str>') either coerces via json.loads once or raises a clear validation error at construction time.",
+        "A test pins the chosen behavior; existing llm contract tests stay green."
+      ],
+      "priority": 6,
+      "passes": true,
+      "notes": "Source: 2026-10-07 runtime findings P2-2 (Worth exploring). Deletion test: concentrates — construction is the one place every tool call crosses. Constraints: dict input behavior unchanged; pick coerce-vs-reject by what decision.parse can handle downstream.\nDONE 2026-10-08 (optimize session): NativeToolCall gained a __post_init__ that raises TypeError at construction when arguments is not a dict (e.g. a raw JSON string) — previously it died later with an obscure error. Chose clear-error over coerce: parsing belongs to the adapter layer (resolve_tool_arguments), the dataclass contract says arguments is already parsed. Both legitimate construction sites pass dicts. New tests: test_native_tool_call_arguments.py (2 passed); existing adapter_wire + run_with_tool_use 7 passed 1 skipped. ruff clean. Implementation vs assessment: as assessed."
     }
   ]
 }

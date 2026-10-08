@@ -42,6 +42,19 @@ class NativeToolCall:
     wire_reason: str = ""
     wire_raw_preview: str = ""
 
+    def __post_init__(self) -> None:
+        # RA-047: fail loud at construction — a JSON string passed as
+        # arguments used to die later with an obscure error far from the
+        # actual mistake. Parsing belongs to the adapter layer
+        # (resolve_tool_arguments); by the time we get here arguments must
+        # already be a dict.
+        if not isinstance(self.arguments, dict):
+            raise TypeError(
+                "NativeToolCall arguments must be dict[str, Any], got "
+                f"{type(self.arguments).__name__}; "
+                "parse the JSON string before constructing"
+            )
+
 
 @dataclass(frozen=True)
 class LLMResponse:

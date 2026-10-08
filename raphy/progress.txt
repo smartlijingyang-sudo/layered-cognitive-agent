@@ -10,6 +10,15 @@
 
 （raphy 轮共享的模式/禁区登记，供后续 assess/optimize 轮参考）
 
+- **port 迁移先查生产者（RA-042 血训）：** 把 metadata 走私改成 typed port
+  时，必须先确认该 port 全图有生产者——`state` port 无任何写入方，
+  RA-033 删 smuggle 后 effect.execute 拿到 None，PG-003 让所有工具调用
+  静默死亡。迁移前 grep `PortName("<name>")` 的写入点；无生产者就用
+  `lca/nodes/_resolve.py::resolve_typed_port_or_runtime`（port 优先、
+  kernel runtime carrier 兜底，think/decision/parse 同款）。
+- **禁区（本轮用户在迭代）：** `lca/infrastructure/computer/guest/preamble.py`
+  的 emit/resolve 路径映射（用户 10-08 14:57–15:04 连修 4 版），本轮不碰。
+
 - **pair-seam 收敛先列 case 表（RA-032）：** seam 只返回 pair 一半（如 store）
   而消费者要 `(store, policy)` 元组时，先枚举全部状态组合
   （unbound→(None,None)；bound+store None→(None,policy)；bound+store 有→
@@ -1432,3 +1441,152 @@
   lca/framework/graph/strategies/subgraph_run.py、
   tests/unit/framework/graph/test_strategies.py
 ---
+
+## 2026-10-08 15:05 CST - ASSESS (Round 11)
+
+- 新评估轮：距上次评估（12:06）已 3 小时，冷却通过；分支
+  raphy/arch-20261008-1505（基线 b6608bb58），隔离 worktree 作业，
+  主树他人未提交改动零触碰。
+- 摩擦漫步三区：carrier/runs（lifecycle+runnable_assembly+execution_environment
+  精读）、act/effect dispatch（envelope/execute/dispatch/handlers 全读）、
+  observability spine anomaly（双模块确认为 seam+module 分工，非重复）。
+  sandbox/guest-preamble 列为本轮禁区（用户 14:57–15:04 连续 4 个提交在
+  迭代该处）。
+- **运行时验证（实跑，LLM_API_KEY=dummy）：**(a)基础 run completed；(b)带
+  tool_call 的 run **FAILED**——工具 0 次执行（marker 文件探针），报错
+  "Agent 运行结束但未产生任何输出"；(c)两轮 sequential completed；
+  (d)RA-023 回归：非收敛 run 返回 failed Result、无异常泄漏。
+- **P0 发现**：(b) 是 RA-033（7b38118ad）引入的回归。二分
+  d5eed82c5(好)..b6608bb58(坏) → 首坏 commit 即 RA-033。根因：RA-033 把
+  state/decision 从 envelope metadata 搬到 typed kwargs，但 `state` typed
+  port 全图无生产者（decision 有、state 到 effect.execute 时为 None），
+  BodyActEffectHandler 遂 PG-003 fail-loud，工具永不执行。DEBUG 实证：
+  node_execute ports decision=Decision(...) state=None；_dispatch 捕获
+  PG-003。
+- 6 个 stories 入 prd.json（RA-042~047）：RA-042=修 P0（Strong，沿用
+  lca/nodes/_resolve.py::resolve_typed_port_or_runtime 既定 seam）；
+  RA-043 dispatcher active_decision 死代码；RA-044 carrier publish-session
+  ritual 收敛；RA-045 _assistant_spec_for_run 提为公共 seam；RA-046
+  run(None) 入口校验；RA-047 NativeToolCall arguments 校验/宽容。
+  Diversity quota 满足（无纯 duplication story）。
+- **Learnings for future iterations:**
+  - Port 迁移类 story 必须验证"port 真的有生产者"：RA-033 删 smuggle 时
+    没检查 state port 的写入方——评估时加一条"who writes this port"检查。
+  - 二分定位回归时，用 marker 文件探针（工具写文件）而非内存标记，
+    排除子进程执行假阴性。
+  - ssh252 传 heredoc 脚本必须用 quoted delimiter（<<'PYEOF'）；传文件
+    用 `ssh252 'cmd' < localfile` 走 stdin；大段文本先写本地再 cat >。
+---
+
+
+## 2026-10-08 16:10 CST - RA-042
+
+- 修 P0 回归：`effect.execute` 的 `node_execute` 改走
+  `lca/nodes/_resolve.py::resolve_typed_port_or_runtime` 解析
+  decision/state（typed port 优先、kernel runtime carrier 兜底），替代裸
+  `input.port_values.get`。根因见本轮 ASSESS：RA-033 删 metadata 走私后
+  `state` port 全图无生产者，到 handler 时为 None → PG-003 → 工具永不执行。
+- 实现与评估的差异：评估只列了 execute.py 本体；落地时发现
+  tests/plugins/concept/test_effect_execute_tool_result_surface.py 的 9 处
+  调用点按旧契约（无 decision/state）构造 node 调用，需同步更新到新契约
+ （decision 放 port、state 放 fake runtime carrier）——它们 pin 的
+  attribution 行为不变。
+- 测试：E2E 四场景全过（basic completed / tool-call completed 且 marker
+  文件证明工具真执行 / sequential 双 completed / 非收敛 failed 无泄漏）；
+  28 passed（surface+registry_dispatch）、3 passed（tool_call e2e cutover）、
+  4 passed（envelope n_to_n）；ruff clean。
+- 文件：lca/nodes/concept/effect/execute.py、
+  tests/plugins/concept/test_effect_execute_tool_result_surface.py
+- **Learnings for future iterations:**
+  - 改 node 的输入契约（fail-loud 化）时，必须 grep 该 node 的所有测试
+    调用点同步更新——契约变更不是"只改实现"。
+  - `resolve_typed_port_or_runtime` 的 fail-loud 是刻意的：测试 fake 必须
+    像生产一样提供 port/runtime，不能靠 None 穿透。
+---
+
+
+## 2026-10-08 16:25 CST - RA-043
+
+- 接上 `active_decision` 死代码：`RegistryEffectDispatcher.execute` 计算了
+  precedence（per-call kwarg 优先、构造期捕获兜底）却只用于 approval 检查，
+  传给 `handler.handle` 的仍是原始 kwargs——构造期注入的 decision/state 在
+  handler 缝处被静默丢弃。现计算 `active_state`/`active_decision` 并转发
+  解析后的值。
+- 实现与评估一致。新增 2 个 pin 测试（构造值到达 handler；per-call 仍优先）。
+- 测试：21 passed（test_registry_dispatch，含 2 新）；E2E tool-call run 仍
+  completed 且工具执行；ruff clean。
+- 文件：lca/harness/declarative/execute/dispatch.py、
+  tests/harness/declarative/execute/test_registry_dispatch.py
+- **Learnings for future iterations:**
+  - "注释声称的优先级"类问题，测试要钉在最终消费者（handler 收到什么），
+    不能只钉中间检查（approval 门）——RA-043 前已有
+    test_typed_decision_kwarg_overrides_constructor_decision 却只覆盖了门。
+---
+
+
+## 2026-10-08 16:45 CST - RA-044
+
+- 新建 `lca/plugins/events/publish_scope.py`（`bind_event_bridge` /
+  `unbind_event_bridge`），把 execute()/resume() 里各重复一次的
+  publish-session ritual 收敛到一处；lifecycle.py 不再内联 import 私有模块。
+- 实现与评估差异：用显式 bind/unbind 而非 context manager——两处都是
+  try 之前 bind、finally 里在 emit_kernel_run_stop **之前** reset，
+  context manager 会颠倒这个顺序；配对逻辑仍只在 seam 里一份。
+- 修补插曲：行号替换脚本误删了 resume() 里条件块内的
+  `spine_hook_token = bind_bridge_spine_hook(bound.bridge)`，
+  ruff F401 抓到，已恢复（条件语义不变）。教训：display 层的 token
+  redaction 会遮住 `xxx_token = ...` 赋值行，做文本替换时用 base64/行号
+  绕过显示层核对。
+- 测试：新 test_publish_scope.py 3 passed；现有 carrier 16 passed；ruff clean。
+- 文件：lca/plugins/events/publish_scope.py（新）、
+  lca/plugins/transport/webserver/carrier/runs/lifecycle/lifecycle.py、
+  tests/plugins/events/test_publish_scope.py（新）
+---
+
+
+## 2026-10-08 17:00 CST - RA-045
+
+- `_assistant_spec_for_run` → 公共 `require_assistant_spec`
+  （runnable_assembly.py，入 `__all__`）；4 个调用点 + execution_environment.py
+  的跨模块 import 全更新；docstring 明确这是拥有
+  "assistant_id set 但 catalog 缺失 → fail loud" 策略的唯一 seam。
+- 实现与评估差异：评估草稿里的路径写错了（实际是
+  carrier/runs/lifecycle/runnable_assembly.py，不是
+  session/runtime/contextfiles/assemble.py）——动手前按真实路径核对，
+  prd notes 已更正。
+- 测试：新 test_require_assistant_spec.py 4 passed；ruff clean
+ （RUF022 用 --fix 排序 __all__，RUF043 match= 改 raw string）。
+- 文件：.../lifecycle/runnable_assembly.py、.../execute/execution_environment.py、
+  tests/.../test_require_assistant_spec.py（新）
+---
+
+
+## 2026-10-08 17:10 CST - RA-046
+
+- `CognitiveAgent.run()` 入口加 None 校验：`task is None` 直接抛
+  `TypeError("Agent.run() task must be str | AgentMessage, got None")`。
+  之前 None 经 `_task_as_text` 原样返回，一路进 runtime，最后在
+  `objective_preview` 里 `None[:N]` 爆出不知所云的 TypeError。
+- 实现与评估一致（最小改动，只守入口）。
+- 测试：新 test_cognitive_agent_run_none_task.py 1 passed；ruff clean。
+- 文件：lca/agent/cognitive_agent.py、
+  tests/agent/test_cognitive_agent_run_none_task.py（新）
+---
+
+
+## 2026-10-08 17:20 CST - RA-047
+
+- `NativeToolCall` 加 `__post_init__`：arguments 非 dict 时构造期直接抛
+  TypeError（"must be dict[str, Any], got ...; parse the JSON string
+  before constructing"）。选 clear-error 而非 coerce：解析是 adapter 层
+  的职责（resolve_tool_arguments + wire 三态），dataclass 契约写明
+  arguments 已是解析结果，不应重复解析。
+- 核对过两个合法构造点（openai_compat/_shared.py、leaked_tool_call.py）
+  都传 dict，不受影响。
+- 测试：新 test_native_tool_call_arguments.py 2 passed；现有
+  adapter_wire + run_with_tool_use 7 passed 1 skipped；ruff clean。
+- 文件：lca/contracts/models/core/conversation/llm.py、
+  tests/contracts/models/test_native_tool_call_arguments.py（新）
+---
+
+**本轮 6 个 stories 全部完成（RA-042~047），无 open。**

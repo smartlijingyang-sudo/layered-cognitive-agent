@@ -87,7 +87,7 @@ class CognitiveRunnableAssembler:
         assistant_id = str(getattr(request.session, "assistant_id", "") or "").strip()
         # Resolve the Home spec once; the persona, the tool set, and the
         # per-assistant model all read the same Home (ADR-0242 D3/D4/D9).
-        spec = _assistant_spec_for_run(request.scope, assistant_id)
+        spec = require_assistant_spec(request.scope, assistant_id)
         home_path = spec.home_path if spec is not None else None
 
         llm = request.llm_resolver.resolve()
@@ -122,8 +122,13 @@ class CognitiveRunnableAssembler:
         return cast("Agent | Team", await adapter.build(prepared))
 
 
-def _assistant_spec_for_run(scope: Context | None, assistant_id: str) -> AssistantSpec | None:
+def require_assistant_spec(scope: Context | None, assistant_id: str) -> AssistantSpec | None:
     """Resolve an assistant's Home spec through the catalog (ADR-0242 D4/D9).
+
+    Public seam (RA-045): the single place that owns the "assistant_id set
+    but catalog missing -> fail loud" policy. Callers pass the result
+    through; a ``None`` return means "no assistant" (empty id) or "catalog
+    has no entry" — the caller decides whether that is an error.
 
     A non-empty ``assistant_id`` must resolve through the assistant catalog;
     a missing catalog is a run-assembly error rather than a silent policy
@@ -157,7 +162,7 @@ def _role_profile_for_assistant(
     if not assistant_id:
         return None
     if home_path is None:
-        spec = _assistant_spec_for_run(scope, assistant_id)
+        spec = require_assistant_spec(scope, assistant_id)
         if spec is None:
             raise RuntimeError(
                 "assistant_id is set but no assistant catalog entry found; "
@@ -265,7 +270,7 @@ def tools_from_scope(
     if not assistant_id:
         return tools
     if home_path is None:
-        spec = _assistant_spec_for_run(scope, assistant_id)
+        spec = require_assistant_spec(scope, assistant_id)
         if spec is None:
             raise RuntimeError(
                 "assistant_id is set but no assistant catalog entry found; "
@@ -306,5 +311,6 @@ __all__ = [
     "LlmResolver",
     "RunnableAssemblyRequest",
     "RunnableBuildRequest",
+    "require_assistant_spec",
     "tools_from_scope",
 ]
