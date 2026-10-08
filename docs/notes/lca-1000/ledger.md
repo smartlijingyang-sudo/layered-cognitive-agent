@@ -1070,3 +1070,16 @@
 - commit: 无代码 commit；本台账单独 docs commit（沿用 0521–0526 `docs(lca-1000): 第NNNN轮台账` 模式）。
 - 备注: 只 commit docs/notes/lca-1000/ledger.md（`git add` + `git commit -- <path>` 显式路径）。扫描输出存 252 /tmp（ast0527b_out.txt、sndb0527b_out.txt、exc0527b.txt；ast0527_out.txt/dead0527_out.txt/sndb0527_out.txt 为中断尝试遗留）。注意：本轮开工前 252 /tmp 已有 00:26 生成的 ast0527/dead0527/sndb0527 扫描文件（ledger 无 0527 条目、无相关 commit，应为 00:03 轮次中断残留，参考 0522 备注的 02:03 中断判例）；本轮为避免基线漂移（00:30 有新 merge 落盘）全部重跑，数据取自当前 HEAD。探索中无分支切换、无代码改动。
 
+
+## 第0528轮 (2026-10-09 01:05-01:14 CST)
+- 改了什么: 无代码改动。**本轮未发现新的实质机会**（依据 body 规则 4：不硬凑 trivial commit）。
+- 依据 skill 哪一节: SKILL.md Deletion test + LANGUAGE.md（load-bearing knowledge / Two adapters = real seam / 接口即测试面）+ DEEPENING.md Seam discipline —— 见候选清单的驳回依据。
+- 关键设计决策（夜间跳过 grilling，记台账）: 自 0527 explore（00:33–01:01）后无新落盘 —— HEAD 仍为 0527 台账 commit ed3f496aa（00:18–00:30 的 iter-arch/iter-tests ADR-0221 同步 + todo-85/86/87 裁决均已在 0527 覆盖）。唯一未提交改动为 .agent/skills/airtap-automation/SKILL.md，属并发会话，按 0.5/规则 5 绝不动、不细看（沿用 0522 判例：不 re-litigate、不动别人的改动）。
+- 候选清单（本轮 explore：AST 同体扫描重跑 8431 函数/243 组 + dead-code + 真死 17 + 同名异体 295 组 + deslop 清单）:
+  1. AST 243 组 —— 组 hash（G 行）集合与 0523 基线（/tmp/ast0523.txt）逐成员一致，零新组；函数数 8431 不变（0522/0523 已逐组人工裁决）。
+  2. dead / dead-b —— 输出与 dead0527_out.txt 逐字节一致；真死 17 与 0522–0527 裁决集合一致（_RoleConfig 静态锚点；框架按名调用或保留；_validate_* ×12 pydantic validator classmethod 假阳性）。
+  3. sndb —— 输出与 sndb0527_out.txt 逐字节一致（295 组，含 0527 新裁决的 5 组 create_session/run_in_session/relink_global_skills/_relative/turn_of）。
+  4. deslop：TODO/FIXME/HACK/XXX 均为既往裁决（expander 中文示例 XXX、s3 ADR-0167 PR-10 占位、compact_summary TODOs 字段）；except Exception lca/ 仍 442，无新增；noqa F401 仅 cli.py side-effect registry 老项；"自承 dead" 仅语义项（dead holder's lock file）；叙事性注释无新增。
+- 验证结果: 无代码改动，无需验证门。扫描脚本全部 exit 0（ast0527/dead0527/dead0522b/sndb0527 确定性重跑）；开工/收工工作区 on main（并发会话的未提交改动始终不动）。
+- commit: 无代码 commit；本台账单独 docs commit（沿用 0521–0527 `docs(lca-1000): 第NNNN轮台账` 模式）。
+- 备注: 只 commit docs/notes/lca-1000/ledger.md（`git add` + `git commit -- <path>` 显式路径）。扫描输出存 252 /tmp（ast0528_out.txt、dead0528_out.txt、dead0528b_out.txt、sndb0528_out.txt）。
