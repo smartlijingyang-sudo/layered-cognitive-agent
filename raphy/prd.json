@@ -690,8 +690,8 @@
         "A test pins the chosen behavior; existing llm contract tests stay green."
       ],
       "priority": 6,
-      "passes": false,
-      "notes": "Source: 2026-10-07 runtime findings P2-2 (Worth exploring). Deletion test: concentrates — construction is the one place every tool call crosses. Constraints: dict input behavior unchanged; pick coerce-vs-reject by what decision.parse can handle downstream."
+      "passes": true,
+      "notes": "Source: 2026-10-07 runtime findings P2-2 (Worth exploring). Deletion test: concentrates — construction is the one place every tool call crosses. Constraints: dict input behavior unchanged; pick coerce-vs-reject by what decision.parse can handle downstream.\nDONE 2026-10-08 (optimize session): NativeToolCall gained a __post_init__ that raises TypeError at construction when arguments is not a dict (e.g. a raw JSON string) — previously it died later with an obscure error. Chose clear-error over coerce: parsing belongs to the adapter layer (resolve_tool_arguments), the dataclass contract says arguments is already parsed. Both legitimate construction sites pass dicts. New tests: test_native_tool_call_arguments.py (2 passed); existing adapter_wire + run_with_tool_use 7 passed 1 skipped. ruff clean. Implementation vs assessment: as assessed."
     }
   ]
 }

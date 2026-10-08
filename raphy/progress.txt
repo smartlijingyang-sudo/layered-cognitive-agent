@@ -1573,3 +1573,20 @@
   tests/agent/test_cognitive_agent_run_none_task.py（新）
 ---
 
+
+## 2026-10-08 17:20 CST - RA-047
+
+- `NativeToolCall` 加 `__post_init__`：arguments 非 dict 时构造期直接抛
+  TypeError（"must be dict[str, Any], got ...; parse the JSON string
+  before constructing"）。选 clear-error 而非 coerce：解析是 adapter 层
+  的职责（resolve_tool_arguments + wire 三态），dataclass 契约写明
+  arguments 已是解析结果，不应重复解析。
+- 核对过两个合法构造点（openai_compat/_shared.py、leaked_tool_call.py）
+  都传 dict，不受影响。
+- 测试：新 test_native_tool_call_arguments.py 2 passed；现有
+  adapter_wire + run_with_tool_use 7 passed 1 skipped；ruff clean。
+- 文件：lca/contracts/models/core/conversation/llm.py、
+  tests/contracts/models/test_native_tool_call_arguments.py（新）
+---
+
+**本轮 6 个 stories 全部完成（RA-042~047），无 open。**
