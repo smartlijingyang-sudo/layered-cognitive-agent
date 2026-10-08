@@ -61,9 +61,6 @@ class DefaultEvidencePolicy(EvidencePolicy):
         keywords = _RESTRICTED_KEYWORDS + self.extra_restricted_keywords
         if any(kw in lowered for kw in keywords):
             return Classification.RESTRICTED
-        # 默认按 media_type 区分
-        if media_type.startswith(("application/json", "text/")):
-            return Classification.INTERNAL
         return Classification.INTERNAL
 
     def retention(

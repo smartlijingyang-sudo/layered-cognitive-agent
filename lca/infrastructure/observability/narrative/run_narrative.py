@@ -69,7 +69,7 @@ def format_span_line(span: SpanView, *, depth: int = 0) -> str:
     if action:
         bits.append(f"→ {action}")
     callee = attr_text(attrs, ATTR_CALLEE_ROLE)
-    if callee and ("transport" in name or span.name in (SpanName.DELEGATION.value,)):
+    if callee and ("transport" in name or span.name == SpanName.DELEGATION.value):
         bits.append(callee)
         subtask = attr_text(attrs, ATTR_SUBTASK_PREVIEW)
         if subtask and span.name == SpanName.DELEGATION.value:
