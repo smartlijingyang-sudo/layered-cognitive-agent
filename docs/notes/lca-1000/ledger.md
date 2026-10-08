@@ -1233,3 +1233,18 @@
 - 验证结果: 无代码改动，无需验证门。扫描脚本全部 exit 0（ast0527.py/dead0527.py/dead0522b.py/sndb0527.py/shallow_scan.py 确定性重跑）；开工/收工工作区 on main（并发会话的未提交改动始终不动）。
 - commit: 无代码 commit；本台账单独 docs commit（沿用 0521–0537 `docs(lca-1000): 第NNNN轮台账` 模式）。
 - 备注: 只 commit docs/notes/lca-1000/ledger.md（`git add` + `git commit -- <path>` 显式路径；-m 须在 -- 之前，见 AGENTS.md 教训）。扫描输出存 252 /tmp（ast0538_out.txt、dead0538_out.txt、dead0538b_out.txt、sndb0538_out.txt、shallow0538_out.txt）。新教训：ssh252 远程命令里避免 `${...}` 花括号参数展开（会被包装吞掉致误判），只用裸 `$var`（0533 教训扩展）。
+--
+
+## 第0539轮 (2026-10-09 06:33-06:40 CST)
+- 改了什么: 无代码改动。**本轮未发现新的实质机会**（依据 body 规则 4：不硬凑 trivial commit）。
+- 依据 skill 哪一节: SKILL.md Deletion test + LANGUAGE.md（深度即杠杆/真实 seam/接口即测试面）+ DEEPENING.md Seam discipline + SKILL.md 的 ADR 不 re-litigate 规则 —— 见候选清单的驳回依据。
+- 关键设计决策（夜间跳过 grilling，记台账）: 自 0538（06:09）后新落盘两笔 —— 8e39509bb（test(graph): repair stale duplicate-port pins after 03dc0def0 relaxation）与 41041c875（merge iter-tests-20261009-0609）：均为另一会话 iter-tests 的纯测试改动，按 0533/0537 判例（ADR-0295 todo-88/89 仍在 Chao 待裁决队列）不 re-litigate、不动。唯一未提交改动 .agent/skills/airtap-automation/SKILL.md 属并发会话，按 0.5/规则 5 绝不动（沿用 0522–0538 判例）。时间窗（06:33）与分支（main）两硬门槛均过，skill 四文件（SKILL.md/DEEPENING.md/LANGUAGE.md/INTERFACE-DESIGN.md）完整重读。
+- 候选清单（本轮 explore：AST 同体 + dead a/b + 同名异体 + shallow-facade 基线复核 + deslop 清单 + 新鲜 diff 复查）:
+  1. AST —— /tmp/ast0539_out.txt 与 ast0538_out.txt 逐字节一致（functions=8430，243 组，零新组；0522/0523 已逐组人工裁决）。
+  2. dead a / dead b —— 与 dead0538_out.txt / dead0538b_out.txt 逐字节一致；真死 17 与 0522–0538 裁决集合一致。
+  3. sndb —— 与 sndb0538_out.txt 逐字节一致（295 组，含 0527 新裁决的 5 组）。
+  4. shallow-facade —— /tmp/shallow0539_out.txt 与 shallow0538_out.txt 逐字节一致（total 61），无新未裁决项可深读（0538 已裁决榜首 runtime_loop.py；0537 已裁决 runtime_emit.py；0536 已裁决 session aggregate 与 meta_event_emit）。
+  5. deslop：TODO/FIXME/HACK/XXX lca/ --include='*.py' = 8（既往裁决项，无新增）；except Exception lca/ = 442（与基线一致，目录口径与 0537 基线对齐）；noqa F401 lca/ = 1（cli.py side-effect registry 老项）；deprecated 新增 0；生产代码新增行（git diff ae2740ff7..HEAD -- lca/）= 0（仅 tests/framework/graph/test_ports.py 一文件变更）。
+- 验证结果: 无代码改动，无需验证门。扫描脚本全部 exit 0（ast0527.py/dead0527.py/dead0522b.py/sndb0527.py/shallow_scan.py 确定性重跑）；开工/收工工作区 on main（并发会话的未提交改动始终不动）。
+- commit: 无代码 commit；本台账单独 docs commit（沿用 0521–0538 `docs(lca-1000): 第NNNN轮台账` 模式）。
+- 备注: 只 commit docs/notes/lca-1000/ledger.md（`git add` + `git commit -- <path>` 显式路径；-m 须在 -- 之前，见 AGENTS.md 教训）。台账文本经 exec stdin 原样追加（UTF-8，未走 base64 管道；沿用 0536–0538）。扫描输出存 252 /tmp（ast0539_out.txt、dead0539_out.txt、dead0539b_out.txt、sndb0539_out.txt、shallow0539_out.txt）。新教训：for 循环里的裸 `$base` 也被 ssh252 包装吞掉（`case $base in` 直接变空致 syntax error；0538 的 `${}` 教训扩展版）；多文件 cmp 直接写多条裸命令，不要用循环变量。
