@@ -1,10 +1,11 @@
 """Regression: run attachments must be readable at their guest path.
 
 ``ensure_ready`` resolves attachments from the ids bound at
-``bind_sandbox_runtime`` and stages them at the canonical guest mount root.
-Staging into a session sub-tree instead leaves ``/mnt/data/<name>`` — the path
-prompts advertise and user code reads verbatim — unresolvable on backends that
-map the guest root onto a real host directory.
+``bind_sandbox_runtime`` and stages them under the session root
+(todo-79 (b), 6d8ba982e): ``_stage_files`` passes the session id so the
+agent's files land in its own session tree. The advertised guest path stays
+``/mnt/data/<name>`` (virtual); the adapter rewrites it onto the session
+root on backends that map the guest root onto a real host directory.
 """
 
 from __future__ import annotations
@@ -47,10 +48,12 @@ class TestEnsureReadyStagesAttachments(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(entries[0].path, f"/mnt/data/{_XLSX}")
             self.assertEqual(entries[0].attachment_id, stored.attachment_id)
 
-            # Staged at the mount root, never a session sub-tree.
+            # Staged under the session root (todo-79 (b)): _stage_files
+            # passes the session id created during ensure_ready, never "".
             stage_calls = [c for c in sandbox.write_files_calls if _XLSX in c[0]]
             self.assertEqual(len(stage_calls), 1)
-            self.assertEqual(stage_calls[0][1], "")
+            self.assertEqual(stage_calls[0][1], sandbox.created_sessions[-1])
+            self.assertTrue(stage_calls[0][1], "session_id must not be empty")
             self.assertEqual(stage_calls[0][0][_XLSX], b"xlsx-bytes")
         finally:
             tmp.cleanup()

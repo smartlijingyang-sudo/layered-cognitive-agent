@@ -44,18 +44,22 @@ def test_commit_body_tool_execute_end_appends_tool_role_message() -> None:
     # (one source, two renderings — the envelope's content_origin mark).
     assert tool_msgs[0]["content"] == fence_external_content('{"stdout": "page one"}')
 def test_journal_persists_display_projection_not_absolute_paths() -> None:
-    """RA-034(a): journal content == display projection.
+    """RA-034(a) as revised by 8094cc234: journal content == ``observation_content()`` verbatim.
 
-    The old narrative claimed "the journal keeps absolute process paths".
-    Reality: ``commit_body_tool_execute_end`` persists
-    ``observation_content()``'s projected text verbatim — workspace-relative
-    guest paths, no absolute-path copy anywhere on the write path.
+    The display-path projection moved into guest emit
+    (``computer/guest/preamble.py``): by the time an observation reaches
+    ``observation_content()`` its structured path fields are already in
+    workspace-relative display form. ``commit_body_tool_execute_end``
+    persists that text verbatim — no second projection, no absolute-path
+    copy anywhere on the write path.
     """
     session = Session("journal_display_pin")
+    # Post-emit display form: emit() already projected the guest path to
+    # workspace-relative; observation_content() must persist it unchanged.
     obs = Observation(
         observation_id=new_id("obs"),
         success=True,
-        payload={"path": "/mnt/data/a.xlsx"},
+        payload={"path": "a.xlsx"},
         content_origin=ContentOrigin.INTERNAL,
     )
     receipt = commit_body_tool_execute_end(
@@ -71,4 +75,4 @@ def test_journal_persists_display_projection_not_absolute_paths() -> None:
     assert len(events) == 1
     content = events[0].payload["content"]
     assert content == observation_content(obs)
-    assert "/mnt/data" not in content
+    assert content == '{"path": "a.xlsx"}'

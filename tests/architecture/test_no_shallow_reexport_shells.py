@@ -20,10 +20,14 @@ import pytest
 
 REPO = Path(__file__).resolve().parents[2]
 
+# NOTE (2026-10-08): ``lca/infrastructure/sandbox/paths/__init__.py`` was
+# legitimately re-created by the SandboxPaths single-seam work (e9f9f06be,
+# ADR-0294 / todo-81) as the canonical package for ``SandboxPaths`` -- it is
+# a real package ``__init__``, not a re-export shell, so it is intentionally
+# absent from this deleted list.
 _DELETED_REL_PATHS = (
     "lca/infrastructure/capability/composio/composio.py",
     "lca/infrastructure/sandbox/paths/paths.py",
-    "lca/infrastructure/sandbox/paths/__init__.py",
     "lca/infrastructure/host_runtime/providers/user.py",
     "lca/cognition/body/delegation/cache.py",
 )
