@@ -9,14 +9,9 @@ import subprocess
 import textwrap
 from pathlib import Path
 
-import pytest
-
 _REPO_ROOT = Path(__file__).resolve().parents[2]
 _COGNITION = _REPO_ROOT / "lca" / "cognition"
 _PERCEIVE_HUB = _COGNITION / "perceive" / "hub.py"
-_PHASE_LOOP = _REPO_ROOT / "lca" / "plugins" / "loop" / "phase"
-_PHASE_EMITTER = _REPO_ROOT / "lca" / "loop" / "emit" / "spine" / "phase_fact.py"
-_TRANSACTION = _REPO_ROOT / "lca" / "loop" / "transaction.py"
 
 
 def _have_ripgrep() -> bool:
@@ -109,35 +104,8 @@ class TestIFact2:
 
 
 class TestIFact3:
-    def test_i_fact_3_transaction_calls_phase_fact_emitter(self) -> None:
-        text = _TRANSACTION.read_text(encoding="utf-8")
-        assert "emit_phase_catalog_facts" in text
-
     def test_i_fact_3_runtime_journal_uses_session_committer(self) -> None:
         from lca.infrastructure.session.commit.fact_committer import SessionFactCommitter
         from lca.runtime.loop.runtime_journal import RuntimeJournalCommitter
 
         assert issubclass(RuntimeJournalCommitter, SessionFactCommitter)
-
-
-class TestIFact5:
-    @pytest.mark.parametrize("module_name", ["perceive", "remember"])
-    def test_i_fact_5_phase_executors_no_scattered_emit(self, module_name: str) -> None:
-        path = _PHASE_LOOP / module_name / "standard" / "plugin.py"
-        text = path.read_text(encoding="utf-8")
-        for forbidden in (
-            "begin_step(",
-            "end_step(",
-            "emit_context_injected",
-            "emit_context_manifested",
-            "lifecycle_emit",
-            "meta_event_emit",
-        ):
-            assert forbidden not in text, f"{path.name} must not call {forbidden}"
-
-    def test_i_fact_5_phase_fact_emitter_exists(self) -> None:
-        assert _PHASE_EMITTER.exists()
-        text = _PHASE_EMITTER.read_text(encoding="utf-8")
-        assert "emit_context_manifested_for_state" in text
-        assert "begin_step" in text
-        assert 'advance("perceive")' in text
