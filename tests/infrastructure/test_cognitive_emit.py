@@ -14,7 +14,7 @@ from lca.contracts.models.core.policy.budget import create_budget
 from lca.contracts.models.core.policy.gate_policy import GateDecided, PolicyFact
 from lca.contracts.models.core.state.state import AgentState
 from lca.infrastructure.session.emit.cognitive_emit import (
-    emit_context_manifested_for_state,
+    emit_context_manifested,
     emit_gate_decided_from_policy,
     run_reasoner_generate_thoughts_with_spine_facts,
 )
@@ -105,11 +105,10 @@ def test_emit_gate_decided_noop_when_session_unbound() -> None:
     )
 
 
-def test_emit_context_manifested_for_state_serializes_items() -> None:
+def test_emit_context_manifested_serializes_items() -> None:
     session = Session("manifest_items")
     token = set_publish_session(session)
     try:
-        state = _state(step=4)
         manifest = ContextManifest(
             items=(
                 ContextItem(
@@ -121,7 +120,7 @@ def test_emit_context_manifested_for_state_serializes_items() -> None:
             ),
             digest="abc123",
         )
-        emit_context_manifested_for_state(state, manifest)
+        emit_context_manifested(session, manifest, step=4)
         folded = fold_context_manifest_from_events(session.snapshot_events(), step=4)
         assert folded is not None
         assert len(folded.items) == 1

@@ -272,23 +272,15 @@ def test_cognitive_emit_context_manifested_via_gateway() -> None:
     assert folded.items[0].provenance == "repeat_tool_call"
 
 
-def test_cognitive_emit_context_manifested_for_state_uses_bound_session() -> None:
+def test_cognitive_emit_context_manifested_uses_bound_session() -> None:
     from lca.contracts.models.core.perceive.perception import ContextManifest
-    from lca.contracts.models.core.policy.budget import create_budget
-    from lca.contracts.models.core.state.state import AgentState
-    from lca.infrastructure.session.emit.cognitive_emit import emit_context_manifested_for_state
+    from lca.infrastructure.session.emit.cognitive_emit import emit_context_manifested
 
     session = Session("manifest_bound")
     token = set_publish_session(session)
     try:
-        state = AgentState(
-            trace_id="trace:cognitive-emit-loop",
-            task="test",
-            budget=create_budget(max_steps=8),
-            step=5,
-        )
         manifest = ContextManifest(items=(), digest="bound-digest")
-        receipt = emit_context_manifested_for_state(state, manifest)
+        receipt = emit_context_manifested(session, manifest, step=5)
         assert receipt is not None
         assert receipt.event_type == "context.manifested.v1"
         assert session.event_count == 1
