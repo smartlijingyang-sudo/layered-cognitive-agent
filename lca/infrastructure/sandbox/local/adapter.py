@@ -12,7 +12,6 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import os
-import re
 import shlex
 import tempfile
 from pathlib import Path
@@ -34,6 +33,7 @@ from lca.contracts.models.core.state.guest_layout import GuestLayout
 from lca.contracts.protocols import Sandbox
 from lca.infrastructure.sandbox.onlyboxes.bootstrap import safe_rel_name
 from lca.infrastructure.sandbox.output.collect import try_append_generated_file
+from lca.infrastructure.sandbox.paths.sandbox_paths import SandboxPaths
 from lca.infrastructure.sandbox.streaming.streaming import SandboxStreamEmitter
 
 _log = structlog.get_logger(__name__)
@@ -118,16 +118,18 @@ class LocalSandboxAdapter(Sandbox):
             return self._sessions[session_id]
         return Path(self._host_root)
 
+    def _paths_for(self, session_id: str = "") -> SandboxPaths:
+        """Single-seam path mapping for one session (todo-81).
+
+        The only place that knows how the agent-visible guest mount maps
+        onto this machine; every boundary crossing below derives from it.
+        """
+        return SandboxPaths.for_local(
+            self._session_root(session_id), guest_mount=self._layout.root.rstrip("/")
+        )
+
     def _guest_to_host(self, guest_path: str, *, session_id: str = "") -> str:
-        root = self._session_root(session_id)
-        guest = guest_path.replace("\\", "/")
-        mount = self._layout.root.rstrip("/")
-        if guest == mount or guest.startswith(mount + "/"):
-            rel = guest[len(mount) :].lstrip("/")
-            return str(root / rel) if rel else str(root)
-        if guest.startswith(f"{os.sep}tmp{os.sep}"):
-            return guest
-        return str(root / guest.lstrip("/"))
+        return str(self._paths_for(session_id).resolve(guest_path))
 
     def _rewrite_command(self, command: str, root: str) -> str:
         """Map guest ``/mnt/data`` references onto the host session root backing the agent's workspace.
@@ -138,11 +140,12 @@ class LocalSandboxAdapter(Sandbox):
         so attachments live under the session root; guest scripts read
         ``LCA_GUEST_ROOT`` (exported per spawn) as their ROOT. Shell commands
         map onto the same session root so all three views agree.
+
+        Single seam (todo-81): delegates to :meth:`SandboxPaths.rewrite_command`.
         """
-        mount = self._layout.root.rstrip("/")
-        if root == mount:
-            return command
-        return command.replace(mount, root)
+        return SandboxPaths.for_local(
+            root, guest_mount=self._layout.root.rstrip("/")
+        ).rewrite_command(command)
 
     def _project_host_to_guest(self, text: str, root: str) -> str:
         """Project host session-root paths in TEXT back to the guest view.
@@ -159,11 +162,12 @@ class LocalSandboxAdapter(Sandbox):
         followed by a path-continuation character, so sibling paths that
         merely share the prefix (``<root>2/...``) are left alone. Uses the
         same ``root``/``mount`` constants as the forward rewrite.
+
+        Single seam (todo-81): delegates to :meth:`SandboxPaths.present_text`.
         """
-        mount = self._layout.root.rstrip("/")
-        if not text or root == mount:
-            return text
-        return re.sub(re.escape(root) + r"(?![A-Za-z0-9_.\-])", mount, text)
+        return SandboxPaths.for_local(
+            root, guest_mount=self._layout.root.rstrip("/")
+        ).present_text(text)
 
     async def _exec_shell(
         self,
@@ -177,11 +181,13 @@ class LocalSandboxAdapter(Sandbox):
         emitter = SandboxStreamEmitter(invocation_id)
         work = cwd or str(self._session_root(session_id))
         _ensure_dir(Path(work))
-        rewritten = self._rewrite_command(command, work)
+        paths = SandboxPaths.for_local(work, guest_mount=self._layout.root.rstrip("/"))
+        rewritten = paths.rewrite_command(command)
         wrapped = f"cd {shlex.quote(work)} && {rewritten}"
         # Guest scripts read ROOT from this var; without it they would hit the
         # host's literal /mnt/data and bypass the per-session root entirely.
-        env = {**os.environ, "LCA_GUEST_ROOT": work}
+        # Single source (todo-81): the value IS the seam's host root.
+        env = {**os.environ, "LCA_GUEST_ROOT": str(paths.host_root)}
         try:
             proc = await asyncio.create_subprocess_shell(
                 wrapped,
@@ -203,12 +209,8 @@ class LocalSandboxAdapter(Sandbox):
             emitter.emit_stderr(err + "\n")
             return SandboxResult(success=False, exit_code=1, error=err, stderr=err + "\n")
 
-        stdout = self._project_host_to_guest(
-            (stdout_b or b"").decode("utf-8", errors="replace"), work
-        )
-        stderr = self._project_host_to_guest(
-            (stderr_b or b"").decode("utf-8", errors="replace"), work
-        )
+        stdout = paths.present_text((stdout_b or b"").decode("utf-8", errors="replace"))
+        stderr = paths.present_text((stderr_b or b"").decode("utf-8", errors="replace"))
         code = int(proc.returncode or 0)
         if stdout:
             emitter.emit_stdout(stdout)
