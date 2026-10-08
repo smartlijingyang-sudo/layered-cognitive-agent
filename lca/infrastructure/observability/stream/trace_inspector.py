@@ -53,6 +53,17 @@ class TraceInspector:
         self._events = tuple(events)
         self._by_seq = {event.seq: event for event in self._events}
 
+    @property
+    def events(self) -> tuple[StampedEvent, ...]:
+        """Read-only view of the ledger events (RA-038).
+
+        The explicit accessor replacing the old private-attribute backdoor
+        in the diagnostics helpers: diff adapters read through here, so
+        inspector internals can be refactored without silently breaking
+        the diff tools.
+        """
+        return self._events
+
     def inspect_trace(
         self,
         *,

@@ -1334,3 +1334,34 @@
   - 预存坏测试用 `git stash` 留证据再下结论：attachment_path 的 3 个失败
     在干净树复现，属环境/预存问题，不纳入本轮修复（也不背锅）。
 ---
+
+## 2026-10-08 13:06 CST - RA-038
+- `TraceInspector` 加只读 `events` property（tuple，不可变视图），替代
+  `_helpers._inspector_events` 的 `getattr(inspector, "_events", ())` 后门；
+  docstring 记明"diff adapter 走这里，inspector 内部可重构"。
+- 两处生产调用点改走访问器：`diff/context.py`（DiffContext）、
+  `run/diff.py`（RunDiffToolAdapter）；`_helpers.py` 删 `_inspector_events`
+  + `__all__` 条目 + 孤儿 `Sequence` import。
+- `tests/scenario/coding/test_explain_failure_ledger.py` 的调用点同步改走
+  `inspector.events`。全仓 grep `_inspector_events` 零命中（含 docstring
+  措辞避开字面旧名）。
+- 插曲：RA-038 测试暴露 RA-035 rename 漏了一处调用者
+  （`lca/infrastructure/cli/commands/observation/run_explain.py`，
+  RA-035 轮 grep 错了目录只查了 repo 根 `commands/`）。已补改，并用
+  `git commit --fixup` + `git rebase -i --autosquash` 把它并回 RA-035
+  commit（分支未 push，重写安全），RA-038 diff 保持干净。
+- 测试 12 passed（ledger）；ruff clean。
+- 文件：lca/infrastructure/observability/stream/trace_inspector.py、
+  lca/plugins/tools/diagnostics/helpers/_helpers.py、
+  lca/plugins/tools/diagnostics/diff/context.py、
+  lca/plugins/tools/diagnostics/run/diff.py、
+  tests/scenario/coding/test_explain_failure_ledger.py
+  （另：RA-035 补改 lca/infrastructure/cli/commands/observation/run_explain.py）
+- **Learnings for future iterations:**
+  - rename 类改动 grep 范围要用 repo 根全仓（`rg -l` 不设路径），不要凭
+    记忆猜目录：本轮漏 `lca/infrastructure/cli/commands/` 就是教训。
+    commit 前跑一遍引用该符号的测试文件做冒烟。
+  - 私有分支未 push 时，`--fixup` + `rebase -i --autosquash` 是把"漏改"
+    并回原 story commit 的干净手法（注意 `--autosquash` 必须配 `-i`，
+    光 `--autosquash` 不生效）；rebase 前先 stash 未提交改动。
+---

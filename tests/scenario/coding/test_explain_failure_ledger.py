@@ -38,7 +38,6 @@ from lca.infrastructure.cli.commands.kernel._shared import (
 from lca.plugins.tools.diagnostics.failure.explainer import FailureExplainer
 from lca.plugins.tools.diagnostics.helpers._helpers import (
     _event_from_payload,
-    _inspector_events,
     _load_inspector_from_jsonl,
 )
 
@@ -173,7 +172,7 @@ def test_inspector_selects_the_whole_ledger_by_run_id(tmp_path: Path) -> None:
     """``_select(run_id=...)`` used to drop all 650 events of a real run."""
     ledger = _write_run(tmp_path, _failed_ledger(), session_status="failed")
     inspector = _load_inspector_from_jsonl(ledger)
-    events = _inspector_events(inspector)
+    events = inspector.events
     assert len(events) == 3
     assert inspector._select(trace_id=None, run_id=RUN_ID) == tuple(events)
     assert [e.seq for e in events] == [2, 482, 1040]

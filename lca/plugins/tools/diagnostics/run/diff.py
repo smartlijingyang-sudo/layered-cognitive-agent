@@ -6,7 +6,6 @@ from pathlib import Path
 
 from lca.contracts.observability.infra.coding_agent_tools import RunDiff, RunDiffTool
 from lca.plugins.tools.diagnostics.helpers._helpers import (
-    _inspector_events,
     _load_inspector_from_jsonl,
 )
 
@@ -19,7 +18,7 @@ class RunDiffToolAdapter(RunDiffTool):
 
     def diff(self, *, run_id_a: str, run_id_b: str, step: int = 0) -> RunDiff:
         inspector = _load_inspector_from_jsonl(self._path)
-        events = _inspector_events(inspector)
+        events = inspector.events
         events_a = [e for e in events if str(e.scope.run_id) == run_id_a and e.scope.step == step]
         events_b = [e for e in events if str(e.scope.run_id) == run_id_b and e.scope.step == step]
         prompt_hash_a = ""

@@ -570,7 +570,7 @@
       "description": "As an LCA maintainer, I want the diff adapters to read trace events through an explicit TraceInspector accessor instead of getattr-piercing its private _events, so inspector internals can be refactored without silently breaking the diff tools.",
       "id": "RA-038",
       "notes": "Source: Round 10 friction walk B (Worth exploring). Deletion test: after adding the accessor, deleting the helper only requires call-site edits -> the seam is real. Overlap: none with RA-001..RA-032.",
-      "passes": false,
+      "passes": true,
       "priority": 6,
       "title": "Give TraceInspector an explicit accessor; delete the _inspector_events private-attribute backdoor"
     },

@@ -6,7 +6,6 @@ from pathlib import Path
 
 from lca.contracts.observability.infra.coding_agent_tools import ContextDiff, DiffContextTool
 from lca.plugins.tools.diagnostics.helpers._helpers import (
-    _inspector_events,
     _load_inspector_from_jsonl,
 )
 
@@ -23,7 +22,7 @@ class DiffContext(DiffContextTool):
 
     def diff(self, *, run_id: str, step: int = 0) -> ContextDiff:
         inspector = _load_inspector_from_jsonl(self._path)
-        events = _inspector_events(inspector)
+        events = inspector.events
         events = [e for e in events if str(e.scope.run_id) == run_id]
         steps = sorted({e.scope.step for e in events})
         if not steps or step not in steps:
