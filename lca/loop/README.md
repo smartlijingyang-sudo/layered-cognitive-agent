@@ -84,10 +84,9 @@ sink 完成。
 
 ```text
 HTTP/CLI → CognitiveAgent → CognitiveRuntime → DeclarativeRuntimeDriver
-  → PlanInterpreterAdapter（图遍历）
-    → PhaseExecutionTransaction（单 phase visit）
-      → PhaseExecutor（plugin）→ Brain/Body/Memory/PerceiveHub
-      → FactGateway → Session.append → *.spine.jsonl
+  → PlanInterpreter（kernel-native 图遍历，ADR-0221 P3）
+    → NodeExecutor strategy（`StrategyRegistry.resolve(node.binding)`）→ Brain/Body/Memory/PerceiveHub
+      → FactGateway → Session.append（publish seam）→ *.spine.jsonl
       → Reducer.apply_*（控制面 State）
 ```
 
@@ -98,10 +97,10 @@ HTTP/CLI → CognitiveAgent → CognitiveRuntime → DeclarativeRuntimeDriver
 
 | 顺序 | 文件 | 看什么 |
 |---|---|---|
-| 1 | `bundles/declarative-phase-graph.yaml` | 节点、边、控制 plugin 列表 |
+| 1 | `bundles/agent/*.yaml`、`bundles/act/act_subgraph.yaml` 等 | v2 graph spec：`nodes`/`edges` 直接写在 bundle yaml（ADR-0221 P3 后无 v1 `phase_graph` 重建） |
 | 2 | `lca_kernel/plan/` | 图遍历与 loop 回边（kernel-native phase runner） |
 | 3 | `lca/harness/declarative/lifecycle/phase_observation.py` | 一次 visit 的被动观测生命周期 |
-| 4 | `lca/plugins/phase_graph/*.py` | 各 phase 如何调认知原语 |
+| 4 | `lca/framework/graph/strategy_registry.py` + 各 strategy 实现 | `node.binding` 如何解析为 NodeExecutor strategy（`PlanInterpreter` 注入 registry） |
 | 5 | `lca/runtime/loop/runtime_loop.py` | Run 入口与 lifecycle |
 | 6 | `lca/loop/fact_gateway.py` + `emit/` + `commit/` | Gate/perceive catalog 事实 |
 
