@@ -33,6 +33,7 @@ from lca.contracts.models.core.execution.external_content import (
     ContentOrigin,
     fence_external_content,
 )
+from lca.infrastructure.session.projections.display_paths import project_display_paths
 
 
 def observation_content(observation: Observation) -> str:
@@ -54,7 +55,9 @@ def observation_content(observation: Observation) -> str:
     elif isinstance(payload, str):
         text = payload
     elif isinstance(payload, (dict, list, tuple)):
-        text = json.dumps(payload, ensure_ascii=False)
+        # Display projection (ADR-0121): the model sees workspace-relative
+        # guest paths; receipts and the journal keep absolute process paths.
+        text = json.dumps(project_display_paths(payload), ensure_ascii=False)
     else:
         text = str(payload)
     origin = getattr(observation, "content_origin", ContentOrigin.EXTERNAL)

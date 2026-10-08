@@ -313,10 +313,9 @@ These `CursorRecord` / `cursor.record_*` paths are **second-track**: they reach 
 ### `lca/infrastructure/session/projections/tool_result_message.py`
 
 - **public functions**:
-  - `clip_tool_result_content(text, *, limit)` (`lca/infrastructure/session/projections/tool_result_message.py:14`).
-  - `observation_tool_result_content(observation)` (line 24).
-  - `build_openai_tool_result_message(*, tool_call_id, content)` (line 46).
-  - `build_tool_surface_data(*, tool_name, invocation_id, attempt, outcome, observation, latency_ms, ok)` (line 60).
+  - `tool_error_text(error)` (`lca/infrastructure/session/projections/tool_result_message.py`).
+  - `build_openai_tool_result_message(*, tool_call_id, content, error)` (same file).
+  - Payload-to-text extraction was consolidated into `lca/cognition/body/emit/observation_surface.py::observation_content`, the single model-visible seam shared by `SimpleBody.dispatch_tool_call` and `effect.execute`. The caller-free duplicates `clip_tool_result_content`, `observation_tool_result_content`, and `build_tool_surface_data` were deleted.
 - **emits**: **none directly** — pure projection/builders returning `dict[str, Any]` consumed by `tool_surface_emit.append_tool_result_surface` (which is the actual emit point).
 - **via Session.append**: **n/a** (this module does not emit).
 - **owns invocation_id**: **no** — passed in (line 65, 82).
