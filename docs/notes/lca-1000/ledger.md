@@ -1263,3 +1263,19 @@
 - 备注: 只 commit docs/notes/lca-1000/ledger.md（`git add` + `git commit -- <path>` 显式路径；-m 须在 -- 之前，见 AGENTS.md 教训）。台账文本经 exec stdin 原样追加（UTF-8，未走 base64 管道；沿用 0536–0539）。扫描输出存 252 /tmp（ast0540_out.txt、dead0540_out.txt、dead0540b_out.txt、sndb0540_out.txt、shallow0540_out.txt）。新教训两条：(1) shallow_scan.py 用相对 ROOTS（['lca','lca_kernel']），必须在 ~/layered-cognitive-agent 根目录下跑；在 /tmp 跑会得到 total: 0 的误报（0540 首轮差点误判为"零浅模块"）。(2) 往本地拷 skill 文件时 ssh252 登录 banner 会前插进 stdout；按 `^#` 定位剥离会误删 SKILL.md 开头的 YAML frontmatter，必须逐文件 md5 核验。
 
 --
+--
+
+## 第0541轮 (2026-10-09 07:33-07:39 CST)
+- 改了什么: 无代码改动。**本轮未发现新的实质机会**（依据 body 规则 4：不硬凑 trivial commit）。
+- 依据 skill 哪一节: SKILL.md Deletion test + LANGUAGE.md（深度即杠杆/真实 seam/接口即测试面）+ DEEPENING.md Seam discipline + SKILL.md 的 ADR 不 re-litigate 规则 —— 见候选清单的驳回依据。
+- 关键设计决策（夜间跳过 grilling，记台账）: 自 0540（07:20）后新落盘两笔 —— 9238cc10e（test(scenario): rewrite v3 scenario contract test per ADR-0107/bundles reality (todo-91)）与 66742c169（merge: iter-tests-20261009-0715）：均为另一会话 iter-tests 的纯测试改动，按 0533/0537/0539 判例（ADR-0295 todo-88/89 仍在 Chao 待裁决队列）不 re-litigate、不动。唯一未提交改动 .agent/skills/airtap-automation/SKILL.md 属并发会话，按 0.5/规则 5 绝不动、不细看（沿用 0522–0540 判例）。时间窗（07:33）与分支（main）两硬门槛均过；skill 四文件（SKILL.md/DEEPENING.md/LANGUAGE.md/INTERFACE-DESIGN.md）逐字完整重读（本地缓存经 md5 与 252 原件逐文件核验一致）。
+- 候选清单（本轮 explore：AST 同体 + dead a/b + 同名异体 + shallow-facade 最浅未裁决项深读 + deslop 清单 + 新鲜 diff 复查）:
+  1. AST —— /tmp/ast0541_out.txt 与 ast0540_out.txt 逐字节一致（functions=8430，243 组，零新组；0522/0523 已逐组人工裁决）。
+  2. dead a / dead b —— 与 dead0540_out.txt / dead0540b_out.txt 逐字节一致；真死 17 与 0522–0540 裁决集合一致。
+  3. sndb —— 与 sndb0540_out.txt 逐字节一致（295 组，含 0527 新裁决的 5 组）。
+  4. shallow-facade —— /tmp/shallow0541_out.txt 与 shallow0540_out.txt 逐字节一致（total 61）；最浅未裁决项 **lca/application/api/api.py**（14/18，Agent/Team/TeamLead 门面，334 行）深读裁决：驳回。Deletion test：删去该 Module 会把 spec 组装实质（Agent.__init__ 的 RoleProfile/ToolPermissionManifest 构建、auto_mcp 工具合并、llm 非空校验、scope 回退；Team.__init__ 的 lead/coordination 二选一校验；Agent.run 的 capability_bindings token 安装/复位生命周期）散到所有构造入口 caller —— 复杂度不消失，是真实 seam。Module docstring 明示这是开发者公共面门面（ADR-0030 公共面 + ADR-0033 spec 化 + ADR-0056 spawn 委托）：14 个 pass-through（spec 访问器、run/resume/cancel 委托、7 个 Team 协调构造类方法）是刻意设计的窄公共 Interface（接口即测试面），把开发者要学的面压缩到最小，binding/装配内部演进不波及 caller，非无依据 indirection。`__getattr__` 的 _cached_default_ctx 弃用垫片与 `__all__` NOTE 是 ADR-0115 决定 7 声明的兼容性 seam（retire 2027-02-28），非 slop。按 SKILL.md ADR 规则不 re-litigate ADR-0030/0033/0056/0115。
+  5. deslop：TODO/FIXME/HACK/XXX lca/ --include='*.py' = 8（既往裁决项，无新增）；except Exception lca/ = 442（与基线一致）；noqa F401 lca/ = 1（cli.py side-effect registry 老项）；deprecated 无新增（git diff 9671aba59..HEAD -- lca/ 为空，生产代码零变更）。
+- 验证结果: 无代码改动，无需验证门。扫描脚本全部 exit 0（ast0527.py/dead0527.py/dead0522b.py/sndb0527.py/shallow_scan.py 确定性重跑）；开工/收工工作区 on main（并发会话的未提交改动始终不动）。
+- commit: 无代码 commit；本台账单独 docs commit（沿用 0521–0540 `docs(lca-1000): 第NNNN轮台账` 模式）。
+- 备注: 只 commit docs/notes/lca-1000/ledger.md（`git add` + `git commit -m <msg> -- <path>` 显式路径；-m 须在 -- 之前，见 AGENTS.md 教训）。台账文本经 exec stdin 原样追加（UTF-8，未走 base64 管道；沿用 0536–0540）。扫描输出存 252 /tmp（ast0541_out.txt、dead0541_out.txt、dead0541b_out.txt、sndb0541_out.txt、shallow0541_out.txt）。新教训两条：(1) ssh252 包装的 git-status banner 只进包装自身 stdout，不进远程 `> 重定向` 写出的文件 —— 0540 及本轮首轮"基线文件含 banner"系误读；扫描器原始输出可直接 cmp，无需剥离。(2) awk 剥离脚本在空 payload 上 cmp 得出虚假 IDENTICAL —— cmp 前务必先 wc -l 核验 payload 非空（本轮差点误判，幸被空文件发现）。
+
