@@ -1504,3 +1504,22 @@
     像生产一样提供 port/runtime，不能靠 None 穿透。
 ---
 
+
+## 2026-10-08 16:25 CST - RA-043
+
+- 接上 `active_decision` 死代码：`RegistryEffectDispatcher.execute` 计算了
+  precedence（per-call kwarg 优先、构造期捕获兜底）却只用于 approval 检查，
+  传给 `handler.handle` 的仍是原始 kwargs——构造期注入的 decision/state 在
+  handler 缝处被静默丢弃。现计算 `active_state`/`active_decision` 并转发
+  解析后的值。
+- 实现与评估一致。新增 2 个 pin 测试（构造值到达 handler；per-call 仍优先）。
+- 测试：21 passed（test_registry_dispatch，含 2 新）；E2E tool-call run 仍
+  completed 且工具执行；ruff clean。
+- 文件：lca/harness/declarative/execute/dispatch.py、
+  tests/harness/declarative/execute/test_registry_dispatch.py
+- **Learnings for future iterations:**
+  - "注释声称的优先级"类问题，测试要钉在最终消费者（handler 收到什么），
+    不能只钉中间检查（approval 门）——RA-043 前已有
+    test_typed_decision_kwarg_overrides_constructor_decision 却只覆盖了门。
+---
+

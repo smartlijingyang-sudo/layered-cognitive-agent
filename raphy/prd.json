@@ -640,8 +640,8 @@
         "ruff check clean on touched files; existing dispatcher tests stay green."
       ],
       "priority": 2,
-      "passes": false,
-      "notes": "Source: Round 11 friction walk (Worth exploring). Found while tracing RA-042. Deletion test: concentrates — the precedence rule is currently stated in a comment but not implemented; implementing it removes a trap for the next caller. Constraints: handler.handle signature unchanged; per-call kwargs still win."
+      "passes": true,
+      "notes": "Source: Round 11 friction walk (Worth exploring). Found while tracing RA-042. Deletion test: concentrates — the precedence rule is currently stated in a comment but not implemented; implementing it removes a trap for the next caller. Constraints: handler.handle signature unchanged; per-call kwargs still win.\nDONE 2026-10-08 (optimize session): execute() now computes active_state/active_decision (per-call kwarg wins, constructor-captured fallback) and forwards THOSE to handler.handle instead of the raw kwargs. Two new pin tests: test_constructor_captured_kwargs_reach_handler and test_per_call_kwarg_still_wins_over_constructor. 21 passed (test_registry_dispatch), ruff clean; E2E tool-call run still completes with the tool executed. Implementation vs assessment: as assessed."
     },
     {
       "id": "RA-044",

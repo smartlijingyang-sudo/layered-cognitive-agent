@@ -202,6 +202,63 @@ class TestApprovalGate:
         assert result == "ok"
         assert len(handler.calls) == 1
 
+    async def test_constructor_captured_kwargs_reach_handler(self) -> None:
+        """RA-043: the documented precedence (per-call kwarg wins,
+        constructor-captured values are the fallback) must hold at the
+        handler.handle seam — not just at the approval gate. Previously the
+        resolved active_decision was computed but the raw kwargs were
+        forwarded, silently dropping constructor-captured values."""
+        seen: dict[str, Any] = {}
+
+        class _KwargRecordingHandler(_FakeEffectHandler):
+            async def handle(
+                self, envelope: Any, policy: Any, capabilities: Any, **kwargs: Any
+            ) -> Any:
+                seen.update(kwargs)
+                return await super().handle(envelope, policy, capabilities, **kwargs)
+
+        handler = _KwargRecordingHandler(result="ok")
+        constructed_decision = _decision(needs_approval=False)
+        constructed_state = object()
+        gateway = _dispatcher(
+            _DictEffectRegistry({"body.act": handler}),
+            _FakeClaimStore(),
+            decision=constructed_decision,
+            state=constructed_state,
+        )
+        result = await gateway.execute(_envelope(), _policy())
+        assert result == "ok"
+        assert seen["decision"] is constructed_decision
+        assert seen["state"] is constructed_state
+
+    async def test_per_call_kwarg_still_wins_over_constructor(self) -> None:
+        """RA-043: per-call kwargs keep precedence over constructor values
+        at the handler seam."""
+        seen: dict[str, Any] = {}
+
+        class _KwargRecordingHandler(_FakeEffectHandler):
+            async def handle(
+                self, envelope: Any, policy: Any, capabilities: Any, **kwargs: Any
+            ) -> Any:
+                seen.update(kwargs)
+                return await super().handle(envelope, policy, capabilities, **kwargs)
+
+        handler = _KwargRecordingHandler(result="ok")
+        gateway = _dispatcher(
+            _DictEffectRegistry({"body.act": handler}),
+            _FakeClaimStore(),
+            decision=_decision(needs_approval=False),
+            state=object(),
+        )
+        call_decision = _decision(needs_approval=False)
+        call_state = object()
+        result = await gateway.execute(
+            _envelope(), _policy(), decision=call_decision, state=call_state
+        )
+        assert result == "ok"
+        assert seen["decision"] is call_decision
+        assert seen["state"] is call_state
+
     async def test_typed_decision_kwarg_overrides_constructor_decision(self) -> None:
         handler = _FakeEffectHandler(result="ok")
         gateway = _dispatcher(

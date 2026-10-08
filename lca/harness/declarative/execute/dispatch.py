@@ -77,8 +77,12 @@ class RegistryEffectDispatcher(EffectDispatcher):
         # RA-033: typed kwargs 不再只做 admission 对称 —— dispatcher 把它们
         # 原样转发给 handler（EffectHandler.handle 的 keyword-only 参数），
         # handler 不再从 ``envelope.metadata`` 读活对象。
-        # typed kwargs take precedence over the constructor-captured values
+        # RA-043: typed kwargs take precedence over the constructor-captured
+        # values — and the *resolved* values are what the handler receives
+        # (previously the raw kwargs were forwarded, so a constructor-captured
+        # decision/state was silently dropped at the handler seam).
         active_decision = decision if decision is not None else self._decision
+        active_state = state if state is not None else self._state
 
         # --- policy admission (was _validated_effect_class) ---------------
         metadata = envelope.metadata
@@ -132,7 +136,12 @@ class RegistryEffectDispatcher(EffectDispatcher):
             raise DeclarativeValidationError("PG-003", f"undeclared effect operation: {operation}")
 
         effect_output = await handler.handle(
-            envelope, policy, self._capabilities, state=state, decision=decision, **handler_kwargs
+            envelope,
+            policy,
+            self._capabilities,
+            state=active_state,
+            decision=active_decision,
+            **handler_kwargs,
         )
         if not envelope.idempotency_key:
             return cast("object", effect_output)
