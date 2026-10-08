@@ -20,6 +20,7 @@ from lca.cognition.brain.sections.types import (
 )
 from lca.contracts.atoms.enums.enums import MemoryCategory
 from lca.contracts.models.cognition.prompt_assembly import SectionOutput
+from lca.contracts.models.core.execution.sandbox import SANDBOX_MOUNT_ROOT
 from lca.contracts.models.core.perceive.perception import ContextManifest
 from lca.contracts.models.core.workspace.activation import ActivatedSkill
 from lca.contracts.models.team.role.team import RoleProfile
@@ -117,12 +118,12 @@ class HomeSection:
         ("plugins_dir", "plugins_dir: {home}/plugins/  (自主创造的插件独立执行目录)"),
         (
             "workspace_dir",
-            "workspace_dir: {home}/workspace/  (你的 Workspace；guest 内路径 /mnt/data)",
+            "workspace_dir: {home}/workspace/  (你的 Workspace；guest 内路径 {guest_mount})",
         ),
         (
             "routing",
             "目录路由: 用户问「你的目录/配置/记忆/你自己」时，默认用 home_dir；"
-            "只有文件操作/代码执行/生成产物时才用 workspace_dir（guest 内路径 /mnt/data）。",
+            "只有文件操作/代码执行/生成产物时才用 workspace_dir（guest 内路径 {guest_mount}）。",
         ),
         (
             "memory_note",
@@ -162,7 +163,7 @@ class HomeSection:
         if not home and not assistant_id:
             return SectionOutput(text="")
         lines = [
-            template.format(home=home, assistant_id=assistant_id)
+            template.format(home=home, assistant_id=assistant_id, guest_mount=SANDBOX_MOUNT_ROOT)
             for key, template in self._LINE_TEMPLATES
             if (key == "assistant_id" and assistant_id) or (key in self._HOME_ONLY_KEYS and home)
         ]
