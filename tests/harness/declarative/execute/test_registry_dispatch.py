@@ -6,7 +6,10 @@ dispatch -> assemble -> run chain. The happy-path idempotency flow (claim /
 replay / RT-003 fail-closed) is already covered by
 ``tests/e2e/test_declarative_long_horizon_recovery.py``; these tests pin the
 guard rails instead: policy admission (PS-006), the approval gate, operation
-dispatch errors (PG-003), receipt naming, and delta dispatch.
+dispatch errors (PG-003), receipt naming, and delta dispatch. The resolved
+``active_decision`` (typed kwarg falling back to the constructor-captured
+value) is what the handler receives — gate and handler can never disagree
+(``77574e362`` regression pin).
 """
 
 from __future__ import annotations
@@ -35,6 +38,20 @@ from lca.harness.declarative.execute.dispatch import (
     RegistryDeltaReducer,
     RegistryEffectDispatcher,
 )
+
+
+class _KwargsRecordingHandler:
+    """EffectHandler recording the typed kwargs it received."""
+
+    def __init__(self, result: Any = "ok") -> None:
+        self._result = result
+        self.kwarg_calls: list[dict[str, Any]] = []
+
+    async def handle(
+        self, envelope: Any, policy: Any, capabilities: Any, **kwargs: Any
+    ) -> Any:
+        self.kwarg_calls.append(kwargs)
+        return self._result
 
 
 class _FakeEffectHandler:
@@ -167,6 +184,41 @@ class TestPolicyAdmission:
             DeclarativeValidationError, match="effect requires an idempotency key"
         ):
             await gateway.execute(_envelope(), policy)
+
+
+class TestActiveDecisionForwarding:
+    """The handler receives the resolved active_decision (77574e362).
+
+    Before the fix the approval gate evaluated ``active_decision`` while the
+    handler got the raw call arg, so the two could disagree.
+    """
+
+    async def test_constructor_decision_forwarded_to_handler(self) -> None:
+        handler = _KwargsRecordingHandler()
+        captured = _decision()
+        gateway = _dispatcher(
+            _DictEffectRegistry({"body.act": handler}),
+            _FakeClaimStore(),
+            decision=captured,
+        )
+        result = await gateway.execute(_envelope(), _policy())
+        assert result == "ok"
+        assert len(handler.kwarg_calls) == 1
+        assert handler.kwarg_calls[0]["decision"] is captured
+
+    async def test_typed_kwarg_decision_forwarded_to_handler(self) -> None:
+        handler = _KwargsRecordingHandler()
+        captured = _decision()
+        typed = _decision()
+        gateway = _dispatcher(
+            _DictEffectRegistry({"body.act": handler}),
+            _FakeClaimStore(),
+            decision=captured,
+        )
+        result = await gateway.execute(_envelope(), _policy(), decision=typed)
+        assert result == "ok"
+        assert len(handler.kwarg_calls) == 1
+        assert handler.kwarg_calls[0]["decision"] is typed
 
 
 class TestApprovalGate:
