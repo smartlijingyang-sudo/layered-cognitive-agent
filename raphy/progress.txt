@@ -1785,3 +1785,10 @@
 - **Learnings for future iterations:**
   - Assessment evidence can go stale within the same round when an earlier story (RA-051) touches the same file — the story even said "Same file as RA-051; coordinate with it". Before implementing, grep the CURRENT tree for the named symbols; if they're gone, verify via git log -S which commit removed them and close the story as already-satisfied instead of re-implementing.
 ---
+## 2026-10-09 04:20 CST - RA-066 (recover)
+- Recovered interrupted 03:05 round: `resolve_plugin_origin` fallback no longer "assume bundled"; unclassifiable module paths resolve to pip/untrusted (profile admission required, I-HPC-11 default-deny); first-party namespaces (lca, lca_kernel) explicitly trusted as core bundled. resolve.py call site adjusted accordingly.
+- Files changed: lca/harness/profile/resolve/plugin_origin.py, lca/harness/profile/resolve/resolve.py, tests/harness/profile/resolve/test_plugin_origin.py, tests/harness/profile/resolve/test_untrusted_filter.py
+- **Learnings for future iterations:**
+  - Trust classification fallback shape: never let a classifier's "unknown" branch upgrade privilege; unknown must degrade to untrusted. The assessor's "thread discovery in, or fail-closed" guidance maps cleanly to fail-closed here since production never passes the discovery map.
+  - Check: `ps -p <pid>` for pgrep self-matches before treating a background process as real work.
+---

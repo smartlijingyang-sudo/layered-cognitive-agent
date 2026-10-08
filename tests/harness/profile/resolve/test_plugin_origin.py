@@ -73,11 +73,15 @@ def test_pip_entry_point_overrides_to_pip_untrusted() -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_unknown_module_falls_back_to_bundled_core() -> None:
-    """Unknown module path → bundled / core (safe default)."""
+def test_unknown_module_falls_back_to_pip_untrusted() -> None:
+    """Unknown module path → pip / untrusted (I-HPC-11 default-deny, RA-066).
+
+    "Assume bundled" silently trusted third-party code as core; the
+    fail-closed fallback requires explicit profile admission instead.
+    """
     origin = resolve_plugin_origin("some.random.module.that.does.not.match")
-    assert origin.source == "bundled"
-    assert origin.trust == "core"
+    assert origin.source == "pip"
+    assert origin.trust == "untrusted"
 
 
 # ---------------------------------------------------------------------------
