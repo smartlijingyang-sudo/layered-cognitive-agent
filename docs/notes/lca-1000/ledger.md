@@ -1139,3 +1139,18 @@
 - 验证结果: 无代码改动，无需验证门。扫描脚本全部 exit 0；开工/收工工作区 on main（并发会话的未提交改动始终不动）。
 - commit: 无代码 commit；本台账单独 docs commit（沿用 0521–0531 `docs(lca-1000): 第NNNN轮台账` 模式）。
 - 备注: 只 commit docs/notes/lca-1000/ledger.md（`git add` + `git commit -- <path>` 显式路径）。台账文本经 base64 编码走 stdin 管道追加（沿用 0525 教训）。扫描输出存 252 /tmp（ast0532_out.txt、dead0532_out.txt、dead0532b_out.txt、sndb0532_out.txt；另有 ast0532_err.txt 等空错误文件）。教训：/tmp/0521_scan0519.py 等 0521 版脚本输出格式已与 0527+ 基线不一致，以后只用 0527 版脚本。
+
+--
+
+## 第0533轮 (2026-10-09 03:33-03:47 CST)
+- 改了什么: 无代码改动。**本轮未发现新的实质机会**（依据 body 规则 4：不硬凑 trivial commit）。
+- 依据 skill 哪一节: SKILL.md Deletion test + LANGUAGE.md（深度即杠杆/真实 seam/接口即测试面）+ DEEPENING.md Seam discipline —— 见候选清单的驳回依据。
+- 关键设计决策（夜间跳过 grilling，记台账）: 新鲜 diff（f766f654e @03:22：iter-quality-20261009-0309 merge，7cb1dbf14 test(conventions) +8 行，ADR-0295 行数豁免登记）是纯测试的架构约定同步，ADR-0295 仍在 Chao 待裁决队列（todo-88/89），不 re-litigate、不动（沿用 0522/0531 判例）。未提交改动 .agent/skills/airtap-automation/SKILL.md 属并发会话，绝不动（沿用 0522/0528–0532 判例）。
+- 候选清单（本轮 explore：AST 同体 + dead a/b + 同名异体 + deslop 清单 + 新鲜 diff 复查）:
+  1. AST —— 与 ast0532_out.txt 逐字节一致（functions 8430 不变；243 组，组 hash（G 行）与 0523 基线逐成员一致，零新组；0522/0523 已逐组人工裁决）。
+  2. dead a —— 与 dead0532_out.txt 逐字节一致；dead b —— 与 dead0532b_out.txt 逐字节一致；真死 17 与 0522–0532 裁决集合一致（_RoleConfig 静态锚点；框架按名调用或保留；_validate_* ×12 pydantic validator classmethod 假阳性）。
+  3. sndb —— 与 sndb0532_out.txt 逐字节一致（295 组，含 0527 新裁决的 create_session/run_in_session/relink_global_skills/_relative/turn_of 5 组）。
+  4. deslop：TODO/FIXME/HACK/XXX lca/ = 8 行既往裁决；except Exception lca/ = 442，无新增；noqa F401 lca/ = 1（cli.py side-effect registry 老项）；"自承 dead"/叙事性注释无新增。
+- 验证结果: 无代码改动，无需验证门。扫描脚本全部 exit 0（ast0527.py/dead0527.py/dead0522b.py/sndb0527.py 确定性重跑，0533 输出逐字节对齐 0532）；开工/收工工作区 on main（并发会话的未提交改动始终不动）。
+- commit: 无代码 commit；本台账单独 docs commit（沿用 0521–0532 `docs(lca-1000): 第NNNN轮台账` 模式）。
+- 备注: 只 commit docs/notes/lca-1000/ledger.md（`git add` + `git commit -- <path>` 显式路径；-m 须在 -- 之前，见 AGENTS.md 教训）。台账文本经 base64 编码走 stdin 管道追加（沿用 0525 教训）。扫描输出存 252 /tmp（ast0533_out.txt、dead0533_out.txt、dead0533b_out.txt、sndb0533_out.txt）。教训：ssh252 包装会吃掉双引号命令里的 `${p}` 变量展开，for 循环比较误报 DIFFERS；改用单引号 + `$f` 裸变量重跑核验后四组全部 IDENTICAL。
