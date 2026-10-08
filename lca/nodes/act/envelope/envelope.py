@@ -36,6 +36,7 @@ from lca.contracts.harness.composition.plugin_contract import (
 from lca.contracts.models.core.execution.decision import Decision
 from lca.contracts.protocols.act.command.envelope import (
     CapabilityGrant,
+    ToolsEnvelopeMeta,
     mint_envelope,
 )
 from lca.contracts.protocols.declarative.declarative_1.node_executor import (
@@ -111,13 +112,15 @@ class ActEnvelopeExecutor:
                         effect_class="delegations",
                     ),
                     idempotency_key=f"{plan_ref}:{node_ref}:{decision.decision_id}:{del_index}",
-                    metadata={
-                        "effect_class": "delegations",
-                        "operation": "body.act",
-                        "state": context.runtime.get("state"),
-                        "decision": decision,
-                        "delegation_index": del_index,
-                    },
+                    # RA-033: metadata 经 ToolsEnvelopeMeta 类型化 seam 构造；
+                    # 活对象（state / decision）不再塞进 metadata —— handler
+                    # 经 EffectHandler.handle 的 typed kwargs 拿对象。
+                    metadata=ToolsEnvelopeMeta(
+                        effect_class="delegations",
+                        operation="body.act",
+                        delegation_index=del_index,
+                        decision_ref=decision.decision_id,
+                    ).to_metadata(),
                 )
                 for del_index in range(len(decision.delegations))
             )
@@ -138,19 +141,20 @@ class ActEnvelopeExecutor:
                     # entry (PR-2 already separated BodySurfaceEventContract;
                     # this is the matching envelope-side guard).
                     idempotency_key=(f"{plan_ref}:{node_ref}:{decision.decision_id}:{call_index}"),
-                    metadata={
-                        "effect_class": "tools",
-                        "operation": "body.act",
-                        "state": context.runtime.get("state"),
-                        "decision": decision,
-                        "tool_call_index": call_index,
-                        # The dispatch site is the only place that knows which
-                        # declared call this envelope carries. ``effect.execute``
-                        # reads this id to attribute the model-visible
-                        # ``surface/tool_result`` row; reconstructing it downstream
-                        # from ``decision`` only works for a single-call turn.
-                        "tool_call_id": tool_call.call_id,
-                    },
+                    # RA-033: metadata 经 ToolsEnvelopeMeta 类型化 seam 构造。
+                    # The dispatch site is the only place that knows which
+                    # declared call this envelope carries. ``effect.execute``
+                    # reads this id (via ``tools_meta_of``) to attribute the
+                    # model-visible ``surface/tool_result`` row; reconstructing
+                    # it downstream from ``decision`` only works for a
+                    # single-call turn.
+                    metadata=ToolsEnvelopeMeta(
+                        effect_class="tools",
+                        operation="body.act",
+                        tool_call_id=tool_call.call_id,
+                        tool_call_index=call_index,
+                        decision_ref=decision.decision_id,
+                    ).to_metadata(),
                 )
                 for call_index, tool_call in enumerate(decision.tool_calls)
             )

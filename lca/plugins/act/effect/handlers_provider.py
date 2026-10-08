@@ -30,6 +30,9 @@ from lca.contracts.protocols.act.effect.handler import (
     EffectHandler,
     EffectHandlerRegistry,
 )
+from lca.contracts.protocols.declarative.declarative_1.declarative_common import (
+    DeclarativeValidationError,
+)
 from lca.contracts.protocols.declarative.declarative_2.declarative_phase_graph import (
     CommandEnvelope,
     EffectPolicyPlan,
@@ -50,9 +53,10 @@ class Config(BaseModel):
 class BodyActEffectHandler(EffectHandler):
     """Handle the plan-declared ``body.act`` effect operation.
 
-    The handler extracts state and decision from the immutable command envelope
-    and delegates world execution to the Body capability.  It does not mutate
-    ``AgentState``; a subsequent delta handler remains the only state writer.
+    RA-033: ``state`` / ``decision`` arrive as typed kwargs from the dispatch
+    seam — never smuggled through ``envelope.metadata``.  The handler does
+    not mutate ``AgentState``; a subsequent delta handler remains the only
+    state writer.
     """
 
     receipt_name = "body.acted"
@@ -62,12 +66,17 @@ class BodyActEffectHandler(EffectHandler):
         envelope: CommandEnvelope,
         policy: EffectPolicyPlan,
         capabilities: EffectCapabilities,
+        *,
+        state: AgentState | None = None,
+        decision: Decision | None = None,
+        **_: Any,
     ) -> Observation:
         """Execute the Body operation described by an authorized envelope."""
         del policy
-        metadata = envelope.metadata
-        state: AgentState = metadata["state"]
-        decision: Decision = metadata["decision"]
+        if state is None or decision is None:
+            raise DeclarativeValidationError(
+                "PG-003", "body.act handler requires typed state/decision kwargs"
+            )
         return await capabilities.body.act(decision, state)
 
 
@@ -81,13 +90,24 @@ class MemoryUpdateEffectHandler(EffectHandler):
         envelope: CommandEnvelope,
         policy: EffectPolicyPlan,
         capabilities: EffectCapabilities,
+        *,
+        state: AgentState | None = None,
+        observation: Observation | None = None,
+        reflection: Reflection | None = None,
+        **_: Any,
     ) -> dict[str, Any]:
-        """Commit memory without directly mutating ``AgentState``."""
+        """Commit memory without directly mutating ``AgentState``.
+
+        RA-033: ``state`` / ``observation`` / ``reflection`` arrive as typed
+        kwargs from the dispatch seam — never smuggled through
+        ``envelope.metadata``.
+        """
         del policy
-        metadata = envelope.metadata
-        state: AgentState = metadata["state"]
-        observation: Observation = metadata["observation"]
-        reflection: Reflection = metadata["reflection"]
+        if state is None or observation is None or reflection is None:
+            raise DeclarativeValidationError(
+                "PG-003",
+                "memory.update handler requires typed state/observation/reflection kwargs",
+            )
         await capabilities.memory.update(state, observation, reflection)
         return {"admitted": True}
 

@@ -1,5 +1,13 @@
 ## Codebase Patterns
 
+- **metadata 走私 → typed kwargs 迁移纪律（RA-033）：** envelope metadata
+  只放 JSON 友好的 id/ref 标量；需要活对象的 handler 从
+  `EffectHandler.handle` 的 keyword-only 参数拿（`state`/`decision`/
+  `observation`/`reflection`），dispatcher 经 `execute(**handler_kwargs)`
+  原样转发。新增 effect 操作时 handler 签名直接加 kwarg，不要回头往
+  metadata 塞对象。fail-loud：handler 缺必需 kwarg 时 raise
+  DeclarativeValidationError（PG-003），不要 KeyError 裸奔。
+
 （raphy 轮共享的模式/禁区登记，供后续 assess/optimize 轮参考）
 
 - **pair-seam 收敛先列 case 表（RA-032）：** seam 只返回 pair 一半（如 store）
@@ -1157,3 +1165,53 @@
   `display_paths.py` 删模块只搬移复杂度（浅但无害）；`warn_deprecated_envelope_constructor`
   零调用者（死代码，机械清理未立案）；run(None) / `NativeToolCall.arguments` 传 str
   的 10-07 P2 仍 defer 给 iter-quality。
+
+## 2026-10-08 12:45 CST - RA-033
+- 实现了 envelope metadata 的类型化 seam：`ToolsEnvelopeMeta` frozen dataclass
+  （effect_class / operation / tool_call_id / tool_call_index /
+  delegation_index / decision_ref，只允许 JSON 友好标量）+ 模块级访问器
+  `tools_meta_of`，落在 `lca/contracts/protocols/act/command/envelope.py`
+  （ADR-0015 module-level 访问器纪律），`__all__` 导出。
+- `act.envelope` 节点（tools / delegations 两分支）经 `ToolsEnvelopeMeta`
+  构造 metadata；`effect.execute._owed_rows` 经 `tools_meta_of` 读取 ——
+  两边不再手写 `metadata["tool_call_id"]` / `metadata["effect_class"]` 字符串 key。
+- 删掉了两处铸造点往 metadata 塞的活对象：act.envelope 的 `state`/`decision`、
+  remember/write 的 `state`/`decision`/`observation`/`reflection`/`candidate`，
+  改放 `*_ref` id（JSON 友好）。
+- 为承接被拿掉的活对象，`EffectHandler.handle` Protocol 加 typed
+  keyword-only 参数（state / decision / observation / reflection），
+  `RegistryEffectDispatcher.execute` 原样转发（**handler_kwargs 透传）；
+  `BodyActEffectHandler` / `MemoryUpdateEffectHandler` 改读 typed kwargs，
+  缺失时 fail-loud（DeclarativeValidationError PG-003）。
+  remember/write 经 `gateway.execute(..., state=..., decision=...,
+  observation=..., reflection=...)` 传对象。
+- 测试：删掉 `test_effect_execute_tool_result_surface.py` 的手写 `_mint`
+  副本，全部改走真实 `ActEnvelopeExecutor`（既有 `_mint_via_node`）；
+  `test_unattributable_result_fails_loud` 保留为回归 pin（经类型化 seam
+  手工铸造无 tool_call_id 的 envelope，仍期望 raise）；
+  断言 `metadata["candidate"]` / `metadata["state"]` 的两个 integration
+  测试改为 ref 断言；dispatch/substitutability 的 fake handler 加 `**_`。
+- 文件：lca/contracts/protocols/act/command/envelope.py、
+  lca/contracts/protocols/act/effect/handler.py、
+  lca/harness/declarative/execute/dispatch.py、
+  lca/nodes/act/envelope/envelope.py、lca/nodes/concept/effect/execute.py、
+  lca/nodes/remember/write/write.py、lca/plugins/act/effect/handlers_provider.py、
+  tests/plugins/concept/test_effect_execute_tool_result_surface.py、
+  tests/harness/declarative/execute/test_registry_dispatch.py、
+  tests/architecture/test_handler_substitutability.py、
+  tests/integration/test_memory_and_procedural_distillation.py、
+  tests/integration/test_semantic_memory_candidate.py
+- **Learnings for future iterations:**
+  - live 对象走私点检查清单：评估"metadata 只放 id/ref"类 story 时，
+    先 rg 全仓 `envelope.metadata` 读点 —— handlers_provider 的两个默认
+    handler 是生产级消费者，漏了会直接 KeyError；另有 integration 测试
+    把走私行为 pin 住（`metadata["candidate"] == candidate`），必须同步改。
+  - deletion test 是验证"测试 pin 住真实生产者"的最廉价手段：临时删掉
+    生产者构造行 → 期望红的测试变红 → 恢复。本轮删 `tool_call_id` 构造
+    后 `test_multi_call_turn_answers_every_declared_call_id` 与
+    `test_dispatch_failure_still_answers_the_declared_call` 变红，契约成立。
+  - 预存坏测试先 `git stash` 跑一遍确认再下结论：本轮
+    `test_runtime_binding_has_one_declarative_driver_construction_path`
+    在干净树同样失败（引用的 `lca/runtime/runtime_bindings.py` 早已搬走），
+    与本 story 无关，不纳入本轮修复范围。
+---

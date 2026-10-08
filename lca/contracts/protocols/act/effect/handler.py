@@ -19,6 +19,8 @@ from __future__ import annotations
 
 from typing import Any, Protocol, runtime_checkable
 
+from lca.contracts.models.core.execution.decision import Decision, Observation, Reflection
+from lca.contracts.models.core.state.state import AgentState
 from lca.contracts.protocols.act.embodiment.embodiment import Body
 from lca.contracts.protocols.declarative.declarative_2.declarative_phase_graph import (
     CommandEnvelope,
@@ -61,14 +63,28 @@ class EffectHandler(Protocol):
         envelope: CommandEnvelope,
         policy: EffectPolicyPlan,
         capabilities: EffectCapabilities,
+        *,
+        state: AgentState | None = None,
+        decision: Decision | None = None,
+        observation: Observation | None = None,
+        reflection: Reflection | None = None,
     ) -> Any:
         """Execute the effect operation.
+
+        RA-033: 需要运行时对象的 handler（state / decision / observation /
+        reflection）从 typed keyword-only 参数拿 —— 不再经
+        ``envelope.metadata`` 走私活对象（ADR-0235 方向）。dispatcher 把
+        调用方传进来的 typed kwargs 原样转发给 handler。
 
         Args:
             envelope: 命令信封，包含 effect 操作的具体参数
             policy: effect 策略计划，声明允许的操作和约束
             capabilities: runtime phase 能力 facade（``RuntimePhaseCapabilities``），
                          包含 brain / body / memory / perceive_hub / stop_rule
+            state: 当前 AgentState（``body.act`` / ``memory.update`` 需要）
+            decision: 触发该 effect 的 Decision（``body.act`` 需要）
+            observation: 执行出的 Observation（``memory.update`` 需要）
+            reflection: 配套的 Reflection（``memory.update`` 需要）
 
         Returns:
             effect 执行结果（具体类型由实现决定）

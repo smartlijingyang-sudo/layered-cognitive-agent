@@ -41,7 +41,7 @@ from lca.contracts.models.core.execution.decision import (
     decision_scope,
 )
 from lca.contracts.models.core.state.state import AgentState
-from lca.contracts.protocols.act.command.envelope import CommandEnvelope
+from lca.contracts.protocols.act.command.envelope import CommandEnvelope, tools_meta_of
 from lca.contracts.protocols.declarative.declarative_1.node_executor import (
     NodeContext,
     NodeInput,
@@ -204,9 +204,12 @@ def _owed_rows(
     rows = _batch_rows(observation)
     if rows:
         return rows
-    if envelope.metadata.get("effect_class") != "tools":
+    # RA-033: metadata 契约经 ToolsEnvelopeMeta 类型化 seam 读取 —— 不再手写
+    # metadata["tool_call_id"] / metadata["effect_class"] 字符串 key。
+    meta = tools_meta_of(envelope)
+    if meta.effect_class != "tools":
         return ()
-    call_id = envelope.metadata.get("tool_call_id") or getattr(observation, "tool_call_id", None)
+    call_id = meta.tool_call_id or getattr(observation, "tool_call_id", None)
     if call_id:
         return (_ToolResultRow(str(call_id), observation, dispatch_error),)
     if observation is None and dispatch_error is None:
@@ -214,7 +217,7 @@ def _owed_rows(
     raise ToolResultAttributionError(
         "effect.execute: cannot attribute tool result to a declared call_id "
         f"(invocation_id={receipt.invocation_id}, outcome={receipt.outcome.value}); "
-        "act.envelope must mint each envelope with metadata['tool_call_id']"
+        "act.envelope must mint each envelope through ToolsEnvelopeMeta with tool_call_id"
     )
 
 

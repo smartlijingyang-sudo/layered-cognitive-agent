@@ -129,8 +129,10 @@ class _RecordingGateway:
         *,
         state: object | None = None,
         decision: object | None = None,
+        observation: object | None = None,
+        reflection: object | None = None,
     ) -> dict[str, bool]:
-        del state, decision
+        del state, decision, observation, reflection
         self.executed.append((envelope, policy))
         return {"admitted": True}
 
@@ -157,8 +159,10 @@ async def test_remember_write_dispatches_via_execute() -> None:
     output = await executor.node_execute(context, input_)
     assert len(gateway.executed) == 1
     envelope = gateway.executed[0][0]
-    assert envelope.metadata["state"] is not None
-    assert envelope.metadata["decision"].decision_id == "decision_1"
+    # RA-033: no live objects in envelope metadata — ids/refs only
+    assert "state" not in envelope.metadata
+    assert "decision" not in envelope.metadata
+    assert envelope.metadata["decision_ref"] == "decision_1"
     assert output.port_values.get("memory_receipt") == {"admitted": True}
 
 

@@ -116,11 +116,11 @@ def test_effect_handler_registry_rejects_duplicate_owner_and_keeps_first() -> No
     """Effect operation 所有权在接缝处唯一，避免注册顺序改变执行行为。"""
 
     class _FirstHandler:
-        async def handle(self, envelope, policy, capabilities):
+        async def handle(self, envelope, policy, capabilities, **_):
             return None
 
     class _ReplacementHandler:
-        async def handle(self, envelope, policy, capabilities):
+        async def handle(self, envelope, policy, capabilities, **_):
             return None
 
     registry: EffectHandlerRegistry = InMemoryEffectHandlerRegistry()
@@ -141,7 +141,7 @@ async def test_replacement_handler_owns_receipt_label() -> None:
     class _CustomHandler:
         receipt_name = "custom.effect.completed"
 
-        async def handle(self, envelope, policy, capabilities):
+        async def handle(self, envelope, policy, capabilities, **_):
             del envelope, policy, capabilities
             return {"accepted": True}
 
@@ -377,7 +377,7 @@ async def test_effect_class_rejects_non_string_metadata_before_handler() -> None
     """Policy admission must not coerce untrusted metadata into an effect class."""
 
     class _ShouldNotRun:
-        async def handle(self, envelope, policy, capabilities):
+        async def handle(self, envelope, policy, capabilities, **_):
             raise AssertionError("handler must not run")
 
     registry: EffectHandlerRegistry = InMemoryEffectHandlerRegistry()

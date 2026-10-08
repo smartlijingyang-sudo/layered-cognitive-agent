@@ -493,7 +493,7 @@
       "description": "As an LCA maintainer, I want the act.envelope <-> _owed_rows metadata contract (tool_call_id / effect_class) held by a typed seam instead of untyped string keys plus a runtime raise, so a producer-side change cannot silently drift past the consumer test.",
       "id": "RA-033",
       "notes": "Source: Round 10 friction walk C (Strong). Deletion test: removing tool_call_id from act.envelope fails test_unattributable_result_fails_loud -> contract is real load-bearing; deleting the test's _mint copy keeps all green -> the copy is redundant. Overlap: RA-013 converged EffectReceipt construction (SimpleBody); this story touches only the CommandEnvelope metadata side. RA-032 (evidence-store seam) is adjacent but not overlapping.",
-      "passes": false,
+      "passes": true,
       "priority": 1,
       "title": "Give envelope metadata a typed seam; delete the hand-written _mint copy in the consumer test"
     },
