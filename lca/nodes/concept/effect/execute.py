@@ -52,6 +52,7 @@ from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import
     OwnershipDeclaration,
 )
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
+from lca.nodes._resolve import resolve_typed_port_or_runtime
 
 _log = logging.getLogger(__name__)
 
@@ -110,8 +111,16 @@ class EffectExecuteExecutor:
         # ADR-0235 / PR-5: decision / state are typed-port inputs; they
         # flow into ``gateway.execute(envelope, policy, *, decision=...,
         # state=...)`` instead of being smuggled via ``envelope.metadata``.
-        decision = input.port_values.get(PortName("decision"))
-        state = input.port_values.get(PortName("state"))
+        # RA-042: the ``state`` port has no graph producer (nothing writes
+        # it), so resolve through the shared typed-port-or-runtime seam —
+        # port first, kernel runtime carrier fallback (same convention as
+        # think/decision/parse and think/history/assemble).
+        decision = resolve_typed_port_or_runtime(
+            PortName("decision"), input=input, context=context, node="effect.execute"
+        )
+        state = resolve_typed_port_or_runtime(
+            PortName("state"), input=input, context=context, node="effect.execute"
+        )
 
         receipt, observation, dispatch_error = await _dispatch(envelope, context, decision, state)
         _append_tool_result_surface(context, envelope, receipt, observation, dispatch_error)

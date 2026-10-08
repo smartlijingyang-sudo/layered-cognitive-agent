@@ -1478,3 +1478,29 @@
     用 `ssh252 'cmd' < localfile` 走 stdin；大段文本先写本地再 cat >。
 ---
 
+
+## 2026-10-08 16:10 CST - RA-042
+
+- 修 P0 回归：`effect.execute` 的 `node_execute` 改走
+  `lca/nodes/_resolve.py::resolve_typed_port_or_runtime` 解析
+  decision/state（typed port 优先、kernel runtime carrier 兜底），替代裸
+  `input.port_values.get`。根因见本轮 ASSESS：RA-033 删 metadata 走私后
+  `state` port 全图无生产者，到 handler 时为 None → PG-003 → 工具永不执行。
+- 实现与评估的差异：评估只列了 execute.py 本体；落地时发现
+  tests/plugins/concept/test_effect_execute_tool_result_surface.py 的 9 处
+  调用点按旧契约（无 decision/state）构造 node 调用，需同步更新到新契约
+ （decision 放 port、state 放 fake runtime carrier）——它们 pin 的
+  attribution 行为不变。
+- 测试：E2E 四场景全过（basic completed / tool-call completed 且 marker
+  文件证明工具真执行 / sequential 双 completed / 非收敛 failed 无泄漏）；
+  28 passed（surface+registry_dispatch）、3 passed（tool_call e2e cutover）、
+  4 passed（envelope n_to_n）；ruff clean。
+- 文件：lca/nodes/concept/effect/execute.py、
+  tests/plugins/concept/test_effect_execute_tool_result_surface.py
+- **Learnings for future iterations:**
+  - 改 node 的输入契约（fail-loud 化）时，必须 grep 该 node 的所有测试
+    调用点同步更新——契约变更不是"只改实现"。
+  - `resolve_typed_port_or_runtime` 的 fail-loud 是刻意的：测试 fake 必须
+    像生产一样提供 port/runtime，不能靠 None 穿透。
+---
+
