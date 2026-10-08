@@ -128,6 +128,10 @@ def _materialize_global_skills(
         # 标记来源：global_link（本地 manifest 多一个 source 字段）
         meta = json.loads((src / "manifest.json").read_text(encoding="utf-8"))
         meta["source"] = "global_link"
+        # 先断链再写:此刻 dest/manifest.json 仍是全局包的硬链接,原地写会穿透到
+        # 全局 inode,把标记写进内容源本身,并同时改写所有共享该 inode 的 Home。
+        # SKILL.md 与 resources/ 保持硬链接(ADR-0243 P3 空间不膨胀)。
+        (dest / "manifest.json").unlink()
         (dest / "manifest.json").write_text(
             json.dumps(meta, ensure_ascii=False, indent=2, sort_keys=True),
             encoding="utf-8",

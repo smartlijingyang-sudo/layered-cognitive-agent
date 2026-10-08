@@ -116,9 +116,7 @@ def catalog(
     def _record(event: str, payload: Mapping[str, Any]) -> None:
         emitted.append((event, dict(payload)))
 
-    return AssistantCatalogImpl(
-        root=root, event_emitter=_record, global_skills_store=global_store
-    )
+    return AssistantCatalogImpl(root=root, event_emitter=_record, global_skills_store=global_store)
 
 
 @pytest.fixture
@@ -169,6 +167,38 @@ class TestCreateMaterializesGlobalSkills:
         assert entry["source"] == "global_link"
         assert entry["artifact_state"] == "verified"
         assert manifest["digests"]["skills/global-skill"] == entry["digest"]
+
+    def test_source_marker_does_not_write_through_to_the_global_package(
+        self,
+        catalog: AssistantCatalogImpl,
+        global_store: DiskSkillPackageStore,
+    ) -> None:
+        """写 source 标记前必须断链，否则穿透污染内容源与其它 Home。
+
+        ``_link_tree`` 之后 ``dest/manifest.json`` 仍是全局包的硬链接，原地
+        ``write_text`` 会写穿到全局 inode：全局包凭空多出一个 ``source`` 键，
+        且所有共享该 inode 的 Home 同时被改写（生产实测 21:40:49 一次创建
+        让 links=9 的全局 manifest 带上 ``source: global_link``）。
+        """
+        global_meta_path = global_store.root / "global-skill" / "manifest.json"
+        global_meta_before = json.loads(global_meta_path.read_text(encoding="utf-8"))
+
+        handle = catalog.create(
+            CreateAssistantRequest(name="Demo", description="d", initial_skills=("global-skill",))
+        )
+        home_meta_path = Path(handle.home_path) / "skills" / "global-skill" / "manifest.json"
+
+        # 全局包不被写入:内容不变、无 source 键、inode 未被 Home 共享
+        assert json.loads(global_meta_path.read_text(encoding="utf-8")) == global_meta_before
+        assert "source" not in json.loads(global_meta_path.read_text(encoding="utf-8"))
+        assert os.stat(home_meta_path).st_ino != os.stat(global_meta_path).st_ino
+        # Home 副本拿到自己的标记
+        assert json.loads(home_meta_path.read_text(encoding="utf-8"))["source"] == "global_link"
+        # SKILL.md 与 resources 仍硬链接（ADR-0243 P3 空间不膨胀）
+        assert (
+            os.stat(Path(handle.home_path) / "skills" / "global-skill" / "SKILL.md").st_ino
+            == os.stat(global_store.root / "global-skill" / "SKILL.md").st_ino
+        )
 
     def test_create_initial_skills_requires_global_store(self, root: Path) -> None:
         catalog = AssistantCatalogImpl(root=root, event_emitter=None)
@@ -271,7 +301,9 @@ class TestInheritance:
         a = catalog.create(
             CreateAssistantRequest(name="A", description="d", initial_skills=("global-skill",))
         )
-        b = catalog.create(CreateAssistantRequest(name="B", description="d", inherit_from=a.assistant_id))
+        b = catalog.create(
+            CreateAssistantRequest(name="B", description="d", inherit_from=a.assistant_id)
+        )
         b_home = Path(b.home_path)
         skill_dir = b_home / "skills" / "global-skill"
         assert (skill_dir / "SKILL.md").is_file()
