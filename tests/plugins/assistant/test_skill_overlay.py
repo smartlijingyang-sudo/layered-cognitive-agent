@@ -31,6 +31,7 @@ from lca.contracts.protocols.assistant.catalog import CreateAssistantRequest
 from lca.contracts.protocols.assistant.skill_overlay import (
     SkillNotInstalledError,
     SkillNotVerifiedError,
+    SkillRelinkReport,
     SkillSource,
 )
 from lca.contracts.protocols.declarative.declarative_1.declarative_common import PluginSpecKind
@@ -139,6 +140,28 @@ class TestSkillSource:
         assert SkillSource(url="https://x.test/s.md").reference == "https://x.test/s.md"
         source = SkillSource(local_path="/tmp/s")  # noqa: S108 - test fixture
         assert source.reference == "/tmp/s"  # noqa: S108 - test fixture
+
+
+# ── SkillRelinkReport 契约 ──────────────────────────────────────────
+
+
+class TestSkillRelinkReport:
+    def test_empty_assistant_id_rejected(self) -> None:
+        with pytest.raises(ValueError, match="assistant_id"):
+            SkillRelinkReport(assistant_id="  ", revision_seq=0, manifest_digest="sha256:x")
+
+    def test_negative_revision_seq_rejected(self) -> None:
+        with pytest.raises(ValueError, match="revision_seq"):
+            SkillRelinkReport(assistant_id="asst_1", revision_seq=-1, manifest_digest="sha256:x")
+
+    def test_buckets_default_to_empty_tuples(self) -> None:
+        report = SkillRelinkReport(
+            assistant_id="asst_1", revision_seq=3, manifest_digest="sha256:x"
+        )
+        assert report.relinked == ()
+        assert report.already_current == ()
+        assert report.skipped_local == ()
+        assert report.skipped_missing_global == ()
 
 
 # ── install:本地源 ──────────────────────────────────────────────────

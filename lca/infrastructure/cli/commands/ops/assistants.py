@@ -1,9 +1,9 @@
 """``lca-ops assistants`` — Assistant lifecycle CLI（ADR-0187 §3 D7）。
 
 创建/查看助理走 REST 薄封装（真值在 ``AssistantCatalog``，经
-``routes_assistants``）；``soul-history/diff/rollback`` 是内容级回滚的
-诊断/恢复命令，直接进程内读 ``revisions/`` 快照并调用 catalog（与
-``memory`` 命令同构），因为快照读回尚无 REST 端点。
+``routes_assistants``）；``soul-history/diff/rollback`` 与 ``relink-skills``
+是内容级回滚 / 技能升级的维护命令，直接进程内读 Home 并调用 catalog 与
+skill overlay（与 ``memory`` 命令同构），因为这些写路径尚无 REST 端点。
 """
 
 from __future__ import annotations
@@ -14,8 +14,13 @@ import os
 import urllib.error
 import urllib.request
 from pathlib import Path
+from typing import TYPE_CHECKING, Any
 
 import typer
+
+if TYPE_CHECKING:
+    from lca.contracts.protocols.assistant.skill_overlay import SkillRelinkReport
+    from lca.plugins.assistant.skill.overlay import AssistantSkillOverlayImpl
 
 _BASE_URL_DEFAULT = "http://10.36.6.252:8765"
 
@@ -32,6 +37,7 @@ def register(app: typer.Typer) -> None:
     assistants_app.command(name="soul-history", help=_soul_history.__doc__ or "")(_soul_history)
     assistants_app.command(name="soul-diff", help=_soul_diff.__doc__ or "")(_soul_diff)
     assistants_app.command(name="soul-rollback", help=_soul_rollback.__doc__ or "")(_soul_rollback)
+    assistants_app.command(name="relink-skills", help=_relink_skills.__doc__ or "")(_relink_skills)
     app.add_typer(assistants_app, name="assistants")
 
 
@@ -120,6 +126,106 @@ def _soul_rollback(
         f"rolled back {assistant_id} → rev{to}，新 revision_seq={revision.revision_seq} "
         f"snapshot={revision.snapshot_path}"
     )
+
+
+def _overlay() -> AssistantSkillOverlayImpl:
+    """进程内实例化 skill overlay（与 ``_catalog`` 同一用法；无 REST 端点）。"""
+    from lca.plugins.assistant.skill.overlay import AssistantSkillOverlayImpl
+
+    return AssistantSkillOverlayImpl(catalog=_catalog())  # type: ignore[arg-type]
+
+
+def _home_assistant_ids() -> list[str]:
+    """``assistants`` 根下每个含 manifest.json 的 Home 目录名（= assistant_id）。"""
+    root = _assistants_root()
+    if not root.is_dir():
+        return []
+    return sorted(
+        child.name
+        for child in root.iterdir()
+        if child.is_dir() and (child / "manifest.json").is_file()
+    )
+
+
+_RELINK_BUCKETS = ("relinked", "already_current", "skipped_local", "skipped_missing_global")
+"""``SkillRelinkReport`` 的四个分类桶；输出字段名与报告字段名同源。"""
+
+
+def _relink_row(report: SkillRelinkReport) -> dict[str, Any]:
+    """``SkillRelinkReport`` → CLI / JSON 行。"""
+    row: dict[str, Any] = {
+        "assistant_id": report.assistant_id,
+        "revision_seq": report.revision_seq,
+        "manifest_digest": report.manifest_digest,
+    }
+    row.update({bucket: list(getattr(report, bucket)) for bucket in _RELINK_BUCKETS})
+    return row
+
+
+def _relink_totals(rows: list[dict[str, Any]], errors: list[dict[str, str]]) -> dict[str, int]:
+    """``--all`` 合计（文本行与 JSON ``totals`` 共用同一份数字）。"""
+    totals = {"assistants": len(rows) + len(errors)}
+    totals.update({bucket: sum(len(row[bucket]) for row in rows) for bucket in _RELINK_BUCKETS})
+    totals["errors"] = len(errors)
+    return totals
+
+
+def _relink_skills(
+    assistant: str = typer.Option("", "--assistant", help="助理 id（与 --all 二选一）。"),
+    all_homes: bool = typer.Option(
+        False, "--all", help="遍历 assistants 根下每个 Home（与 --assistant 二选一）。"
+    ),
+    json_mode: bool = typer.Option(False, "--json", help="Print raw JSON."),
+) -> None:
+    """把 global_link 技能重链到全局库当前版本（ADR-0243 D1 显式升级）。
+
+    全局技能更新只写新版本，已链接 Home 保持旧 inode，所以升级必须显式触发。
+    只动 Home manifest 里 ``source=global_link`` 的条目：``local`` 副本与全局已
+    缺失/退役的包一律保留（版本固定；删除走 ``remove``）。一个 Home 整批只产生
+    一次 manifest 修订。任一 Home 失败 ⇒ 退出码 1，其余 Home 继续。
+    """
+    target = assistant.strip()
+    if bool(target) == all_homes:
+        typer.echo("必须且只能指定 --assistant / --all 之一")
+        raise typer.Exit(code=1)
+    ids = [target] if target else _home_assistant_ids()
+    if not ids:
+        typer.echo(f"（{_assistants_root()} 下无助理 Home）")
+        return
+
+    overlay = _overlay()
+    rows: list[dict[str, Any]] = []
+    errors: list[dict[str, str]] = []
+    for assistant_id in ids:
+        try:
+            report = overlay.relink_global_skills(assistant_id)
+        except Exception as exc:  # 单个 Home 失败不阻断整批；退出码承担失败信号
+            errors.append({"assistant_id": assistant_id, "error": f"{type(exc).__name__}: {exc}"})
+            continue
+        rows.append(_relink_row(report))
+
+    if json_mode:
+        payload: object
+        if target:
+            payload = rows[0] if rows else errors[0]
+        else:
+            payload = {
+                "assistants": rows,
+                "errors": errors,
+                "totals": _relink_totals(rows, errors),
+            }
+        typer.echo(json.dumps(payload, ensure_ascii=False, indent=2))
+    else:
+        for row in rows:
+            counts = " ".join(f"{bucket}={len(row[bucket])}" for bucket in _RELINK_BUCKETS)
+            typer.echo(f"{row['assistant_id']}  {counts}  rev={row['revision_seq']}")
+        for row in errors:
+            typer.echo(f"{row['assistant_id']}  ERROR {row['error']}")
+        if not target:
+            totals = " ".join(f"{k}={v}" for k, v in _relink_totals(rows, errors).items())
+            typer.echo(f"total: {totals}")
+    if errors:
+        raise typer.Exit(code=1)
 
 
 def _request(

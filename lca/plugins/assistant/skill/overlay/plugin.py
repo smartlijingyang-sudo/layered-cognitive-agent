@@ -80,6 +80,9 @@ async def setup(ctx: PluginContext, config: Config) -> None:
        catalog plugin boot 期统一补登(12 个),本插件不重复注册。
     3. 拉取器默认 ``_default_url_importer``(0048 HttpSkillImporter 绑定
        Home 内 staging store);测试可经实现类构造参数替换。
+    4. 全局技能库读缝默认 ``_default_global_store``,只被 ``relink_global_skills``
+       读取(ADR-0243 D1);不是 capability,故不进 ``ownership.reads``,写路径
+       仍 ⊆ ``{home}/skills/``。测试可经实现类构造参数替换。
     """
     del config
     catalog = ctx.require(ASSISTANT_CATALOG.key)

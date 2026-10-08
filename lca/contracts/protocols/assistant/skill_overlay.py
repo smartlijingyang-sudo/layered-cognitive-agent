@@ -34,6 +34,7 @@ __all__ = [
     "SkillInstallReceipt",
     "SkillNotInstalledError",
     "SkillNotVerifiedError",
+    "SkillRelinkReport",
     "SkillSource",
 ]
 
@@ -156,6 +157,42 @@ class SkillActivationReceipt:
             raise ValueError("actor 必为非空字符串")
 
 
+@dataclass(frozen=True)
+class SkillRelinkReport:
+    """``relink_global_skills`` 的不可变报告（ADR-0243 D1「显式 re-link 才升级」）。
+
+    四个 skill_id 元组是 Home manifest ``skills`` 索引的**互斥穷尽**分类：索引里
+    每个条目恰好落进一个。``skills/`` 下无索引记录的目录不在报告内（不属全局链接
+    治理面，re-link 不动它）。``skipped_missing_global`` 同时覆盖「全局包不存在」
+    与「全局包已退役」——两者都不构成删除授权。
+
+    ``revision_seq`` / ``manifest_digest`` 是调用结束时 Home manifest 的值：
+    ``relinked`` 非空 ⇒ 整批只 ``revision_seq++`` 一次后的新值；``relinked``
+    为空 ⇒ 原值（一个字节都不写盘）。
+
+    时序：manifest 写盘（若发生）成功后才构造;构造失败不可能产生半成品报告。
+    所有权：调用方只读消费,不得原地变更（frozen）。
+    """
+
+    assistant_id: str
+    revision_seq: int
+    manifest_digest: str
+    relinked: tuple[str, ...] = ()
+    """硬链接已换成全局当前版本的技能（skill_id 升序）。"""
+    already_current: tuple[str, ...] = ()
+    """``global_link`` 且包摘要与全局一致 ⇒ 未触盘、未进修订。"""
+    skipped_local: tuple[str, ...] = ()
+    """索引里 ``source`` 非 ``global_link`` 的条目（助理自有副本,含 install 源字面）。"""
+    skipped_missing_global: tuple[str, ...] = ()
+    """全局包缺失或已退役 ⇒ Home 条目与索引原样保留（版本固定;删除走 ``remove``）。"""
+
+    def __post_init__(self) -> None:
+        if not self.assistant_id or not self.assistant_id.strip():
+            raise ValueError("assistant_id 必为非空字符串")
+        if self.revision_seq < 0:
+            raise ValueError(f"revision_seq 必为非负整数,得到 {self.revision_seq!r}")
+
+
 # ── 失败语义异常 ─────────────────────────────────────────────────────
 
 
@@ -180,7 +217,8 @@ class AssistantSkillOverlay(Protocol):
     实现约束（ADR-0187 §3 D4 / D6 + §6 删除条件）：
 
     1. 写路径 ⊆ ``{home}/skills/``；全局 ``~/.lca/skills/`` 只读不写
-       （0048 机制复用,落点绑定本助理 Home）。
+       （0048 机制复用,落点绑定本助理 Home）。``relink_global_skills`` 是唯一
+       读全局库的动作:读内容源当前状态,不写全局库、不触发全局库自身刷新。
     2. install 必经 0067 三闸 + ``DRAFT → VERIFIED``；未验证不落盘、不发 EP。
     3. Catalog（``assistant.catalog``）拥有 Home / manifest digest 真值；
        本 Protocol 经 ``AssistantCatalog.get`` 拿 home_path 与 digest
@@ -287,5 +325,35 @@ class AssistantSkillOverlay(Protocol):
 
         外部后果：``{home}/skills/<skill_id>/`` 内容更新 + manifest 修订 +
         一条 ``assistant.profile.revised`` Spine 事件。
+        """
+        ...
+
+    def relink_global_skills(
+        self,
+        assistant_id: str,
+        *,
+        actor: str = "system",
+    ) -> SkillRelinkReport:
+        """把 ``global_link`` 技能重链到全局库当前版本（ADR-0243 D1 显式升级路径）。
+
+        时序：``catalog.get`` 解析 Home（配置面 digest 不一致时按 ADR-0187 §3 D2
+        自愈 reimport 后继续,读路径不阻断）⇒ 取 Home manifest
+        ``skills`` 索引里 ``source == "global_link"`` 的条目 ⇒ 逐个按包内容摘要
+        与全局包比对 ⇒ 需升级者先在 ``{home}/skills/.staging/`` 内硬链接成包并过
+        0067 三闸 ⇒ 全部成包后才落盘 ⇒ **整批一次** manifest 修订
+        （``revision_seq++`` 一次 + 一份 ``revisions/`` 快照）⇒ 每个重链技能一条
+        ``assistant.skill.installed`` EP。
+
+        失败语义：
+        - ``assistant_id`` 不存在 ⇒ Catalog 异常透传；
+        - 全局包缺失 / 已退役 ⇒ 进 ``skipped_missing_global``，Home 落盘与索引
+          条目**原样保留**（版本固定;删除授权只在 ``remove``）；
+        - 索引里 ``source`` 非 ``global_link`` 的条目一律不动，进 ``skipped_local``；
+        - 全局包过不了 0067 三闸 ⇒ ``SkillImportError`` 透传，此时尚未落盘、
+          未写 manifest、未发 EP。
+
+        外部后果：``{home}/skills/<skill_id>/`` 内容换成全局当前版本的硬链接；
+        仅当 ``relinked`` 非空时有一次 manifest 修订与逐技能一条
+        ``assistant.skill.installed``。同步:只读全局库 + 只写本助理 Home，无网络。
         """
         ...

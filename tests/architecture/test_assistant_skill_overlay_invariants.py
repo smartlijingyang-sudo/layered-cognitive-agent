@@ -3,8 +3,8 @@
 每条测试对应一项删除条件 / 安全立场:
 
 - 写路径 ⊆ ``{home}/skills/``;**禁写**全局 ``~/.lca/skills/``
-  (静态:模块不引用全局 store 默认路径;动态:HOME 重定向后安装
-  不触达 ``$HOME/.lca/skills``)
+  (静态:不硬编码全局路径,全局库只经唯一可注入读缝触达 —— ADR-0243 D1
+  的 re-link 只读它;动态:HOME 重定向后安装不触达 ``$HOME/.lca/skills``)
 - 未 VERIFIED 不可 activate(ADR-0187 §3 D6 fail-closed)
 - install / activate EP 必含四件套字段(ADR-0187 §3 D8)
 - ``AssistantRuntime`` / ``AssistantLoop`` / ``compile_assistant_plan`` = 0
@@ -66,22 +66,34 @@ def _code_only(text: str) -> str:
 
 
 class TestWritePathConstrainedToHomeSkills:
-    def test_module_does_not_reference_global_skill_store(self) -> None:
-        """静态:不引用全局 store 默认路径,不调 ``get_skill_settings``。"""
+    def test_module_does_not_hardcode_global_skill_store_path(self) -> None:
+        """静态:不硬编码全局 store 路径,不用 ``Path.home()`` 定落点。"""
         code = _code_only(_read_overlay_code())
         assert ".lca/skills" not in code, "overlay 代码引用全局 skills store 路径"
         assert "Path.home()" not in code, "overlay 代码不得用 Path.home() 定落点"
-        assert "get_skill_settings" not in code, (
-            "overlay 不得用全局默认 SkillSettings(cache_dir 缺省 = ~/.lca/skills)"
-        )
+
+    def test_global_store_reachable_only_through_one_read_seam(self) -> None:
+        """ADR-0243 D1:全局库是**只读**内容源,re-link 经唯一可注入缝读它。
+
+        根解析点必须唯一(``_default_global_store``,调用方可整体替换),且不得走会
+        写全局库的入口:``resolve_skill_store()`` 附带 ``ensure_bundled_skills``,
+        会从 repo 工作树刷全局库;``update_package_meta`` 是全局退役/计数写缝。
+        """
+        code = _code_only(_read_overlay_code())
+        assert code.count("get_skill_settings()") == 1, "全局库根解析点必须唯一"
+        for banned in ("resolve_skill_store", "ensure_bundled_skills", "update_package_meta"):
+            assert banned not in code, f"overlay 经 {banned} 触达全局库写路径"
 
     def test_module_constructs_store_with_explicit_cache_dir(self) -> None:
-        """每个 ``DiskSkillPackageStore(`` 调用点必须带显式 settings。"""
+        """Home 内落点钉显式 ``cache_dir``;全局库只经 settings 根解析一次。"""
         code = _code_only(_read_overlay_code())
-        for match in re.finditer(r"DiskSkillPackageStore\(([^)]*)\)", code):
-            arg = match.group(1)
-            assert "SkillSettings(cache_dir=" in arg, (
-                f"DiskSkillPackageStore 调用缺显式 cache_dir: {match.group(0)!r}"
+        for match in re.finditer(r"DiskSkillPackageStore\(\s*([A-Za-z_][\w.]*)", code):
+            assert match.group(1) in {"SkillSettings", "get_skill_settings"}, (
+                f"DiskSkillPackageStore 的 settings 来源越界: {match.group(0)!r}"
+            )
+        for match in re.finditer(r"SkillSettings\(([^)]*)\)", code):
+            assert "cache_dir=" in match.group(1), (
+                f"SkillSettings 缺显式 cache_dir(缺省即全局 ~/.lca/skills): {match.group(0)!r}"
             )
 
     @pytest.mark.asyncio

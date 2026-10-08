@@ -173,6 +173,7 @@ LCA 采用 **硬链接 + COW**：兼容现有 `DiskSkillPackageStore` 目录结�
 
 - 新增 `edit_assistant_skill` 工具：断链复制 → 编辑 SKILL.md → 重算 digest。
 - `skill_overlay.remove` 处理 `global_link`（unlink 即可，不动全局）。
+- `skill_overlay.relink_global_skills` + `lca-ops assistants relink-skills`：D1 的显式升级路径，把 `global_link` 包重链到全局当前版本（一个 Home 整批一次修订；`local` 与全局已缺失/退役的包不动）。
 
 ### PR-4 · 工具 schema 与 overlay（D3/D4/D7）
 

@@ -1,7 +1,7 @@
 """assistant.skill_overlay —— Overlay 实现类。
 
 ``_AssistantSkillOverlayImpl`` 承载 install / list_installed / activate /
-remove / edit;manifest skills 索引修订与 EP 发射仍在此实现。
+remove / edit / relink_global_skills;manifest skills 索引修订与 EP 发射仍在此实现。
 """
 
 from __future__ import annotations
@@ -10,7 +10,7 @@ import contextlib
 import json
 import shutil
 import uuid
-from collections.abc import Callable, Mapping
+from collections.abc import Callable, Mapping, Sequence
 from pathlib import Path
 from typing import Any
 
@@ -30,15 +30,21 @@ from lca.contracts.protocols.assistant.skill_overlay import (
     SkillInstallReceipt,
     SkillNotInstalledError,
     SkillNotVerifiedError,
+    SkillRelinkReport,
     SkillSource,
 )
-from lca.contracts.protocols.memory.operational_skills import SkillImporter, SkillPackage
+from lca.contracts.protocols.memory.operational_skills import (
+    SkillImporter,
+    SkillNotFoundError,
+    SkillPackage,
+    SkillPackageStore,
+)
 from lca.infrastructure.skills.disk.store import (
     DiskSkillPackageStore,
     safe_rel_path,
     sanitize_skill_id,
 )
-from lca.infrastructure.skills.settings.settings import SkillSettings
+from lca.infrastructure.skills.settings.settings import SkillSettings, get_skill_settings
 from lca.plugins.assistant.events._events import (
     AssistantProfileRevisedEventPayload,
     AssistantSkillActivatedEventPayload,
@@ -54,9 +60,12 @@ from lca.plugins.assistant.home._home_layout import (
 )
 from lca.plugins.assistant.skill.overlay.gating import (
     _ACTIVATABLE_STATES,
+    _GLOBAL_LINK_SOURCE,
     _SKILLS_DIGEST_PREFIX,
     _STAGING_DIR_NAME,
     _gate_package,
+    _is_global_link,
+    _link_global_package,
     _mark_local,
     _package_digest,
     _place_package,
@@ -69,6 +78,17 @@ from lca.plugins.assistant.skill.overlay.importing import (
 from lca.plugins.assistant.skill.overlay.receipts import _receipt_from_disk
 
 log = structlog.get_logger(__package__)
+
+
+def _default_global_store() -> SkillPackageStore:
+    """默认全局技能库读缝（ADR-0243 D1:全局库是只读内容源）。
+
+    直接构造 ``DiskSkillPackageStore(get_skill_settings())``,**不**经
+    ``resolve_skill_store()``:后者附带 ``ensure_bundled_skills``,会从 repo
+    工作树写全局库。re-link 只按全局库当前状态升级已链接 Home——把 bundled
+    技能刷进内容源是 boot 期职责,混进升级路径会让「重链」偷偷变成「先改源」。
+    """
+    return DiskSkillPackageStore(get_skill_settings())
 
 
 class _AssistantSkillOverlayImpl(AssistantSkillOverlay):
@@ -85,10 +105,14 @@ class _AssistantSkillOverlayImpl(AssistantSkillOverlay):
         catalog: AssistantCatalog,
         event_emitter: Callable[[str, Mapping[str, Any]], Any] | None = None,
         url_importer_factory: Callable[[Path], SkillImporter] | None = None,
+        global_store_factory: Callable[[], SkillPackageStore] | None = None,
     ) -> None:
         self._catalog = catalog
         self._emit = event_emitter
         self._url_importer_factory = url_importer_factory or _default_url_importer
+        # 注入的是工厂而非实例:构造 DiskSkillPackageStore 会 mkdir 全局根,
+        # 没有 global_link 条目的 Home 不该因此触碰全局库。
+        self._global_store_factory = global_store_factory or _default_global_store
 
     # ── 公开面 ────────────────────────────────────────────────────────
 
@@ -364,6 +388,121 @@ class _AssistantSkillOverlayImpl(AssistantSkillOverlay):
             install_path=str(dest),
         )
 
+    def relink_global_skills(
+        self,
+        assistant_id: str,
+        *,
+        actor: str = "system",
+    ) -> SkillRelinkReport:
+        """把 ``global_link`` 技能重链到全局库当前版本（ADR-0243 D1 显式升级）。
+
+        全局更新只写新版本、不动已链接 inode，所以升级必须是显式动作。全部候选
+        先在 staging 内成包并过 0067 三闸，再落盘、再整批一次 manifest 修订：
+        成包阶段任何失败都不改 ``skills/`` 一个字节。``local`` / install 源条目与
+        全局已缺失或已退役的包一律不动（版本固定；删除授权只在 ``remove``）。
+        """
+        spec = self._catalog.get(assistant_id)  # 配置面 digest 不一致时自愈 reimport,不阻断
+        home = Path(spec.home_path)
+        skills_root = home / "skills"
+        manifest = load_manifest(home, assistant_id)
+        skills_section = manifest.get("skills")
+        section: Mapping[str, Any] = skills_section if isinstance(skills_section, dict) else {}
+
+        candidates: list[str] = []
+        skipped_local: list[str] = []
+        for skill_id in sorted(section):
+            if _is_global_link(section[skill_id]):
+                candidates.append(skill_id)
+            else:
+                skipped_local.append(skill_id)
+        if not candidates:
+            return SkillRelinkReport(
+                assistant_id=assistant_id,
+                revision_seq=_revision_of(manifest),
+                manifest_digest=str(manifest.get("manifest_digest") or ""),
+                skipped_local=tuple(skipped_local),
+            )
+
+        global_store = self._global_store_factory()
+        raw_root = getattr(global_store, "root", None)
+        if raw_root is None:
+            raise TypeError(
+                f"全局技能库不支持硬链接 re-link（缺 root 属性）: {type(global_store).__name__}"
+            )
+        global_root = Path(raw_root)
+        home_store = DiskSkillPackageStore(SkillSettings(cache_dir=skills_root))
+
+        already_current: list[str] = []
+        skipped_missing_global: list[str] = []
+        staged: list[tuple[str, SkillPackage, CapabilityArtifact]] = []
+        installed_at = utc_now_iso()  # 整批同一时刻:manifest 条目与 EP 必须一致
+        staging_root = skills_root / _STAGING_DIR_NAME / f"relink-{uuid.uuid4().hex}"
+        try:
+            for skill_id in candidates:
+                try:
+                    package = global_store.get(skill_id)
+                except SkillNotFoundError:
+                    skipped_missing_global.append(skill_id)
+                    continue
+                if package.retired:
+                    skipped_missing_global.append(skill_id)
+                    continue
+                try:
+                    current = _package_digest(home_store.get(skill_id))
+                except SkillNotFoundError:
+                    # 落盘包缺失/不完整 = 未能证明与全局一致 ⇒ 重链把它补齐到
+                    # 全局当前版本（重跑收敛到同一终态）。
+                    current = ""
+                if current == _package_digest(package):
+                    already_current.append(skill_id)
+                    continue
+                staged.append((skill_id, package, _gate_package(package)))
+                _link_global_package(global_root, staging_root, skill_id)
+
+            for skill_id, _, _ in staged:
+                _place_package(staging_root, skills_root, skill_id)
+            if staged:
+                manifest = self._record_relink(
+                    home=home,
+                    assistant_id=assistant_id,
+                    relinked=staged,
+                    actor=actor,
+                    installed_at=installed_at,
+                )
+        finally:
+            shutil.rmtree(staging_root, ignore_errors=True)
+            staging_parent = skills_root / _STAGING_DIR_NAME
+            if staging_parent.is_dir():
+                with contextlib.suppress(OSError):
+                    staging_parent.rmdir()  # 仅当空目录时收掉,不留空壳
+
+        revision_seq = _revision_of(manifest)
+        manifest_digest = str(manifest["manifest_digest"])
+        for skill_id, package, artifact in staged:
+            self._emit_installed(
+                AssistantSkillInstalledEventPayload(
+                    assistant_id=assistant_id,
+                    revision_seq=revision_seq,
+                    manifest_digest=manifest_digest,
+                    actor=actor,
+                    skill_id=skill_id,
+                    skill_digest=_package_digest(package),
+                    artifact_state=artifact.state.value,
+                    source=_GLOBAL_LINK_SOURCE,
+                    version=package.version,
+                    installed_at=installed_at,
+                )
+            )
+        return SkillRelinkReport(
+            assistant_id=assistant_id,
+            revision_seq=revision_seq,
+            manifest_digest=manifest_digest,
+            relinked=tuple(skill_id for skill_id, _, _ in staged),
+            already_current=tuple(already_current),
+            skipped_local=tuple(skipped_local),
+            skipped_missing_global=tuple(skipped_missing_global),
+        )
+
     def _stage_edited_package(
         self,
         staging_root: Path,
@@ -458,6 +597,59 @@ class _AssistantSkillOverlayImpl(AssistantSkillOverlay):
         write_manifest(home, new_manifest)
         # I-B6: 一切配置变更留 revisions/ 快照（install 也是配置面变更）。
         write_revision_snapshot(home, _revision_of(new_manifest), new_manifest)
+        return new_manifest
+
+    def _record_relink(
+        self,
+        *,
+        home: Path,
+        assistant_id: str,
+        relinked: Sequence[tuple[str, SkillPackage, CapabilityArtifact]],
+        actor: str,
+        installed_at: str,
+    ) -> dict[str, object]:
+        """整批 re-link 记一次修订:单次 ``revision_seq++`` + 单次写盘 + 单份快照。
+
+        逐技能调 ``_record_install`` 会把一次升级动作记成 N 次配置修订（N 份
+        ``revisions/`` 快照 + N 次 ``manifest_digest`` 抖动 ⇒ N 次 AgentSpec
+        重编译）,所以这里把整批摘要一次性并入同一个 manifest。
+        """
+        manifest = load_manifest(home, assistant_id)
+        previous_digests = manifest.get("digests")
+        extra: dict[str, str] = {}
+        if isinstance(previous_digests, dict):
+            extra = {
+                str(name): str(value)
+                for name, value in previous_digests.items()
+                if isinstance(value, str) and str(name).startswith(_SKILLS_DIGEST_PREFIX)
+            }
+        skills_section = manifest.get("skills")
+        section: dict[str, Any] = dict(skills_section) if isinstance(skills_section, dict) else {}
+        for skill_id, package, artifact in relinked:
+            package_digest = _package_digest(package)
+            extra[f"{_SKILLS_DIGEST_PREFIX}{skill_id}"] = package_digest
+            section[skill_id] = {
+                "digest": package_digest,
+                "artifact_state": artifact.state.value,
+                "version": package.version,
+                "source": _GLOBAL_LINK_SOURCE,
+                "installed_at": installed_at,
+                "actor": actor,
+            }
+
+        new_revision_seq = _revision_of(manifest) + 1
+        new_manifest = build_manifest(
+            assistant_id=assistant_id,
+            template_id=str(manifest.get("template_id") or DEFAULT_TEMPLATE_ID),
+            revision_seq=new_revision_seq,
+            home=home,
+            created_at=str(manifest.get("created_at") or "") or None,
+            extra_digests=extra,
+        )
+        new_manifest["skills"] = section
+        write_manifest(home, new_manifest)
+        # I-B6: 配置面变更留 revisions/ 快照（re-link 改的是技能版本，属配置面）。
+        write_revision_snapshot(home, new_revision_seq, new_manifest)
         return new_manifest
 
     def _emit_installed(self, payload: AssistantSkillInstalledEventPayload) -> None:
