@@ -7,6 +7,10 @@ from pathlib import Path
 from unittest.mock import MagicMock
 
 from lca.contracts.models.team.role.team import RoleProfile
+from lca.infrastructure.connectors.core.state import (
+    ConnectionMetadata,
+    ConnectionState,
+)
 from lca.infrastructure.connectors.core.vault import ConnectorVault
 from lca.plugins.prompts.sections.connected_services import (
     ConnectedServicesSection,
@@ -59,7 +63,13 @@ def test_render_connected_services_empty(tmp_path: Path) -> None:
 
 def test_connected_services_section_render() -> None:
     mock_vault = MagicMock()
-    mock_vault.list_active_services.return_value = ["gmail", "googledrive"]
+    # a0f9809ce switched the render path from vault.list_active_services()
+    # (service name strings) to vault.list_connections() (ConnectionMetadata
+    # with is_active); the mock must follow the new seam.
+    mock_vault.list_connections.return_value = [
+        ConnectionMetadata(service="gmail", state=ConnectionState.ACTIVE),
+        ConnectionMetadata(service="googledrive", state=ConnectionState.ACTIVE),
+    ]
 
     section = ConnectedServicesSection(vault=mock_vault)
     role_profile = MagicMock(spec=RoleProfile)
@@ -72,15 +82,10 @@ def test_connected_services_section_render() -> None:
 
 def test_render_connected_services_budget_truncation() -> None:
     mock_vault = MagicMock()
-    # 7 active services
-    mock_vault.list_active_services.return_value = [
-        "gmail",
-        "github",
-        "googledrive",
-        "slack",
-        "notion",
-        "linear",
-        "jira",
+    # 7 active services (mock the post-a0f9809ce list_connections() seam)
+    mock_vault.list_connections.return_value = [
+        ConnectionMetadata(service=svc, state=ConnectionState.ACTIVE)
+        for svc in ["gmail", "github", "googledrive", "slack", "notion", "linear", "jira"]
     ]
 
     # Max 5 services allowed in budget
