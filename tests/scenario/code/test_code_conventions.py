@@ -776,6 +776,14 @@ _LINE_COUNT_EXEMPT: dict[str, str] = {
         "outcome/receipts 落盘（ADR-0268 §6）；store API 面内聚（2026-10-06 iter-tests "
         "02:09 Phase D 补登记，ADR-0291 §5① 仲裁）"
     ),
+    "lca/contracts/protocols/assistant/skill_overlay.py": (
+        "AssistantSkillOverlay Protocol 与其 5 dataclass / 2 errors 同属单一内聚定义单元，硬拆反内聚"
+        "（ADR-0295，2026-10-09 iter-quality 03:09 登记临时豁免）"
+    ),
+    "lca/infrastructure/cli/commands/ops/assistants.py": (
+        "typer 命令聚合点（soul + skill/relink 系），与 runs/tools.py 豁免同构"
+        "（ADR-0295，2026-10-09 iter-quality 03:09 登记临时豁免）"
+    ),
 }
 
 
