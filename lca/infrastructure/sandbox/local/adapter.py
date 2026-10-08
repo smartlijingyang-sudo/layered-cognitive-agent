@@ -245,12 +245,19 @@ class LocalSandboxAdapter(Sandbox):
         )
 
     async def create_session(self, config: SessionConfig | None = None) -> SessionInfo | None:
-        del config
+        # Per-run workspace SSOT: the caller resolves the run assistant's
+        # workspace inside the run scope; the boot-time default root only
+        # backs sessions created without that binding.
+        root = (
+            config.workspace_root.rstrip("/")
+            if config and config.workspace_root
+            else self._host_root
+        )
         sid = new_id("lsess")
-        path = Path(self._host_root) / ".sessions" / sid
+        path = Path(root) / ".sessions" / sid
         self._ensure_tree(path)
-        # Also ensure canonical guest mount exists when host_root IS /mnt/data.
-        self._ensure_tree(Path(self._host_root))
+        # Also ensure canonical guest mount exists when root IS /mnt/data.
+        self._ensure_tree(Path(root))
         self._sessions[sid] = path
         _log.info("local_sandbox_session_created", session_id=sid, root=str(path))
         return SessionInfo(session_id=sid, container_id=f"local:{sid}")

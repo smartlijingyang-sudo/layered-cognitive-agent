@@ -163,11 +163,16 @@ class SessionConfig:
 
     会话是有状态的执行环境——容器跨调用存活，变量/安装包/文件系统均保持。
     生命周期应绑定 agent run：run 结束即销毁。
+
+    ``workspace_root`` 是会话基目录的宿主真值（WSOT per-run 绑定）：空串表示
+    adapter 默认根。Local adapter 以它为基目录建 ``.sessions/<sid>``，使 run
+    落在所属助理的 workspace；Onlyboxes adapter 忽略它，容器根由镜像契约固定。
     """
 
     timeout_s: int = DEFAULT_SANDBOX_TIMEOUT_S
     files: dict[str, bytes] = field(default_factory=dict)
     python_version: str = "3.11"
+    workspace_root: str = ""
 
 
 @dataclass(frozen=True)

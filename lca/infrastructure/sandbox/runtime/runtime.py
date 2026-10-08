@@ -21,6 +21,7 @@ from lca.contracts.models.core.execution.sandbox import (
     SandboxExecResult,
     SandboxFile,
     SandboxResult,
+    SessionConfig,
     SessionInfo,
 )
 from lca.contracts.models.core.state.guest_layout import GuestLayout
@@ -135,7 +136,12 @@ class RunBoundSandboxRuntime(SandboxRuntime):
 
         if self._session is None and not self._stateless:
             try:
-                self._session = await self._sandbox.create_session()
+                # Resolve inside the run scope so the session tree lands in
+                # the run assistant's workspace, not the boot-time default.
+                from lca.infrastructure.path.locator import assistant_workspace_root
+
+                config = SessionConfig(workspace_root=str(assistant_workspace_root()))
+                self._session = await self._sandbox.create_session(config)
             except Exception:
                 _log.debug("sandbox_session_create_failed", exc_info=True)
                 self._session = None

@@ -259,7 +259,12 @@ class OnlyboxesSandboxAdapter(Sandbox):
         self,
         config: SessionConfig | None = None,
     ) -> SessionInfo | None:
-        """Lightweight: no-op command triggers container creation."""
+        """Lightweight: no-op command triggers container creation.
+
+        ``config.workspace_root`` is ignored here: the guest root is fixed
+        by the Onlyboxes image contract, so the host-side workspace SSOT
+        has no mount to redirect.
+        """
         result = await self._exec_terminal(":", timeout_s=30)
         if result.success:
             return SessionInfo(session_id="terminal-session", container_id="")

@@ -180,3 +180,35 @@ def test_ssot_assistant_scope_is_run_local():
             assert get_current_assistant_id() == "asst_b"
         assert get_current_assistant_id() == "asst_a"
     assert get_current_assistant_id() == ""
+
+
+def test_wsot08_session_root_follows_run_assistant(monkeypatch, tmp_path):
+    """沙箱会话目录落在 run 所属助理的 workspace，不回落到 boot 默认助理。"""
+    import asyncio
+
+    from lca.contracts.models.core.execution.sandbox import SessionConfig
+    from lca.infrastructure.path.locator import assistant_workspace_root
+    from lca.infrastructure.sandbox.local.adapter import LocalSandboxAdapter
+    from lca.infrastructure.tools.run.assistant_scope import run_assistant_scope
+
+    _clean_env(monkeypatch)
+    monkeypatch.setenv("LCA_HOME", str(tmp_path / ".lca"))
+    monkeypatch.setenv("LCA_ASSISTANT_ID", "asst_boot_default")
+
+    # Constructed outside any run scope, like the boot-time provider does.
+    adapter = LocalSandboxAdapter()
+    boot_default_ws = tmp_path / ".lca" / "assistants" / "asst_boot_default" / "workspace"
+    assert adapter.host_root == str(boot_default_ws)
+
+    with run_assistant_scope("asst_run_owner"):
+        config = SessionConfig(workspace_root=str(assistant_workspace_root()))
+        info = asyncio.run(adapter.create_session(config))
+    assert info is not None
+    owner_ws = tmp_path / ".lca" / "assistants" / "asst_run_owner" / "workspace"
+    assert (owner_ws / ".sessions" / info.session_id).is_dir()
+    assert not (boot_default_ws / ".sessions" / info.session_id).exists()
+
+    # Without the per-run binding the boot default still backs the session.
+    fallback = asyncio.run(adapter.create_session())
+    assert fallback is not None
+    assert (boot_default_ws / ".sessions" / fallback.session_id).is_dir()
