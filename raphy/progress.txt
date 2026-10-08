@@ -1413,3 +1413,22 @@
     display 侧——豁免是刻意的（删豁免会 corrupt 文件内容），两边各守
     一条线。
 ---
+
+## 2026-10-08 13:23 CST - RA-041
+- `StrategyContext` 加正式可选字段 `outer_ports`（frozen 模型声明字段，
+  docstring 注明 ADR-0241 §4）；interpreter 在构造时填它，subgraph_run
+  改读 `context.outer_ports`；`node_config` 不再携带 `"_port_registry"`
+  字符串 key（lca 内零存活读写，只剩注释里的历史指代）。
+- 实现与评估的差异：字段类型用 `Any` 而非 `PortRegistry`——concrete
+  PortRegistry 住在 `lca.framework.graph`，contracts 反向 import 会破分层
+  （全仓零先例）；读侧保留 `isinstance(PortRegistry)` 检查保运行时安全。
+- 新 pin 测试 `test_execute_seeds_inner_registry_from_formal_outer_ports_field`
+ （node_config 刻意不带旧 key，断言 inner registry 同时拿到 outer 的 tools
+  与 projected input）。
+- 测试：tests/unit/framework/graph/ 104 passed、
+  tests/integration/cutover/test_tool_call_e2e.py 3 passed；ruff clean。
+- 文件：lca/contracts/protocols/graph/strategy.py、
+  lca/framework/graph/interpreter.py、
+  lca/framework/graph/strategies/subgraph_run.py、
+  tests/unit/framework/graph/test_strategies.py
+---

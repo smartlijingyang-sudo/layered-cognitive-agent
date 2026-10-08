@@ -48,6 +48,14 @@ class StrategyContext(BaseModel):
     # inner output ports → outer output ports at the subgraph seam;
     # other strategies ignore it.
     inner_io_schema: NodeIOSchema | None = None
+    # Kernel-to-strategy port handoff (ADR-0241 §4 / RA-041). The outer
+    # plan's port registry handle (kernel-seeded ``tools`` / ``bindings``
+    # included); ``SubgraphStrategy`` reads this to seed the inner plan's
+    # registry. ``None`` means no outer registry was handed off. Typed
+    # ``Any`` deliberately: the concrete ``PortRegistry`` lives in
+    # ``lca.framework.graph`` and contracts must not import framework.
+    # Replaces the old ``node_config["_port_registry"]`` string backdoor.
+    outer_ports: Any = None
 
 
 @runtime_checkable

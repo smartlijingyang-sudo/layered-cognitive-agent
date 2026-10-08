@@ -612,7 +612,7 @@
       "description": "As an LCA maintainer, I want the kernel-to-strategy port handoff to go through a formal StrategyContext field instead of the _port_registry string backdoor, so the frozen seam means what it says.",
       "id": "RA-041",
       "notes": "Source: Round 10 friction walk C (Speculative). Deletion test: deleting the injection breaks subgraph kernel-seeded ports -> the mechanism is load-bearing; the string backdoor itself is the smell. Overlap: none.",
-      "passes": false,
+      "passes": true,
       "priority": 9,
       "title": "Move the _port_registry kernel-private key into a formal StrategyContext field"
     }
