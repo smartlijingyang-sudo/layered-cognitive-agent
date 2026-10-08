@@ -1011,7 +1011,7 @@
       "description": "As an LCA on-call, I want all boot diagnostics on one channel, so fail-loud fallbacks aren't missed by structlog tailing. Evidence (Round 13, profile/boot zone): _emit_boot_events is structlog-only for a good reason (K3 pre-Session-bind, Session.append unreachable, no journal side-channel). But K6's fail-loud hooks — the highest-value diagnostics ('unhandled exception') — fall back to stdlib logging: lifecycle.py log = logging.getLogger(__name__) with two log.exception('lifecycle.fail_loud: ...') in _capture; lifespan.py cron daemon start failure via logging.getLogger(__name__).exception. Two diagnostic exits, contract governs one.",
       "id": "RA-070",
       "notes": "Source: Round 13 friction walk (Worth exploring; contract leak).",
-      "passes": false,
+      "passes": true,
       "priority": 3,
       "title": "Bring fail-loud fallback under the structlog-only boot diagnostics contract"
     },

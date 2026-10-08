@@ -1855,3 +1855,11 @@
   - `provide` 里 `self.reflect._service_provide_simple(...)` 根本不存在（AttributeError 被 `except Exception: pass` 吞掉）——"mirror to Reflect" 是 no-op，别信那行注释。
   - stub 的 `inject` 签名必须用 sentinel 区分"没传 default"和"default=None"（cordis 本体用 `_MISSING` 同理），否则 `inject(key, default=None)` 会被误判成无 default 抛 KeyError——这个 bug 在本轮真实踩中。
 ---
+
+## 2026-10-09 07:40 CST - RA-070
+- boot 诊断只走 structlog：`lca_kernel/boot/lifecycle.py` 的 `logging.getLogger` → `structlog.get_logger`（两处 `log.exception("... boundary=%s", boundary)` 改成 structlog 风格 `log.exception("...", boundary=boundary)`）；`lca_kernel/boot/lifespan.py` 的内联 `import logging / getLogger().exception(...)` → 模块级 `_log = structlog.get_logger(__name__)` + `_log.exception(...)`。boot.py 本来就是 structlog，现在包内统一。
+- Files changed: `lca_kernel/boot/lifecycle.py`，`lca_kernel/boot/lifespan.py`；new `tests/lca_kernel/boot/test_diagnostics_channel.py`（pin 1：扫描 lca_kernel/boot/*.py 源码，stdlib logging 标记出现即红；pin 2：AST 检查"有日志调用的模块必须绑定 structlog.get_logger"）。
+- **Learnings for future iterations:**
+  - "单通道"类 story 的 pin 写法：源码扫描（markers 列表）+ AST 结构检查双保险，比运行时 caplog 更便宜、且防的是"以后有人加回来"。
+  - structlog 的 `exception()` 签名是 `(event, **kw)`，不是 printf 风格——迁移时把 `%s` 插值改成 kwarg。
+---
