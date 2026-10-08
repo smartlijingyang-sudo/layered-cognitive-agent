@@ -127,6 +127,36 @@
   含它，否则 lift 直接 `PlanLiftError`。只改消费侧 yaml 不够，生产侧
   （本轮是 `act.authorize`）的 outputs 也要同步；lift probe 当场验。
  node 读端口时查三处——executor `declared_inputs`、yaml inputs、实际 `port_values.get` 调用；三处名字不一致即 declared interface 说谎。
+
+- **envelope metadata 类型化 seam（RA-033 教训）：** 跨 phase 的生产者/消费者
+  metadata 约定不能靠字符串 key + 运行时 raise；消费者测试手抄 `_mint` 副本 =
+  契约漂移时测试照样绿——producer→consumer 契约必须由真实生产者 pin 住。另：
+  号称 JSON 友好的 envelope metadata 不得塞活对象（state/decision/observation）。
+- **display/process 叙事债务（RA-034 教训）：** `observation_content` 自称"单 seam
+  双消费者、journal 存绝对路径"，实测 tool_journal 是第三个调用者且 journal 存的
+  就是投影文本；删掉叙事零复杂度变化 = 叙事债务的证据。修法二选一：承认
+  journal=display 面，或拆双视图。
+- **guest ROOT 三视图同源（f21cd0af2 实证）：** preamble 模板烘焙 / adapter env
+  导出（LCA_GUEST_ROOT）/ `_rewrite_command` 文本重写三处必须一致；
+  `command.replace(mount, root)` 全文替换会把 host 会话根写进命令文本，display
+  投影豁免自由文本 → host 路径泄漏给模型（RA-040）；修的一侧是 adapter 出口
+  逆向投影，不是去掉豁免。
+- **run_in_session 未知 sid 静默回落（RA-037）：** per-run 绑定只活在内存
+  `_sessions` dict，`run_in_session` 对未知 sid 用 boot-time `_host_root` 重建目录
+  继续执行——静默错目录；修法 fail-loud。
+- **doctor facade 的 SINGLE-entry 承诺（RA-039 教训）：** Privilege/Trust/Resource
+  三 pass 在 facade 之外，`doctor profile --ci` 自称 fail-closed 却跑不到——
+  deletion test 在这里测的是承诺："删掉承诺"也是诚实解。
+- **TraceInspector 私有属性穿透（RA-038）：** `_helpers._inspector_events` 用 getattr
+  读 `_events`——adapter 拿事件序列必须走显式访问器，不伸手进内脏。
+- **idempotency_key 公式（RA-036）：** 四个铸造点各自发明公式，不变量只写
+  docstring——无 observed bug 前强度上限 Worth exploring。
+- **`_port_registry` kernel 私有 key（RA-041）：** `node_config["_port_registry"]`
+  字符串后门绕过 frozen StrategyContext——能工作，风险假设性，上限 Speculative。
+- **流程（本轮教训）：** 并发 lane 直接在 raphy 分支主 checkout 提交
+  （f21cd0af2，12:11:45），评估中途 HEAD 移动——长评估里读文件用
+  `git show <sha>:` 锁定版本；子任务误报写树时先查 reflog 再定论。
+
 ---
 
 ## Round 6 — assess (2026-10-07 23:15, branch raphy/arch-20261007-2315)
@@ -1102,3 +1132,28 @@
     6 个摸过的文件 `ruff check` clean。零行为变更由 case 表 + 全绿背书。
 ---
 
+
+## Round 10 — assess (2026-10-08 12:06, branch raphy/arch-20261008-1206)
+
+- 按硬化版 `raphy-assess.md` 执行：读 `skills/improve-codebase-architecture/SKILL.md`；
+  `git log -45` 定热点（sandbox/computer workspace 绑定、CLI doctor/stack_heal/debug-trace、
+  act envelope/graph translate_outputs）；CONTEXT.md + ADR 目录；三区 friction walk 拆给
+  3 个全新会话子任务（5 问必答、端到端精读）；mandatory runtime verification
+  （MockLLMAdapter：basic / tool-call / 双 run 全 completed；RA-023 非收敛回归返回
+  failed Result 无抛错——修复生效；无新 P0）；duplication 副扫描；self-grilling 写进
+  assessment.md；diversity quota 满足（3 Strong 全部来自 friction walk，非 duplication 类）。
+- 评估中途并发 lane 在本分支主 checkout 上直接提交 f21cd0af2
+  （fix(sandbox): guest script ROOT 指回 session root，12:11:45），HEAD 移动；
+  A 区结论以 f21cd0af2 之后为准。子任务 A 一度被误判写树，reflog 证实为并发提交——
+  已记录，树当前干净。
+- 9 个 stories（RA-033~RA-041）：RA-033 envelope metadata 类型化 seam（Strong）、
+  RA-034 observation_content 三消费者/journal 叙事（Strong）、RA-035
+  ROOT_CAUSE_TEMPLATES 死抽象（Strong）、RA-036 idempotency_key 公式收敛
+  （Worth exploring）、RA-037 run_in_session 未知 sid 回落（Worth exploring）、
+  RA-038 TraceInspector 显式访问器（Worth exploring）、RA-039 doctor 三 pass 接入
+  facade（Worth exploring）、RA-040 _rewrite_command host 路径泄漏（Worth exploring）、
+  RA-041 _port_registry 进 StrategyContext 正式字段（Speculative）。
+- 丢弃/未立案：`assistant_scope.py` 的 ContextVar 换皮（命名封装，只搬移复杂度）；
+  `display_paths.py` 删模块只搬移复杂度（浅但无害）；`warn_deprecated_envelope_constructor`
+  零调用者（死代码，机械清理未立案）；run(None) / `NativeToolCall.arguments` 传 str
+  的 10-07 P2 仍 defer 给 iter-quality。
