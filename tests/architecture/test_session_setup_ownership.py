@@ -22,7 +22,7 @@ def _imports(path: Path) -> set[str]:
 
 def test_session_setup_coordinator_does_not_own_builder_or_diagnostics() -> None:
     """The setup facade coordinates distinct ownership modules."""
-    setup = _TRANSPORT_SESSION / "setup.py"
+    setup = _TRANSPORT_SESSION / "setup" / "setup.py"
     source = setup.read_text(encoding="utf-8")
 
     assert "RunSessionBuilder" in source
