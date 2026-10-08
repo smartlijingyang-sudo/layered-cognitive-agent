@@ -1837,3 +1837,12 @@
   - doctor 的只读测试（test_no_journal_writes_in_module）是按"读模块源码"断言的：新 import 只要不含 forbidden 词就过，但加 import 前仍要人眼确认语义（diagnostics import 无副作用）。
   - 真实 doctor（纯 AST）比 stub 更适合做 CLI 端到端 pin：快、确定、无需维护 MagicMock。
 ---
+
+## 2026-10-09 06:30 CST - RA-068
+- 把 44 行的 BootEntry 投影模块内联进 lca_kernel/boot/boot.py::_boot_context：`BootEntry.from_resolved(resolved)` 的"未禁用过滤+拓扑序"直接写成 `for entry in resolved.plugins: if entry.disabled: continue`——ResolvedPlugin 本就带 .definition/.config/.id/.module，循环体零改动，行为逐字相同。
+- Files changed: deleted `lca/harness/profile/boot/projection.py`；`lca_kernel/boot/boot.py`（删 import + __all__ re-export + 内联循环 + 两处 docstring 去 BootEntry）。
+- **Learnings for future iterations:**
+  - 内联"薄投影 dataclass"前先确认三件事：唯一消费者、被投影对象已带全部字段、循环体只用投影字段的子集。本次三者全中，diff 只有 -6/+3 行循环头。
+  - `lca/harness/README.md` 与 `lca/harness/profile/README.md` 里 `boot_projection.py` 的条目本就是错的（路径从未存在过），属 pre-existing staleness，本轮未动——删模块不背这个锅，但 commit body 记一笔。
+  - boot.py 的 `__all__` 里 "BootEntry" 是死 re-export：无任何测试/生产 import，删得干净。
+---

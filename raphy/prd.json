@@ -984,7 +984,7 @@
       "description": "As an LCA maintainer, I want the BootEntry projection folded into its single consumer, so 'projection' stops being a word with no projection semantics. Evidence (Round 13, profile/boot zone): lca/harness/profile/boot/projection.py (44 lines): 4-field dataclass + one classmethod 'filter disabled, keep topo order' consumed only by boot.py::_boot_context. Interface (BootEntry.from_resolved) is a verbatim restatement of the implementation; inlining the 5-line filter into _boot_context's loop changes nothing. Deletion test passes (docstring longer than logic).",
       "id": "RA-068",
       "notes": "Source: Round 13 friction walk (Worth exploring; shallow module).",
-      "passes": false,
+      "passes": true,
       "priority": 3,
       "title": "Inline BootEntry into boot.py (shallow 44-line projection module)"
     },
