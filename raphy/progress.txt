@@ -1810,3 +1810,12 @@
   - preset/discovery 的 "quarantined" 是另一个概念（broken preset 隔离加载），grep 同词必须逐条分辨语义，不能按词删。
   - 约束确认：ADR-0067 的 gates 才是真故事（生产隔离语义），此模块是幻影隔离——删掉不影响任何生产路径。
 ---
+
+## 2026-10-09 05:20 CST - RA-063
+- 删死模块 `lca/harness/profile/resolve/external_filter.py` 及其测试：第二套 provenance filter，零生产调用者；其"profile_path 包含插件 id/模块名即显式启用"的启发式与 plugin_origin 的统一分类分歧，是误用诱饵。
+- Files changed: deleted `lca/harness/profile/resolve/external_filter.py`, `tests/harness/profile/resolve/test_external_filter.py`（纯删除，无引用残留：resolve/__init__.py 无 re-export）。
+- **Learnings for future iterations:**
+  - **pytest 必须从 worktree cwd 跑，且要带上主仓 egg-info 的 entry points：** ssh252 默认 cwd 是主仓根，`python3 -m pytest <worktree绝对路径>` 会让 `import lca` 落到主仓（测试跑错树、静默出假绿）；而 `cd worktree` 后裸跑又会丢 `lca_framework.egg-info` 的 entry points（health derivers 的 8 个 entry point 全丢，test_runs_debug_health 4 个用例假红）。正确姿势：`cd <worktree> || exit 1; PYTHONPATH=<worktree>:<主仓> LLM_API_KEY=dummy python3 -m pytest tests/... --no-cov -q -p no:cacheprovider`——lca 解析到 worktree（PYTHONPATH 首位），entry points 经主仓 egg-info 可见，deriver 模块仍从 worktree 的 lca 包导入。
+  - 删 filter 类模块先看 `__init__.py` 有无 re-export，再 grep 全仓；这次两者都干净。
+  - commit body 按 AC 要求注明未来增长点：P5-03 若真需要 external-kind 过滤，从 plugin_origin.resolve_plugin_origin / is_untrusted_default_disabled 的统一分类长出来，不复活这个启发式。
+---

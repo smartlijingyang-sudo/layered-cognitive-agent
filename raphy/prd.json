@@ -915,7 +915,7 @@
       "description": "As an LCA maintainer, I want the dead second trust filter gone, so nobody wires up the divergent heuristic by mistake. Evidence (Round 13, profile/boot zone): lca/harness/profile/resolve/external_filter.py (102 lines): filter_external_default_disabled is a second, parallel provenance filter (heuristic: plugin.id in profile_path_str) vs production's filter_untrusted_default_disabled + _profile_explicitly_admits — semantics already diverged. Zero production callers; only its own test file references it. Deletion test: removing module + test changes nothing repo-wide (verified by grep).",
       "id": "RA-063",
       "notes": "Source: Round 13 friction walk (Strong; deletion test).",
-      "passes": false,
+      "passes": true,
       "priority": 3,
       "title": "Delete external_filter.py (dead second provenance filter with divergent heuristic)"
     },
