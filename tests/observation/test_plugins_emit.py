@@ -181,10 +181,10 @@ def test_diff_plugin_pure() -> None:
 
 
 def test_explainer_plugin_pure() -> None:
-    from lca.plugins.diagnosis.failure_explainer.plugin import explain_failure
+    from lca.plugins.diagnosis.failure_explainer.plugin import explain_from_diff
 
     diff = DiffReport(run_id="r", plan_ref="p", diffed_at="t")
-    explanation = explain_failure(run_id="r", diff=diff, control_traces=[])
+    explanation = explain_from_diff(run_id="r", diff=diff, control_traces=[])
     assert isinstance(explanation, FailureExplanation)
 
 

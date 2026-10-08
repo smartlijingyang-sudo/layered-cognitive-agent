@@ -1249,3 +1249,34 @@
     `SURFACE_TOOL_RESULT_TYPE`（spine.body.tool.execute.end），不是字面的
     "surface/tool_result"；payload 即 data 本体。
 ---
+
+## 2026-10-08 12:54 CST - RA-035
+- 删掉 `lca/plugins/diagnosis/failure_explainer/plugin.py` 的死抽象：
+  `_Template` dataclass + `ROOT_CAUSE_TEMPLATES`（6 条目，从未被算法引用）；
+  模块 docstring 重写为真实算法（3 个硬编码循环：control deny → decision
+  缺失 → missing_nodes）；plugin description 同步修正；`dataclass` import
+  一并清理。
+- 顺手做了 AC 允许的 rename：diagnosis 侧 `explain_failure` →
+  `explain_from_diff`，与 `TraceInspector.explain_failure` 消歧。调用者只有
+  `observe_explanation`（内部）+ 两个测试文件，一并改完；`__all__` 同步。
+- 重写 `tests/observation/test_explainer_algorithm.py`：删掉断言模板表的
+  `test_explainer_template_data_driven`，新增
+  `test_explainer_three_hardcoded_branches` pin 住 3 个分支的
+  evidence_fact_kind 顺序（ControlTrace → NodeExit → PlanBlueprint）与
+  step_index（1,2,3）；h6 fixtures 恰好同时触发全部三分支。
+- 全仓（lca/tests/commands）grep ROOT_CAUSE_TEMPLATES 零命中；历史设计文档
+  `docs/notes/implemented/seam/2026-09-10-observation-9module-mechanism.md`
+  是 dated 记录，留作历史未动。
+- 约束遵守：`explain_from_diff(run_id, diff, control_traces)` 纯函数签名与
+  返回语义不变。测试 18 passed；ruff clean。
+- 文件：lca/plugins/diagnosis/failure_explainer/plugin.py、
+  tests/observation/test_explainer_algorithm.py、
+  tests/observation/test_plugins_emit.py
+- **Learnings for future iterations:**
+  - "死抽象"类 story 动手前先数引用者：本轮 `ROOT_CAUSE_TEMPLATES` 除定义
+    外只有测试引用 + `__all__`，删除面干净；`explain_failure` 的重命名面
+    也小（3 处），才敢顺手做。引用者多就别"顺手"。
+  - 历史设计文档（docs/notes/implemented/... dated）不随代码改 —— 它是
+    时间胶囊；改它反而破坏可追溯性。live 文档（docstring/description）
+    才跟代码走。
+---

@@ -525,7 +525,7 @@
       "description": "As an LCA maintainer, I want the diagnosis failure_explainer module to stop claiming a template-method design it does not implement, so readers are not misled into believing the algorithm is a data-driven rule table.",
       "id": "RA-035",
       "notes": "Source: Round 10 friction walk B (Strong). Deletion test: after deletion only that one test needs rewriting -> pure dead abstraction. Overlap: none with RA-001..RA-032.",
-      "passes": false,
+      "passes": true,
       "priority": 3,
       "title": "Delete the dead ROOT_CAUSE_TEMPLATES abstraction in diagnosis failure_explainer"
     },

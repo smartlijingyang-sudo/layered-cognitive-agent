@@ -22,7 +22,7 @@ from lca.contracts.observability.observation import (
 )
 from lca.infrastructure.cli.commands._shared.projection import load_spine_facts
 from lca.infrastructure.cli.commands.observation._shared import _find_blueprint
-from lca.plugins.diagnosis.failure_explainer.plugin import explain_failure
+from lca.plugins.diagnosis.failure_explainer.plugin import explain_from_diff
 
 _LOG = logging.getLogger(__name__)
 
@@ -43,7 +43,7 @@ def register(app: typer.Typer) -> None:
 
         blueprint = _find_blueprint(facts)
         diff, ctrl_traces = _build_diff_and_ctrl(facts, blueprint)
-        explanation = explain_failure(run_id=run_id, diff=diff, control_traces=ctrl_traces)
+        explanation = explain_from_diff(run_id=run_id, diff=diff, control_traces=ctrl_traces)
         report = _compose_agent_report(explanation, diff, blueprint)
 
         if json_mode:
