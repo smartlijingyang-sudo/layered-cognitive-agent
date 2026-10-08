@@ -32,6 +32,7 @@ from lca.infrastructure.cli.commands import (
     composio,
     creator_plan,
     declarative,
+    doctor_profile,
     driver_debug,
     e2e,
     events_delivery,
@@ -113,6 +114,7 @@ notes.register(app)
 memory.register(app)
 typecheck.register(app)
 observation.register(app)
+doctor_profile.register(app)  # RA-053: mount `lca-ops doctor`
 
 
 # ── legacy alias: `lca-ops logs` → `journal logs` ──────────────────

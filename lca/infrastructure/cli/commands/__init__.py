@@ -1,5 +1,7 @@
 """CLI command modules — re-export nested command groups for cli.cli."""
 
+# RA-053: mount the doctor command group on the real root app.
+from lca.infrastructure.cli.commands.doctor import profile as doctor_profile
 from lca.infrastructure.cli.commands.journal import exceptions as journal_exceptions
 from lca.infrastructure.cli.commands.journal import journal
 from lca.infrastructure.cli.commands.journal import replay as journal_replay
@@ -56,6 +58,7 @@ __all__ = [
     "composio",
     "creator_plan",
     "declarative",
+    "doctor_profile",
     "e2e",
     "events_delivery",
     "journal",

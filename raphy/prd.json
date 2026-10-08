@@ -774,8 +774,8 @@
    "branchName": "raphy/arch-20261009-0107",
    "description": "As an LCA user, I want `lca-ops doctor` to exist (or be explicitly retired), so the well-tested doctor CLI is actually reachable. Evidence (Round 13, doctor zone): lca/infrastructure/cli/commands/doctor/profile.py defines register(), but lca/infrastructure/cli/cli/cli.py L30-100's command registry has no doctor entry; scripts/lca-ops -> `python3 -m lca.infrastructure.cli.cli` root app has NO `doctor` command. Tests (test_doctor_profile_cli.py, test_doctor_ci_integration.py) always build a fresh typer.Typer() + register(app) and never go through the real root app — which is why 'root app never mounted doctor' was never caught.",
    "id": "RA-053",
-   "notes": "Source: Round 13 friction walk (Strong; untested assembly seam). Lesson: CLI register() tests must go through the real root app.",
-   "passes": false,
+   "notes": "Source: Round 13 friction walk (Strong; untested assembly seam). Lesson: CLI register() tests must go through the real root app. | Implemented 2026-10-09: mounted on real root app, new root-app pin.",
+   "passes": true,
    "priority": 1,
    "title": "Mount `doctor` commands into the lca-ops root CLI (or declare them retired)"
   },

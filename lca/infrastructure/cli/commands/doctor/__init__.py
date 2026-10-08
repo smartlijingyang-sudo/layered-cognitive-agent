@@ -2,6 +2,5 @@
 
 Subpackage marker only — registration with the top-level :mod:`lca.infrastructure.cli`
 app is performed by importing :func:`lca.infrastructure.cli.commands.doctor.profile.register`
-in the commands package's ``__init__.py`` (P2-12 wires this up if not done by an
-earlier follow-up).
+in the commands package's ``__init__.py`` (wired into the root app by RA-053).
 """

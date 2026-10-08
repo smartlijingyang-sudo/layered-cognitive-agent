@@ -1682,3 +1682,10 @@
   - Chain analysis first: verified links 2-4 already worked before touching link 1, so the fix stayed minimal (one kwarg).
   - ruff isort in this repo wants `lca.*` before `lca_kernel.*` in the same third-party block (I001).
 ---
+## 2026-10-09 03:05 - RA-053
+- Implemented: mounted `lca-ops doctor` on the REAL root app: commands/__init__.py re-exports `doctor_profile` (doctor/profile.register), cli/cli.py imports it and calls doctor_profile.register(app). Updated doctor/__init__.py docstring (was 'P2-12 wires this up if not done' — now wired by RA-053). New pin tests/infrastructure/cli/test_doctor_root_mount.py invokes the real root app: `doctor --help` lists profile, `doctor profile --help` reachable with --ci/--json/--skip-plugin-shape.
+- Files changed: lca/infrastructure/cli/commands/__init__.py, lca/infrastructure/cli/cli/cli.py, lca/infrastructure/cli/commands/doctor/__init__.py, tests/infrastructure/cli/test_doctor_root_mount.py (new), raphy/prd.json, raphy/progress.txt
+- **Learnings for future iterations:**
+  - The assembly-seam lesson from the story is real: register() existed and was tested only against fresh typer apps — nothing caught the unmounted root app. The fix pattern (real-root-app pin) applies to any future CLI command.
+  - Mount followed the existing convention exactly: re-export in commands/__init__.py + __all__, import in cli.py's alphabetical list, register(app) in the explicit block. No new wiring idiom invented.
+---
