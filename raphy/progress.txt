@@ -72,6 +72,35 @@
   `next_retry_ms`/`last_error` 四 key 字面量散四处，无 module——真 friction
   但无失败证据，speculative，留待有 bug 时立案。
 
+- **daemon 观察路径仍绕行 lifecycle owner（RA-028 认领）：** RA-014 把 DaemonService
+  立为 daemon-lifecycle 唯一 owner 并委托了 start/stop，但 `CLIProvider.status()` 的
+  `_report_daemon_status` 仍直读 pid 文件（自家路径推导 `user.state_dir/connect.pid`
+  vs DaemonService 经 sudo 读 `/home/<user>/.lca/connect.pid`——两套推导可分歧 +
+  特权不对称），`_report_kernel_serve_status` 对 `DaemonService.state()` 已算好的
+  gateway check 再做一次 `http_ready` 探测，`heal()` 手写 stop+start 而 DaemonService
+  有 `restart()`。**与 RA-014/015 正交**（那两轮是 start/stop lifecycle），不是重审。
+- **journal `turn` 是 stringly 缝（RA-029 认领）：** `state.extra["current_turn"]`
+  魔法字符串，1 写方（`harness/projection/agent_state.py:70`）+ 2 读方
+  （`simple_body.py:230`、`nodes/think/llm/invoke.py:104`），各带静默 `.get(..., 0)`；
+  而同一 `AgentState` 上的兄弟维度 `state.step` 是具名字段。修法对标 RA-025
+  （`step_id_for`）：给 turn 具名 seam，静默 0 默认收进 seam 显式化。
+- **anomaly detector 误报风暴（RA-030 认领）：** 健康 run 数十条误报——`_check_stalled`
+  见跳号就报（spine 多生产者本就跳号）、`_check_collision` 见 span_id 重复就报
+  （关联事件复用 span_id 正常）、`_check_cycle` 在 `runtime.reducer.apply` 连续 2 次
+  就报（每事件必跑，构造性误报）。检测器模型与 spine 实际语义对不上；修完前
+  "anomaly_detector 刷屏"不作为真异常证据。
+- **运行时验证基线（2026-10-08 05:15，Round 8 复测，MockLLMAdapter，LLM_API_KEY=dummy）：**
+  basic / tool-call / 同一 agent 双 run 全 completed；非收敛 run（InfiniteMock +
+  max_steps=5）返回 failed Result 无抛错——**RA-023 修复生效**。`run(None)` TypeError
+  与 `NativeToolCall.arguments` 传 str 晦涩报错（10-07 P2）仍 defer 给 iter-quality。
+- **`NativeToolCall` wire 三字段的 getattr 死防御：** `project_llm_response` 里
+  `getattr(call, "wire_status", None) or "ok"` 三处，但类型是 frozen dataclass 具名字段，
+  getattr 永不 fallback——"类型保证 vs 防御式读取"矛盾，小杠杆未立案；以后 friction walk
+  见到可直接按诚实化修，不必开 story。
+- **`_handle_output_text_chunk` per-chunk 重查 bindings：** 函数内 import +
+  每 chunk `current_bindings_view()`，可能是"bindings 可热变"刻意设计，无失败证据，
+  观察中，未立案。
+
 ---
 
 ## Round 6 — assess (2026-10-07 23:15, branch raphy/arch-20261007-2315)
@@ -798,3 +827,133 @@
     传参前确认路径存在，目录与文件混传本就按红线分开跑。
 ---
 
+## Round 8 — assess (2026-10-08 05:06, branch raphy/arch-20261008-0506)
+
+- 按硬化版 `raphy-assess.md` 执行：读 `skills/improve-codebase-architecture/SKILL.md`；
+  `git log -40` 定热点；friction walk 精读三区（host_runtime providers 5 文件 +
+  daemon.py state/restart 对比 / brain/llm_turn 5 文件 + NativeToolCall 类型 /
+  simple_body.py dispatch 全路径 + current_turn 写读三方，5 问必答）；
+  mandatory runtime verification（mock LLM 真跑 4 场景）；duplication 副扫描；
+  self-grilling 写进 assessment.md；diversity quota 满足（3 friction，0 duplication）。
+- 热点来源：`providers/user_cli.py` ×3（2 笔 RA-014/015 自家 + 1 笔后续 fix，本轮只走
+  status/heal 观察路径，与 RA-014/015 正交）；`test_persist_before_execute.py` ×2
+  （生产侧 simple_body.py 无故事覆盖）；observability/adapters ×2 含 iter-tests revert
+  战，按禁区避开；其余热点均为 RA-023~027 领地。
+- 产出 3 个 stories（`passes: false`），续号 RA-028~030：
+  - RA-028（P1, Worth exploring）：CLIProvider daemon status/heal 改走 DaemonService
+    观察 seam——删 `_report_daemon_status`/`_report_kernel_serve_status` 私有推导与
+    `pid_alive` import，status 投影 `DaemonService.state()`，heal 走 restart 形状；
+    全仓 pid_alive 非 owner 直调只剩 user_cli.py:207 一处（孤例佐证）。
+  - RA-029（P2, Worth exploring）：journal `turn` 具名 seam——`state.step` typed vs
+    `turn` stringly 的不对称；1 写 + 2 读的魔法字符串 + 静默 0 默认收进 seam。
+  - RA-030（P2, Worth exploring）：anomaly detector 模型对齐 spine 语义——stalled/
+    collision/cycle 三检查在健康 run 上构造性误报数十条；修法按生产者追序列、
+    collision 只报并发 open、cycle 区分 per-event/per-turn EP。
+- **Top 推荐 RA-028**：RA-014 的组织结论已写好只是观察路径漏网，deletion test 最脆，
+  且有具体分歧 hazard（两套 pid 路径推导 + 直读/sudo 特权不对称）。
+- **运行时验证**：A basic ✅ completed / B tool-call ✅ completed / C 双 run ✅✅ /
+  D 非收敛 ✅ failed Result 无抛错（RA-023 生效）；anomaly_detector 健康 run 误报风暴
+  确认（stalled/collision/cycle 三类）。
+- **Learnings for future iterations:**
+  - Round 7 评估曾以"RA-014/015 已做"整体避开 user_cli.py——避开的是"领地"不是"文件"；
+    同一文件不同 seam（lifecycle vs 观察路径）可以正交立案，但必须在 assessment 顶部
+    Scope 写清正交性，避免后人误判重复立案。
+  - "类型保证 vs 防御式读取"矛盾（NativeToolCall wire 字段的 getattr）是诚实化小修，
+    杠杆不足单独立 story，但值得记入 patterns 供以后顺手修。
+  - 本机 /tmp 的脚本经 `ssh252 'python3' < /tmp/xxx.py` 走 stdin 传 252 最稳；
+    别在 252 侧用 python 读本机 /tmp 路径（上次 FileNotFoundError 翻车一次）。
+---
+
+
+## 2026-10-08 05:40 - RA-028
+- CLIProvider daemon status/heal 观察路径收敛进 DaemonService seam：删
+  `_report_daemon_status`（直读 `user.state_dir/connect.pid` + 私有路径推导）
+  与 `_report_kernel_serve_status`（对 `state()` 已算好的 gateway 再做一次
+  `http_ready` 探测）；`status()` 改从注入的 `DaemonService.state()` 经新
+  `_project_check` 投影 daemon/gateway（owner 名 → provider 名映射、
+  owner 缺 check 时 hard fail 不静默跳过；gateway 不可达保持 warn 级别契约）；
+  `heal()` 改调 `DaemonService.restart()`（RA-006 单活语义归 seam）；
+  `user_cli.py` 不再 import `pid_alive`/`http_ready`；CLI-deployed 检查留 provider。
+- Files changed: `lca/infrastructure/host_runtime/providers/user_cli.py`,
+  `tests/infrastructure/host_runtime/test_cli_provider_daemon_delegation.py`,
+  `raphy/prd.json`（RA-028 passes=true + learnings）
+- **Learnings for future iterations:**
+  - `_project_check` 是"owner HealthCheck → provider StatusReport"的可复用投影
+    形状：source/target 名映射 + 缺席 hard fail，今后同类 owner-seam 收敛可直接套用。
+  - 测试环境坑：252 本机 `/opt/lca/dist/index.js` 真实存在，`deployed` 检查在 CI 机器上是
+    OK 而非 MISSING——断言改钉"provider 自有 `_cli_js` 镜像"而非固定状态。
+  - 被删代码的旧测试（`test_kernel_serve_status_converges_on_http_ready`）不硬留：
+    删代码的同时把它的"钉住意图"（收敛在 http_ready 语义）翻译成新 seam 的投影测试。
+---
+
+## 2026-10-08 06:00 - RA-029
+- journal `turn` 维度具名化：`AgentState` 新增 `current_turn: int | None = None`
+  具名字段（紧邻 `step` 兄弟字段）；contracts 层新增 `turn_of(state)` 访问器
+  （对标 RA-025 `step_id_for`）：`turn_of(None)==0`（unbound single-shot 显式决策），
+  bound state 未填充则 `ValueError` fail-loud（生产 turn 1-based，None 无歧义）。
+  写方（`harness/projection/agent_state.py`）改赋 `state.current_turn`；两读方
+  （`simple_body.dispatch_tool_calls`、`nodes/think/llm/invoke.py`）改走 `turn_of`；
+  telemetry adapter 无需改（读的是 turn kwarg）。`lca/` 与 `tests/` 再无
+  `extra["current_turn"]` 代码读取（仅注释提及）。
+- Files changed: `lca/contracts/models/core/state/state.py`,
+  `lca/harness/projection/agent_state.py`,
+  `lca/cognition/body/executor/simple_body.py`, `lca/nodes/think/llm/invoke.py`,
+  `tests/contracts/test_agent_state_shape.py`（4 个 turn_of 契约测试）,
+  `tests/integration/test_persist_before_execute.py`（projection→dispatch→journal
+  turn==3 端到端 + fail-loud dispatch 测试；fixture 迁到 seam）,
+  `tests/think/llm/test_invoke.py`, `tests/unit/observability/adapters/test_telemetry_llm_adapter.py`
+  （fixtures 迁到 seam）, `raphy/prd.json`（RA-029 passes=true + learnings）
+- **Learnings for future iterations:**
+  - "具名 field + 访问器" beats 裸 field：field 解决拼写错误变类型错误，
+    访问器收编默认语义（silent-0 → 显式 fail-loud/0 决策）；以后 stringly 袋
+    维度收敛都按这个两件套做。
+  - 迁移 fixture 时注意 em-dash 等不可见字符（persist fixture docstring 里是 `—` 不是 `--`），
+    精确匹配失败先 `cat -A` 看原文。
+  - `tests/harness/test_seam_provider_locality.py::test_baseline_capability_set_matches`
+    在 RA-029 前 commit 同样红（PR-10 baseline 过期 vs `writable.matrix.default`
+    插件）——与 turn 无关，已验证 pre-existing，本轮不碰（非 RA-029 范围）。
+---
+
+## 2026-10-08 06:20 - RA-029 (follow-up)
+- fail-loud 上线后 4-scenario 实测直接炸出真相：`AgentStateProjection`
+  在 `lca/` 生产代码里从未被实例化（writer 自 2026-09-15 起就是 dead code），
+  live carrier 的 turn 永远是静默 0。补线：`begin_turn()` 改返回 emitted turn
+  （unbound 时 `None`）；`runtime_loop` 在 `begin_turn()` 后把返回值反射到
+  `state.current_turn`（无 session 时显式 0 = unbound single-shot 默认）。
+  4-scenario 全 complete，journal 行 turn=1。
+- Files changed: `lca/infrastructure/session/emit/lifecycle_emit.py`,
+  `lca/runtime/loop/runtime_loop.py`,
+  `tests/infrastructure/session/test_begin_turn.py`（new）
+- **Learnings for future iterations:**
+  - 触及 live 路径的 story，**先 runtime-verify 再 commit**——本轮是先 commit
+    后实测，白白多了一个 follow-up commit。
+  - "1 writer + N readers" 这类断言必须验证 writer 真的喂到 reader（grep 实例化，
+    或实测），不能只看读写点数量。
+
+## 2026-10-08 06:35 - RA-030
+- anomaly detector 按实测数据重调模型（非拍脑袋）：4-scenario 实测修前
+  A/B/C1/C2/D 分别 37/278/193/188/356 条误报。forensics 结论：
+  ① span_id 是 per-run 序列派生（`lca-seq-*`）且永不 close——跨 run 复用连
+  "naive 新模型"都误报 → `on_event` 按 `run_id` 重置全部有状态
+  （sequence/open spans/cycle 计数器）；`_check_collision` 只在".start 遇到
+  已 open span"时报，复用 `_check_stuck` 的表（`on_event` 里 collision 排到
+  stuck 前面，否则当前事件自己的 `.start` 已入库）；② `_check_stalled`
+  改 `STALLED_GAP_ALLOWANCE=128`（健康最大 gap 69，~2x headroom）+ 非正跳变
+  重定基线不报；③ `_check_cycle` 按 EP 设基线：`llm.stream.token`=10000
+  （streaming 即健康形状）、`runtime.reducer.apply`=32（健康最大 ~8）、
+  `body.tool.execute.end`=8，默认仍 2。修后 5 个 scenario run **零误报**。
+  阈值保持公开具名（`test_anomaly_detector_class_constants_are_well_named` 已扩展）。
+- Files changed: `lca/plugins/observability/spine/derivers/anomaly.py`,
+  `tests/lca_plugins/observability/spine/test_anomaly_detector.py`,
+  `raphy/prd.json`（RA-030 passes=true + learnings）
+- **Learnings for future iterations:**
+  - 阈值类 story 必须先实测再定数：本轮的 128/10000/32/8 全部来自
+    4-scenario 实测分布（max gap 69、token 连续 112、reducer 连续 ~8），
+    不是评估时拍的。
+  - "复用某表"要检查时序：collision 复用 `_check_stuck` 的表必须排在
+    stuck 前面，否则当前事件的 `.start` 已入库、首开即误报——单测里
+    `test_collision_trips_end_to_end_via_on_event` 把顺序钉住了。
+  - 长寿 detector（跨 run 存活）的状态必须按 run 划界，否则 per-run 派生
+    的 id（span/sequence）必然跨 run 误报；以后写 detector 先问"状态的
+    生命周期跟哪个域对齐"。
+---

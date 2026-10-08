@@ -39,7 +39,7 @@ from lca.contracts.models.core.conversation.llm import (
     LLMStreamEventType,
     TokenUsage,
 )
-from lca.contracts.models.core.state.state import remaining_wall_clock_seconds
+from lca.contracts.models.core.state.state import remaining_wall_clock_seconds, turn_of
 from lca.contracts.protocols.declarative.declarative_1.node_executor import (
     NodeContext,
     NodeInput,
@@ -101,7 +101,7 @@ class LlmInvokeExecutor:
             history=history,
             tools=list(request.tools) if request.tools else None,
             state=state,
-            turn=int(state.extra.get("current_turn", 0)),
+            turn=turn_of(state),
             step=state.step,
             cursor=cursor,
             reasoner_prompt=reasoner_prompt,

@@ -45,10 +45,10 @@ class _RuntimeCarrier(dict):
 
 
 def _state(step: int = 3, turn: int = 7) -> AgentState:
-    """AgentState with ``step`` and ``extra['current_turn']`` set."""
+    """AgentState with ``step`` and the typed ``current_turn`` seam set."""
     state = AgentState(trace_id="trace-llm-invoke", task="", budget=Budget())
     state.step = step
-    state.extra["current_turn"] = turn
+    state.current_turn = turn
     return state
 
 

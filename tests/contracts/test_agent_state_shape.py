@@ -81,3 +81,45 @@ def test_stop_policy_does_not_read_state_final_output() -> None:
     code_lines = [line for line in body.splitlines() if not line.lstrip().startswith("#")]
     code_body = "\n".join(code_lines)
     assert "state.final_output" not in code_body, "stop_policy.py 代码段仍读 state.final_output"
+
+
+def _ra029_state(**kwargs):
+    from lca.contracts.models.core.policy.budget import create_budget
+    from lca.contracts.models.core.state.state import AgentState
+
+    return AgentState(trace_id="t", task="", budget=create_budget(max_steps=10), **kwargs)
+
+
+def test_turn_of_unbound_single_shot_is_zero() -> None:
+    """RA-029: turn_of(None) == 0 -- unbound single-shot has no turn dimension."""
+    from lca.contracts.models.core.state.state import turn_of
+
+    assert turn_of(None) == 0
+
+
+def test_turn_of_reads_typed_field() -> None:
+    """RA-029: the typed current_turn field is the single source."""
+    from lca.contracts.models.core.state.state import turn_of
+
+    assert turn_of(_ra029_state(current_turn=3)) == 3
+
+
+def test_turn_of_fails_loud_when_projection_never_ran() -> None:
+    """RA-029: a bound state with current_turn=None is a contract violation --
+    fail loud instead of silently writing turn=0 journal rows."""
+    import pytest
+
+    from lca.contracts.models.core.state.state import turn_of
+
+    state = _ra029_state()
+    assert state.current_turn is None
+    with pytest.raises(ValueError, match="current_turn"):
+        turn_of(state)
+
+
+def test_current_turn_defaults_to_none_not_zero() -> None:
+    """RA-029: the typed field defaults to None (unset), never a silent 0."""
+    from lca.contracts.models.core.state.state import AgentState
+
+    assert "current_turn" in AgentState.__annotations__
+    assert _ra029_state().current_turn is None

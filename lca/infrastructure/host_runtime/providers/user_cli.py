@@ -4,6 +4,11 @@ RA-014: the connect daemon has exactly one lifecycle owner — the lca-ops
 ``DaemonService``. ``CLIProvider`` keeps only CLI artifact deployment
 (provision/status/heal); ``start_daemon``/``stop_daemon`` delegate to the
 daemon-lifecycle seam instead of re-implementing spawn/pkill/pid-file logic.
+
+RA-028: the observation path delegates too — ``status()`` projects daemon
+liveness and gateway reachability from ``DaemonService.state()`` (no second
+pid-file path derivation, no second gateway probe), and ``heal()`` restarts
+through ``DaemonService.restart()``.
 """
 
 
@@ -17,7 +22,7 @@ from urllib.parse import urlsplit
 
 from lca.infrastructure.cli.config.config import DaemonConfig
 from lca.infrastructure.cli.config.config import KernelServeConfig as CliKernelServeConfig
-from lca.infrastructure.cli.service.service import http_ready, pid_alive
+from lca.infrastructure.cli.service.service import ServiceState
 from lca.infrastructure.cli.services.daemon.daemon import DaemonService
 from lca.infrastructure.cli.sudo.sudo import Sudo
 from lca.infrastructure.host_runtime.config import HostRuntimeConfig, UserConfig
@@ -163,22 +168,40 @@ class CLIProvider(Provider):
         return True
 
     def status(self) -> StatusReport:
-        """Report deployment, daemon liveness, and kernel_serve connectivity when user-scoped."""
+        """Report deployment, daemon liveness, and kernel_serve connectivity when user-scoped.
+
+        Daemon liveness and gateway reachability project from the injected
+        DaemonService's ``state()`` (RA-028): "where the pid file is" and "is
+        the gateway reachable" are computed exactly once, by the lifecycle
+        owner. The CLI-deployed check stays in the provider — it is the
+        provider's own deployment surface.
+        """
         report = StatusReport(self.name)
         if self._cli_js.is_file():
             report.ok("deployed", str(self.config.paths.cli_dir))
         else:
             report.fail("deployed", "CLI not found")
         if self.user:
-            self._report_daemon_status(report)
-            self._report_kernel_serve_status(report)
+            state = self._daemon_service().state()
+            self._project_check(report, state, source="daemon", target="daemon")
+            self._project_check(
+                report,
+                state,
+                source="gateway",
+                target="kernel_serve",
+                warn_when_unhealthy=True,
+            )
         return report
 
     def heal(self, failed_check: CheckResult) -> bool:
-        """Restart the user daemon when its health check is the failed condition."""
+        """Restart the user daemon when its health check is the failed condition.
+
+        Delegates to the DaemonService ``restart()`` seam (RA-028): stop+start
+        with the RA-006 single-instance invariant (old process confirmed dead
+        before spawning) is owned there, not hand-rolled here.
+        """
         if failed_check.name == "daemon" and self.user:
-            self.stop_daemon()
-            return self.start_daemon()
+            return self._daemon_service().restart().is_running
         return False
 
     def _daemon_service(self) -> DaemonService:
@@ -196,30 +219,30 @@ class CLIProvider(Provider):
         wrapper = f'#!/usr/bin/env bash\nexec node "{self._cli_js}" "$@"\n'
         _stage_privileged_file(self.run_sudo, wrapper, wrapper_destination, mode="+x")
 
-    def _report_daemon_status(self, report: StatusReport) -> None:
-        if self.user is None:
-            raise AssertionError("user is None in _report_daemon_status")
-        pid_file = Path(self.user.state_dir) / "connect.pid"
-        if not pid_file.is_file():
-            report.fail("daemon", "not running")
-            return
-        pid = int(pid_file.read_text().strip() or "0")
-        if pid and pid_alive(pid):
-            report.ok("daemon", f"pid={pid}")
-        else:
-            report.fail("daemon", "stale pid file")
+    @staticmethod
+    def _project_check(
+        report: StatusReport,
+        state: ServiceState,
+        *,
+        source: str,
+        target: str,
+        warn_when_unhealthy: bool = False,
+    ) -> None:
+        """Project one owner-computed ``HealthCheck`` onto the provider report (RA-028).
 
-    def _report_kernel_serve_status(self, report: StatusReport) -> None:
-        """Probe kernel_serve reachability via the shared ``http_ready`` seam (RA-014).
-
-        Converges on the same reachability probe DaemonService uses; the
-        bespoke ``curl -sf`` subprocess probe (which also parsed the health
-        body for a devices count) is gone.
+        The owner names its checks its own way ("gateway"); the provider
+        surface keeps its historical names ("kernel_serve"). An absent owner
+        check is a hard fail — a silent skip would hide seam drift.
         """
-        if http_ready(self.config.kernel_serve.health_url, timeout=5.0):
-            report.ok("kernel_serve", "reachable")
+        check = next((c for c in state.checks if c.name == source), None)
+        if check is None:
+            report.fail(target, f"'{source}' not reported by daemon service")
+        elif check.ok:
+            report.ok(target, check.detail)
+        elif warn_when_unhealthy:
+            report.warn(target, check.detail)
         else:
-            report.warn("kernel_serve", "unreachable")
+            report.fail(target, check.detail)
 
 
 __all__ = ["CLIProvider"]
