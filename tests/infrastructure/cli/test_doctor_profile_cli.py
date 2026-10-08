@@ -6,7 +6,9 @@ These tests pin:
   * The Typer subcommand registration shape (``doctor profile``).
   * The two output modes (human text vs ``--json``).
   * The CI exit-code contract (``--ci`` → exit 1 on errors).
-  * The skip-flag passthrough to :class:`DoctorFacade`.
+  * The skip-flag passthrough to :class:`DoctorFacade` (RA-051: only
+    ``--skip-plugin-shape`` remains; the capability/phase_graph/privilege/trust
+    passes are no longer wired, so their skip flags were deleted).
   * Read-only invariant (I-HPC-7): no journal / session imports.
 
 We monkeypatch :class:`DoctorFacade` so tests stay deterministic and
@@ -193,8 +195,6 @@ class TestRegistration:
         assert "--ci" in result.stdout
         assert "--json" in result.stdout
         assert "--skip-plugin-shape" in result.stdout
-        assert "--skip-capability" in result.stdout
-        assert "--skip-phase-graph" in result.stdout
 
     def test_no_args_is_help(self) -> None:
         """``lca-ops doctor`` with no subcommand shows help (no args is help).
@@ -444,34 +444,8 @@ class TestSkipFlags:
         _, kwargs = fake_facade_clean.doctor_profile.call_args
         assert kwargs["include_plugin_shape"] is False
 
-    def test_skip_capability_flag(self, fake_facade_clean: MagicMock, tmp_profile: Path) -> None:
-        """``--skip-capability`` flips ``include_capability_cardinality`` to False."""
-        app = _build_app()
-        _register(app)
-        runner = CliRunner()
-        result = runner.invoke(
-            app,
-            ["doctor", "profile", str(tmp_profile), "--skip-capability"],
-        )
-        assert result.exit_code == 0, result.stdout
-        _, kwargs = fake_facade_clean.doctor_profile.call_args
-        assert kwargs["include_capability_cardinality"] is False
-
-    def test_skip_phase_graph_flag(self, fake_facade_clean: MagicMock, tmp_profile: Path) -> None:
-        """``--skip-phase-graph`` flips ``include_phase_graph`` to False."""
-        app = _build_app()
-        _register(app)
-        runner = CliRunner()
-        result = runner.invoke(
-            app,
-            ["doctor", "profile", str(tmp_profile), "--skip-phase-graph"],
-        )
-        assert result.exit_code == 0, result.stdout
-        _, kwargs = fake_facade_clean.doctor_profile.call_args
-        assert kwargs["include_phase_graph"] is False
-
     def test_skip_defaults_are_true(self, fake_facade_clean: MagicMock, tmp_profile: Path) -> None:
-        """Without skip flags, all three passes are opted in (default-True)."""
+        """Without skip flags, the plugin-shape pass is opted in (default-True)."""
         app = _build_app()
         _register(app)
         runner = CliRunner()
@@ -479,32 +453,6 @@ class TestSkipFlags:
         assert result.exit_code == 0, result.stdout
         _, kwargs = fake_facade_clean.doctor_profile.call_args
         assert kwargs["include_plugin_shape"] is True
-        assert kwargs["include_capability_cardinality"] is True
-        assert kwargs["include_phase_graph"] is True
-
-    def test_skip_all_three_flags_together(
-        self, fake_facade_clean: MagicMock, tmp_profile: Path
-    ) -> None:
-        """All three skip flags can be combined in one invocation."""
-        app = _build_app()
-        _register(app)
-        runner = CliRunner()
-        result = runner.invoke(
-            app,
-            [
-                "doctor",
-                "profile",
-                str(tmp_profile),
-                "--skip-plugin-shape",
-                "--skip-capability",
-                "--skip-phase-graph",
-            ],
-        )
-        assert result.exit_code == 0, result.stdout
-        _, kwargs = fake_facade_clean.doctor_profile.call_args
-        assert kwargs["include_plugin_shape"] is False
-        assert kwargs["include_capability_cardinality"] is False
-        assert kwargs["include_phase_graph"] is False
 
 
 # ─────────── 7. I-HPC-7 read-only invariant ───────────

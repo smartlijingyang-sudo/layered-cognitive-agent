@@ -2,7 +2,7 @@
 
 Per ADR-0199 §5.3 this CLI is one of three canonical doctor consumers
 (CLI / CI / web). It runs the DoctorFacade (compile dry-run + plugin
-shape + capability cardinality + phase graph) against a profile path
+shape) against a profile path
 and prints the DoctorReport.
 
 Exit codes:
@@ -29,7 +29,7 @@ from lca.harness.diagnostics.doctor.facade import DoctorFacade
 def register(app: typer.Typer) -> None:
     """Register the ``doctor`` subcommand on the CLI app."""
     doctor_app = typer.Typer(
-        help="Read-only doctor (compile dry-run + plugin shape + capability + phase graph).",
+        help="Read-only doctor (compile dry-run + plugin shape).",
         no_args_is_help=True,
     )
     doctor_app.command(name="profile", help=_doctor_profile.__doc__ or "")(_doctor_profile)
@@ -56,26 +56,6 @@ def _doctor_profile(
         "--skip-plugin-shape",
         help="Disable the DOC-PS-* pass (profile-independent, may be slow on large plugin trees).",
     ),
-    skip_capability: bool = typer.Option(
-        False,
-        "--skip-capability",
-        help="Disable the DOC-CAP-* pass.",
-    ),
-    skip_phase_graph: bool = typer.Option(
-        False,
-        "--skip-phase-graph",
-        help="Disable the DOC-PG-* pass.",
-    ),
-    skip_privilege: bool = typer.Option(
-        False,
-        "--skip-privilege",
-        help="Disable the DOC-PRIV-* pass.",
-    ),
-    skip_trust: bool = typer.Option(
-        False,
-        "--skip-trust",
-        help="Disable the DOC-TRUST-* pass.",
-    ),
 ) -> None:
     """Run the Doctor facade on a profile and print the report."""
     path = Path(profile_path)
@@ -87,10 +67,6 @@ def _doctor_profile(
     report = facade.doctor_profile(
         path,
         include_plugin_shape=not skip_plugin_shape,
-        include_capability_cardinality=not skip_capability,
-        include_phase_graph=not skip_phase_graph,
-        include_privilege=not skip_privilege,
-        include_trust=not skip_trust,
     )
 
     if json_output:

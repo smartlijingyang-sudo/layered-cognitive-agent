@@ -1665,3 +1665,12 @@
   - "叫 resolve 的函数不能写生产数据"：71515dace 的根因不是测试隔离，是 resolve_skill_store 的命名-行为错位（RA-058）——assess "resolve" 命名时查副作用。
   - 运行时探针陷阱（实证）：think.llm.invoke 走 adapter.stream() 而非 complete()，Protocol 默认 stream 直接 yield 空 COMPLETED 不调 complete；bash 在 _STANDARD_SHELL_TOOLS 特权名单里，ADR-0292 §10 grant-absence fail-closed 的报错与 RA-033 回归一字不差（"Agent 运行结束但未产生任何输出"）——探针必须用自研非特权工具。探针脚本 ~/workspace/raphy-probe-r13.py 留存。
   - 丢弃：exec/bootstrap.py + format/routing.py 的 shallow（收益仅 2 跳转点，太弱）；doctor 的 except Exception return None（已并入 RA-051）；_revision_of 第三处未出现不立案（纪律）。
+## 2026-10-09 02:35 - RA-051
+- Implemented: deleted the dead pass 3-6 orchestration in DoctorFacade (capability/phase_graph/privilege/trust wiring, _optional_resolve_contracts/_optional_resolve_phase_graph helpers, dead constructor params, include_* kwargs, external_kind_by_plugin). Docstring now honestly says 2 passes. CLI lost the 4 dead --skip-* flags; the four pass modules stay as library passes with their own tests.
+- Files changed: lca/harness/diagnostics/doctor/facade.py, lca/infrastructure/cli/commands/doctor/profile.py, tests/harness/diagnostics/doctor/test_facade.py, tests/infrastructure/cli/test_doctor_profile_cli.py, raphy/prd.json, raphy/progress.txt
+- **Learnings for future iterations:**
+  - Proven structurally dead via slots dataclass fields, not runtime behavior: CompiledRunPlan has neither plugin_contracts nor phase_graph_plan, and V2ExecutablePlan.__getattr__ delegates to inner which lacks them too — so any getattr was provably always-None, no runtime probe needed.
+  - Deletion vs fix call: ADR-0221 P3 retired the v1 phase graph region from plans, so growing a phase_graph_plan projection would resurrect a retired region — wrong direction. I-HPC-7 read-only forbids the facade from materializing inputs itself. Deletion was the only honest option.
+  - ssh252 'cat file' > local mixes the wrapper git-status header into the file; use git show HEAD:path + strip leading lines, or strip after fetch.
+  - Consequence: RA-065 (converge the two resolve helpers) is now moot — its subject was deleted here; expect a drop when reached.
+---
