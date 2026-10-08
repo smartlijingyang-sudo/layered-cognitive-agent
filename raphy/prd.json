@@ -760,8 +760,8 @@
    "branchName": "raphy/arch-20261009-0107",
    "description": "As an LCA operator, I want `doctor profile --json`'s activation_ref to carry the real plan ref, so CI/downstream can rely on it for idempotency. Evidence (Round 13, doctor zone): the chain has 4 links — (1) compile_dry_run.py L150-161 puts plan_ref only on the DOC-COMPAT-000 finding, `DoctorReport.from_findings(subject, findings)` is never passed activation_ref; (2) facade.py L109-116 reads compile_report.activation_ref (always None) into the aggregate; (3) CLI --json emits activation_ref: null forever; `_print_human`'s `if report.activation_ref:` is dead. Each link is individually correct and testable — test_facade.py:270 fakes activation_ref='act-123' via stub and passes while the real producer never emits it. Classic no-locality: the bug lives in 'nobody moves finding.plan_ref into report.activation_ref'.",
    "id": "RA-052",
-   "notes": "Source: Round 13 friction walk (Strong; no-locality / testability gap).",
-   "passes": false,
+   "notes": "Source: Round 13 friction walk (Strong; no-locality / testability gap). | Implemented 2026-10-09: one-line producer fix (activation_ref=plan_ref), e2e pin on real fixture profile.",
+   "passes": true,
    "priority": 1,
    "title": "Wire activation_ref through compile_dry_run -> facade -> CLI (fix broken 4-link chain)"
   },

@@ -1674,3 +1674,11 @@
   - ssh252 'cat file' > local mixes the wrapper git-status header into the file; use git show HEAD:path + strip leading lines, or strip after fetch.
   - Consequence: RA-065 (converge the two resolve helpers) is now moot — its subject was deleted here; expect a drop when reached.
 ---
+## 2026-10-09 02:50 - RA-052
+- Implemented: one-line fix in ProfileCompileDryRun.run() success branch: from_findings(subject, findings, activation_ref=plan_ref). Facade (link 2) and CLI --json/_print_human (links 3-4) already consumed report.activation_ref, so the whole 4-link chain is now live. New e2e pin test_activation_ref_equals_plan_ref_on_real_profile runs the REAL pass on profiles/web-standard.yaml and asserts report.activation_ref == DOC-COMPAT-000 finding's plan_ref (no stub faking).
+- Files changed: lca/harness/diagnostics/doctor/compile_dry_run.py, tests/harness/diagnostics/doctor/test_compile_dry_run.py, raphy/prd.json, raphy/progress.txt
+- **Learnings for future iterations:**
+  - Real-pass e2e pins on repo fixture profiles are cheap here (profiles/web-standard.yaml compiles in ~10s, no network) — prefer them over stubbed seams when the story is about producer/consumer wiring.
+  - Chain analysis first: verified links 2-4 already worked before touching link 1, so the fix stayed minimal (one kwarg).
+  - ruff isort in this repo wants `lca.*` before `lca_kernel.*` in the same third-party block (I001).
+---

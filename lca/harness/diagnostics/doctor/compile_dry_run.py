@@ -158,7 +158,7 @@ class ProfileCompileDryRun:
                 plan_ref=plan_ref,
             )
         )
-        return DoctorReport.from_findings(subject, findings)
+        return DoctorReport.from_findings(subject, findings, activation_ref=plan_ref)
 
 
 __all__ = ("DoctorCompileError", "ProfileCompileDryRun")

@@ -3,24 +3,26 @@
 Per ADR-0199 §5.1 + §5.2 the doctor is a compile-pipeline projection. These
 tests assert: no exception escapes for profile-level failures, every emitted
 code matches DOC-XX-NNN, and the pass is deterministic (C8) + read-only
-(I-HPC-7). Real profile files are NOT required; resolve_profile /
-compile_plan are stubbed at the module boundary.
+(I-HPC-7). The boundary tests stub resolve_profile / compile_plan at the
+module boundary; one RA-052 end-to-end pin runs the real pass on the
+repo's fixture profile (no stub faking).
 """
 
 from __future__ import annotations
 
 import re
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any
 from unittest.mock import patch
 
 import pytest
 
-from lca_kernel.plan.plan_compile import PlanCompilerError
 from lca.harness.diagnostics.doctor.compile_dry_run import (
     DoctorCompileError,
     ProfileCompileDryRun,
 )
+from lca_kernel.plan.plan_compile import PlanCompilerError
 
 # Stable machine-code regex copied verbatim from
 # lca.contracts.diagnostics.doctor (DOC-<DOMAIN>-<NNN>).
@@ -169,6 +171,22 @@ class TestSuccess:
 
         assert report.findings[0].plan_ref == _FAKE_PLAN_REF
         assert _FAKE_PLAN_REF in report.findings[0].message
+
+    def test_activation_ref_equals_plan_ref_on_real_profile(self) -> None:
+        """RA-052: end-to-end pin on the REAL pass — no stub faking.
+
+        Runs the actual resolve_profile + compile_plan on the repo's
+        web-standard fixture profile and asserts the report's
+        activation_ref equals the plan ref carried by the DOC-COMPAT-000
+        success finding. Before the RA-052 fix, activation_ref was
+        always None here (the broken 4-link chain).
+        """
+        profile = Path(__file__).parents[4] / "profiles" / "web-standard.yaml"
+        report = ProfileCompileDryRun().run(profile)
+        assert report.summary.errors == 0, [f.code for f in report.findings]
+        ok = next(f for f in report.findings if f.code == "DOC-COMPAT-000")
+        assert ok.plan_ref, "success finding must carry plan_ref"
+        assert report.activation_ref == ok.plan_ref
 
 
 class TestErrorTranslation:
