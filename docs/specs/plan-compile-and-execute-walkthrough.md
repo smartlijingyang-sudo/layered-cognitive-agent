@@ -211,18 +211,17 @@ def compiled_run_plan_ref(plan) -> str:
 
 ```
 python -m lca_kernel serve --profile profiles/web-standard.yaml
-  └─ run_kernel_lifespan()                       lca_kernel/cli.py:166
-      └─ boot_resolved_profile()                 lca/harness/profile/boot.py:67-82
-          ├─ resolve_profile()   ← 读 YAML、校验、拓扑排序插件
-          ├─ compile_profile_boot_products()     boot_products.py:40-55
-          │    compile_plan(resolved, options=CompileOptions(
-          │       require_executable_phase_graph=not profile_allows_test_defaults(resolved)))
-          └─ attach_profile_boot_products(ctx, products)   boot.py:156
+  └─ run_kernel_lifespan()                       lca_kernel/boot/lifecycle.py
+      ├─ resolve_profile() / resolve_entries()   ← 读 YAML、校验、拓扑排序插件（K1/K1b）
+      └─ run_resolved_kernel(resolved)           lca_kernel/boot/boot.py:206（K3 入口，已知 ResolvedProfile）
+          ├─ compile_run_plan(resolved)          lca_kernel/plan/plan.py:25（公共 API，即 compile_plan）
+          ├─ validate_profile_plans(resolved)    lca_kernel/boot/plan_validation/（fail-loud）
+          └─ _boot_context(products)             编译产物装配后才进 Fiber 生命周期
 ```
 
-`compile_profile_boot_products` 里那个条件很关键：**生产 Profile 强制要求可执行图，只有显式标记的测试 Profile 才放宽。**
+`run_resolved_kernel` 的顺序很关键：**先 `compile_run_plan` 编译（ADR-0221 P3 后 `require_executable_phase_graph` 已被忽略，v2 图恒编译），随后 `validate_profile_plans` 在 `_boot_context` 之前 fail-loud——被拒的计划进不了 Fiber 生命周期。**
 
-编译结果被原子地钉在 Context 上，且拒绝二次改写（`boot_products.py:63-67`）：
+编译结果被原子地钉在 Context 上，且拒绝二次改写（`lca/harness/profile/boot/products.py`）：
 
 ```python
 if existing is not None:
