@@ -1636,3 +1636,16 @@
 - 测试：tests/transport/test_lifecycle_observe_failure.py 2 passed；
   tests/plugins/assistant/ 42 passed；ruff clean。
 - 实现与评估一致，无差异（评估要求"helper 是 sync 的"，确认调用点全 sync，无 await）。
+
+## 2026-10-08 RA-049 done
+- 内容：新增模块级 `@contextmanager bind_resume_capabilities(session, bindings)`，
+  收敛 resume() 里的 capability_bindings / tools_service / defer_session 三元组
+  手动 set/reset ritual；resume() 改用单一 `with (...)` 合并 CM 与原有
+  ambit/identity/workspace/plane 四个 scope（ruff 要求合并嵌套 with）。
+- learnings：CM 里的 deferred import（函数内 import）是刻意为之，
+  避免 lifecycle<->capability_bindings 循环导入；None-guards 原样保留
+  （capability None 跳过三元组，tools None 跳过 tools+defer）；
+  ADR-0248 的 gated vocal mode -> agent namespace eager 镜像原样搬进 CM。
+- 测试：tests/transport/test_lifecycle_observe_failure.py 2 passed（回归）；
+  ruff clean。
+- 实现与评估一致，无差异。

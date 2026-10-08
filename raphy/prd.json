@@ -721,7 +721,7 @@
         "HIL resume tests stay green; ruff check clean on touched files."
       ],
       "priority": 2,
-      "passes": false,
+      "passes": true,
       "notes": "Source: Round 12 friction walk (Worth exploring; leaky seam). Constraints: the None-guards and the ADR-0248 vocal-mode mirror are load-bearing — keep them inside the CM, don't simplify them away. Dependencies: capability_bindings / tool_defer session modules unchanged; callers of resume() unchanged. Deletion test: concentrates the bind/reset pairing. Test survival: HIL resume tests. Strength: Worth exploring — policy nuances need care during implementation."
     },
     {

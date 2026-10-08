@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import asyncio
-from contextlib import nullcontext
+from contextlib import contextmanager, nullcontext
 from typing import Any
 
 import structlog
@@ -52,6 +52,59 @@ from lca.plugins.transport.webserver.read.runs.live import (
 )
 
 _log = structlog.get_logger(__name__)
+
+
+@contextmanager
+def bind_resume_capabilities(session, bindings):
+    """Bind the resume capability trio with guaranteed reset (RA-049).
+
+    HIL resume runs without the execution environment that publishes the
+    per-turn RuntimePlane handles. Re-publish the hot-cached handles so
+    think/fork nodes resolve typed ``bindings`` / ``tools`` ports on the
+    resumed traversal. Missing cache (pre-pause-code runs) leaves ports
+    unseeded -- same as before this change.
+
+    The three ContextVar bindings (capability_bindings / tools_service /
+    defer_session) are set on entry and reset on exit. None-guards are
+    preserved: ``capability_bindings`` None skips the whole trio;
+    ``tools_service`` None skips tools + defer binding.
+    """
+    from lca.infrastructure.runtime_plane.capability_bindings import (
+        reset_capability_bindings,
+        reset_current_tools_service,
+        set_capability_bindings,
+        set_current_tools_service,
+    )
+    from lca.infrastructure.tool_defer.policy import DeferPolicy
+    from lca.infrastructure.tool_defer.session import (
+        ToolDeferSession,
+        reset_current_defer_session,
+        set_current_defer_session,
+    )
+
+    capability_token = None
+    tools_token = None
+    defer_token = None
+    if getattr(session, "capability_bindings", None) is not None:
+        capability_token = set_capability_bindings(session.capability_bindings)
+        if getattr(session, "tools_service", None) is not None:
+            tools_token = set_current_tools_service(session.tools_service)
+            # Mirror the create-run policy (ADR-0248): gated vocal
+            # mode keeps the ``agent`` namespace eager so the resumed
+            # run's vocal contract and visible tool schema agree.
+            vocal_mode = getattr(bindings, "vocal_mode", "direct") or "direct"
+            defer_token = set_current_defer_session(
+                ToolDeferSession(DeferPolicy.for_vocal_mode(vocal_mode))
+            )
+    try:
+        yield
+    finally:
+        if capability_token is not None:
+            reset_capability_bindings(capability_token)
+        if tools_token is not None:
+            reset_current_tools_service(tools_token)
+        if defer_token is not None:
+            reset_current_defer_session(defer_token)
 
 
 class RunLifecycleCoordinator:
@@ -235,34 +288,10 @@ class RunLifecycleCoordinator:
             # ``bindings`` / ``tools`` ports on the resumed traversal.
             # Missing cache (pre-pause-code runs) leaves ports unseeded —
             # same as before this change.
-            capability_token = tools_token = defer_token = None
-            if getattr(session, "capability_bindings", None) is not None:
-                from lca.infrastructure.runtime_plane.capability_bindings import (
-                    reset_capability_bindings,
-                    reset_current_tools_service,
-                    set_capability_bindings,
-                    set_current_tools_service,
-                )
-                from lca.infrastructure.tool_defer.policy import DeferPolicy
-                from lca.infrastructure.tool_defer.session import (
-                    ToolDeferSession,
-                    reset_current_defer_session,
-                    set_current_defer_session,
-                )
-
-                capability_token = set_capability_bindings(session.capability_bindings)
-                if getattr(session, "tools_service", None) is not None:
-                    tools_token = set_current_tools_service(session.tools_service)
-                    # Mirror the create-run policy (ADR-0248): gated vocal
-                    # mode keeps the ``agent`` namespace eager so the resumed
-                    # run's vocal contract and visible tool schema agree.
-                    vocal_mode = getattr(bindings, "vocal_mode", "direct") or "direct"
-                    defer_token = set_current_defer_session(
-                        ToolDeferSession(DeferPolicy.for_vocal_mode(vocal_mode))
-                    )
-            try:
-                # P3-06: snapshot/runnable are hot-path cache; authority is Session facts.
-                with (
+            # RA-049: the capability-bind/reset ritual lives in the
+            # bind_resume_capabilities CM; the with-block guarantees reset.
+            with (
+                bind_resume_capabilities(session, bindings),
                     bind_run_ambit(ambit) if ambit is not None else nullcontext(),
                     run_identity_scopes(
                         session.run_id,
@@ -271,15 +300,8 @@ class RunLifecycleCoordinator:
                     ),
                     run_workspace_scope(session.run_id),
                     plane_bindings_scope(bindings) if bindings is not None else nullcontext(),
-                ):
+            ):
                     result = await session.runnable.resume(session.snapshot, input=answer)
-            finally:
-                if capability_token is not None:
-                    reset_capability_bindings(capability_token)
-                if tools_token is not None:
-                    reset_current_tools_service(tools_token)
-                if defer_token is not None:
-                    reset_current_defer_session(defer_token)
             if self._outcomes.apply_resume(session, result):
                 self._registry.mark_paused(session)
                 return
