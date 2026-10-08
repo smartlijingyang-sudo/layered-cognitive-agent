@@ -971,7 +971,7 @@
       "description": "As an LCA maintainer, I want SinglePluginDoctor either reachable or retired, so test coverage stops vouching for unreachable code. Evidence (Round 13, doctor zone): lca/harness/diagnostics/doctor/single_plugin.py (247 lines, P2-09 single-file AST audit) has a complete test file but ZERO consumers in lca/ — facade doesn't wire it, CLI doesn't expose it, unlike ResourceDoctor which at least has an explicit 'not wired' record in the facade docstring. It sits exported from doctor/__init__.py in a gray zone. Its three AST helpers (_kwarg_names/_extract_kwarg_value/_extract_plugin_id) could also merge.",
       "id": "RA-067",
       "notes": "Source: Round 13 friction walk (Worth exploring; orphan module).",
-      "passes": false,
+      "passes": true,
       "priority": 3,
       "title": "Decide SinglePluginDoctor's fate: wire `doctor plugin <path>` or mark retired"
     },

@@ -1828,3 +1828,12 @@
   - products.py 的 `scope.__dict__` 后门是 RA-069 的地盘，本轮零触碰。
   - composition/__init__ 删 re-export 后，README 的门面符号数（两处）必须同步改，否则文档撒谎。
 ---
+
+## 2026-10-09 06:05 CST - RA-067
+- 给 SinglePluginDoctor 接上真消费者：`lca-ops doctor plugin <path>` 落地（与 doctor profile 并列注册）。评估给了 wire/retire 二选一；选 wire——模块是 247 行纯 AST 审计器（DOC-PS-*），已测试、有用，不是装饰，retire 是浪费。
+- Files changed: `lca/infrastructure/cli/commands/doctor/profile.py`（register 加 plugin 子命令；新增 _doctor_plugin：exit 2 输入无效 / --ci 错误 exit 1 / --json；_print_human 加 subject_label 参数，plugin 命令打印 `plugin: <path>`）；new `tests/infrastructure/cli/test_doctor_plugin_cli.py`（16 个用例：注册、JSON、human、CI 退出码、坏输入、I-HPC-7 只读——全部走真实 SinglePluginDoctor，无 stub）。
+- **Learnings for future iterations:**
+  - 给 CLI 加子命令时，_print_human 这类"写死标签"的渲染函数要参数化 subject label，否则新人会看到 `profile: xxx_plugin.py` 的谎言。
+  - doctor 的只读测试（test_no_journal_writes_in_module）是按"读模块源码"断言的：新 import 只要不含 forbidden 词就过，但加 import 前仍要人眼确认语义（diagnostics import 无副作用）。
+  - 真实 doctor（纯 AST）比 stub 更适合做 CLI 端到端 pin：快、确定、无需维护 MagicMock。
+---
