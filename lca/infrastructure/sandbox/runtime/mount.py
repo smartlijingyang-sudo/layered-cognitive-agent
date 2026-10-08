@@ -27,7 +27,9 @@ from lca.infrastructure.sandbox.factory.factory import ONLYBOXES
 MOUNT_VERIFY_SCRIPT = """
 import json as _j
 import os as _o
-root = {root!r}
+# Local exports LCA_GUEST_ROOT per spawn (= the session root, where staging
+# lands); Onlyboxes leaves it unset and keeps the image contract root.
+root = _o.environ.get("LCA_GUEST_ROOT") or {root!r}
 expected = {expected!r}
 found = {{}}
 for dirpath, _, filenames in _o.walk(root):
