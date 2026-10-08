@@ -598,7 +598,7 @@
       "description": "As an LCA maintainer, I want host absolute paths injected into command text by _rewrite_command to be reverse-projected at the adapter exit, so the model does not see host session roots that the display projection deliberately exempts.",
       "id": "RA-040",
       "notes": "Source: Round 10 friction walk A (Worth exploring). Deletion test: removing the free-text exemption would concentrate complexity but risk corrupting file contents -> the exemption is deliberate; the fix belongs on the adapter exit, not the display side. Overlap: none (duplication stories did not touch this seam).",
-      "passes": false,
+      "passes": true,
       "priority": 8,
       "title": "Reverse-project host paths injected by _rewrite_command at the sandbox adapter exit"
     },

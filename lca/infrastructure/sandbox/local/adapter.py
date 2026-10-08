@@ -12,6 +12,7 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import os
+import re
 import shlex
 import tempfile
 from pathlib import Path
@@ -143,6 +144,27 @@ class LocalSandboxAdapter(Sandbox):
             return command
         return command.replace(mount, root)
 
+    def _project_host_to_guest(self, text: str, root: str) -> str:
+        """Project host session-root paths in TEXT back to the guest view.
+
+        Inverse of :meth:`_rewrite_command`: the rewrite maps the guest
+        mount (``/mnt/data``) onto the host session root inside the command
+        text, so the shell's stdout/stderr come back containing host
+        absolute paths. The display projection deliberately never rewrites
+        free text (pinned by ``test_observation_surface_display_paths``),
+        so the adapter exit is the one place that converts them back —
+        the model only ever sees the guest view.
+
+        The match is boundary-aware: ``root`` is only replaced when NOT
+        followed by a path-continuation character, so sibling paths that
+        merely share the prefix (``<root>2/...``) are left alone. Uses the
+        same ``root``/``mount`` constants as the forward rewrite.
+        """
+        mount = self._layout.root.rstrip("/")
+        if not text or root == mount:
+            return text
+        return re.sub(re.escape(root) + r"(?![A-Za-z0-9_.\-])", mount, text)
+
     async def _exec_shell(
         self,
         command: str,
@@ -181,8 +203,12 @@ class LocalSandboxAdapter(Sandbox):
             emitter.emit_stderr(err + "\n")
             return SandboxResult(success=False, exit_code=1, error=err, stderr=err + "\n")
 
-        stdout = (stdout_b or b"").decode("utf-8", errors="replace")
-        stderr = (stderr_b or b"").decode("utf-8", errors="replace")
+        stdout = self._project_host_to_guest(
+            (stdout_b or b"").decode("utf-8", errors="replace"), work
+        )
+        stderr = self._project_host_to_guest(
+            (stderr_b or b"").decode("utf-8", errors="replace"), work
+        )
         code = int(proc.returncode or 0)
         if stdout:
             emitter.emit_stdout(stdout)

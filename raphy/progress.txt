@@ -1393,3 +1393,23 @@
   - 传脚本给 ssh252 时文件名别写错（本轮曾把 edit3 传成 edit5 的内容，
     TestOrder 改动漏执行——靠 git diff 逐 hunk 核对才发现）。
 ---
+
+## 2026-10-08 13:20 CST - RA-040
+- `LocalSandboxAdapter` 加 `_project_host_to_guest(text, root)`：
+  `_rewrite_command` 的逆操作，把 stdout/stderr 里的 host session root
+  投影回 guest mount（`/mnt/data`），与重写共用同一对 root/mount 常量；
+  匹配是 boundary-aware（root 后不跟路径延续字符才替换），共享前缀的
+  兄弟路径（`<root>2/...`）不动。
+- 投影点在 `_exec_shell` 的 decode 之后、emitter 发射之前——live stream
+  与最终 SandboxResult 同时干净；display_paths 的自由文本豁免原样保留
+  （豁免测试 21 passed 仍绿）。
+- 新测试 tests/infrastructure/sandbox/test_adapter_host_path_projection.py：
+  pwd/stdout 与 LCA_GUEST_ROOT/stderr 的真机投影断言 + 边界单测；3 passed。
+- ruff clean（修掉 S108：单测里硬编码 /tmp 路径改走 tmp_path）。
+- 文件：lca/infrastructure/sandbox/local/adapter.py（+import re）、
+  tests/infrastructure/sandbox/test_adapter_host_path_projection.py（新）
+- **Learnings for future iterations:**
+  - display/process split 的泄漏修在 process 侧出口（adapter），不碰
+    display 侧——豁免是刻意的（删豁免会 corrupt 文件内容），两边各守
+    一条线。
+---
