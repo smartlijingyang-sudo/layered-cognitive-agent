@@ -1,216 +1,195 @@
-# Raphy Assessment — Round 8 (2026-10-08 05:06, branch `raphy/arch-20261008-0506`)
+# Raphy Assessment — Round 9 (2026-10-08 09:20, branch `raphy/arch-20261008-0118`)
 
 ASSESS ONLY. 本轮按硬化版 `raphy-assess.md` 执行：读 `skills/improve-codebase-architecture/SKILL.md`
-→ git log 热点定域 → CONTEXT.md + 相关 ADR → 三区 friction walk（5 问必答，端到端精读非 grep）
-→ mandatory runtime verification（mock LLM 真跑：basic / tool-call / 双 run / 非收敛复现）
-→ duplication 副扫描 → self-grilling → stories 入 prd.json（`userStories` 键，RA-028 起编号）。
+→ git log 热点定域 → CONTEXT.md + 相关 ADR（ADR-0292 精读）→ 三区 friction walk（5 问必答，
+端到端精读非 grep）→ mandatory runtime verification（mock LLM 真跑：basic / tool-call / 双 run）
+→ duplication 副扫描 → self-grilling → stories 入 prd.json（`userStories` 键，RA-031 起编号）。
 
 ## Scope（YAGNI）
 
-`git log --oneline -40` 生产代码热点（排除已做故事领地 + 纯测试 + 禁区）：
-- `lca/infrastructure/host_runtime/providers/user_cli.py` ×3 → 其中 2 笔是 RA-014/015 自己的
-  converge，第 3 笔是其后续 fix（`7aa5a7202` unlink tempfile in finally）。Round 7 评估曾整体避开，
-  但本轮 friction walk 只走**观察路径**（status/heal），RA-014/015 的 scope 是 start/stop
-  lifecycle——不重审已收敛部分，只看 RA-014 声明 seam 后**仍绕行**的 status/heal。
-- `lca/infrastructure/observability/adapters/policy.py` ×2 → 含 iter-tests 的 revert 战
-  （`3a7bc323a` 恢复 `e51902b07` 删掉的 else），iter lane 刚动过，避开。
-- `tests/integration/test_persist_before_execute.py` ×2 → persist-before-execute 是活跃 seam，
-  其生产侧 `lca/cognition/body/executor/simple_body.py` 无 raphy 故事覆盖，可走。
-- 其余热点（model_visible hook、schedulers、fold_source、tool_search）均为 RA-023~027 领地，避开。
-- 禁区遵守：ralph Round 2（DecisionGates / Ingest / ContextFiles shims / Read Runs micro-dirs /
-  `lca/cognition/memory/`）、lca-1000 迁移领地（`plugins/transport/webserver/`、`contracts/event.py`）、
-  `gate_chain_strategy.py`（他人工作）、`brain/decision_gates/`（Round 2 领地）。
+`git log --oneline -40/-60` 生产代码热点（排除已做故事领地 + 纯测试 + 禁区）：
+- `lca/nodes/intervene/`（approve_gate.py + interrupt.py）— be4f52dd1 / ca9a07a63 两笔
+  ADR-0292 授权语义 feature，新鲜热区；非 ralph Round 2 领地（Round 2 的 DecisionGates 是
+  `brain/decision_gates/`，不是 `nodes/intervene/`）。可走。
+- `lca/infrastructure/tool_defer/`（policy.py + session.py + tool_search.py）— Defer tool L1
+  生产默认的深水区；×2 in -60；非禁区。可走。
+- `lca/plugins/observability/cli/debug_trace_provider.py` — cf8d64a53 刚 pin 了
+  debug-trace explain_failure 路由；`e51902b07/2bb3ceefc` 的 else 机械触碰区（已修复，
+  不重审）。可走。
+- 避开：model_visible（RA-024/025）、schedulers（RA-026）、fold（RA-027）、user_cli（RA-028）、
+  simple_body/agent_state（RA-029）、anomaly（RA-030）、cognitive_agent/loop_budget（RA-023）、
+  observability/adapters（iter-tests revert 战）、ralph Round 2 / lca-1000 / memory /
+  gate_chain_strategy.py。
 
 三区 friction walk 定域（精读文件，非 grep）：
-- **Area A**：host_runtime providers（`providers/user_cli.py` 225 行 / `shared.py` 258 行 /
-  `user_workspace.py` 57 行 / `user_account.py` 67 行 / `providers/__init__.py` 128 行全文）
-  + 对比 `lca/infrastructure/cli/services/daemon/daemon.py` 的 `state()`/`restart()`（200-262 / 85-164 行）。
-- **Area B**：`lca/cognition/brain/llm_turn/`（`executor.py` 195 行 / `mode.py` 18 行 / `policy.py` 37 行 /
-  `response_projection.py` 134 行 / `__init__.py` 18 行全文）+ `NativeToolCall` 类型定义
-  （`contracts/models/core/conversation/llm.py` 24-46 行）。
-- **Area C**：`lca/cognition/body/executor/simple_body.py`（399 行，dispatch_tool_calls 全路径精读）
-  + `state.extra["current_turn"]` 的写方（`harness/projection/agent_state.py:70`）与另一读方
-  （`nodes/think/llm/invoke.py:104`）。
+- **Area A**：`lca/nodes/intervene/approve_gate.py`（380 行全文）+
+  `lca/nodes/intervene/interrupt.py`（140 行全文）+
+  `lca/nodes/act/authorize/authorize.py`（outputs/emit 段）+
+  `bundles/act/act_subgraph.yaml`（gate 节点 inputs/outputs + 边）。
+- **Area B**：`lca/infrastructure/tool_defer/policy.py`（150 行全文）+
+  `lca/infrastructure/tool_defer/session.py`（~420 行全文）+
+  `lca/infrastructure/tool_defer/tool_search.py`（230 行全文）。
+- **Area C**：`lca/plugins/observability/cli/debug_trace_provider.py`（全文）+
+  `lca/plugins/observability/cli/debug_seam.py`（全文）。
 
 ## Friction walk — 5 问必答
 
-### Area A：host_runtime providers（daemon 观察路径）
+### Area A：nodes/intervene（approve 门）
 
-1. **理解一个概念要在多少小模块间跳？** "daemon 当前状态"要跳 4 处：`CLIProvider.status()`
-   → `_report_daemon_status`（直读 pid 文件）→ `DaemonService.state()`（另一套状态计算）
-   → `ServiceState`（`cli/service/service.py`）。同一个 daemon，两套状态推导。
-2. **shallow module？** `_daemon_service_for`（模块级函数，接口 `(config, user)` vs 实现 6 字段映射）
-   偏薄但 load-bearing（RA-014 的映射契约）；`_report_daemon_status` / `_report_kernel_serve_status`
-   是薄的重复推导——deletion test：删掉它们、改从 `DaemonService.state()` 投影，复杂度**收敛**
-   （少一套 pid 文件路径推导 + 少一次 gateway 探测）。
-3. **为可测试抽出的纯函数藏 bug？** `_stage_privileged_file`（RA-015）抽出后真正的 bug
-   （sudo 失败残留 tempfile）藏在**仪式内部**，`7aa5a7202` 事后才补 finally unlink——"抽出"没有
-   让 bug 更早暴露。不适用为新 story（已修复），记为教训。
-4. **leaky seam？** **有，RA-028 的核心**：RA-014 宣布 DaemonService 是"唯一 daemon-lifecycle owner"
-   并委托了 start/stop，但**观察路径仍绕行**：(a) `_report_daemon_status` 直读
-   `Path(self.user.state_dir) / "connect.pid"` + `pid_alive`，而 DaemonService 经 sudo 读
-   `/home/<user>/.lca/connect.pid`——"pid 文件在哪"是两套独立推导，home 定制时可分歧；
-   直读 vs sudo 读还有特权不对称。(b) `_report_kernel_serve_status` 用 `http_ready(health_url)`
-   再探一次 gateway，而 `DaemonService.state()` 已算好 gateway check——同一端点两次探测。
-   (c) `heal()` 手写 `stop_daemon(); start_daemon()`，而 DaemonService 有 `restart()`（= stop+start，
-   含 RA-006 的 single-instance 语义）——形状重复。(d) 全仓 `pid_alive` 的非 owner 直调只剩
-   user_cli.py:207 一处（daemon.py / lobehub.py 是各自 lifecycle owner，合法）。
-5. **不可测试/绕过接口测试？** `CLIProvider.status()` 的 daemon 分支今天只能靠磁盘上真实 pid
-   文件测（`test_private_pid_alive_replica_is_gone` 只钉"私有 replica 已删"，没钉"改走 seam"）；
-   若改从注入的 DaemonService 投影，fake DaemonService 可直接断言——"interface is the test surface"
-   在此成立。
+1. **理解一个概念要在多少小模块间跳？** "审批门凭什么放行"要跳 4 处：`act.authorize`
+   （发出 `approval_required` bool + `approval_requirement` 对象）→ `act_subgraph.yaml`
+  （gate 的 yaml inputs 列的是 `approval_required`）→ `approve_gate.py` 的 executor
+   （读的却是 `approval_requirement`）→ ADR-0292 §10（grant-absence 语义）。"要不要批"
+   有三个名字（`approval_required` / `approval_requirement` / `decision.needs_approval`），
+   分散在 policy engine / yaml / executor 三处——典型的 shallow-module sprawl。
+2. **shallow module？** `_grant_absence_refusal(decision, req: object | None)`：接口几乎和实现
+   一样复杂——`getattr(req, "required", False)` 的鸭子类型就是在用代码重复描述
+   "有个 required 字段"。deletion test：现在删掉它只移动复杂度；但把它 typed 化
+   （`req: ApprovalRequirement | None`，contracts 里现成的 frozen dataclass）之后，
+   它才 earn 存在。`_route_refusal_to_evidence` 是薄的 adapter：删掉它，复杂度就散进
+   `safe_executor` 的同款仪式——这正说明那份仪式该有自己的 module（→ RA-032）。
+3. **为可测试抽出的纯函数藏 bug？** 没有抽取问题；但真正的语义藏法是：
+   `_grant_absence_refusal` 里 `hasattr(req, "required")` 为 False 时**静默回退**到
+   `decision.needs_approval`——而 ADR-0292 §10 恰恰说模型自报的 `needs_approval`
+   不可信（幻觉可清）。一个"看起来像对象但缺 required"的 req 会无声降级到不可信信号。
+   类型本该在 seam 上保证，却在调用点用 getattr 补——no locality。
+4. **leaky seam？** **有，三处**：(a) executor 从 `port_values` 读 `approval_requirement`，
+   但 `declared_inputs=(decision, command)` 没声明——违反 ADR-0235 "reads typed ports
+   only"；(b) yaml 的 gate inputs 列的是另一个名字 `approval_required`（bool），executor
+   根本不读它；(c) 两个输出分支都 echo `approval_requirement`，但 `declared_outputs`
+   没声明。另外 executor 自称 "pure transform"，实际读 ambient TrustEnvelope
+   （`get_current_trust_envelope()`）并写 evidence ledger——docstring 与实现对不上。
+5. **不可测试/绕过接口测试？** grant-absence 路径的测试必须往 `port_values` 里"走私"
+   `approval_requirement`——declared interface 测不到它（"the interface is the test
+   surface"）。`hasattr` 降级分支生产永远传 `ApprovalRequirement`，不可达但无类型保证。
 
-### Area B：brain/llm_turn
+### Area B：infrastructure/tool_defer
 
-1. **跳模块？** "一次 LLM turn"要跳：`execute_llm_turn` → `resolve_llm_turn_mode`（policy.py）→
-   `_stream_turn` / `_summarize_after_search` → `_handle_output_text_chunk`（内联 import
-   capability_bindings）→ `project_llm_response`。kwargs 袋（cursor/reasoner_prompt/history）
-   是约定式 seam，但那是 ADR spec section H 的显式设计（ContextVar 删除），属刻意，不立案。
-2. **shallow module？** `mode.py`（18 行，一个 StrEnum）+ `policy.py`（37 行，两个函数）——薄，
-   但 deletion test：删掉 → 模式判定逻辑散回 executor，**发散**，留着 earned。不立案。
-3. **纯函数藏 bug？** `project_llm_response` 内的 `getattr(call, "wire_status", None) or "ok"`
-   三处防御式读取——但 `NativeToolCall` 是 frozen dataclass，`wire_status/wire_reason/wire_raw_preview`
-   是**具名字段**（llm.py:24-46）。类型已保证，getattr 是死防御；更糟的是它暗示"字段可能不存在"，
-   而类型说"一定存在"——接口撒谎。小杠杆，不单独立案，记入本轮 learnings（诚实化候选）。
-4. **leaky seam？** `_handle_output_text_chunk` 每 chunk 一次函数内 import + `current_bindings_view()`
-   重解析 vocal_mode——capability_bindings 的 seam 形状可疑（per-chunk 重查），但 import 有缓存、
-   语义可能是"bindings 可热变"的刻意设计。无失败证据，不立案（记入观察）。
-5. **不可测试？** `_summarize_after_search` 与 `_stream_turn` 的"空响应恢复"是**两套不同形状**
-   （前者重 stream 3 次 `_POST_SEARCH_COMPLETE_RETRIES`，后者转 `llm.complete` 2 次
-   `_EMPTY_STREAM_COMPLETE_RETRIES`）——同一概念"LLM 空响应怎么办"两种恢复策略，分散在同一模块。
-   有收敛形状（统一恢复策略），但两处语义确有差异（summarize 本就是 non-stream），speculative
-   偏大，不立案；duplication 扫描亦只得 4 处语义各异的 retry loop（stream_event_manager /
-   casting），不成簇。
+1. **跳几处？** "本轮 model 看到哪些工具"要跳 6 处：policy（eager 集合）→
+   `session.update_turn`（分组 + unknown 兜底）→ `session.render_turn`（wire + catalog）→
+   `think.history.assemble`（model 可见切片）→ `tool_search`（loader）→
+   `capability_bindings`（ContextVar 镜像）。有 sprawl，但每处职责清晰（policy=策略，
+   session=状态，assemble=投影），locality 尚可——记为观察，不立案。
+2. **shallow？** ContextVar 三件套（set/reset/current）薄，但属 run-entry ritual
+   （与 `current_tools_service` 同构）；deletion test：删掉只是把 ContextVar 调用散到各处，
+   不收敛——不适用。`_classify_args`/`_ArgShape` 已收敛（不立案）。
+3. **testability 错位？** `update_turn` 的 fail-soft（unknown parking）是 2026-10-01
+   真事故后的刻意 backstop，fail-fast（无描述的 declared namespace）是 ADR-0256 B2
+   显式要求——逻辑内聚在 `update_turn` 里，有 locality。不适用。
+4. **leaky seam？** `_tool_to_spec` 与 `think.history.assemble._tool_to_spec` 逐字相同，
+   但注释写明是刻意层边（"infrastructure must not import L2 nodes"）——deliberate，
+   不适用。`getattr(tool, "namespace", "")` 的鸭子类型是 wrapper 事故史后的刻意
+   fail-soft，不适用。
+5. **测试死角？** `tests/infrastructure/tool_defer/test_defer_catalog.py` 钉 catalog；
+   `render_turn`/`load_namespaces` 有测试面。不适用。
 
-### Area C：body dispatch（persist-before-execute）
+### Area C：plugins/observability/cli（debug trace）
 
-1. **跳模块？** "journal 行上的 turn 是哪一轮"要跳：`simple_body.py:230`（读）→
-   `nodes/think/llm/invoke.py:104`（另一读）→ `harness/projection/agent_state.py:70`（唯一写方）
-   → `state.py:117`（`extra: dict[str, Any]` 无类型袋）。四跳才答得上来。
-2. **shallow module？** 两处读方各一行 `int(state.extra.get("current_turn", 0))`——接口（魔法字符串）
-   与实现一样复杂，deletion test：删掉任一处只是搬走约定，不收敛；**收敛点在给 turn 一个具名 seam**。
-3. **纯函数藏 bug？** 不适用（无为此抽出的纯函数）。
-4. **leaky seam？** **有，RA-029 的核心**：同一 `AgentState` 对象上，`step` 是具名字段
-   （`state.step`），`turn` 却是 `extra` 袋里的魔法字符串——同一 journal 行的两个维度，
-   一个 typed 一个 stringly，不对称 seam。写方（harness projection）与读方（cognition/body、
-   nodes/think）跨层靠字符串约定；`.get(..., 0)` 静默默认使"projection 没跑"变成 turn=0 的
-   脏行而非 fail-loud。`query.py` 里对袋内值做 `isinstance(value, int) and not isinstance(value, bool)`
-   防御，说明无类型袋以前咬过人。
-5. **不可测试？** "projection 缺席时 turn 回退到 0"今天只能靠"不跑 projection"测到——
-   接口上无 seam 可钉；具名化后可直接断言 seam 行为。
+1. **跳几处？** 小——理解 "trace 命令"只需 `_DebugTraceCommand.run`（~60 行 flag dispatch）
+   + `TraceInspector`。不适用。
+2. **shallow？** `_render_event`（debug_trace_provider.py:99）**零调用者**——不是 shallow，
+   是 dead code（journal.py 的同名函数是另一个、有调用者）。`Config(BaseModel)` 在
+   debug_seam.py / debug_trace_provider.py 各一份——cosmetic duplicate，无杠杆。
+   不立案。
+3. **testability 错位？** `run()` 是 `kwargs.get` 的 flag-dispatch；
+   `inspect_trace(focus=focus)` 上的 `# type: ignore[arg-type]` 是残留（focus 已是 str）。
+   无隐藏 bug 证据。不适用。
+4. **leaky seam？** 无。
+5. **测试死角？** `tests/scenario/cli/test_cli_debug_trace.py` 钉注册 + explain_failure
+   路由。不适用。
 
 ## Runtime verification（mandatory，MockLLMAdapter，LLM_API_KEY=dummy）
 
-沿用 `hidden_files/runtime-findings-20261007.md` 的配方（`Agent` + `ensure_default_ctx`）：
+自写探针 `/tmp/raphy-round9-runtime.py`（`ssh252 'python3' < script` 走 stdin，
+`PYTHONPATH=/home/lichao/layered-cognitive-agent`）：
+- A basic run（"1+1等于几?"）→ **completed** ✅
+- B tool-call run（NoopTool + 首轮 tool_call mock）→ **completed** ✅
+- C 同一 agent 连续两次 run → **completed / completed** ✅
+- 无 crash/hang/静默失败。10-07 P0（RA-023）本轮未复现——Round 8（05:15）已复测
+  "非收敛 run 返回 failed Result 无抛错"，本分支含 RA-023 merge（6324b2aad），不再重跑。
 
-| # | 场景 | 结果 |
-|---|------|------|
-| A | basic run（`1+1等于几？`） | ✅ completed |
-| B | tool-call run（CalcTool，首轮 tool_call 次轮作答） | ✅ completed，工具执行 |
-| C | 同一 agent 两轮连续 run | ✅ completed / completed |
-| D | 非收敛 run（InfiniteMock + max_steps=5） | ✅ **failed Result，无抛错**——RA-023 修复生效（`LoopObligationExceededError` 被翻译进 `result.error`，日志 `status=failed max_steps=5`）|
+## Duplication 副扫描（friction walk 之后）
 
-**新发现（运行时，非静态）：** 健康 run 的 `anomaly_detector` 噪音比 10-07 记录的更严重——
-单轮 healthy run 数十条 `stalled`（sequence 只要跳号>1 就报，但 spine 多生产者/过滤本就跳号）、
-`collision`（span_id 如 `lca-seq-00000007` 在关联事件间复用，并非"同一 span 开两次"）、
-`cycle`（`runtime.reducer.apply` 连续出现 2 次就报，但它每事件必跑一次，consecutive_count=2
-是构造性误报）。检测器的事件/span/序列模型与 spine 实际语义对不上→ RA-030。
-
-## Duplication 副扫描
-
-- `for attempt in range(_*_RETRIES)` 4 处：语义各异（publish 重试 / post-search 重流 /
-  空流转 complete / casting），各有独立常量与 body——不成"同一仪式"簇，不立案。
-- `pid_alive` 非 owner 直调：全仓只剩 user_cli.py:207 一处——反向佐证 RA-028（leak 是孤例）。
-- `int(state.extra.get("current_turn", 0))` 2 处：是 RA-029 本体，不另立案。
-- 本轮 duplication  story：0（quota 要求至少一个 friction 非 duplication 故事——满足，三个全是 friction）。
+- `current_bound()` 全仓 4 处：`runs/tools.py:368`（fail-loud + typer.Exit）、
+  `fact_gateway.py:198`（journal 镜像）、`safe_executor:162` + `approve_gate:125`
+  （"ambient → evidence_binding().store → 无绑定 no-ref" 逐字同形）。前两者是不同形状，
+  不收编；后两者 two = real（→ RA-032）。
+- `getattr(req, ...)` 全仓仅 approve_gate 一处（→ RA-031 的一部分）。
+- 其余：`_render_event` dead（上文，不立案）、`Config` ×2 cosmetic（不立案）、
+  `_classify_args` 已收敛（不立案）、`_tool_to_spec` 刻意层边（不立案）。
 
 ## Candidate table
 
-| id | Files | Problem | Solution | Benefits（locality + leverage） | Strength |
-|----|-------|---------|----------|-------------------------------|----------|
-| RA-028 | `lca/infrastructure/host_runtime/providers/user_cli.py`, `lca/infrastructure/cli/services/daemon/daemon.py` | RA-014 把 DaemonService 立为 daemon-lifecycle 唯一 owner 并委托了 start/stop，但**观察路径仍绕行**：`_report_daemon_status` 直读 pid 文件（自家路径推导 `user.state_dir/connect.pid` vs DaemonService 的 sudo 读 `/home/<user>/.lca/connect.pid`——两套推导可分歧 + 特权不对称）；`_report_kernel_serve_status` 对 `DaemonService.state()` 已算好的 gateway check 再做一次 `http_ready` 探测；`heal()` 手写 stop+start 而 DaemonService 有 `restart()` | `status()` 的 daemon/gateway 部分改从 `self._daemon_service().state()` 投影（CLI-deployed 检查留 provider）；删 `_report_daemon_status`/`_report_kernel_serve_status` 私有推导与 `pid_alive` import；`heal()` 走 seam 的 restart 形状 | **locality**：daemon 状态计算只剩 lifecycle owner 手里一处；**leverage**：未来 daemon 健康信号（source drift、`next_action`）免费流进 provider status；status 可经注入的 fake DaemonService 测试（"interface is the test surface"） | **Worth exploring** |
-| RA-029 | `lca/harness/projection/agent_state.py`, `lca/cognition/body/executor/simple_body.py`, `lca/nodes/think/llm/invoke.py`, `lca/contracts/models/core/state/state.py` | journal 维度 `turn` 靠魔法字符串 `"current_turn"` 在无类型 `AgentState.extra` 袋里流转：1 写方 + 2 读方，各带静默 `.get(..., 0)`；而同一对象上的兄弟维度 `state.step` 是具名字段——不对称 seam；写方改键名/漏写时 journal 静默写 turn=0 脏行 | 给 turn 具名 seam（`AgentState.current_turn` 由 projection 填充，或 contracts 层 `turn_of(state)`，对标 RA-025 的 `step_id_for`）；两读方改走 seam；静默 0 默认收进 seam 做显式决策（session-bound 缺席则 fail-loud，unbound 单测才 0） | **locality**："turn 从哪来"一处定义；**leverage**：拼写错误变类型错误；turn 传播可端到端钉测试；`extra` 袋的其余 key 不动（scope 外） | **Worth exploring** |
-| RA-030 | `lca/plugins/observability/spine/derivers/anomaly.py` | 检测器的模型与 spine 实际语义对不上，健康 run 数十条误报：`_check_stalled` 见跳号就报（多生产者本就跳号）；`_check_collision` 见 span_id 重复就报（关联事件复用 span_id 是正常）；`_check_cycle` 在 `runtime.reducer.apply` 连续 2 次就报（它每事件必跑，构造性误报）。操作员被训练成无视 detector，真异常会被淹没 | 按实际语义重调模型：stalled 按生产者分别追踪序列或显式允许跳号；collision 只在"同一 span_id 并发 open 两次"时报（复用 `_check_stuck` 的 open-span 表）；cycle 区分 per-event EP 与 per-turn EP（per-EP 基线）；阈值保持公开具名 | **locality**："何为异常"的定义与现实在一处对齐；**leverage**：detector 从噪音变可信信号；"健康 run 零告警"可写成回归测试 | **Worth exploring** |
+| ID | Files | Problem | Solution | Benefits（locality+leverage） | Strength |
+|----|-------|---------|----------|------------------------------|----------|
+| RA-031 | `lca/nodes/intervene/approve_gate.py`, `bundles/act/act_subgraph.yaml` | 门的 declared interface 说谎两处：`declared_inputs` 不含 executor 实际读的 `approval_requirement`（yaml 列的却是另一个名字 `approval_required`，executor 根本不读）；`req: object \| None` + `getattr/hasattr` 鸭子类型，而 contracts 里有现成的 frozen `ApprovalRequirement`；"看起来像对象但缺 required" 会静默降级到 ADR-0292 §10 明言不可信的 `decision.needs_approval` | `declared_inputs`/`declared_outputs` 补上 `approval_requirement`（yaml inputs/outputs 同步）；`_grant_absence_refusal` 签名改为 `req: ApprovalRequirement \| None`，删鸭子类型，`req is None → decision.needs_approval` 的回退显式化；class docstring 去掉 stale 的 "pure transform"，写清 ambient TrustEnvelope 读 + evidence ledger 写 | locality：门"需要政策信号什么"收进 declared interface，测试可经 interface 驱动 grant 门（"the interface is the test surface"）；leverage：§10 是安全关键路径，类型即文档，后续改 grant 语义不再靠读实现猜形状 | **Strong** |
+| RA-032 | `lca/nodes/intervene/approve_gate.py`, `lca/cognition/body/executor/safe_executor/executor.py`, `lca/infrastructure/observability/`（新 seam 落点） | "从 ambient observability 解析 evidence store，无绑定走 no-ref" 的仪式在两处逐字重复（safe_executor._resolve_evidence_pair / approve_gate._route_refusal_to_evidence 内联版）；two = real seam | 在 `lca/infrastructure/observability` 立 `resolve_evidence_store()` seam（deferred import 保留，无绑定/无 store → None，fail-soft 契约不变）；两处调用方收敛到它；safe_executor 保留 `(store, policy)` 元组形状（store 走新 seam）；落点选 observability 而非 safe_executor——nodes（L2）不得 import cognition/body，层向论证 | locality："怎么从 ambient 拿到 evidence store" 成为一个 module 的知识；leverage：第三个消费者出现时直接复用，不再手写第三份仪式 | Worth exploring |
 
 ## Top recommendation
 
-**先做 RA-028**。它是三者中最干净的 leaky seam：RA-014 已经把"谁拥有 daemon 生命周期"
-的组织结论写好了（DaemonService），只是观察路径漏网——"删掉私有推导，复杂度收敛进 owner"
-的 deletion test 是三者中最脆的。且它有具体的分歧 hazard（两套 pid 路径推导 + 直读/sudo
-读特权不对称），不是纯美学。RA-029 第二：不对称 seam 的证据确凿（`state.step` typed vs
-`turn` stringly 并排两行），修法小而明确。RA-030 第三：证据最生动（运行时亲眼所见的数十条
-误报），但 detector 阈值是行为变更，需要先定"何为正常"的基线，spike 成分稍大。
+**先做 RA-031**。理由：① 它违反的是项目明文规则（ADR-0235 "reads typed ports only"），
+不是审美分歧；② §10 grant 检查是安全关键路径，fail-closed 语义现在靠 `object` +
+`getattr` 承载——类型系统本可免费提供的保证，被鸭子类型主动放弃了；
+③ deletion test 最脆：declared interface 删掉（或保持说谎），复杂度不收敛，
+测试永远要"走私"端口值。RA-032 是干净的 "two = real" 收敛，排第二。
 
 ## Self-grilling
 
-### RA-028 — CLIProvider daemon 观察路径改走 DaemonService seam
+### RA-031 — 门的 approval_requirement 端口：声明 + 定型
 
-- **Constraints**：`Provider.status() -> StatusReport` / `heal(CheckResult) -> bool` 契约不变；
-  `user=None` 时 status 跳过 daemon 检查的行为不变；`test_private_pid_alive_replica_is_gone` 与
-  `test_kernel_serve_status_converges_on_http_ready` 的 pin 语义不违背（后者钉的是"不用 bespoke
-  curl 探针"，改走 `state()` 是更进一步的收敛，不开倒车）；RA-014 的"lifecycle owner"结论不重审。
-- **Dependencies**：上游 `DaemonService.state() -> ServiceState`（checks 含 daemon/gateway/cli/cli_sync，
-  读 pid 经 sudo）；下游 `CLIProvider.status()` 的调用方（HostEnvironment / doctor 链）——seam 移动后
-  它们拿到的 StatusReport 条目名可能变化（"daemon"/"kernel_serve" → state 的 check 名），需同步。
-  `heal` 的 bool 返回要从 ServiceState 映射（`is_running`）。
-- **Shape of the deepened module**：`status()` 内 `if self.user:` 分支改调
-  `self._daemon_service().state()`，把其 `daemon`/`gateway` check 投影成 StatusReport 条目；
-  `CLI-deployed` 检查保留（provider 属主）；`heal()` 调 `self._daemon_service().restart()` 并映射
-  bool。seam 后面是 pid 文件/sudo/探测细节，前面是 Provider 契约。
-- **Test survival**：现有 `test_cli_provider_daemon_delegation.py` 全绿（start/stop 委托测试不受影响）；
-  新测试：注入 fake DaemonService（`state()` 返回 canned ServiceState），磁盘无 pid 文件时
-  `status()` 仍正确报告——这是今天写不出来的测试（testability gap 的钉子）。
-- **Deletion test verdict**：**concentrates**。删掉 `_report_daemon_status`/`_report_kernel_serve_status`
-  → daemon 状态计算只剩 DaemonService.state() 一处；留着 → 两套推导永久并存。
+- **Constraints**：ADR-0292 §10 语义零变更（fail-closed grant 检查；`content_origin`
+  仅审计元数据；拒绝走 `terminal.commit` + evidence ledger）。ADR-0237 的 PortRegistry
+  避碰：`approval_requirement` 的 echo 值与 `act.authorize` 发出的同一对象，
+  last-write-wins 下无害；声明它不改变运行时接线（spike 须先确认：runtime 把边输出
+  送进 `port_values` 时不校验 `declared_inputs`——若校验，则声明是修复而非装饰）。
+  yaml 的 gate inputs 当前列 `approval_required`（bool，executor 不读）——spike 定它是
+  历史残留还是另有消费者，再决定删/留。
+- **Dependencies**：上游 `act.authorize`（发两个端口）；下游 `act.envelope`（收 decision；
+  gate 的 echo 是否被下游消费——当前 `declared_outputs` 不声明 echo，若下游真在读，
+  声明是补洞）。调用链：`_grant_absence_refusal` 仅 gate 内用；`ApprovalRequirement`
+  在 contracts，gate 已 import 同包的 `Decision`，无新层边。
+- **Shape of the deepened module**：`declared_inputs += (PortName("approval_requirement"),)`，
+  `declared_outputs += (PortName("approval_requirement"),)`；yaml 同步；
+  `_grant_absence_refusal(decision: Decision, req: ApprovalRequirement | None)`；
+  `needs_approval = req.required if req is not None else decision.needs_approval`；
+  docstring：删 "pure transform"，写清 ambient TrustEnvelope 读 + evidence ledger 写。
+- **Test survival**：`tests/contracts/test_adr0292_authorization_semantic_isolation.py`
+  钉 §10 语义；`test_act_subgraph_yaml_e2e.py` / `test_hitl_e2e_loop.py` 钉接线。
+  新测试：typed `ApprovalRequirement(required=True)` + 未授权 tool + 无 TrustEnvelope
+  → `terminal.commit` + echo 保留；`(required=False)` → `decision.needs_approval` 主导。
+- **Deletion test verdict**：concentrates——"门需要什么政策信号"从实现+走私收进
+  declared interface。
 
-### RA-029 — turn 具名 seam
+### RA-032 — ambient evidence-store 解析收进一个 seam
 
-- **Constraints**：journal 行的 `(turn, step)` 二元维度语义不变；`state.extra` 袋不动（其余 key
-  各有 owner，scope 外）；projection 缺席的 unbound 单测仍要能跑（0 默认保留，但收进 seam 显式化）。
-- **Dependencies**：写方 `harness/projection/agent_state.py:70`（`session.created.v1` /
-  `turn.started.v1` 投影）；读方 `simple_body.py:230`、`invoke.py:104`；`AgentState` 定义
-  （`contracts/models/core/state/state.py`）。若选 `AgentState.current_turn` 字段方案，
-  注意 `AgentState` 可能是 frozen dataclass——字段加法 vs accessor 二选一 spike 定。
-- **Shape of the deepened module**：二选一（spike 定）：(a) `AgentState` 加 `current_turn: int | None`
-  可空字段，projection 填充，读方 `state.current_turn if ... else <seam默认>`；
-  (b) contracts 层 `turn_of(state) -> int` accessor（对标 RA-025 `step_id_for`），内部封装
-  袋读 + 默认策略。seam 后面是"projection 设没设"的知识，前面是两个读方。
-- **Test survival**：现有 persist/dispatch/session 测试全绿；新测试：projection 跑完后
-  `dispatch_tool_calls` 的 journal 行 turn 正确（端到端钉传播链）；另钉"袋缺席时 seam 的显式默认"。
-- **Deletion test verdict**：**concentrates**。"turn 从哪来"从 3 处魔法字符串收进 1 个 seam。
-
-### RA-030 — anomaly detector 模型对齐 spine 语义
-
-- **Constraints**：8 个 detector 的 kind 名不变（下游可能按 kind 订阅）；阈值保持公开具名
-  （design §7.5.4.1）；`on_event` 的 fail-contained 语义（FD-2）不动；`bind_anomaly_sink` 不动。
-- **Dependencies**：上游 spine 事件流（EventRecord 的 sequence/span_id/execution_point 产生方）——
-  改模型前先确认"跳号正常""span_id 复用正常"是 spine 的**契约**而非巧合（读 spine 的 span/sequence
-  产生代码钉住）；下游 anomaly sink 消费者（日志/订阅方）——误报减少是纯收益。
-- **Shape of the deepened module**：`_check_stalled`：按 `(producer, sequence)` 分别追踪或显式
-  gap 容忍；`_check_collision`：复用 `_open_spans` 表，只在 span_id 已 open 未 close 时重复出现才报；
-  `_check_cycle`：EP 分两类（per-event 如 reducer.apply / per-turn），per-event 类要求更高
-  consecutive_count 或直接豁免。seam 后面是"何为正常"的基线，前面是 8 个 check 的统一形状。
-- **Test survival**：现有 anomaly deriver 测试全绿；新测试：用真实 healthy run 的事件流形状
-  （跳号序列、复用 span_id、per-event EP）喂 detector，断言零误报——这是今天写不出来的测试。
-- **Deletion test verdict**：**concentrates**。"何为异常"的定义从操作员的脑子里收进 detector。
+- **Constraints**：零行为变更；两处都保留"无绑定 → no-ref" 的 fail-soft 契约
+  （tests/offline 路径依赖它）；approve_gate 的 deferred import 纪律保留
+  （load 期不对 observability 取硬依赖）。
+- **Dependencies**：调用方 = safe_executor（2 处）+ approve_gate（1 处）。
+  seam 落点必须是 `lca/infrastructure/observability`（两处已从它 import
+  `current_bound`；nodes 绝不能 import `cognition/body`——层向论证）。
+  `runs/tools.py` / `fact_gateway.py` 的 `current_bound()` 是不同形状，out of scope。
+- **Shape**：`resolve_evidence_store() -> EvidenceStore | None`；
+  safe_executor 的 `_resolve_evidence_pair` 改为调它取 store（policy 另取，
+  元组形状不变）；approve_gate 的 `_route_refusal_to_evidence` 内联仪式删掉改调它。
+- **Test survival**：safe_executor 的 no-ref 测试；ADR-0292 测试。
+  新测试：unbound → None；fake bound 有/无 store → store/None。
+- **Deletion test verdict**：concentrates——"怎么从 ambient 拿到 evidence store"
+  成为 observability 包自己的知识。
 
 ## 丢弃（有证据）
 
-- `NativeToolCall` 映射里的三处 `getattr(..., "wire_status", None) or "ok"` 死防御：类型是 frozen
-  dataclass 具名字段，getattr 永不 fallback——接口诚实化小瑕疵，单函数内、无杠杆，不开 story
-  （记入 learnings：以后 friction walk 见到"类型保证 vs 防御式读取"矛盾可直接按诚实化修）。
-- `_handle_output_text_chunk` 的函数内 import + per-chunk `current_bindings_view()` 重查：
-  可能是"bindings 可热变"的刻意设计，无失败证据，不立案，记观察。
-- `_summarize_after_search` vs `_stream_turn` 的两套空响应恢复（重 stream 3 次 vs 转 complete 2 次）：
-  语义确有差异（summarize 本是 non-stream），收敛形状 speculative，不立案。
-- retry loop 4 处（stream_event_manager / executor ×2 / casting）：各有独立常量与 body，
-  不是同一仪式，不成簇。
-- `ProactiveScheduler.js` state dict（patterns 已有）：本轮未新增证据，维持 speculative。
-- `ModelVisibleHook.before_publish`/`after_dispatch` 占位（patterns 已有）：ADR-0185 PR-3 未决，维持。
-- `run(None)` TypeError / `NativeToolCall.arguments` 传 str 晦涩报错（10-07 P2）：defer 给
-  iter-quality lane，本轮未立案（patterns 已有）。
-- `CLIProvider.provision()` 内 `self.run` 与裸 `subprocess.run` 混用：同一方法的两处 tsc 调用
-  走了不同进程 seam——真不一致，但属单方法内 hygiene，杠杆不足以单独立 story；RA-028 优化轮可顺手收敛。
-- Round 7 评估曾以"RA-014/015 已做"整体避开 user_cli.py：本轮 RA-028 只取**观察路径**
-  （status/heal），与 RA-014/015 的 start/stop lifecycle scope 正交，不属重审——此区分已在本
-  assessment 顶部 Scope 注记，避免后人误判为重复立案。
+- `interrupt.py` 的 `spine_seq` 缺席时回退 `SpineContext.current_sequence()`：
+  读了全文；declared-but-optional 带 ambient fallback，与 RA-031 同类但属可选端口的
+  显式语义（`del context` + 明确 TypeError），无说谎成分——不立案，记观察。
+- `debug_trace_provider.py:99` `_render_event`：全仓零调用者，dead code——但属
+  机械清理，无杠杆，不立案（若顺手删，单行 diff 即可）。
+- `tool_defer.session._tool_to_spec` 与 `think.history.assemble` 的重复：注释写明
+  刻意层边（"infrastructure must not import L2 nodes"）——deliberate，不立案。
+- `tool_defer` 的 ContextVar 三件套 / `_classify_args` / fail-soft unknown parking：
+  读完全文；薄但 load-bearing ritual / 已收敛 / 事故后的刻意 backstop——不立案。
+- debug 双 `Config(BaseModel)`：cosmetic，不立案。
+- Area B 的 "6 处跳才看清本轮工具视图"：每处职责清晰（policy/session/assemble），
+  locality 尚可——观察中，未到立案阈值。
+- 10-07 P2（`run(None)` / `NativeToolCall.arguments` str）：仍 defer 给 iter-quality，
+  本轮未重立案（patterns 已有记录）。

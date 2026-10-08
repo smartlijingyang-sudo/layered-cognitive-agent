@@ -73,7 +73,8 @@ class ActAuthorizeExecutor:
 
         inputs 端口(yaml): decision (Decision), state (AgentState)
         outputs 端口(yaml): decision (Decision), state (AgentState),
-                            approval_required (bool)
+                            approval_required (bool),
+                            approval_requirement (ApprovalRequirement)
         """
         del context
         decision = input.port_values.get(PortName("decision"))

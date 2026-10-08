@@ -2,6 +2,18 @@
 
 （raphy 轮共享的模式/禁区登记，供后续 assess/optimize 轮参考）
 
+- **pair-seam 收敛先列 case 表（RA-032）：** seam 只返回 pair 一半（如 store）
+  而消费者要 `(store, policy)` 元组时，先枚举全部状态组合
+  （unbound→(None,None)；bound+store None→(None,policy)；bound+store 有→
+  (store,policy)）证明新实现输出与旧实现逐字相同再动手。"无绑定 no-ref"
+  的直觉会误写成 `store is None → (None, None)`——RA-031 教训的实例化：
+  验收模糊或直觉与实现分歧时，以显式 case 表 + 零语义变更为准。
+- **observability 新 seam 三层导出清单（RA-032）：**
+  `facade/facade/facade.py` 定义 → `facade/__init__.py`（import + `__all__`）→
+  顶层 `__init__.py`（import + `__all__`）；deferred import 纪律是调用方的
+  （函数内 import，approve_gate 保留 try/except ImportError），seam 本体不替
+  调用方 import。
+
 - **禁区（ralph Round 2 领地 + 冻结区）：** DecisionGates、Ingest、ContextFiles shims、
   Read Runs micro-dirs（`plugins/transport/webserver/read/runs/`）、MemoryTools directory seam
   （`infrastructure/tools/assistant/`）、`lca/cognition/memory/`（Round 2 AP-01 冻结）。
@@ -101,6 +113,20 @@
   每 chunk `current_bindings_view()`，可能是"bindings 可热变"刻意设计，无失败证据，
   观察中，未立案。
 
+- **`approval_requirement` 三名口径漂移（RA-031 认领）：** `act.authorize` 发 `approval_required`（bool）+ `approval_requirement`（ApprovalRequirement 对象）；yaml gate inputs 只列 `approval_required`；executor 读的却是 `approval_requirement` 且 `declared_inputs` 两个都不含——declared interface、yaml wiring、实现三方口径不一致；payload 有现成 contracts frozen 类型却用 `object` + getattr 鸭子类型。
+- **ambient evidence-store 解析仪式两处（RA-032 认领）：** `safe_executor._resolve_evidence_pair` 与 `approve_gate._route_refusal_to_evidence` 逐字相同的 "current_bound → evidence_binding().store → 无绑定 no-ref" 仪式；`runs/tools.py` 与 `fact_gateway` 的 `current_bound()` 是不同形状（fail-loud / journal 镜像），不收编。
+- **端口三方对齐检查（RA-031 教训）：** node 读端口时查三处——executor `declared_inputs`、yaml inputs、实际 `port_values.get` 调用；三处名字不一致即 declared interface 说谎。
+- **build_input 按 schema.required_inputs() 过滤端口（RA-031 实证）：**
+  `PlanInterpreter` 经 `PortRegistry.build_input(schema.required_inputs())`
+  把 registry 投影成 `NodeInput`——yaml/schema 没声明的端口，真实图里永远到
+  不了 executor（直调 `node_execute` 手造 `NodeInput` 的单测会掩盖这一点）。
+  §10 这类安全门若读了未声明端口，在真实图里就是静默死的。修法上"声明"
+  不是装饰而是修复；spike 不要先验地假设 behavior-preserving。
+- **yaml 加 required input 必同步生产者 outputs（RA-031 实证）：** 给节点 yaml
+  加 required input 时，`TypedPortWiringCheck` 要求某个可达前驱的 yaml outputs
+  含它，否则 lift 直接 `PlanLiftError`。只改消费侧 yaml 不够，生产侧
+  （本轮是 `act.authorize`）的 outputs 也要同步；lift probe 当场验。
+ node 读端口时查三处——executor `declared_inputs`、yaml inputs、实际 `port_values.get` 调用；三处名字不一致即 declared interface 说谎。
 ---
 
 ## Round 6 — assess (2026-10-07 23:15, branch raphy/arch-20261007-2315)
@@ -957,3 +983,122 @@
     的 id（span/sequence）必然跨 run 误报；以后写 detector 先问"状态的
     生命周期跟哪个域对齐"。
 ---
+
+## Round 9 — assess (2026-10-08 09:20, branch raphy/arch-20261008-0118)
+
+- 按硬化版 `raphy-assess.md` 执行：读 `skills/improve-codebase-architecture/SKILL.md`；
+  `git log -60` 定热点；CONTEXT.md + ADR-0292 精读；friction walk 精读三区
+  （nodes/intervene approve_gate.py 380 行 + interrupt.py 140 行全文 /
+  tool_defer policy.py + session.py + tool_search.py 全文 /
+  plugins/observability/cli debug_trace_provider.py + debug_seam.py 全文，5 问必答）；
+  mandatory runtime verification 真跑；duplication 副扫描；self-grilling 写进
+  assessment.md；diversity quota 满足（2 friction，0 纯 duplication story）。
+- 热点来源：`lca/nodes/intervene/`（be4f52dd1/ca9a07a63 两笔 ADR-0292 feature，新鲜）；
+  `lca/infrastructure/tool_defer/`（Defer tool L1 深水区）；debug_trace_provider
+  （cf8d64a53 刚 pin explain_failure 路由）。RA-023~030 / iter lanes / ralph Round 2 /
+  lca-1000 / memory / gate_chain_strategy.py 领地全部避开。
+- 产出 2 个 stories（`passes: false`），续号 RA-031~032：
+  - RA-031（P1, **Strong**）：`act.approve.gate` 的 `approval_requirement` 端口声明 +
+    定型——`declared_inputs` 不含 executor 实际读的端口（yaml 列的却是另一个名字
+    `approval_required`，executor 不读）；`req: object | None` + getattr/hasattr 鸭子类型，
+    而 contracts 有现成 frozen `ApprovalRequirement`；静默降级分支（req-like 但缺
+    required → 回退到 §10 明言不可信的 `decision.needs_approval`）无类型保证。
+    违反 ADR-0235 "reads typed ports only" 明文规则。
+  - RA-032（P2, Worth exploring）：ambient evidence-store 解析收进一个 seam——
+    `safe_executor._resolve_evidence_pair` 与 `approve_gate._route_refusal_to_evidence`
+    逐字相同的 "current_bound → evidence_binding().store → 无绑定 no-ref" 仪式；
+    two = real；落点 `lca.infrastructure.observability`（层向论证：L2 nodes 不得
+    import cognition/body；runs/tools.py / fact_gateway 形状不同，out of scope）。
+- **Top 推荐 RA-031**：违反明文规则 + §10 是安全关键路径 + deletion test 最脆
+  （declared interface 说谎，测试只能"走私"端口值）。
+- **运行时验证**（MockLLMAdapter，LLM_API_KEY=dummy）：A basic ✅ completed /
+  B tool-call ✅ completed / C 同一 agent 双 run ✅✅；无 crash/hang/静默失败。
+  RA-023 非收敛路径未重跑（Round 8 05:15 已复测，本分支含其 merge）。
+- 丢弃（有证据）：`interrupt.py` spine_seq ambient fallback（可选端口的显式语义，
+  无说谎）；debug_trace_provider `_render_event` 零调用者（dead，机械清理无杠杆）；
+  tool_defer `_tool_to_spec` 重复（刻意层边）；ContextVar 三件套/`_classify_args`/
+  unknown parking（load-bearing ritual / 已收敛 / 事故后刻意 backstop）；双
+  `Config(BaseModel)`（cosmetic）；10-07 P2 两项（仍 defer iter-quality）。
+- Commit：`chore: [raphy] assess - 2 architecture candidates`（未 push）。
+
+## Round 9 — optimize RA-031 (2026-10-08 10:14, branch raphy/arch-20261008-0118)
+
+- What was implemented（P1, Strong）：`act.approve.gate` 的 `approval_requirement`
+  端口声明 + 定型——`declared_inputs`/`declared_outputs` 补上
+  `PortName("approval_requirement")`；`_grant_absence_refusal` 签名改为
+  `req: ApprovalRequirement | None`（`lca.contracts.models.core.execution.approval`
+  frozen dataclass，与 Decision 同包、无新层边），删 `getattr`/`hasattr` 鸭子类型；
+  `req is None → decision.needs_approval` 回退显式化
+  （`req.required if req is not None else decision.needs_approval`）；
+  class docstring 去掉 stale "pure transform"，如实写清两条 ambient 缝：
+  TrustEnvelope 读（ADR-0199）+ refused 路径的 evidence-ledger 写（ADR-0292 C4）。
+  yaml：gate inputs/outputs 补 `approval_requirement`；`act.authorize` outputs
+  同步补上（wiring check 要求）；`approval_required` bool 判定为历史残留但保留
+  （spike 见 learnings）；修正了边注释里"predicate 读 approval_required"的
+  stale 声称（实际 `when: true`）。
+- Files changed: `lca/nodes/intervene/approve_gate.py`,
+  `lca/nodes/act/authorize/authorize.py`（docstring 一行）,
+  `bundles/act/act_subgraph.yaml`,
+  `tests/intervene/test_approve_gate_rich_requirement.py`（+3 新测试）,
+  `tests/contracts/test_adr0292_authorization_semantic_isolation.py`
+  （3 处 `SimpleNamespace(required=True)` 换 typed `ApprovalRequirement`）,
+  `raphy/prd.json`（RA-031 passes=true）
+- **Learnings for future iterations:**
+  - Spike 证伪了评估的 "behavior-preserving" 假设：`PlanInterpreter` 经
+    `PortRegistry.build_input(schema.required_inputs())` 过滤端口，未声明的
+    `approval_requirement` 在真实图里永远到不了 gate——§10 grant 门在图里是
+    静默死的（`req=None → _grant_absence_refusal` 直接返回 None），只在手造
+    `NodeInput` 的单测里"活着"。声明是修复，不是装饰。
+  - `approval_required`（bool）spike 结论：历史残留——无 executor 读、无 edge
+    predicate 引用（yaml 边注释声称 predicate 读它是 stale 的，实际
+    `when: true`）。刻意保留：删掉会让 authorize 的 emission 成为
+    "produced but unrequired"，触发 unused-ports hygiene warning；清理单开 story。
+  - 验收文字模糊时以显式公式 + 零语义变更约束为准：criterion 4 的
+    "decision.needs_approval governs" 若按字面会推出 OR 语义，与 criterion 2
+    的显式公式 `req.required if req is not None else decision.needs_approval`
+    和"§10 语义零变更"冲突——present 的 required=False 权威覆盖
+    needs_approval=True（新测试钉住），None-fallback 另钉。
+  - `NodeIOSchema.project_outputs` 的 kernel 强制执行是文档声称，实际零调用
+    点（只有单测 pin 那个 raise）——读到"kernel calls X to enforce"先 grep
+    调用点再信。非本 story 范围，仅记录。
+  - SSH 长 pytest（>10min）会断管：分文件跑 + `--no-cov -p no:cacheprovider`
+    提速，单个文件几秒级。
+---
+
+
+## Round 9 — optimize RA-032 (2026-10-08 10:40, branch raphy/arch-20261008-0118)
+- What was implemented: `lca.infrastructure.observability` 新增
+  `resolve_evidence_store()` seam（`facade/facade/facade.py` 紧随 `current_bound`
+  定义；`facade/__init__.py` 与顶层 `__init__.py` 同步导出），收敛两处逐字相同
+  的 "current_bound → evidence_binding().store → 无绑定 no-ref" 仪式：
+  `safe_executor._resolve_evidence_pair` 的 store 解析改调 seam（policy 从同一
+  binding 另取，`(store, policy)` 元组形状不变），
+  `approve_gate._route_refusal_to_evidence` 删内联仪式改调 seam
+  （deferred import + try/except ImportError 纪律保留）；两处 docstring 里
+  "exactly like safe_executor._resolve_evidence_pair" 的 stale 引用改指新 seam。
+  `runs/tools.py` / `fact_gateway.py` 的 `current_bound()` 用法按验收 out of
+  scope 未动（fail-loud CLI / journal mirror，不同形状）。
+- Files changed: `lca/infrastructure/observability/facade/facade/facade.py`
+  （新 seam）, `lca/infrastructure/observability/__init__.py`,
+  `lca/infrastructure/observability/facade/__init__.py`（两层导出）,
+  `lca/cognition/body/executor/safe_executor/executor.py`,
+  `lca/nodes/intervene/approve_gate.py`,
+  `tests/unit/observability/test_resolve_evidence_store.py`（4 新测试）,
+  `raphy/prd.json`（RA-032 passes=true）
+- **Learnings for future iterations:**
+  - pair-seam 收敛必须先列 case 表：`_resolve_evidence_pair` 原实现在
+    bound 非空但 store 为 None 时返回 `(None, policy)` 而非 `(None, None)`——
+    "无绑定 no-ref" 的直觉会误写成 `store is None → (None, None)`。
+    动手前枚举全部状态组合（unbound→(None,None)；bound+store None→
+    (None,policy)；bound+store 有→(store,policy)）并证明新实现输出与旧实现
+    逐字相同。这是 RA-031 "验收模糊时以显式公式+零语义变更为准" 的实例化。
+  - observability 新 seam 三层导出清单：`facade/facade/facade.py` 定义 →
+    `facade/__init__.py`（import + `__all__`）→ 顶层 `__init__.py`
+    （import + `__all__`）；deferred import 纪律是调用方的（函数内 import，
+    approve_gate 保留 try/except ImportError），seam 本体不替调用方 import。
+  - 质量门结果：新 seam 4 测试（unbound→None；fake bound 有 store→store；
+    fake bound 无 store→None；pair 元组形状 pin）全过；ADR-0292 20 过；
+    safe_executor 7 文件 36 过；namespace + observability boundary 17 过；
+    6 个摸过的文件 `ruff check` clean。零行为变更由 case 表 + 全绿背书。
+---
+

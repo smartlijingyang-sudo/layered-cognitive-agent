@@ -159,6 +159,22 @@ def current_bound() -> BoundObservability | None:
     return _bound.get()
 
 
+def resolve_evidence_store() -> EvidenceStore | None:
+    """Return the ambient evidence store, or None when unbound / store missing.
+
+    One seam for the "current_bound -> evidence_binding().store -> no-ref when
+    unbound" ritual (RA-032): ``safe_executor._resolve_evidence_pair`` and
+    ``nodes.intervene.approve_gate._route_refusal_to_evidence`` both converge
+    here instead of hand-writing their own copies. Fail-soft contract
+    unchanged: unbound observability (unit tests / offline paths) -> None,
+    and each caller takes its own no-ref path.
+    """
+    bound = current_bound()
+    if bound is None:
+        return None
+    return bound.evidence_binding().store
+
+
 @contextmanager
 def bind_backends(bound: BoundObservability) -> Iterator[BoundObservability]:
     """在 run 边缘激活 backend；嵌套绑定不泄漏到外层。"""

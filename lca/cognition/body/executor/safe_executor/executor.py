@@ -154,16 +154,17 @@ def _commit_approval_requested(tool: Tool, invocation_id: str) -> None:
 def _resolve_evidence_pair() -> tuple[Any, Any]:
     """Return (evidence_store, evidence_policy) from current bound observability。
 
-    注入 safe_executor 在 boot 时已通过 seam plugin 拿到 capability;如果没有
-    配 seam(测试场景),这里返回 (None, None) → emitter 走 no-ref 路径。
+    store 经共享 seam ``resolve_evidence_store`` 解析（与
+    ``approve_gate._route_refusal_to_evidence`` 同一仪式），policy 从同一
+    binding 另取；元组形状不变。如果没有配 seam（测试场景），这里返回
+    (None, None) → emitter 走 no-ref 路径。
     """
-    from lca.infrastructure.observability import current_bound
+    from lca.infrastructure.observability import current_bound, resolve_evidence_store
 
+    store = resolve_evidence_store()
     bound = current_bound()
-    if bound is None:
-        return None, None
-    evidence = bound.evidence_binding()
-    return evidence.store, evidence.policy
+    policy = bound.evidence_binding().policy if bound is not None else None
+    return store, policy
 
 
 class SimpleSafeExecutor(SafeExecutor):
