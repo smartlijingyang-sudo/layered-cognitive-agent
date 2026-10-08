@@ -104,6 +104,17 @@
 - **`approval_requirement` 三名口径漂移（RA-031 认领）：** `act.authorize` 发 `approval_required`（bool）+ `approval_requirement`（ApprovalRequirement 对象）；yaml gate inputs 只列 `approval_required`；executor 读的却是 `approval_requirement` 且 `declared_inputs` 两个都不含——declared interface、yaml wiring、实现三方口径不一致；payload 有现成 contracts frozen 类型却用 `object` + getattr 鸭子类型。
 - **ambient evidence-store 解析仪式两处（RA-032 认领）：** `safe_executor._resolve_evidence_pair` 与 `approve_gate._route_refusal_to_evidence` 逐字相同的 "current_bound → evidence_binding().store → 无绑定 no-ref" 仪式；`runs/tools.py` 与 `fact_gateway` 的 `current_bound()` 是不同形状（fail-loud / journal 镜像），不收编。
 - **端口三方对齐检查（RA-031 教训）：** node 读端口时查三处——executor `declared_inputs`、yaml inputs、实际 `port_values.get` 调用；三处名字不一致即 declared interface 说谎。
+- **build_input 按 schema.required_inputs() 过滤端口（RA-031 实证）：**
+  `PlanInterpreter` 经 `PortRegistry.build_input(schema.required_inputs())`
+  把 registry 投影成 `NodeInput`——yaml/schema 没声明的端口，真实图里永远到
+  不了 executor（直调 `node_execute` 手造 `NodeInput` 的单测会掩盖这一点）。
+  §10 这类安全门若读了未声明端口，在真实图里就是静默死的。修法上"声明"
+  不是装饰而是修复；spike 不要先验地假设 behavior-preserving。
+- **yaml 加 required input 必同步生产者 outputs（RA-031 实证）：** 给节点 yaml
+  加 required input 时，`TypedPortWiringCheck` 要求某个可达前驱的 yaml outputs
+  含它，否则 lift 直接 `PlanLiftError`。只改消费侧 yaml 不够，生产侧
+  （本轮是 `act.authorize`）的 outputs 也要同步；lift probe 当场验。
+ node 读端口时查三处——executor `declared_inputs`、yaml inputs、实际 `port_values.get` 调用；三处名字不一致即 declared interface 说谎。
 ---
 
 ## Round 6 — assess (2026-10-07 23:15, branch raphy/arch-20261007-2315)
@@ -997,3 +1008,48 @@
   unknown parking（load-bearing ritual / 已收敛 / 事故后刻意 backstop）；双
   `Config(BaseModel)`（cosmetic）；10-07 P2 两项（仍 defer iter-quality）。
 - Commit：`chore: [raphy] assess - 2 architecture candidates`（未 push）。
+
+## Round 9 — optimize RA-031 (2026-10-08 10:14, branch raphy/arch-20261008-0118)
+
+- What was implemented（P1, Strong）：`act.approve.gate` 的 `approval_requirement`
+  端口声明 + 定型——`declared_inputs`/`declared_outputs` 补上
+  `PortName("approval_requirement")`；`_grant_absence_refusal` 签名改为
+  `req: ApprovalRequirement | None`（`lca.contracts.models.core.execution.approval`
+  frozen dataclass，与 Decision 同包、无新层边），删 `getattr`/`hasattr` 鸭子类型；
+  `req is None → decision.needs_approval` 回退显式化
+  （`req.required if req is not None else decision.needs_approval`）；
+  class docstring 去掉 stale "pure transform"，如实写清两条 ambient 缝：
+  TrustEnvelope 读（ADR-0199）+ refused 路径的 evidence-ledger 写（ADR-0292 C4）。
+  yaml：gate inputs/outputs 补 `approval_requirement`；`act.authorize` outputs
+  同步补上（wiring check 要求）；`approval_required` bool 判定为历史残留但保留
+  （spike 见 learnings）；修正了边注释里"predicate 读 approval_required"的
+  stale 声称（实际 `when: true`）。
+- Files changed: `lca/nodes/intervene/approve_gate.py`,
+  `lca/nodes/act/authorize/authorize.py`（docstring 一行）,
+  `bundles/act/act_subgraph.yaml`,
+  `tests/intervene/test_approve_gate_rich_requirement.py`（+3 新测试）,
+  `tests/contracts/test_adr0292_authorization_semantic_isolation.py`
+  （3 处 `SimpleNamespace(required=True)` 换 typed `ApprovalRequirement`）,
+  `raphy/prd.json`（RA-031 passes=true）
+- **Learnings for future iterations:**
+  - Spike 证伪了评估的 "behavior-preserving" 假设：`PlanInterpreter` 经
+    `PortRegistry.build_input(schema.required_inputs())` 过滤端口，未声明的
+    `approval_requirement` 在真实图里永远到不了 gate——§10 grant 门在图里是
+    静默死的（`req=None → _grant_absence_refusal` 直接返回 None），只在手造
+    `NodeInput` 的单测里"活着"。声明是修复，不是装饰。
+  - `approval_required`（bool）spike 结论：历史残留——无 executor 读、无 edge
+    predicate 引用（yaml 边注释声称 predicate 读它是 stale 的，实际
+    `when: true`）。刻意保留：删掉会让 authorize 的 emission 成为
+    "produced but unrequired"，触发 unused-ports hygiene warning；清理单开 story。
+  - 验收文字模糊时以显式公式 + 零语义变更约束为准：criterion 4 的
+    "decision.needs_approval governs" 若按字面会推出 OR 语义，与 criterion 2
+    的显式公式 `req.required if req is not None else decision.needs_approval`
+    和"§10 语义零变更"冲突——present 的 required=False 权威覆盖
+    needs_approval=True（新测试钉住），None-fallback 另钉。
+  - `NodeIOSchema.project_outputs` 的 kernel 强制执行是文档声称，实际零调用
+    点（只有单测 pin 那个 raise）——读到"kernel calls X to enforce"先 grep
+    调用点再信。非本 story 范围，仅记录。
+  - SSH 长 pytest（>10min）会断管：分文件跑 + `--no-cov -p no:cacheprovider`
+    提速，单个文件几秒级。
+---
+

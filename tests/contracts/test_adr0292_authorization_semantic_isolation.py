@@ -49,6 +49,7 @@ from lca.cognition.body.emit.observation_surface import observation_content
 from lca.contracts.atoms.ids.ids import new_id
 from lca.contracts.models.core.execution import decision as _decision_module
 from lca.contracts.models.core.execution import external_content as _external_content_module
+from lca.contracts.models.core.execution.approval import ApprovalRequirement
 from lca.contracts.models.core.execution.decision import (
     Decision,
     Observation,
@@ -433,7 +434,7 @@ async def test_s10_approve_gate_refuses_privilege_without_grant() -> None:
         tool_calls=_s9_privilege_tool_calls(),  # tool_name="shell.exec"
     )
     # Privileged = the approval policies flagged it (authoritative signal).
-    req = SimpleNamespace(required=True)
+    req = ApprovalRequirement(required=True)
     executor = ApproveGateExecutor()
     output = await executor.node_execute(
         NodeContext(runtime={}, budget={}, metadata={}),
@@ -470,7 +471,7 @@ async def test_s10_approve_gate_passes_privilege_with_grant() -> None:
         needs_approval=True,
         tool_calls=_s9_privilege_tool_calls(),
     )
-    req = SimpleNamespace(required=True)
+    req = ApprovalRequirement(required=True)
     executor = ApproveGateExecutor()
     with trust_envelope_scope(envelope):
         assert get_current_trust_envelope() is envelope
@@ -503,7 +504,7 @@ async def test_s10_approve_gate_refuses_hallucinated_authorization() -> None:
     )
     # The approval policies flag the dangerous tool call even though the
     # model did not set needs_approval.
-    req = SimpleNamespace(required=True)
+    req = ApprovalRequirement(required=True)
     executor = ApproveGateExecutor()
     output = await executor.node_execute(
         NodeContext(runtime={}, budget={}, metadata={}),

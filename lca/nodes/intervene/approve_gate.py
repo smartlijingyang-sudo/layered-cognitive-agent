@@ -34,6 +34,7 @@ from lca.contracts.harness.composition.plugin_contract import (
     PluginContract,
     PluginIdentity,
 )
+from lca.contracts.models.core.execution.approval import ApprovalRequirement
 from lca.contracts.models.core.execution.decision import Decision
 from lca.contracts.observability.evidence.evidence import (
     Classification,
@@ -63,7 +64,9 @@ _NEXT_HINT_APPROVE_APPROVED = "approve_approved"
 _NEXT_HINT_APPROVE_REJECTED = "approve_rejected"
 
 
-def _grant_absence_refusal(decision: Decision, req: object | None) -> tuple[list[str], bool] | None:
+def _grant_absence_refusal(
+    decision: Decision, req: ApprovalRequirement | None
+) -> tuple[list[str], bool] | None:
     """ADR-0292 section 10: fail-closed grant check for privileged actions.
 
     A decision is *privileged* when the ``approval_requirement`` port's
@@ -85,7 +88,7 @@ def _grant_absence_refusal(decision: Decision, req: object | None) -> tuple[list
     Non-privileged decisions, and privileged decisions without tool calls
     (no privilege to check), are untouched.
     """
-    if req is None or not bool(getattr(req, "required", False)):
+    if req is None or not req.required:
         return None
     tool_names = [
         call.tool_name
@@ -156,17 +159,18 @@ def _route_refusal_to_evidence(
 class ApproveGateExecutor:
     """intervene node: gate ``decision`` flow on HITL approval semantics.
 
-    The node is a pure transform of the typed ``decision`` + ``command``
-    ports for routing purposes. It never reads ``context.runtime``, never
-    mutates ``AgentState``. ADR-0292 section 10: before approval routing, a
-    grant-absence gate refuses privileged actions (``needs_approval``) whose
-    tool privileges are absent from the ambient TrustEnvelope — fail-closed
-    allowlist, ``content_origin`` as audit metadata only. On the
-    ``approve_refused`` path only, the gate additionally routes the refusal
-    payload to the run-trace evidence ledger through the ambient
-    observability seam (same pattern as
+    The node is not a pure transform of its ports: beyond the typed
+    ``decision`` / ``command`` / ``approval_requirement`` ports it reads two
+    ambient seams. ADR-0292 section 10: before approval routing, a
+    grant-absence gate refuses privileged actions whose tool privileges are
+    absent from the ambient TrustEnvelope (ADR-0199, bound via
+    ``trust_envelope_scope``) — fail-closed allowlist, ``content_origin``
+    as audit metadata only. On the refused path only, the gate additionally
+    routes the refusal payload to the run-trace evidence ledger through the
+    ambient observability seam (same pattern as
     ``safe_executor._resolve_evidence_pair``; no-ref path when unbound) —
     ADR-0292 C4, "the blocked attack itself is security evidence".
+    It never reads ``context.runtime`` and never mutates ``AgentState``.
     The four routing outcomes:
 
     - ``approve_skipped`` — ``decision.needs_approval`` is False →
@@ -186,14 +190,30 @@ class ApproveGateExecutor:
 
     semantic_name: str = "act.approve.gate"
     region: str = "intervene"
-    declared_inputs: tuple[PortName, ...] = (PortName("decision"), PortName("command"))
+    # ADR-0292 §10: ``approval_requirement`` is the authoritative policy
+    # signal minted by ``act.authorize``. Declaring it is load-bearing,
+    # not decoration: the kernel projects ``NodeInput`` from
+    # ``schema.required_inputs()``, so an undeclared port never reaches
+    # the executor in a real graph run (unit tests that hand-build
+    # ``NodeInput`` mask this).
+    declared_inputs: tuple[PortName, ...] = (
+        PortName("decision"),
+        PortName("command"),
+        PortName("approval_requirement"),
+    )
     # ADR-0237 / PR-1b: emit ``approval_routing`` (not ``routing``) so
     # the typed port does not collide with downstream ``act.fanout``'s
     # ``routing`` in the kernel-wide :class:`PortRegistry`
     # (last-write-wins would overwrite the gate's signal before the
     # outer plan reads it). The outer plan reads via
     # ``act.main.declared_outputs: [approval_routing]``.
-    declared_outputs: tuple[PortName, ...] = (PortName("decision"), PortName("approval_routing"))
+    declared_outputs: tuple[PortName, ...] = (
+        PortName("decision"),
+        PortName("approval_routing"),
+        # Echoed through so the policy signal the gate acted on stays
+        # visible in the port registry for outer consumers.
+        PortName("approval_requirement"),
+    )
 
     async def node_execute(
         self,
@@ -202,8 +222,12 @@ class ApproveGateExecutor:
     ) -> NodeOutput:
         """act.approve.gate 入口。
 
-        inputs 端口(yaml): decision (Decision), command (Command, optional)
-        outputs 端口(yaml): decision (Decision), approval_routing (RoutingDecision)
+        inputs 端口(yaml): decision (Decision),
+            approval_requirement (ApprovalRequirement),
+            command (Command, optional)
+        outputs 端口(yaml): decision (Decision),
+            approval_routing (RoutingDecision),
+            approval_requirement (ApprovalRequirement, echo)
 
         ADR-0235 / PR-5: reads typed ports only. No more
         ``_resolve_port(context, name)`` that peeked at
@@ -248,11 +272,12 @@ class ApproveGateExecutor:
                 refused_ports[PortName("approval_requirement")] = req
             return NodeOutput(port_values=refused_ports)
 
-        needs_approval = (
-            bool(req.required)
-            if req is not None and hasattr(req, "required")
-            else bool(decision.needs_approval)
-        )
+        # The policy signal is authoritative when present; without it the
+        # gate falls back to the model's self-reported
+        # ``decision.needs_approval`` (§10 treats that fallback as
+        # untrustworthy — the port is declared required so the bundle
+        # wiring check fails loud at boot instead of degrading here).
+        needs_approval = req.required if req is not None else decision.needs_approval
 
         if not needs_approval:
             next_hint = _NEXT_HINT_APPROVE_SKIPPED
