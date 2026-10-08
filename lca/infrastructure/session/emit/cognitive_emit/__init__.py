@@ -24,7 +24,6 @@ from lca.infrastructure.session.emit.cognitive_emit.envelope import (
 )
 from lca.infrastructure.session.emit.cognitive_emit.gate_events import (
     emit_context_manifested,
-    emit_context_manifested_for_state,
     emit_gate_decided,
     emit_gate_decided_from_policy,
 )
@@ -69,7 +68,6 @@ from lca.infrastructure.session.emit.cognitive_emit.tool_events import (
 
 __all__ = [
     "emit_context_manifested",
-    "emit_context_manifested_for_state",
     "emit_critic_eval_end_for_state",
     "emit_critic_eval_start_for_state",
     "emit_gate_decided",

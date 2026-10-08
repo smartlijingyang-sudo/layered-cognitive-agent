@@ -91,29 +91,8 @@ def emit_context_manifested(
     )
 
 
-def emit_context_manifested_for_state(
-    state: AgentState,
-    manifest: ContextManifest,
-    *,
-    session: object | None = None,
-    actor: str = "perceive",
-) -> AppendReceipt | None:
-    """Resolve session from run context, then emit manifest fact."""
-    return append_catalog_bound(
-        ContextManifestCommitted(
-            step=state.step,
-            digest=manifest.digest,
-            items=tuple(_context_item_wire(item) for item in manifest.items),
-        ),
-        state=state,
-        session=session,
-        actor=actor,
-    )
-
-
 __all__ = [
     "emit_context_manifested",
-    "emit_context_manifested_for_state",
     "emit_gate_decided",
     "emit_gate_decided_from_policy",
 ]
