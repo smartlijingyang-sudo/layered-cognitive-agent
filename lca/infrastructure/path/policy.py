@@ -64,12 +64,18 @@ def validate_writable_file(path: Path) -> PathPolicyDecision:
     # are owned by memory projection, not by generic file writes. Rejecting
     # them here covers host-fs file_write paths (see standing_path.py).
     from lca.infrastructure.memory.contextfiles.domain.standing_path import (
+        is_skill_package_write_path,
         is_standing_write_path,
+        skill_package_write_block_message,
         standing_write_block_message,
     )
 
     if is_standing_write_path(path):
         return PathPolicyDecision(False, standing_write_block_message(), "validation")
+    # RA-057:助理 Home 已安装技能包只许经 create/edit_assistant_skill 变更，
+    # 通用文件写直达会被拒（run_755719d1a9d5）。
+    if is_skill_package_write_path(path):
+        return PathPolicyDecision(False, skill_package_write_block_message(), "validation")
     # Re-resolve via absolute path so an input like "/tmp" classifies as
     # a directory even when path.parent cannot be stat'd.
     try:

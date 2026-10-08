@@ -831,8 +831,8 @@
    "branchName": "raphy/arch-20261009-0107",
    "description": "As an LCA operator, I want generic writeFile to be refused inside {home}/skills/, so verified packages can't be silently tampered. Evidence (Round 13, skills zone): proposal docs/notes/proposed/seam/2026-10-09-skill-package-write-guard.md (landed this morning, df03d0cf1) records run_755719d1a9d5: 5x writeFile replacing {home}/skills/psychological-counselor/SKILL.md left the index digest (sha256:298a2c63...) disagreeing with reality (sha256:3be9e508...), revision_seq unchanged, artifact_state still 'verified' — NOTHING noticed. disk/store.py::get never re-hashes; _home_layout.py::compute_digests covers only 8 CONFIG_FACE_FILES; diff_digests skips ('skills/<id>' never in actual, so skipped not mismatched). Proposal already specifies: extend the is_standing_write_path guard to {home}/skills/, refuse writes not reads.",
    "id": "RA-057",
-   "notes": "Source: Round 13 friction walk (Strong; testability gap — only bypassing the interface can detect drift). Proposal text exists; this story lands it.",
-   "passes": false,
+   "notes": "Source: Round 13 friction walk (Strong; testability gap — only bypassing the interface can detect drift). Proposal text exists; this story lands it. | Implemented 2026-10-09: is_skill_package_write_path() + skill_package_write_block_message() in standing_path.py; hooked into validate_writable_file (policy.py) and LcaComputerExecutor.write_file/edit_file (executor.py). Regression pin replays run_755719d1a9d5.",
+   "passes": true,
    "priority": 2,
    "title": "Land the skill-package write guard (is_standing_write_path extended to {home}/skills/)"
   },

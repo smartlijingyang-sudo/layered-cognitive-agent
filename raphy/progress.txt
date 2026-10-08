@@ -1,5 +1,12 @@
 ## Codebase Patterns
 
+- **写守卫挂"谓词+消息"二件套，别改 is_standing_write_path 本体（RA-057）：**
+  新守卫（技能包）在 `standing_path.py` 里与 `is_standing_write_path` 并列加
+  `is_<x>_write_path()` + `<x>_write_block_message()`，三个写调用点
+  （policy.validate_writable_file、executor.write_file/edit_file）各加一段
+  check。别把新形状塞进旧谓词——block message 必须点名生产工具
+  （create_assistant_skill/edit_assistant_skill），混在一起消息就没法区分。
+
 - **digest 约定收敛先定 canonical 函数再改写入点（RA-056）：** 同一字段出现两种
   hash 约定时，不要逐个改写入点——先在共享层立一个 canonical 函数
   （`skill_index_digest(content_hash) -> sha256:<hex>`），把"约定"写成代码，
@@ -1717,4 +1724,12 @@
   - Call-site counts from assessment can be stale: assessed "three writers", the overlay alone had 8 call sites (7x package + 1x home_store.get) — always grep fresh before asserting counts.
   - ssh252 wrapper mangles heredoc quoting and injects a main-workdir git-status header into stdout; use `python3 < local_script` via stdin redirect and anchor parsing on your own marker lines.
   - Config-face digest validation (compute_digests/diff_digests) only covers CONFIG_FACE_FILES, so rewriting `digests["skills/*"]` + manifest_digest during migration does not trip catalog.get's fail-closed check — but this coupling is implicit; a future guard that also covers skills/* digests must be aware of the migration.
+---
+---
+## 2026-10-09 03:30 - RA-057
+- Implemented: landed the skill-package write guard. New `is_skill_package_write_path()` in lca/infrastructure/memory/contextfiles/domain/standing_path.py matches `assistants/<id>/skills/<skill_id>/...` within the same scope as the standing guard (get_lca_home() or .lca/assistants/ tree); workspace SKILL.md stays writable. New `skill_package_write_block_message()` names create_assistant_skill/edit_assistant_skill as the only production paths. Hooked into the same 3 write call sites as the standing guard: policy.validate_writable_file, LcaComputerExecutor.write_file, LcaComputerExecutor.edit_file. readFile untouched. Regression pin tests/infrastructure/computer/test_skill_package_write_guard.py replays run_755719d1a9d5 (writeFile/editFile on {home}/skills/psychological-counselor/SKILL.md refused, backend never called, error names both tools; readFile succeeds; workspace SKILL.md writable); predicate unit tests added to test_standing_write_path.py. Existing install/edit paths don't go through writeFile (staging+shutil), so they are unaffected — covered by tests/plugins/assistant/ (585 passed).
+- Files changed: lca/infrastructure/memory/contextfiles/domain/standing_path.py, lca/infrastructure/path/policy.py, lca/infrastructure/tools/lca_computer/executor.py, tests/infrastructure/memory/test_standing_write_path.py, tests/infrastructure/computer/test_skill_package_write_guard.py (new), raphy/prd.json, raphy/progress.txt
+- **Learnings for future iterations:**
+  - Predicate scope tests should use the same fake homes as the standing tests (/home/u/.lca/assistants/...) — the scope gate (is_under_lca_home or .lca/assistants segments) is shared logic, don't re-derive it per guard.
+  - ssh252 sessions can wedge when the remote command's output never flushes (pytest -q with coverage prints only at the end); prefer nohup + log file + pgrep polling for long test runs (AGENTS.md remote-background pattern).
 ---

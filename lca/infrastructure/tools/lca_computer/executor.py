@@ -70,7 +70,9 @@ class LcaComputerExecutor:
         content = params.get("content")
         path = _str_arg(params, "path")
         from lca.infrastructure.memory.contextfiles.domain.standing_path import (
+            is_skill_package_write_path,
             is_standing_write_path,
+            skill_package_write_block_message,
             standing_write_block_message,
         )
 
@@ -80,6 +82,14 @@ class LcaComputerExecutor:
                 content="",
                 state={"error": standing_write_block_message(), "retryable": False},
                 error=standing_write_block_message(),
+            )
+        # RA-057:助理 Home 已安装技能包只许经 create/edit_assistant_skill 变更。
+        if is_skill_package_write_path(path):
+            return ComputerOpResult(
+                success=False,
+                content="",
+                state={"error": skill_package_write_block_message(), "retryable": False},
+                error=skill_package_write_block_message(),
             )
         return await self._ops.write_file(
             path=path,
@@ -92,7 +102,9 @@ class LcaComputerExecutor:
     async def edit_file(self, params: dict[str, Any]) -> ComputerOpResult:
         path = _str_arg(params, "path")
         from lca.infrastructure.memory.contextfiles.domain.standing_path import (
+            is_skill_package_write_path,
             is_standing_write_path,
+            skill_package_write_block_message,
             standing_write_block_message,
         )
 
@@ -102,6 +114,14 @@ class LcaComputerExecutor:
                 content="",
                 state={"error": standing_write_block_message(), "retryable": False},
                 error=standing_write_block_message(),
+            )
+        # RA-057:助理 Home 已安装技能包只许经 create/edit_assistant_skill 变更。
+        if is_skill_package_write_path(path):
+            return ComputerOpResult(
+                success=False,
+                content="",
+                state={"error": skill_package_write_block_message(), "retryable": False},
+                error=skill_package_write_block_message(),
             )
         return await self._ops.edit_file(
             path=path,
