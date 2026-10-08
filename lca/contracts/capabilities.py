@@ -144,9 +144,6 @@ CODING_AGENT_RUN_DIFF = Capability[object]("coding_agent_run_diff", cardinality=
 TRACE_INSPECTOR_TOOLS = Capability[object]("trace_inspector_tools", cardinality="registry")
 """TraceInspector 5 个方法各自作为工具注册（ADR-0063 PR-9）。"""
 
-CLI_DEBUG_COMMAND = Capability[object]("cli_debug_command", cardinality="registry")
-"""lca-ops debug <name> 的子命令注册（ADR-0063 PR-9）。"""
-
 GENAI_SEMANTIC_MAPPER = Capability[object]("genai_semantic_mapper", cardinality="registry")
 """OTel GenAI 语义映射器（ADR-0063 PR-10）。"""
 

@@ -1792,3 +1792,12 @@
   - Trust classification fallback shape: never let a classifier's "unknown" branch upgrade privilege; unknown must degrade to untrusted. The assessor's "thread discovery in, or fail-closed" guidance maps cleanly to fail-closed here since production never passes the discovery map.
   - Check: `ps -p <pid>` for pgrep self-matches before treating a background process as real work.
 ---
+
+## 2026-10-09 04:30 CST - RA-061
+- 归档装饰性 `cli_debug_command` 插件 seam：评估确认它只有 provide/register、零 CLI 消费者（grep 证实），而 `lca-ops runs debug`（spine-direct，分层编排器）早已挂载并成为唯一的 debug 故事。选了 AC 的归档选项而非为它新造 `lca-ops debug` 入口——后者只是给装饰添消费者的逆操作。
+- Files changed: deleted `lca/plugins/observability/cli/debug_seam.py`, `debug_trace_provider.py`, `lca/contracts/observability/infra/cli_debug_command.py`, `tests/scenario/cli/test_cli_debug_trace.py`; `lca/contracts/capabilities.py`（删 CLI_DEBUG_COMMAND capability）；`lca/contracts/README.md`（删合同清单行）；`bundles/base.yaml` / `bundles/coding-agent-tools.yaml`（删两插件条目）；new `tests/observability/journal/test_journal_trace_read.py`（从旧测试文件 rehome 两个真实生产 pin：TraceInspector.inspect_trace + read_journal round-trip）。
+- **Learnings for future iterations:**
+  - 删 plugin 模块必须同步清四处：模块文件、capabilities.py capability、bundles/*.yaml 插件条目、合同清单 README 行；grep 漏掉任一处 bundle 条目 boot 期就会报缺模块。
+  - 删测试文件前先分辨"测命令的"和"测 infra 的"：前者随命令走，后者（如 journal round-trip）rehome 到 infra 自己的测试目录，别让真实 pin 陪葬。
+  - `coding-agent-tools.yaml` 末行无换行符：python 的 `old in t` 断言对 EOF 文本要单独处理，sed 按行删更稳。
+---

@@ -887,7 +887,7 @@
       "description": "As an LCA maintainer, I want one debuggable debug story, so newcomers aren't confused by two unreachable debug concepts. Evidence (Round 13, doctor zone): lca/plugins/observability/cli/debug_seam.py (63 lines, Tier-1 seam plugin) exists solely to ctx.provide('cli_debug_command', NamedRegistry()); its only consumer debug_trace_provider.py:139 requires it and registers handlers — but NO CLI command ever takes a handler from that registry (zero consumption points in lca/infrastructure). Meanwhile `runs debug` (cli/commands/runs/debug.py, 816 lines) reads the spine directly and is the reachable one. Two 'debug' concepts coexist; only one is reachable. The seam is shallow to the point of decorative.",
       "id": "RA-061",
       "notes": "Source: Round 13 friction walk (Strong; deletion test — seam with provide+register but no use).",
-      "passes": false,
+      "passes": true,
       "priority": 3,
       "title": "Close or land the decorative debug plugin seam (debug_seam.py provide with zero CLI consumers)"
     },

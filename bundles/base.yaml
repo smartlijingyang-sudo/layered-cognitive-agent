@@ -475,14 +475,6 @@ entries:
   name: lca_providers_trace_tool
   $module: lca.plugins.observability.trace.tool_provider
   config: {}
-- id: lca-cli-debug-command-seam
-  name: lca_seam_cli_debug
-  $module: lca.plugins.observability.cli.debug_seam
-  config: {}
-- id: lca-cli-debug-trace
-  name: lca_providers_cli_debug_trace
-  $module: lca.plugins.observability.cli.debug_trace_provider
-  config: {}
 - id: lca-genai-semantic-mapper-seam
   name: lca_seam_genai
   $module: lca.plugins.observability.genai.seam

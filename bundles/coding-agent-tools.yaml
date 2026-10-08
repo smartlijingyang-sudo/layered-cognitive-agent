@@ -13,5 +13,3 @@ requires:
 plugins:
   - lca-trace-tool-seam
   - lca-trace-tool-provider
-  - lca-cli-debug-command-seam
-  - lca-cli-debug-trace
