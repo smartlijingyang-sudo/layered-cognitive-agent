@@ -22,7 +22,6 @@ from lca.contracts.protocols.memory.operational_skills import (
 )
 from lca.infrastructure.path import expand_user_path
 from lca.infrastructure.skills.frontmatter.frontmatter import (
-    parse_references_field,
     skill_title,
     split_frontmatter,
 )
@@ -158,18 +157,23 @@ class DiskSkillPackageStore(SkillPackageInstaller, SkillPackageStore):
 
         meta_front, body = split_frontmatter(skill_md_text)
         # ADR-0214 §7: SKILL.md frontmatter 必须声明 references(可空)。
-        # split_frontmatter 跳过列表值,二次检查 parse_references_field;
-        # 两份都缺失才 fail-loud。
-        if "references" not in meta_front and not parse_references_field(skill_md_text):
+        # 单次解析:references 进 dict 即为 list;缺失或非 list 才 fail-loud。
+        raw_refs = meta_front.get("references")
+        declared_refs = raw_refs if isinstance(raw_refs, list) else []
+        if "references" not in meta_front and not declared_refs:
             raise SkillContractError(
                 f"SKILL.md frontmatter 缺 'references' 字段: {sid!r}"
                 " — 在 frontmatter 里加 'references: []' 声明打包清单。"
             )
         name = skill_title(meta_front, sid)
-        summary = meta_front.get("description", "").strip()
+        _description = meta_front.get("description", "")
+        summary = _description.strip() if isinstance(_description, str) else ""
         # 调用方只在继承既有包时才带 version；其余路径由 frontmatter 提供，
         # 否则 render_skill_discovery 会渲染出空的 "(v)"。
-        resolved_version = version.strip() or str(meta_front.get("version") or "").strip()
+        _fm_version = meta_front.get("version") or ""
+        resolved_version = version.strip() or (
+            _fm_version.strip() if isinstance(_fm_version, str) else ""
+        )
         digest = content_hash(skill_md_text.encode("utf-8"))
 
         dest = self._root / sid
@@ -198,7 +202,7 @@ class DiskSkillPackageStore(SkillPackageInstaller, SkillPackageStore):
 
         # ADR-0214 §7: 校验 references 列表里的所有路径必须落到 _root/<sid>/_RESOURCES
         # 或 _root/<sid>/(SKILL.md 同级) — 不存在就 fail-loud。
-        declared_refs = parse_references_field(skill_md_text)
+        # declared_refs 来自本函数开头的单次解析,不再二次扫描。
         for ref in declared_refs:
             candidate = (dest / ref).resolve()
             if not candidate.is_relative_to(dest.resolve()):

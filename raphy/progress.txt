@@ -1900,3 +1900,15 @@
   - "需要架构决策"的 story:决议本身就是 deliverable,决议要落字(ADR 追加节),不能只落在 commit message。
   - docstring 里插注记时,note 必须插在 closing `"""` 之前;脚本先 `compile()` 校验再继续。
 ---
+
+## 2026-10-09 10:05 CST - RA-075
+- frontmatter 单遍解析:`split_frontmatter` 一次扫描产出完整 dict——`key: [a, b]` 内联列表与 `key:` + `- item` 块序列进 dict 为 `list[str]`,其余保持 str;块 scalar 体永不重扫。`parse_references_field` 降级为薄封装(单次扫描,只取 list 型值,标量沿用旧行为 `[]`)。
+- `install_package` 只调一次解析:fail-loud(`references` 缺失)与 references 越界/缺失文件校验共用 `declared_refs`;删掉二次 `parse_references_field` 扫描与 import。
+- 顺带加固:`skill_title` 遇 list 型 name 回 fallback;`description`/`version` 取值加 isinstance 守卫(病态输入曾被容忍为 `""`,现在不 crash)。
+- 新测试 `tests/infrastructure/skills/test_frontmatter_unified.py`(11 用例):内联/多行/空列表、空值无 item 沿用 `""`、无 frontmatter、**block scalar 内含 `references:` + `- fake.md` 不误解析**(回归 pin)、wrapper 旧契约、fail-loud 仍在、正常安装。
+- 测试:tests/infrastructure/skills/ 46 passed;architecture contracts + tools 206 passed。ruff 全绿。
+- **Learnings for future iterations:**
+  - `muse.write` 是字面写入(无转义):文件里要单个 `\s` 就写 `\s`,写 `\\s` 会进文件成 `\\s`。反斜杠敏感内容写完后用功能验证(跑 import + 断言),别只看 grep(ssh252 包装器还会二次转义输出,容易误判)。
+  - heredoc `<<'PYEOF'` 经 `muse.exec` 时仍会被做一层反斜杠/引号转义(`\"\"\"` 会提前终结三引号):含三引号嵌套的脚本走"本地文件 + stdin 重定向",别走 heredoc。
+  - 合并重复扫描时,先给旧函数写"行为快照"测试(旧的返回 `[]` 的标量写法等),再动手,保证行为一致。
+---

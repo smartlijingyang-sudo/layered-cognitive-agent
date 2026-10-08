@@ -1081,7 +1081,7 @@
       "description": "As an LCA maintainer, I want one frontmatter parser producing the full dict, so 'fix parser A, miss parser B' patches stop happening. Evidence (Round 13, skills zone): lca/infrastructure/skills/frontmatter/frontmatter.py has split_frontmatter (L59-89, skips list values) and parse_references_field (L96-141, second line-scan) — two syntax-INCONSISTENT parsers over the same text: split_frontmatter understands block scalars (just fixed by ed52b2ff0), parse_references_field is an independent line scan (stripped.startswith('references:')) that false-positives on same-named lines inside block scalars. disk/store.py::install_package (L196-205) calls both in sequence, with a comment admitting the 'second check'. One concept (frontmatter schema), no single deep parser — two shallow scans stacked.",
       "id": "RA-075",
       "notes": "Source: Round 13 friction walk (Worth exploring; sprawl + no-locality).",
-      "passes": false,
+      "passes": true,
       "priority": 3,
       "title": "Unify the frontmatter parsing into one parser (kill the two-pass scan)"
     },
