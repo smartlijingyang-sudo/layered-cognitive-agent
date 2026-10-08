@@ -678,8 +678,8 @@
         "A test pins this; existing run tests stay green."
       ],
       "priority": 5,
-      "passes": false,
-      "notes": "Source: 2026-10-07 runtime findings P2-1 (Worth exploring). Runtime findings outrank static findings. Deletion test: concentrates — the entry seam is the one place every run crosses. Constraints: do not change the accepted types, only the failure mode."
+      "passes": true,
+      "notes": "Source: 2026-10-07 runtime findings P2-1 (Worth exploring). Runtime findings outrank static findings. Deletion test: concentrates — the entry seam is the one place every run crosses. Constraints: do not change the accepted types, only the failure mode.\nDONE 2026-10-08 (optimize session): CognitiveAgent.run() now raises TypeError('Agent.run() task must be str | AgentMessage, got None') at the entry when task is None — previously None flowed through _task_as_text into the runtime and died with an obscure TypeError inside objective_preview (None[:N]). New test: test_cognitive_agent_run_none_task.py (1 passed). ruff clean. Implementation vs assessment: as assessed."
     },
     {
       "id": "RA-047",

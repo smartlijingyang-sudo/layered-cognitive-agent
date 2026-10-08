@@ -1560,3 +1560,16 @@
   tests/.../test_require_assistant_spec.py（新）
 ---
 
+
+## 2026-10-08 17:10 CST - RA-046
+
+- `CognitiveAgent.run()` 入口加 None 校验：`task is None` 直接抛
+  `TypeError("Agent.run() task must be str | AgentMessage, got None")`。
+  之前 None 经 `_task_as_text` 原样返回，一路进 runtime，最后在
+  `objective_preview` 里 `None[:N]` 爆出不知所云的 TypeError。
+- 实现与评估一致（最小改动，只守入口）。
+- 测试：新 test_cognitive_agent_run_none_task.py 1 passed；ruff clean。
+- 文件：lca/agent/cognitive_agent.py、
+  tests/agent/test_cognitive_agent_run_none_task.py（新）
+---
+
