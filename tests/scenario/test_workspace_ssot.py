@@ -215,7 +215,8 @@ def test_wsot08_session_root_follows_run_assistant(monkeypatch, tmp_path):
 
 
 def test_wsot09_guest_scripts_honor_session_root(monkeypatch, tmp_path):
-    """Local 平面 guest 脚本的 ROOT 跟随会话根，不落宿主字面 /mnt/data。"""
+    """Local 平面 guest 脚本的 ROOT 跟随会话根，不落宿主字面 /mnt/data；
+    展示层按 RA-040 投影回 guest 视图，宿主路径不泄漏。"""
     import asyncio
 
     from lca.contracts.models.core.execution.sandbox import SessionConfig
@@ -245,4 +246,7 @@ def test_wsot09_guest_scripts_honor_session_root(monkeypatch, tmp_path):
     composed = compose_json_script(SCRIPT_PRELUDE + "def main(encoded):\n    emit(ROOT)\n", {})
     rooted = asyncio.run(adapter.run_in_session(info.session_id, composed, language="python"))
     assert rooted.success, rooted.error
-    assert rooted.stdout.strip().splitlines()[-1].strip('"') == str(session_root)
+    # The script itself read the session root (probe.txt above proves the host
+    # side); the agent-facing display shows the guest view — the host session
+    # path is projected back and never leaks (RA-040).
+    assert rooted.stdout.strip().splitlines()[-1].strip('"') == "/mnt/data"
