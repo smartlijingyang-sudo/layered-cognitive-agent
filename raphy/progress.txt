@@ -1689,3 +1689,10 @@
   - The assembly-seam lesson from the story is real: register() existed and was tested only against fresh typer apps — nothing caught the unmounted root app. The fix pattern (real-root-app pin) applies to any future CLI command.
   - Mount followed the existing convention exactly: re-export in commands/__init__.py + __all__, import in cli.py's alphabetical list, register(app) in the explicit block. No new wiring idiom invented.
 ---
+## 2026-10-09 03:20 - RA-054
+- Implemented: _emit_boot_events now reads products.resolved_profile.profile_path directly (None-safe). Dropped the getattr(products/resolved_profile, "path", "") chain — neither type has .path, so every production boot emitted boot.profile_resolved with profile_path="". No legacy fallback kept: grep showed the deleted chain was the only .path reader on these types. Test fake rebuilt from the REAL ResolvedProfile/ProfileBootProducts dataclasses (old _FakeResolved carried a divergent `path` class attribute that masked the bug); the existing profile_path=="<test>" assertion now pins the real shape.
+- Files changed: lca_kernel/boot/boot.py, tests/lca_kernel/test_boot_events_emitted.py, raphy/prd.json, raphy/progress.txt
+- **Learnings for future iterations:**
+  - Fake-shape divergence is a test smell worth grepping for: when production code uses getattr(x, "field", default), check the fake actually declares the REAL field name, not the one the code happens to read.
+  - Direct attribute access + explicit None guard is more honest than getattr-None chains when the type is known (slots dataclass).
+---

@@ -788,8 +788,8 @@
    "branchName": "raphy/arch-20261009-0107",
    "description": "As an LCA operator, I want boot events to carry the real profile path, so boot logs are attributable. Evidence (Round 13, profile/boot zone): lca_kernel/boot/boot.py `_emit_boot_events` reads `getattr(products, 'path', '') or getattr(products.resolved_profile, 'path', '')`; neither ProfileBootProducts nor ResolvedProfile has `.path` — the real field is `profile_path`. Every production boot emits boot.profile_resolved with profile_path=''. The test (tests/lca_kernel/test_boot_events_emitted.py) builds a _FakeResolved(path='<test>') and asserts equality — a fake whose shape diverges from the real dataclass, green with confidence. The test imports the private function directly, bypassing the real interface — textbook no-locality.",
    "id": "RA-054",
-   "notes": "Source: Round 13 friction walk (Strong; no-locality / fake-shape divergence). Pattern: test fakes must be built from real types.",
-   "passes": false,
+   "notes": "Source: Round 13 friction walk (Strong; no-locality / fake-shape divergence). Pattern: test fakes must be built from real types. | Implemented 2026-10-09: direct .profile_path read; fake replaced with real types.",
+   "passes": true,
    "priority": 1,
    "title": "Fix _emit_boot_events reading .path instead of .profile_path (production boot logs lose profile attribution)"
   },

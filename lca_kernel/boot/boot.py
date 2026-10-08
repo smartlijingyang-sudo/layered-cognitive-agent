@@ -454,9 +454,12 @@ def _emit_boot_events(
     收口。
     """
     duration_ms = (time.monotonic() - boot_started) * 1000
-    profile_path = str(
-        getattr(products, "path", "") or getattr(products.resolved_profile, "path", "")
-    )
+    # RA-054: neither ProfileBootProducts nor ResolvedProfile has a ``path``
+    # attribute — the real field is ``profile_path``. The getattr-None chain
+    # above always resolved to "" in production, so every boot emitted
+    # boot.profile_resolved with an empty profile_path.
+    resolved = products.resolved_profile
+    profile_path = str(resolved.profile_path) if resolved is not None else ""
     bound = _safe_inject(ctx, "observability")
     bound_seams = tuple(
         name
