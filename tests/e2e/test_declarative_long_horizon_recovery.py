@@ -12,6 +12,8 @@ from typing import Any
 
 import pytest
 
+from lca.contracts.models.core.execution.decision import Decision
+from lca.contracts.models.core.state.state import AgentState, Budget
 from lca.contracts.protocols.act.command.envelope import CommandEnvelope
 from lca.contracts.protocols.act.effect.handler import EffectHandlerRegistry
 from lca.harness.declarative.execute.dispatch import RegistryEffectDispatcher
@@ -21,6 +23,22 @@ from lca.plugins.act.effect.handlers_provider import (
 )
 from lca.runtime._overflow_0.idempotency_fixtures import InMemoryFixtureIdempotencyStore
 from lca.runtime.support.runtime_bindings import RuntimePhaseCapabilities
+
+
+def _agent_state() -> AgentState:
+    """Minimal typed state for the RA-033 typed seam (handlers no longer read
+    live objects from ``envelope.metadata``)."""
+    return AgentState(trace_id="trace_1", task="task_1", budget=Budget())
+
+
+def _decision() -> Decision:
+    return Decision(
+        decision_id="dec_1",
+        action_type="act",
+        rationale="test",
+        confidence=1.0,
+        needs_approval=False,
+    )
 
 
 def _default_effect_handlers() -> EffectHandlerRegistry:
@@ -122,7 +140,7 @@ class TestEffectIdempotency:
             provider="test-body",
             grant=CapabilityGrant(capability="body.act", scope="run", effect_class="body.act"),
             idempotency_key="key_123",
-            metadata={"operation": "body.act", "state": {}, "decision": {}},
+            metadata={"operation": "body.act"},
         )
 
         policy = EffectPolicyPlan(
@@ -131,13 +149,13 @@ class TestEffectIdempotency:
         )
 
         # First execution should succeed
-        result1 = await gateway.execute(envelope, policy)
+        result1 = await gateway.execute(envelope, policy, state=_agent_state(), decision=_decision())
         assert len(body.calls) == 1
         assert "receipt" in result1
         assert result1["idempotency_key"] == "key_123"
 
         # Second execution with same key should return cached result
-        result2 = await gateway.execute(envelope, policy)
+        result2 = await gateway.execute(envelope, policy, state=_agent_state(), decision=_decision())
         # Body should only be called once
         assert len(body.calls) == 1
         assert result1 == result2
@@ -164,7 +182,7 @@ class TestEffectIdempotency:
             provider="test-body",
             grant=CapabilityGrant(capability="body.act", scope="run", effect_class="body.act"),
             idempotency_key="key_123",
-            metadata={"operation": "body.act", "state": {}, "decision": {}},
+            metadata={"operation": "body.act"},
         )
 
         policy = EffectPolicyPlan(
@@ -173,12 +191,12 @@ class TestEffectIdempotency:
         )
 
         # First execution succeeds and records receipt
-        result1 = await gateway.execute(envelope, policy)
+        result1 = await gateway.execute(envelope, policy, state=_agent_state(), decision=_decision())
         assert len(body.calls) == 1
 
         # Simulate crash and resume - gateway should check store
         # and return cached result without calling body again
-        result2 = await gateway.execute(envelope, policy)
+        result2 = await gateway.execute(envelope, policy, state=_agent_state(), decision=_decision())
         assert len(body.calls) == 1  # Still only one call
         assert result1 == result2
 
@@ -219,15 +237,15 @@ class TestEffectIdempotency:
             provider="test-body",
             grant=CapabilityGrant(capability="body.act", scope="run", effect_class="body.act"),
             idempotency_key="key_failed",
-            metadata={"operation": "body.act", "state": {}, "decision": {}},
+            metadata={"operation": "body.act"},
         )
         policy = EffectPolicyPlan(
             allowed_effects=("body.act",),
             idempotency_required=("body.act",),
         )
 
-        first = await gateway.execute(envelope, policy)
-        second = await gateway.execute(envelope, policy)
+        first = await gateway.execute(envelope, policy, state=_agent_state(), decision=_decision())
+        second = await gateway.execute(envelope, policy, state=_agent_state(), decision=_decision())
 
         assert first == second
         assert first["idempotency_key"] == "key_failed"
@@ -256,7 +274,7 @@ class TestEffectIdempotency:
             provider="test-body",
             grant=CapabilityGrant(capability="body.act", scope="run", effect_class="body.act"),
             idempotency_key="key_123",
-            metadata={"operation": "body.act", "state": {}, "decision": {}},
+            metadata={"operation": "body.act"},
         )
 
         policy = EffectPolicyPlan(
@@ -269,7 +287,7 @@ class TestEffectIdempotency:
 
         # Should raise RT-003 error
         with pytest.raises(DeclarativeValidationError, match="RT-003"):
-            await gateway.execute(envelope, policy)
+            await gateway.execute(envelope, policy, state=_agent_state(), decision=_decision())
 
 
 class TestRecoveryProfile:

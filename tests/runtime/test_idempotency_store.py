@@ -5,8 +5,23 @@ import sqlite3
 
 import pytest
 
-from lca.contracts.models.core.execution.decision import Observation
+from lca.contracts.models.core.execution.decision import Decision, Observation
+from lca.contracts.models.core.state.state import AgentState, Budget
 from lca.infrastructure.idempotency.store import SqliteIdempotencyStore
+
+
+def _agent_state() -> AgentState:
+    return AgentState(trace_id="trace_1", task="task_1", budget=Budget())
+
+
+def _decision() -> Decision:
+    return Decision(
+        decision_id="dec_1",
+        action_type="act",
+        rationale="test",
+        confidence=1.0,
+        needs_approval=False,
+    )
 
 
 @pytest.mark.asyncio
@@ -89,7 +104,7 @@ async def test_gateway_reuses_receipt_after_runtime_reconstruction(tmp_path) -> 
         provider="test-body",
         grant=CapabilityGrant(capability="body.act", scope="run", effect_class="body.act"),
         idempotency_key="effect-1",
-        metadata={"operation": "body.act", "state": {}, "decision": {}},
+        metadata={"operation": "body.act"},
     )
     policy = EffectPolicyPlan(allowed_effects=("body.act",), idempotency_required=("body.act",))
     path = tmp_path / "idempotency.sqlite3"
@@ -103,13 +118,13 @@ async def test_gateway_reuses_receipt_after_runtime_reconstruction(tmp_path) -> 
     first_gateway = RegistryEffectDispatcher(
         capabilities, default_effect_handlers(), idempotency_store=first
     )
-    first_result = await first_gateway.execute(envelope, policy)
+    first_result = await first_gateway.execute(envelope, policy, state=_agent_state(), decision=_decision())
 
     second = SqliteIdempotencyStore(path)
     second_gateway = RegistryEffectDispatcher(
         capabilities, default_effect_handlers(), idempotency_store=second
     )
-    second_result = await second_gateway.execute(envelope, policy)
+    second_result = await second_gateway.execute(envelope, policy, state=_agent_state(), decision=_decision())
 
     assert first_result == second_result
     assert body.calls == 1
