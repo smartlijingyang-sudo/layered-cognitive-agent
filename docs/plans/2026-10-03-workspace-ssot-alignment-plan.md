@@ -110,6 +110,12 @@ agent 答"对话上下文 ✅ 有，`/mnt/data` 工作区 ❌ 没有，不会自
 - 新 run 的 system prompt 里，"工作区"一词只指向一个概念；抽查 3 个历史问法
   （"文件在 Workspace 吗""保存到工作区""列一下工作区文件"）agent 回答不再自相矛盾。
 
+> **状态（2026-10-08）：已落地。** commit `4ebae41ee` 改了两个 prompt section 的文案
+> （HomeSection 与 cloud_sandbox_system_role.md）：概念名统一为「你的 Workspace」，
+> `/mnt/data` 只作为 guest 路径值出现；回复面要求优先给 workspace 相对路径。
+> 模型可见工具 payload 的相对路径投影由 `3619ca1e5` 在单一投影 seam 完成；
+> per-run 沙箱根绑定由 `78034deea` 完成（SessionConfig.workspace_root）。
+
 ## Task 4：历史 traces/files 迁移 + 旧根废弃
 
 > **状态（2026-10-03 21:0x，李超决策）：本 Task 已撤销——"历史不迁移"。** `traces/files/` 旧根保留只读；迁移脚本/双读/废弃/回填 memory 均不执行；设计要点 4 的"迁移期双读"随之作废。
