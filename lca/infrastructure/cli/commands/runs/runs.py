@@ -358,7 +358,10 @@ def _resolve_assistant_id(agent: str, assistant_id: str | None) -> str | None:
     """
     if assistant_id:
         return assistant_id
-    del agent  # no local reverse mapping to consult; agent-only runs stay unbound.
+    # The agt_* to asst_* reverse mapping lives in the ownership store and is
+    # consulted by the carrier decode seam (decode_create_run), so agent-only
+    # CLI runs stay unbound here and gain their identity server-side.
+    del agent
     return None
 
 

@@ -30,7 +30,18 @@ def default_agent_ref() -> AgentRef:
 
 
 def parse_agent_ref(raw: Any) -> AgentRef:
-    """Parse POST /runs ``agent``. Missing or empty → default solo 助手."""
+    """Parse POST /runs ``agent``. Missing or empty → default solo 助手.
+
+    A bare string is the agent id itself: ``lca-ops runs create --agent``
+    sends it that way. Treating strings as absent collapsed every CLI run
+    onto the solo principal and starved the carrier's assistant mapping.
+    """
+    if isinstance(raw, str):
+        agent_id = raw.strip()
+        if not agent_id:
+            return default_agent_ref()
+        name = SOLO_ROLE if agent_id == DEFAULT_AGENT_ID else agent_id
+        return AgentRef(agent_id=agent_id, name=name)
     if not isinstance(raw, dict):
         return default_agent_ref()
     agent_id = str(raw.get("id") or raw.get("agent_id") or "").strip()
