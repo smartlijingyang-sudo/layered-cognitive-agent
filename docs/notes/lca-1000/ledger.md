@@ -1125,3 +1125,17 @@
 - 验证结果: 无代码改动，无需验证门。扫描脚本全部 exit 0（ast0527/dead0527/dead0522b/sndb0527 确定性重跑，0531 输出逐字节对齐 0530/0523 基线）；开工/收工工作区 on main（并发会话的未提交改动始终不动）。
 - commit: 无代码 commit；本台账单独 docs commit（沿用 0521–0530 `docs(lca-1000): 第NNNN轮台账` 模式）。
 - 备注: 只 commit docs/notes/lca-1000/ledger.md（`git add` + `git commit -- <path>` 显式路径）。扫描输出存 252 /tmp（ast0531_out.txt、dead0531_out.txt、dead0531b_out.txt、sndb0531_out.txt）。flat->subpackage move 162596bde 已在 0530 ancestry 内（本轮仅测试跟进提交），基线未漂移。
+
+
+## 第0532轮 (2026-10-09 03:03-03:25 CST)
+- 改了什么: 无代码改动。**本轮未发现新的实质机会**（依据 body 规则 4：不硬凑 trivial commit）。
+- 依据 skill 哪一节: SKILL.md Deletion test + LANGUAGE.md（深度即杠杆/真实 seam/接口即测试面）+ DEEPENING.md Seam discipline —— 见候选清单的驳回依据。
+- 关键设计决策（夜间跳过 grilling，记台账）: 自 0531 explore（02:33–02:55）后无新落盘 —— HEAD 仍为 0531 台账 commit b2b80b2c3。唯一未提交改动为 .agent/skills/airtap-automation/SKILL.md，属并发会话，按 0.5/规则 5 绝不动、不细看（沿用 0522/0528–0531 判例）。时间窗（03:03）与分支（main）两硬门槛均过，skill 四文件完整重读。
+- 候选清单（本轮 explore：AST 同体扫描 + dead-code a/b + 同名异体 + deslop 清单 + 新鲜 diff 复查）:
+  1. AST —— 输出与 ast0531_out.txt 逐字节一致：functions=8430，243 组，组 hash（G 行）集合与 0523 基线逐成员一致，零新组（0522/0523 已逐组人工裁决）。
+  2. dead a —— 与 dead0531_out.txt 逐字节一致；dead b —— 与 dead0531b_out.txt 逐字节一致；真死 17 与 0522–0531 裁决集合一致（_RoleConfig 静态锚点；框架按名调用或保留；_validate_* ×12 pydantic validator classmethod 假阳性）。注意：首轮用 0521 版旧脚本（0521_scan0519.py/0521_dead0519.py）输出格式与基线不一致，弃用后按 0527 判例改用 ast0527.py/dead0527.py/dead0522b.py/sndb0527.py 确定性重跑，全部 exit 0。
+  3. sndb —— 与 sndb0531_out.txt 逐字节一致（295 组，含 0527 新裁决的 5 组 create_session/run_in_session/relink_global_skills/_relative/turn_of）。
+  4. deslop：TODO/FIXME/HACK/XXX lca/ 仅 8 行既往裁决项（compact_summary TODOs 字段语义、expander 中文示例 XXX ×2、s3 ADR-0167 PR-10 占位 ×5）；except Exception lca/ 仍 442，无新增；noqa F401 lca/ 仅 cli.py side-effect registry 老项（tests/ 20 文件均为架构测试 import-即-断言设计，既往裁决）；"自承 dead" / 叙事性注释无新增。
+- 验证结果: 无代码改动，无需验证门。扫描脚本全部 exit 0；开工/收工工作区 on main（并发会话的未提交改动始终不动）。
+- commit: 无代码 commit；本台账单独 docs commit（沿用 0521–0531 `docs(lca-1000): 第NNNN轮台账` 模式）。
+- 备注: 只 commit docs/notes/lca-1000/ledger.md（`git add` + `git commit -- <path>` 显式路径）。台账文本经 base64 编码走 stdin 管道追加（沿用 0525 教训）。扫描输出存 252 /tmp（ast0532_out.txt、dead0532_out.txt、dead0532b_out.txt、sndb0532_out.txt；另有 ast0532_err.txt 等空错误文件）。教训：/tmp/0521_scan0519.py 等 0521 版脚本输出格式已与 0527+ 基线不一致，以后只用 0527 版脚本。
