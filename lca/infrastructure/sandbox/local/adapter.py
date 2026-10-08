@@ -33,6 +33,10 @@ from lca.contracts.models.core.state.guest_layout import GuestLayout
 from lca.contracts.protocols import Sandbox
 from lca.infrastructure.sandbox.onlyboxes.bootstrap import safe_rel_name
 from lca.infrastructure.sandbox.output.collect import try_append_generated_file
+from lca.infrastructure.sandbox.paths.mount_namespace import (
+    mount_namespace_enabled,
+    wrap_in_mount_namespace,
+)
 from lca.infrastructure.sandbox.paths.sandbox_paths import SandboxPaths
 from lca.infrastructure.sandbox.streaming.streaming import SandboxStreamEmitter
 
@@ -95,9 +99,18 @@ class LocalSandboxAdapter(Sandbox):
 
     name = "local-sandbox"
 
-    def __init__(self, *, root: str | None = None, layout: GuestLayout | None = None) -> None:
+    def __init__(
+        self,
+        *,
+        root: str | None = None,
+        layout: GuestLayout | None = None,
+        mount_namespace: bool | None = None,
+    ) -> None:
         host_root = (root or default_local_root()).rstrip("/")
         self._host_root = host_root
+        # Explicit per-exec mount-namespace mode override; None means
+        # auto-detect (mount_namespace_enabled: env var, else probe).
+        self._mount_namespace_override = mount_namespace
         # Guest paths stay on SANDBOX_MOUNT_ROOT so prompts/tools agree with
         # Onlyboxes. When host_root differs, shell commands are rewritten.
         self._layout = layout if layout is not None else GuestLayout.from_root(SANDBOX_MOUNT_ROOT)
@@ -118,6 +131,18 @@ class LocalSandboxAdapter(Sandbox):
             return self._sessions[session_id]
         return Path(self._host_root)
 
+    def _mount_ns_mode(self) -> bool:
+        """Per-exec mount-namespace mode for this adapter (todo-81 (c)).
+
+        Explicit constructor arg wins, then ``LCA_SANDBOX_MOUNT_NS``, then
+        auto-detect (unshare/userns probe). When False, exec falls back to
+        the (b) virtual string-mapping path — the agent sees the same
+        ``/mnt/data`` namespace either way.
+        """
+        if self._mount_namespace_override is not None:
+            return self._mount_namespace_override
+        return mount_namespace_enabled()
+
     def _paths_for(self, session_id: str = "") -> SandboxPaths:
         """Single-seam path mapping for one session (todo-81).
 
@@ -125,8 +150,28 @@ class LocalSandboxAdapter(Sandbox):
         onto this machine; every boundary crossing below derives from it.
         """
         return SandboxPaths.for_local(
-            self._session_root(session_id), guest_mount=self._layout.root.rstrip("/")
+            self._session_root(session_id),
+            guest_mount=self._layout.root.rstrip("/"),
+            mounted=self._mount_ns_mode(),
         )
+
+    def _wrap_command(self, command: str, paths: SandboxPaths, work: str) -> str:
+        """Wrap the guest command for execution.
+
+        Mounted mode (todo-81 (c)): per-exec ``unshare -Urm`` with the work
+        dir bind-mounted at the guest mount (Pattern A — no holder). The
+        kernel translates, so ``command`` is already guest-native
+        (``rewrite_command`` is identity in this mode).
+        Virtual mode: plain ``cd`` into the host work dir; translation is
+        done by ``SandboxPaths.rewrite_command`` string rewriting.
+        """
+        if paths.mounted:
+            return wrap_in_mount_namespace(
+                command,
+                session_dir=str(paths.host_root),
+                guest_mount=paths.guest_mount,
+            )
+        return f"cd {shlex.quote(work)} && {command}"
 
     def _guest_to_host(self, guest_path: str, *, session_id: str = "") -> str:
         return str(self._paths_for(session_id).resolve(guest_path))
@@ -181,13 +226,23 @@ class LocalSandboxAdapter(Sandbox):
         emitter = SandboxStreamEmitter(invocation_id)
         work = cwd or str(self._session_root(session_id))
         _ensure_dir(Path(work))
-        paths = SandboxPaths.for_local(work, guest_mount=self._layout.root.rstrip("/"))
+        paths = SandboxPaths.for_local(
+            work,
+            guest_mount=self._layout.root.rstrip("/"),
+            mounted=self._mount_ns_mode(),
+        )
         rewritten = paths.rewrite_command(command)
-        wrapped = f"cd {shlex.quote(work)} && {rewritten}"
-        # Guest scripts read ROOT from this var; without it they would hit the
-        # host's literal /mnt/data and bypass the per-session root entirely.
-        # Single source (todo-81): the value IS the seam's host root.
-        env = {**os.environ, "LCA_GUEST_ROOT": str(paths.host_root)}
+        wrapped = self._wrap_command(rewritten, paths, work)
+        # Guest scripts read ROOT from this var. Virtual mode: the host
+        # session dir (guest code runs on the host, strings were rewritten).
+        # Mounted mode: the guest mount itself — inside the namespace that
+        # path really is the session dir, and host paths must stay invisible
+        # to the guest (axiom 1).
+        # Single source (todo-81): derived from the seam in both modes.
+        env = {
+            **os.environ,
+            "LCA_GUEST_ROOT": paths.guest_mount if paths.mounted else str(paths.host_root),
+        }
         try:
             proc = await asyncio.create_subprocess_shell(
                 wrapped,

@@ -60,10 +60,17 @@ class SandboxPaths:
     absolute). ``host_root`` is the real directory backing it on this
     machine (absolute, normalized). The pair is the whole mapping: every
     boundary crossing in the sandbox derives from it.
+
+    ``mounted``: the guest mount is a real kernel bind mount (per-exec
+    mount namespace, todo-81 (c)). Text-level translation
+    (``rewrite_command``/``present_text``) becomes identity — the kernel
+    performs it; path-level ``resolve``/``present`` still map for
+    host-side operations.
     """
 
     guest_mount: str
     host_root: Path
+    mounted: bool = False
 
     def __post_init__(self) -> None:
         mount = self.guest_mount.replace("\\", "/").rstrip("/") or "/"
@@ -80,10 +87,21 @@ class SandboxPaths:
     # ------------------------------------------------------------------
 
     @classmethod
-    def for_local(cls, host_root: str | Path, *, guest_mount: str = SANDBOX_MOUNT_ROOT) -> SandboxPaths:
-        """Local plane: the agent's guest mount is virtualized onto a
-        per-session host directory (the agent's own assistant directory)."""
-        return cls(guest_mount=guest_mount, host_root=Path(host_root))
+    def for_local(
+        cls,
+        host_root: str | Path,
+        *,
+        guest_mount: str = SANDBOX_MOUNT_ROOT,
+        mounted: bool = False,
+    ) -> SandboxPaths:
+        """Local plane: the agent's guest mount is backed by a per-session
+        host directory (the agent's own assistant directory).
+
+        ``mounted=True`` selects the per-exec mount-namespace mode
+        (todo-81 (c)): the guest mount is bind-mounted by the kernel, so
+        text-level translation becomes identity.
+        """
+        return cls(guest_mount=guest_mount, host_root=Path(host_root), mounted=mounted)
 
     @classmethod
     def identity(cls, *, guest_mount: str = SANDBOX_MOUNT_ROOT) -> SandboxPaths:
@@ -158,8 +176,13 @@ class SandboxPaths:
         ``command.replace(mount, root)``, which also rewrote longer tokens
         merely containing the mount as a substring (``/mnt/data2`` ->
         ``<root>2``).
+
+        Mounted mode (real bind mount, todo-81 (c)): identity — the guest
+        mount really is the host directory inside the exec namespace, so
+        the kernel translates; string rewriting would map an
+        already-correct path.
         """
-        if not command or self._is_identity():
+        if not command or self._is_identity() or self.mounted:
             return command
         before = r"(?:^|(?<=[\s\"'`=:;|&<>(){}\[\],]))"
         after = r"(?![A-Za-z0-9_.\-])"
@@ -173,8 +196,11 @@ class SandboxPaths:
         root is only replaced when not followed by a path-continuation
         character, so sibling paths that merely share the prefix are left
         alone.
+
+        Mounted mode: identity — guest outputs already name the real guest
+        mount; there is no host path to project back.
         """
-        if not text or self._is_identity():
+        if not text or self._is_identity() or self.mounted:
             return text
         return re.sub(
             re.escape(str(self.host_root)) + r"(?![A-Za-z0-9_.\-])",
