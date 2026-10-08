@@ -1055,3 +1055,18 @@
 - 验证结果: 不适用（无改动）。
 - commit: 无。
 - 备注: 跳过发生在 raphy 活跃工作期间；下轮先查分支再动手。注意：台账中 0525 段之前的乱码节（"## 第0525辱"+9 行二进制垃圾，系 0525 轮 base64 截断事故产物）已随后由 peter 按本地备份 hidden_files/scratch/round0525_ledger_entry.md 删除，0525 正确条目完整保留。
+
+
+## 第0527轮 (2026-10-09 00:33-01:01 CST)
+- 改了什么: 无代码改动。**本轮未发现新的实质机会**（依据 body 规则 4：不硬凑 trivial commit）。
+- 依据 skill 哪一节: SKILL.md Deletion test + LANGUAGE.md（load-bearing knowledge / Two adapters = real seam / 接口即测试面）+ DEEPENING.md Seam discipline —— 见候选清单的驳回依据。
+- 关键设计决策（夜间跳过 grilling，记台账）: 并发会话新鲜 diff（raphy RA-048..050 @23:58 merge、iter-arch/iter-tests ADR-0221 同步、todo-85/86/87 裁决）全部是刻意的架构收敛/回归修复/文档同步，不 re-litigate 并发会话的新鲜工作（沿用 0522 RA 判例）。其中 RA-050（删 LocalSandboxAdapter._rewrite_command/_project_host_to_guest 死包装器）与 4009b7b7b（退役 v1 fact-plane 测试 pin）正是 deslop 目标的实例 —— 已由并发会话完成，不重复动。
+- 候选清单（本轮 explore：AST 同体扫描重跑 8431 函数/243 组 + dead-code 真死 17 + 同名异体 295 组（+5 新组逐一裁决）+ deslop 清单 + 并发会话新鲜 diff 复查）:
+  1. AST 243 组 —— 组 hash（G 行）集合与 0523 基线逐成员一致，零新组（0522/0523 已逐组人工裁决）；函数数 8397→8431（+34，新增代码），组数不变。
+  2. dead 真死 17 —— 与 0522/0523/0524/0525 裁决集合逐成员一致（_RoleConfig 静态锚点；_coerce_dev_mode/_composio_root/_names_unique/_tupleize 框架按名调用或保留；_validate_* ×12 pydantic validator classmethod 假阳性）。
+  3. sndb 290→295，5 个新 drift-name 组全部驳回：create_session ×6 / run_in_session ×6（protocol 声明 + capability/adapters 实现，真实 seam 上的 Adapter；deletion test：删掉任一实现复杂度回到接线处）；relink_global_skills ×2（skill_overlay.py:331 contract protocol vs overlay.py:391 plugin 实现 —— 接口/实现对，不可删）；_relative ×2（layout.py#241 模块级路径校验 vs sandbox_paths.py#119 SandboxPaths 方法，同名不同 arity/域，假阳性）；turn_of ×2（state.py#182 AgentState→int，RA-029 fail-loud 契约 vs _shared.py#54 SessionEvent→int|None，同名不同契约，合并成 Union-conditional 反而变浅）。
+  4. deslop：TODO/FIXME/HACK/XXX 仅既往裁决项（expander 中文示例 XXX、s3 ADR-0167 PR-10 占位、compact_summary TODOs 字段）；except Exception lca/ 440→442：新增 2 处均为有依据设计 —— assistants.py:202（批量 CLI per-item fail-soft，退出码承担失败信号）与 mount_namespace.py:55（subprocess 能力探针返回 bool，含 TimeoutExpired）；noqa F401 无新增（lca/ 仅 cli.py side-effect registry 老项；tests/ 均为架构测试 import-即-断言设计）；“自承 dead” 全树无新自承项（仅语义 "old process confirmed dead" 一句）；叙事性注释无新增。
+- 验证结果: 无代码改动，无需验证门。扫描脚本全部 exit 0（ast0527b/sndb0527b 确定性重跑）；开工/收工工作区干净（main；.agent/skills/airtap-automation/SKILL.md 的未提交改动属并发会话，不动）。
+- commit: 无代码 commit；本台账单独 docs commit（沿用 0521–0526 `docs(lca-1000): 第NNNN轮台账` 模式）。
+- 备注: 只 commit docs/notes/lca-1000/ledger.md（`git add` + `git commit -- <path>` 显式路径）。扫描输出存 252 /tmp（ast0527b_out.txt、sndb0527b_out.txt、exc0527b.txt；ast0527_out.txt/dead0527_out.txt/sndb0527_out.txt 为中断尝试遗留）。注意：本轮开工前 252 /tmp 已有 00:26 生成的 ast0527/dead0527/sndb0527 扫描文件（ledger 无 0527 条目、无相关 commit，应为 00:03 轮次中断残留，参考 0522 备注的 02:03 中断判例）；本轮为避免基线漂移（00:30 有新 merge 落盘）全部重跑，数据取自当前 HEAD。探索中无分支切换、无代码改动。
+
