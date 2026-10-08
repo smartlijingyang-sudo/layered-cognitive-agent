@@ -1154,3 +1154,19 @@
 - 验证结果: 无代码改动，无需验证门。扫描脚本全部 exit 0（ast0527.py/dead0527.py/dead0522b.py/sndb0527.py 确定性重跑，0533 输出逐字节对齐 0532）；开工/收工工作区 on main（并发会话的未提交改动始终不动）。
 - commit: 无代码 commit；本台账单独 docs commit（沿用 0521–0532 `docs(lca-1000): 第NNNN轮台账` 模式）。
 - 备注: 只 commit docs/notes/lca-1000/ledger.md（`git add` + `git commit -- <path>` 显式路径；-m 须在 -- 之前，见 AGENTS.md 教训）。台账文本经 base64 编码走 stdin 管道追加（沿用 0525 教训）。扫描输出存 252 /tmp（ast0533_out.txt、dead0533_out.txt、dead0533b_out.txt、sndb0533_out.txt）。教训：ssh252 包装会吃掉双引号命令里的 `${p}` 变量展开，for 循环比较误报 DIFFERS；改用单引号 + `$f` 裸变量重跑核验后四组全部 IDENTICAL。
+
+
+--
+
+## 第0534轮 (2026-10-09 04:03-04:22 CST)
+- 改了什么: 无代码改动。**本轮未发现新的实质机会**（依据 body 规则 4：不硬凑 trivial commit）。
+- 依据 skill 哪一节: SKILL.md Deletion test + LANGUAGE.md（深度即杠杆/真实 seam/接口即测试面）+ DEEPENING.md Seam discipline —— 见候选清单的驳回依据。
+- 关键设计决策（夜间跳过 grilling，记台账）: 自 0533（03:47）后无新落盘 —— HEAD 仍为 3e54b0e70（`docs(lca-1000): 第0533轮台账`）。唯一未提交改动为 .agent/skills/airtap-automation/SKILL.md，属并发会话，按 0.5/规则 5 绝不动、不细看（沿用 0522/0528–0533 判例）。ADR-0295（todo-88/89）仍在 Chao 待裁决队列，不 re-litigate、不动（沿用 0531–0533 判例）。时间窗（04:03）与分支（main）两硬门槛均过，skill 四文件（SKILL.md/DEEPENING.md/LANGUAGE.md/INTERFACE-DESIGN.md）完整重读。
+- 候选清单（本轮 explore：AST 同体 + dead a/b + 同名异体 + deslop 清单 + 新鲜 diff 复查）:
+  1. AST —— /tmp/ast0534_out.txt 与 ast0533_out.txt 逐字节一致（functions=8430 不变；243 组，组 hash（G 行）与 0523 基线逐成员一致，零新组；0522/0523 已逐组人工裁决）。
+  2. dead a —— 与 dead0533_out.txt 逐字节一致；dead b —— 与 dead0533b_out.txt 逐字节一致；真死 17 与 0522–0533 裁决集合一致（_RoleConfig 静态锚点；框架按名调用或保留；_validate_* ×12 pydantic validator classmethod 假阳性）。
+  3. sndb —— 与 sndb0533_out.txt 逐字节一致（295 组，含 0527 新裁决的 create_session/run_in_session/relink_global_skills/_relative/turn_of 5 组）。
+  4. deslop：TODO/FIXME/HACK/XXX lca/ --include='*.py' = 9 源码行 + summarize_prompt.md 1 行（compact_summary/summarize_prompt TODOs 字段、expander 中文示例 XXX ×2、s3 ADR-0167 PR-10 占位 ×5），与 0533 既往裁决项一致、无新增；except Exception --include='*.py' = 442（与 0533 一致；裸 grep 451 多出的 9 个是 __pycache__ 二进制误报）；noqa F401 = 1（cli.py side-effect registry 老项）；"自承 dead"/叙事性注释无新增。
+- 验证结果: 无代码改动，无需验证门。扫描脚本全部 exit 0（ast0527.py/dead0527.py/dead0522b.py/sndb0527.py 确定性重跑，0534 输出逐字节对齐 0533）；开工/收工工作区 on main（并发会话的未提交改动始终不动）。
+- commit: 无代码 commit；本台账单独 docs commit（沿用 0521–0533 `docs(lca-1000): 第NNNN轮台账` 模式）。
+- 备注: 只 commit docs/notes/lca-1000/ledger.md（`git add` + `git commit -- <path>` 显式路径；-m 须在 -- 之前，见 AGENTS.md 教训）。台账文本经 base64 编码走 stdin 管道追加（沿用 0525 教训）。扫描输出存 252 /tmp（ast0534_out.txt、dead0534_out.txt、dead0534b_out.txt、sndb0534_out.txt）。教训：deslop 裸 grep 会命中 __pycache__/.pyc 二进制误报（TODO 14、except 451），计数必须加 --include='*.py'（新教训，0521–0533 各轮裸 grep 结果侥幸与基线一致是误报恰好抵消）。
