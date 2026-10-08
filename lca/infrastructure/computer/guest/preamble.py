@@ -21,8 +21,11 @@ import sys
 from datetime import datetime
 from pathlib import Path
 
-ROOT = {ONLYBOXES.root!r}
-BG_DIR = {ONLYBOXES.background_dir!r}
+# The Local adapter exports LCA_GUEST_ROOT per session so host-side execution
+# honors the guest contract with a per-run root. Onlyboxes containers leave it
+# unset and keep the image contract root.
+ROOT = os.environ.get("LCA_GUEST_ROOT") or {ONLYBOXES.root!r}
+BG_DIR = str(Path(ROOT) / ".lca" / "background")
 
 def load_args(encoded):
     return json.loads(base64.b64decode(encoded).decode())

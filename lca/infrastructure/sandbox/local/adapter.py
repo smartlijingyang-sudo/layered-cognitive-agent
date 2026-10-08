@@ -118,21 +118,20 @@ class LocalSandboxAdapter(Sandbox):
             return guest
         return str(root / guest.lstrip("/"))
 
-    def _rewrite_command(self, command: str) -> str:
+    def _rewrite_command(self, command: str, root: str) -> str:
         """Map guest ``/mnt/data`` references onto the host directory backing the mount.
 
         Absolute guest paths resolve against the mount root — that is where
         ``SandboxRuntime._stage_files`` writes run attachments, and what the
-        tool surface advertises to the model. Mapping them onto the per-session
-        cwd instead left ``runCommand`` unable to open an attachment that
-        ``executeCode`` (whose paths live in the code body, never rewritten)
-        could read fine. The session root stays the cwd, so relative writes
-        such as ``outputs/report.pdf`` remain per-session.
+        tool surface advertises to the model. Staging passes the session id,
+        so attachments live under the session root; guest scripts read
+        ``LCA_GUEST_ROOT`` (exported per spawn) as their ROOT. Shell commands
+        map onto the same session root so all three views agree.
         """
         mount = self._layout.root.rstrip("/")
-        if self._host_root == mount:
+        if root == mount:
             return command
-        return command.replace(mount, self._host_root)
+        return command.replace(mount, root)
 
     async def _exec_shell(
         self,
@@ -146,14 +145,18 @@ class LocalSandboxAdapter(Sandbox):
         emitter = SandboxStreamEmitter(invocation_id)
         work = cwd or str(self._session_root(session_id))
         _ensure_dir(Path(work))
-        rewritten = self._rewrite_command(command)
+        rewritten = self._rewrite_command(command, work)
         wrapped = f"cd {shlex.quote(work)} && {rewritten}"
+        # Guest scripts read ROOT from this var; without it they would hit the
+        # host's literal /mnt/data and bypass the per-session root entirely.
+        env = {**os.environ, "LCA_GUEST_ROOT": work}
         try:
             proc = await asyncio.create_subprocess_shell(
                 wrapped,
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
                 cwd=work,
+                env=env,
             )
             try:
                 stdout_b, stderr_b = await asyncio.wait_for(proc.communicate(), timeout=timeout_s)
