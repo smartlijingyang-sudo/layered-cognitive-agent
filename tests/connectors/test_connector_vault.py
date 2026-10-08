@@ -5,8 +5,10 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import pytest
+
 from lca.infrastructure.connectors.core.state import ConnectionState
-from lca.infrastructure.connectors.core.vault import ConnectorVault
+from lca.infrastructure.connectors.core.vault import ConnectorVault, ConnectorVaultError
 
 
 def test_connector_vault_reads_from_user_dir(tmp_path: Path) -> None:
@@ -130,3 +132,31 @@ def test_atomic_write_json(tmp_path: Path) -> None:
     assert target.is_file()
     loaded = json.loads(target.read_text(encoding="utf-8"))
     assert loaded == payload
+
+
+def test_connector_vault_corrupt_file_fails_loud(tmp_path: Path) -> None:
+    """RA-071: a corrupt vault file must raise, never degrade to []."""
+    user_conn_dir = tmp_path / "users" / "u123" / "connectors"
+    user_conn_dir.mkdir(parents=True)
+    (user_conn_dir / "connections.json").write_text("{not valid json", encoding="utf-8")
+
+    vault = ConnectorVault(user_id="u123", lca_home=tmp_path)
+    with pytest.raises(ConnectorVaultError, match="unreadable or corrupt"):
+        vault.list_connections()
+
+
+def test_connector_vault_unexpected_shape_fails_loud(tmp_path: Path) -> None:
+    """RA-071: valid JSON with the wrong shape must raise, not guess."""
+    user_conn_dir = tmp_path / "users" / "u123" / "connectors"
+    user_conn_dir.mkdir(parents=True)
+    (user_conn_dir / "connections.json").write_text('["not", "a", "dict"]', encoding="utf-8")
+
+    vault = ConnectorVault(user_id="u123", lca_home=tmp_path)
+    with pytest.raises(ConnectorVaultError, match="unexpected shape"):
+        vault.list_connections()
+
+
+def test_connector_vault_missing_file_is_empty_not_an_error(tmp_path: Path) -> None:
+    """Absence is honest: a missing vault file means no connections."""
+    vault = ConnectorVault(user_id="u123", lca_home=tmp_path)
+    assert vault.list_connections() == []

@@ -1025,7 +1025,7 @@
       "description": "As an LCA operator, I want a corrupt connector store to surface loudly, so the agent never lies about connection state. Evidence (Round 13, profile/boot zone): lca/infrastructure/connectors/core/vault.py L44-49 _load_raw_connections suppress(Exception) -> returns []; the prompt section then tells the agent 'No external services are currently connected'. A half-written or disk-corrupted connections.json silently zeroes a security-relevant store. Also get_connection returns a NOT_CONNECTED stand-in for unknown services, so callers can't distinguish 'service unknown' from 'service known but disconnected' (composio.py CLI is another consumer — check it).",
       "id": "RA-071",
       "notes": "Source: Round 13 friction walk (Worth exploring; fail-silent in security-adjacent store).",
-      "passes": false,
+      "passes": true,
       "priority": 3,
       "title": "Make ConnectorVault degradation honest (no silent [] on corrupt connections.json)"
     },

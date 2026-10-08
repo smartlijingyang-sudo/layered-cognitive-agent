@@ -1863,3 +1863,11 @@
   - "单通道"类 story 的 pin 写法：源码扫描（markers 列表）+ AST 结构检查双保险，比运行时 caplog 更便宜、且防的是"以后有人加回来"。
   - structlog 的 `exception()` 签名是 `(event, **kw)`，不是 printf 风格——迁移时把 `%s` 插值改成 kwarg。
 ---
+
+## 2026-10-09 08:05 CST - RA-071
+- ConnectorVault 诚实降级：`_load_raw_connections` 里的 `contextlib.suppress(Exception)` 删掉——connections.json 存在但读不出/JSON 坏掉时抛 `ConnectorVaultError`（带文件路径），不再静默退化成"无连接"（下游会基于这个谎言重弹 OAuth）。文件缺失仍是 `[]`（缺席是诚实的）。JSON 合法但形状不对（非 dict / connections 非 list）同样抛。
+- Files changed: `lca/infrastructure/connectors/core/vault.py`（新增 ConnectorVaultError(RuntimeError)；删 contextlib import）；`tests/connectors/test_connector_vault.py`（+3 pin：坏文件抛、错形状抛、缺失文件=空）。
+- **Learnings for future iterations:**
+  - secret 路径的 `suppress(Exception)` 是最高危的 dishonest 模式：读 vault 失败→空列表→调用方以为"用户没连过"→重走授权，静默丢数据。修法固定：缺席=空（诚实），存在但坏=抛（fail-loud）。
+  - 新增异常类型时检查 `__init__.py` 是否 re-export——这次没有，调用方都是直引 `...core.vault`，不用动。
+---
