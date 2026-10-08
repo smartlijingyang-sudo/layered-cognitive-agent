@@ -15,14 +15,10 @@ from lca.contracts.models.core.execution.sandbox import (
 )
 from lca.contracts.models.observability.journal.journal import (
     RunScope,
-    StampedEvent,
-    ToolInvoked,
-    ToolStarted,
     run_scope,
 )
 from lca.contracts.models.team.role.team import CacheConfig, RetryPolicy, ToolPermissionManifest
 from lca.infrastructure.file.store import LocalFileStore
-from lca.infrastructure.observability import bind_backends
 from lca.infrastructure.sandbox.runtime.scope import bind_sandbox_runtime, unbind_sandbox_runtime
 from lca.infrastructure.tools.default.set import build_default_tools
 from lca.infrastructure.tools.run.attachment_scope import run_attachment_scope
@@ -33,22 +29,10 @@ from lca.infrastructure.tools.sandbox.runtime_tools import (
     SandboxExecuteTool,
     SandboxInspectTool,
 )
+from lca.plugins.events.publishers import _session_publish
+from lca.session.append import Session
+from lca.session.lifecycle.bind import RunEventSessionBridge
 from tests.support.inline_sandbox import InlineSandbox
-from tests.support.observability_helpers import make_test_bound
-
-
-class _Collector:
-    def __init__(self) -> None:
-        self.received: list[StampedEvent] = []
-
-    def on_event(self, stamped: StampedEvent) -> None:
-        self.received.append(stamped)
-
-    def flush(self) -> None:
-        return
-
-    def close(self) -> None:
-        return
 
 
 class SandboxRuntimeToolTests(unittest.IsolatedAsyncioTestCase):
@@ -154,25 +138,39 @@ class SandboxRuntimeToolTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(self.sandbox.destroyed_sessions, ["sess_1"])
 
     async def test_safe_executor_propagates_invocation_id(self) -> None:
+        """ToolStarted->ToolInvoked invocation_id propagation via the Session publish seam.
+
+        Tool lifecycle facts are durable facts: they commit through the FactGateway
+        and require a bound publish Session (ADR-0194 S3.1). The legacy journal
+        facade no longer carries ToolStarted, so the observation seam is the
+        Session bridge snapshot -- the same seam as
+        tests/cognition/body/test_blocked_tool_call_is_journaled.py.
+        """
         rid = await self._bind()
         tool = SandboxExecuteTool(sandbox=self.sandbox, store=self.store)
-        collector = _Collector()
-        hub = make_test_bound(projections=[collector])
-        executor = SimpleSafeExecutor(
-            ToolPermissionManifest(allowed_tools=[SANDBOX_EXECUTE_TOOL_NAME])
-        )
-        with bind_backends(hub), run_scope(RunScope(trace_id="t", run_id=rid)), run_id_scope(rid):
-            obs = await executor.execute(
-                tool,
-                {"code": 'print("x")'},
-                RetryPolicy(max_retries=0),
-                CacheConfig(enabled=False),
+        bound = RunEventSessionBridge(Session(rid))
+        _session_publish.set_publish_session(bound)
+        try:
+            executor = SimpleSafeExecutor(
+                ToolPermissionManifest(allowed_tools=[SANDBOX_EXECUTE_TOOL_NAME])
             )
+            with run_scope(RunScope(trace_id="t", run_id=rid)), run_id_scope(rid):
+                obs = await executor.execute(
+                    tool,
+                    {"code": 'print("x")'},
+                    RetryPolicy(max_retries=0),
+                    CacheConfig(enabled=False),
+                )
+        finally:
+            _session_publish.reset_publish_session(None)
         self.assertTrue(obs.success)
-        started = [s.event for s in collector.received if isinstance(s.event, ToolStarted)]
+        events = bound.inner.snapshot_events()
+        started = [e for e in events if e.type == "tool.started.v1"]
+        invoked = [e for e in events if e.type == "tool.invoked.v1"]
         self.assertEqual(len(started), 1)
-        invoked = [s.event for s in collector.received if isinstance(s.event, ToolInvoked)]
-        self.assertEqual(invoked[0].invocation_id, started[0].invocation_id)
+        self.assertEqual(len(invoked), 1)
+        self.assertEqual(started[0].data["tool_name"], SANDBOX_EXECUTE_TOOL_NAME)
+        self.assertEqual(invoked[0].data["invocation_id"], started[0].data["invocation_id"])
 
     async def test_structured_error_on_user_code_failure(self) -> None:
         rid = await self._bind()
