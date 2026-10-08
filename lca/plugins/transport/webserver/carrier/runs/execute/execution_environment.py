@@ -62,7 +62,7 @@ from lca.plugins.transport.webserver.carrier.runs.lifecycle.run_context_factory 
     run_context_for_session as _run_context_for_session,
 )
 from lca.plugins.transport.webserver.carrier.runs.lifecycle.runnable_assembly import (
-    _assistant_spec_for_run,
+    require_assistant_spec,
 )
 from lca.plugins.transport.webserver.carrier.runs.run_scopes import run_identity_scopes
 from lca.plugins.transport.webserver.handlers.runs.api.attachment_staging import (
@@ -210,7 +210,7 @@ class RunExecutionEnvironment:
                     profile=str(getattr(session, "profile", "") or ""),
                 )
             try:
-                spec = _assistant_spec_for_run(self._ctx, assistant_id)
+                spec = require_assistant_spec(self._ctx, assistant_id)
                 home_path = spec.home_path if spec is not None else None
                 tools_service = require_capability(self._ctx, "tools")
                 # ADR-0248: 在组合前解析 assistant 声带/审查配置并创建共享 gate，

@@ -1543,3 +1543,20 @@
   tests/plugins/events/test_publish_scope.py（新）
 ---
 
+
+## 2026-10-08 17:00 CST - RA-045
+
+- `_assistant_spec_for_run` → 公共 `require_assistant_spec`
+  （runnable_assembly.py，入 `__all__`）；4 个调用点 + execution_environment.py
+  的跨模块 import 全更新；docstring 明确这是拥有
+  "assistant_id set 但 catalog 缺失 → fail loud" 策略的唯一 seam。
+- 实现与评估差异：评估草稿里的路径写错了（实际是
+  carrier/runs/lifecycle/runnable_assembly.py，不是
+  session/runtime/contextfiles/assemble.py）——动手前按真实路径核对，
+  prd notes 已更正。
+- 测试：新 test_require_assistant_spec.py 4 passed；ruff clean
+ （RUF022 用 --fix 排序 __all__，RUF043 match= 改 raw string）。
+- 文件：.../lifecycle/runnable_assembly.py、.../execute/execution_environment.py、
+  tests/.../test_require_assistant_spec.py（新）
+---
+

@@ -666,8 +666,8 @@
         "Existing assistant/carrier tests stay green; ruff clean."
       ],
       "priority": 4,
-      "passes": false,
-      "notes": "Source: Round 11 friction walk B (Worth exploring). Deletion test: concentrates — deleting the seam would scatter four copies of the policy. Constraints: ADR-0242 D3/D4/D9 semantics unchanged; the no-assistant (empty id) path still returns None. Not in any 禁区."
+      "passes": true,
+      "notes": "Source: Round 11 friction walk B (Worth exploring). Deletion test: concentrates — deleting the seam would scatter four copies of the policy. Constraints: ADR-0242 D3/D4/D9 semantics unchanged; the no-assistant (empty id) path still returns None. Not in any 禁区.\nDONE 2026-10-08 (optimize session): _assistant_spec_for_run renamed to public require_assistant_spec in runnable_assembly.py, added to __all__, all 4 call sites + the cross-module import in execution_environment.py updated. New tests: test_require_assistant_spec.py (4 passed: empty id -> None, missing catalog -> RuntimeError, catalog miss -> None, hit -> spec). ruff clean (RUF022 __all__ sort + RUF043 raw regex fixed). Implementation vs assessment: as assessed; note the actual paths differ from the assessment draft (runnable_assembly.py, not contextfiles/assemble.py)."
     },
     {
       "id": "RA-046",
