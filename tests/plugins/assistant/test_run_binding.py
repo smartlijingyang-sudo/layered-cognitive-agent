@@ -96,6 +96,58 @@ class TestDecodeCreateRunAssistantId:
         assert decoded.assistant_id == "asst_abc"
 
     @pytest.mark.asyncio
+    async def test_agent_resolves_assistant_when_body_omits_it(
+        self, file_store: LocalFileStore
+    ) -> None:
+        class _Ownership:
+            def assistant_id_for_agent(self, agent_id: str) -> str | None:
+                return "asst_from_agent" if agent_id == "agt_x" else None
+
+        decoded = await decode_create_run(
+            {"messages": _messages(), "agent": {"id": "agt_x"}},
+            ctx=None,
+            file_store=file_store,
+            resolve_mode=_resolve_mode,
+            ownership=_Ownership(),
+        )
+        assert isinstance(decoded, CreateRunRequest)
+        assert decoded.assistant_id == "asst_from_agent"
+
+    @pytest.mark.asyncio
+    async def test_explicit_assistant_id_wins_over_agent_mapping(
+        self, file_store: LocalFileStore
+    ) -> None:
+        class _Ownership:
+            def assistant_id_for_agent(self, agent_id: str) -> str | None:
+                return "asst_from_agent"
+
+        decoded = await decode_create_run(
+            {"messages": _messages(), "assistant_id": "asst_explicit", "agent": {"id": "agt_x"}},
+            ctx=None,
+            file_store=file_store,
+            resolve_mode=_resolve_mode,
+            ownership=_Ownership(),
+        )
+        assert isinstance(decoded, CreateRunRequest)
+        assert decoded.assistant_id == "asst_explicit"
+
+    @pytest.mark.asyncio
+    async def test_unmapped_agent_keeps_legacy_empty(self, file_store: LocalFileStore) -> None:
+        class _Ownership:
+            def assistant_id_for_agent(self, agent_id: str) -> str | None:
+                return None
+
+        decoded = await decode_create_run(
+            {"messages": _messages(), "agent": {"id": "agt_unknown"}},
+            ctx=None,
+            file_store=file_store,
+            resolve_mode=_resolve_mode,
+            ownership=_Ownership(),
+        )
+        assert isinstance(decoded, CreateRunRequest)
+        assert decoded.assistant_id == ""
+
+    @pytest.mark.asyncio
     async def test_non_string_rejected_400(self, file_store: LocalFileStore) -> None:
         decoded = await decode_create_run(
             {"messages": _messages(), "assistant_id": 123},
