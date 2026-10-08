@@ -459,3 +459,31 @@ class TestCodeConformance:
         # The info finding must carry a non-empty remediation string
         # (DoctorFinding.__post_init__ would have raised otherwise).
         assert report.findings[0].remediation != ""
+
+
+class TestSerializationFailure:
+    """RA-072: plan_ref serialization TypeError is a doctor-internal failure."""
+
+    def test_type_error_in_plan_ref_raises_doctor_compile_error(self) -> None:
+        def _bad_plan_ref(*_args: Any, **_kwargs: Any) -> str:
+            raise TypeError("Object of type X is not JSON serializable")
+
+        doctor = ProfileCompileDryRun()
+        with (
+            patch(
+                "lca.harness.diagnostics.doctor.compile_dry_run.resolve_profile",
+                _ok_resolve,
+            ),
+            patch(
+                "lca.harness.diagnostics.doctor.compile_dry_run.compile_plan",
+                _ok_compile,
+            ),
+            patch(
+                "lca.harness.diagnostics.doctor.compile_dry_run.compiled_run_plan_ref",
+                _bad_plan_ref,
+            ),
+            # Must NOT be swallowed as a DOC-COMPAT-003 "profile invalid"
+            # finding: the profile compiled fine; the doctor failed.
+            pytest.raises(DoctorCompileError, match="plan_ref serialization failed"),
+        ):
+            doctor.run("/fake/profile.yaml")

@@ -93,7 +93,17 @@ class ProfileCompileDryRun:
                 # compiled_run_plan_ref is the deterministic SSOT for the
                 # compiled plan's hash; per ADR-0199 §5.2 the doctor
                 # surfaces this as the success marker's plan_ref.
-                plan_ref = compiled_run_plan_ref(compiled)
+                try:
+                    plan_ref = compiled_run_plan_ref(compiled)
+                except TypeError as exc:
+                    # RA-072: canonical_json → json.dumps is the only step
+                    # in this block that raises TypeError. A plan that
+                    # compiled fine but cannot be hashed is a
+                    # doctor-internal failure, NOT a profile bug — raise
+                    # loudly instead of mislabeling it DOC-COMPAT-003.
+                    raise DoctorCompileError(
+                        f"plan_ref serialization failed: {exc}"
+                    ) from exc
         except PlanCompilerError as exc:
             findings.append(
                 DoctorFinding(
@@ -123,10 +133,12 @@ class ProfileCompileDryRun:
                 )
             )
             return DoctorReport.from_findings(subject, findings)
-        except (ValueError, TypeError) as exc:
-            # ProfileResolveError extends ValueError so this handler also
-            # catches resolve-time failures (invalid YAML, duplicate ids,
-            # layer violations, missing capabilities, ...).
+        except ValueError as exc:
+            # ProfileResolveError extends ValueError so this handler catches
+            # resolve-time failures (invalid YAML, duplicate ids, layer
+            # violations, missing capabilities, ...). TypeError is NOT caught
+            # here: the only TypeError source is plan_ref serialization,
+            # which is narrowed to its own handler above (RA-072).
             findings.append(
                 DoctorFinding(
                     code="DOC-COMPAT-003",

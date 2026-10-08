@@ -1039,7 +1039,7 @@
       "description": "As an LCA operator, I want doctor to say 'doctor is broken' when doctor is broken, not 'your profile is invalid'. Evidence (Round 13, doctor zone): compile_dry_run.py L126-144 except (ValueError, TypeError) — the comment justifies it because 'ProfileResolveError extends ValueError so this handler also catches resolve-phase failures'. But TypeError/ValueError are also the most common exception types for implementation bugs inside resolve/compile. A real code bug (wrong arg type) gets wrapped as DOC-COMPAT-003 'profile invalid' and the operator debugs YAML forever. The pure exception->finding translator is correct and testable; the bug is the call site converging 'domain error' and 'implementation error' into one except. DoctorCompileError exists as a classification but is never used here.",
       "id": "RA-072",
       "notes": "Source: Round 13 friction walk (Worth exploring; no-locality at the except site).",
-      "passes": false,
+      "passes": true,
       "priority": 3,
       "title": "Narrow compile_dry_run's except to domain errors (stop misdiagnosing impl bugs as 'profile invalid')"
     },

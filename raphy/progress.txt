@@ -1871,3 +1871,11 @@
   - secret 路径的 `suppress(Exception)` 是最高危的 dishonest 模式：读 vault 失败→空列表→调用方以为"用户没连过"→重走授权，静默丢数据。修法固定：缺席=空（诚实），存在但坏=抛（fail-loud）。
   - 新增异常类型时检查 `__init__.py` 是否 re-export——这次没有，调用方都是直引 `...core.vault`，不用动。
 ---
+
+## 2026-10-09 08:30 CST - RA-072
+- 收窄 compile_dry_run 的 except：`except (ValueError, TypeError)` → `except ValueError`。论证链：try 块里 `resolve_profile` 只抛 ProfileResolveError（ValueError 子类）/FileNotFoundError，`compile_plan` 抛 PlanCompilerError，唯一 TypeError 来源是 `compiled_run_plan_ref` → `canonical_json` → `json.dumps`（序列化）。原来把序列化 TypeError 标成 DOC-COMPAT-003"profile invalid"是撒谎（profile 编译成功了，是 doctor 自己算不出 hash）——现在序列化包一层窄 try，TypeError → `DoctorCompileError("plan_ref serialization failed")`（doctor-internal 失败，按类 docstring 本就该抛）。
+- Files changed: `lca/harness/diagnostics/doctor/compile_dry_run.py`；`tests/harness/diagnostics/doctor/test_compile_dry_run.py`（+1 pin：plan_ref 抛 TypeError → DoctorCompileError，不被吞成 DOC-COMPAT-003）。
+- **Learnings for future iterations:**
+  - "收窄 except"类 story 的标准动作：先枚举 try 块每一步实际抛什么（读源码，不是猜），再决定每个异常类的归宿。TypeError 的归属必须有证据（这里是 canonical_json 的 json.dumps）。
+  - 现有测试 `test_value_error_becomes_doc_compat_003_finding` 是 ValueError 路径的 pin，收窄后依然绿——收窄前先确认旧 pin 覆盖的是保留路径。
+---
