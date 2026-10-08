@@ -1308,3 +1308,29 @@
     `(plan_ref=operation, decision_id=decision_ref, discriminator=target)`，
     不看 case table 的人会觉得参数名"驴唇不对马嘴"。
 ---
+
+## 2026-10-08 13:01 CST - RA-037
+- `lca/infrastructure/sandbox/local/adapter.py`：`run_in_session` 对未知
+  session_id 不再静默重建目录，改为抛 `UnknownSandboxSessionError(ValueError)`
+  （模块级新错误，`__all__` 导出）；docstring 明确两条语义：未知非空 id →
+  fail-loud（必须先 `create_session`），空 id "" → 显式降级的 stateless
+  回落（boot-time host root，无 per-session 隔离）。
+- 调用者核查（grep）：生产调用者只有 capability facade 透传 +
+  `RunBoundSandboxRuntime`（`self._session.session_id`，create_session 产物）；
+  测试调用者全部先 create_session；onlyboxes adapter 无同款静默重建；
+  `delegate/compose` 等非 envelope key 不在本轮范围。无调用者依赖静默重建。
+- 新增 pin 测试（tests/infrastructure/sandbox/test_adapter_seam.py）：
+  `test_local_run_in_session_unknown_id_fails_loud`（抛错 + 未静默建目录）、
+  `test_local_run_in_session_known_id_still_works`（create_session-first 路径照常）。
+- 测试：seam 文件 13 passed（含 2 个新测试）；workspace_ssot 通过；
+  test_local_sandbox_attachment_path.py 的 3 个失败经 `git stash` 验证为
+  预存坏（干净树同样 3 failed），与本轮无关。ruff clean。
+- 文件：lca/infrastructure/sandbox/local/adapter.py、
+  tests/infrastructure/sandbox/test_adapter_seam.py
+- **Learnings for future iterations:**
+  - fail-loud 类 story 必须先 grep 穷举调用者再动手：本轮确认只有
+    runtime 用 `self._session.session_id`（合法），才敢把静默重建改成抛错；
+    若有调用者依赖重建，故事方向就得改成"先修调用者"。
+  - 预存坏测试用 `git stash` 留证据再下结论：attachment_path 的 3 个失败
+    在干净树复现，属环境/预存问题，不纳入本轮修复（也不背锅）。
+---

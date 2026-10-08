@@ -79,6 +79,16 @@ def _unlink_blocking(path: Path) -> None:
         path.unlink(missing_ok=True)
 
 
+class UnknownSandboxSessionError(ValueError):
+    """run_in_session got a session_id that create_session never issued (RA-037).
+
+    Fail-loud instead of silently rebuilding a directory under the boot-time
+    host root: an unknown id is always a caller bug (stale or destroyed
+    session), and executing code under the wrong directory is the worst
+    possible outcome. Callers must go through create_session() first.
+    """
+
+
 class LocalSandboxAdapter(Sandbox):
     """Host-backed Sandbox: real filesystem + subprocess shell/code exec."""
 
@@ -273,10 +283,20 @@ class LocalSandboxAdapter(Sandbox):
         timeout_s: int = DEFAULT_SANDBOX_TIMEOUT_S,
         **kwargs: Any,
     ) -> SandboxResult:
+        """Execute code inside a session created by create_session().
+
+        RA-037: an unknown non-empty session_id raises
+        UnknownSandboxSessionError instead of silently rebuilding a
+        directory under the boot-time host root. The empty session_id ""
+        is the explicit stateless fallback: code runs under the boot-time
+        host root with no per-session isolation (degraded — callers that
+        need isolation must create_session() first).
+        """
         if session_id and session_id not in self._sessions:
-            path = Path(self._host_root) / ".sessions" / session_id
-            self._ensure_tree(path)
-            self._sessions[session_id] = path
+            raise UnknownSandboxSessionError(
+                f"local sandbox: unknown session_id {session_id!r} — "
+                "call create_session() first; refusing to rebuild under the boot root"
+            )
         return await self._run_code(
             code, language=language, timeout_s=timeout_s, session_id=session_id, **kwargs
         )
@@ -328,4 +348,4 @@ class LocalSandboxAdapter(Sandbox):
             _unlink_blocking(Path(code_path))
 
 
-__all__ = ["LocalSandboxAdapter", "default_local_root"]
+__all__ = ["LocalSandboxAdapter", "UnknownSandboxSessionError", "default_local_root"]

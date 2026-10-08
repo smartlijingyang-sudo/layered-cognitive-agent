@@ -555,7 +555,7 @@
       "description": "As an LCA maintainer, I want run_in_session to fail loud on unknown session ids instead of silently executing under a different directory, so per-run workspace binding has a single source of truth.",
       "id": "RA-037",
       "notes": "Source: Round 10 friction walk A (Worth exploring). Deletion test: removing the fallback concentrates complexity on callers (must create_session first) and kills the silent-wrong-directory failure mode. Overlap: none; adjacent to f21cd0af2's session-root fix.",
-      "passes": false,
+      "passes": true,
       "priority": 5,
       "title": "Fail loud on unknown session_id in run_in_session instead of silently rebuilding under the boot root"
     },
