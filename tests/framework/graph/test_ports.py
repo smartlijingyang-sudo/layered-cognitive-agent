@@ -49,26 +49,37 @@ class TestPortNameAcceptsAnyString:
 
 
 class TestDedupInvariantHolds:
-    """NodeIOSchema still rejects duplicate port names across inputs+outputs."""
+    """NodeIOSchema rejects duplicate port names within each direction.
+
+    A port name appearing on both sides is intentionally permitted as a
+    read+write alias (03dc0def0 relaxed cross-side uniqueness: e.g. an act
+    subgraph reads ``decision`` upstream and emits a stamped ``decision``
+    downstream under the same name).
+    """
 
     def test_duplicate_in_inputs_rejected(self) -> None:
-        with pytest.raises(ValidationError, match="duplicate port name"):
+        with pytest.raises(ValidationError, match="duplicate input port name"):
             NodeIOSchema(
                 inputs=(PortSpec(name="dup"), PortSpec(name="dup")),
             )
 
     def test_duplicate_in_outputs_rejected(self) -> None:
-        with pytest.raises(ValidationError, match="duplicate port name"):
+        with pytest.raises(ValidationError, match="duplicate output port name"):
             NodeIOSchema(
                 outputs=(PortSpec(name="dup"), PortSpec(name="dup")),
             )
 
-    def test_duplicate_across_inputs_outputs_rejected(self) -> None:
-        with pytest.raises(ValidationError, match="duplicate port name"):
-            NodeIOSchema(
-                inputs=(PortSpec(name="dup"),),
-                outputs=(PortSpec(name="dup"),),
-            )
+    def test_duplicate_across_inputs_outputs_permitted_as_read_write_alias(
+        self,
+    ) -> None:
+        # Cross-side duplicates are intentionally permitted (03dc0def0):
+        # the same name on both sides is a read+write alias, not a clash.
+        schema = NodeIOSchema(
+            inputs=(PortSpec(name="dup"),),
+            outputs=(PortSpec(name="dup"),),
+        )
+        assert schema.required_inputs() == ("dup",)
+        assert schema.output_names() == frozenset({"dup"})
 
     def test_distinct_names_accepted(self) -> None:
         schema = NodeIOSchema(
