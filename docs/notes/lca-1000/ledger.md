@@ -1184,3 +1184,20 @@
 - 验证结果: 无代码改动，无需验证门。开工/收工工作区 on main（并发会话的未提交改动始终不动）；自 0534 起无新落盘（HEAD a73d386f3）。
 - commit: 无代码 commit；本台账单独 docs commit（沿用 0521–0534 `docs(lca-1000): 第NNNN轮台账` 模式）。
 - 备注: 只 commit docs/notes/lca-1000/ledger.md（`git add` + `git commit -- <path>` 显式路径；-m 须在 -- 之前，见 AGENTS.md 教训）。台账文本经 base64 编码走 stdin 管道追加（沿用 0525 教训）。探索脚本存 252 /tmp/shallow_scan.py（子 agent 本轮新建）；61 个 shallow module 完整列表可重跑输出。
+
+
+--
+
+## 第0536轮 (2026-10-09 05:03-05:12 CST)
+- 改了什么: 无代码改动。**本轮未发现新的实质机会**（依据 body 规则 4：不硬凑 trivial commit）。
+- 依据 skill 哪一节: SKILL.md Deletion test + LANGUAGE.md（深度即杠杆/真实 seam/接口即测试面）+ DEEPENING.md Seam discipline + SKILL.md 的 ADR 不 re-litigate 规则 —— 见候选清单的驳回依据。
+- 关键设计决策（夜间跳过 grilling，记台账）: 自 0535（04:51）后无新落盘 —— HEAD 仍为 bbe29c8a6（`docs(lca-1000): 第0535轮台账`）。唯一未提交改动为 .agent/skills/airtap-automation/SKILL.md，属并发会话，按 0.5/规则 5 绝不动、不细看（沿用 0522/0528–0535 判例）。时间窗（05:03）与分支（main）两硬门槛均过，skill 四文件（SKILL.md/DEEPENING.md/LANGUAGE.md/INTERFACE-DESIGN.md）完整重读。
+- 候选清单（本轮 explore：AST 同体 + dead a/b + 同名异体 + deslop 清单 + shallow-facade 复核 + 新鲜 diff 复查）:
+  1. AST —— /tmp/ast0536_out.txt：functions=8430，groups=243；工作区 Python 与 0535 逐字节一致（git diff 仅并发会话的 .md），确定性脚本 ⇒ 输出与既往裁决基线一致，零新组（0522/0523 已逐组人工裁决）。
+  2. dead a / dead b —— true_dead=17，与 0522–0535 裁决集合一致（_RoleConfig 静态锚点；框架按名调用或保留；_validate_* ×12 pydantic validator classmethod 假阳性）。
+  3. sndb —— drift-name groups=295，与 0535 一致（含 0527 新裁决的 5 组）。
+  4. deslop：TODO/FIXME/HACK/XXX lca/ --include='*.py' = 8（compact_summary TODOs 字段、expander 中文示例 XXX ×2、s3 ADR-0167 PR-10 占位 ×5），既往裁决、无新增；except Exception = 442；noqa F401 = 1（cli.py side-effect registry 老项）；deprecated 命中均为活跃迁移窗口内（ADR-0119 followup-2 至 2026-12-31、ADR-0183 PR-11 tracked COMPAT、2026-Q4 deprecation window、Chunk 2 迁移期），非"无依据的防御性 guard/死兼容路径"，按 SKILL.md ADR 规则不 re-litigate、不动。
+  5. shallow-facade 复核（沿用 0535 /tmp/shallow_scan.py）：榜首 lca/plugins/transport/webserver/handlers/runs/session/session/session.py（18/20）深读裁决：驳回。docstring 明示"intentionally delegates its three independent lifecycles"（RunSessionIndex / RunLocator / ProcessJournalBinding）—— 刻意设计的 carrier-facing aggregate；Deletion test：删去会把三生命周期委托知识散到各 handler caller，复杂度不消失，是真实 seam。附带 COMPAT 别名 `RunStatus = RunLifecycleStatus` 带 delete-when 条件（ADR-0183 PR-11）跟踪，条件未满足不动。lca/infrastructure/observability/meta_event_emit.py（12/18）深读裁决：驳回。ADR-0195 P1-17 立项的"Session catalog + spine structural dual path"统一路由，含 never-silent fallback 契约（unbound → structlog INFO）；删去会把双路路由 + fallback 知识散到 N 个 skill 生命周期 caller，属已加深的 Module，非 shallow。
+- 验证结果: 无代码改动，无需验证门。扫描脚本全部 exit 0（ast0527.py/dead0527.py/dead0522b.py/sndb0527.py 确定性重跑）；0535 的 /tmp 基线输出文件已不在（/tmp 被清理），按"工作区 Python 逐字节未变（git diff --name-only 仅并发会话 .md）+ 确定性脚本"链复核：输出与既往裁决基线一致。开工/收工工作区 on main（并发会话的未提交改动始终不动）。
+- commit: 无代码 commit；本台账单独 docs commit（沿用 0521–0535 `docs(lca-1000): 第NNNN轮台账` 模式）。
+- 备注: 只 commit docs/notes/lca-1000/ledger.md（`git add` + `git commit -- <path>` 显式路径；-m 须在 -- 之前，见 AGENTS.md 教训）。台账文本经 exec stdin 原样追加（UTF-8，未走 base64 管道）。扫描输出存 252 /tmp（ast0536_out.txt、dead0536_out.txt、dead0536b_out.txt、sndb0536_out.txt）。
