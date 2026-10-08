@@ -30,6 +30,9 @@ class DeliverySatisfiedGate(DecisionGate):
     async def enforce(self, state: AgentState, decision: Decision) -> Decision:
         evidence, _verdict = self._runtime.evaluate_and_emit(state)
 
+        if decision.action_type == ActionType.RESPOND:
+            self._runtime.verify_final_answer(state, decision.response_text or "")
+            return decision
         if decision.action_type != ActionType.USE_TOOL or not decision.tool_calls:
             return decision
         if not evidence.satisfied:

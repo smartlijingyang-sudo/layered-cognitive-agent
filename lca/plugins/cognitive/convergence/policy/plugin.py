@@ -23,6 +23,7 @@ from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import
 )
 from lca.contracts.protocols.think.convergence import ConvergencePolicy
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
+from lca.infrastructure.source_verify.registry import SourceRegistry
 
 
 class Config(BaseModel):
@@ -31,12 +32,14 @@ class Config(BaseModel):
 
 @plugin(
     id="convergence.policy.default",
-    provides=[CONVERGENCE_POLICY.key, "convergence_runtime"],
+    provides=[CONVERGENCE_POLICY.key, "convergence_runtime", "source_registry"],
     requires=[],
     implements=[ConvergencePolicy],
     layer="L1",
     effects="none",
-    description="Provide the default convergence policy and runtime facade for gates/stop.",
+    description=(
+        "Provide the run-scoped convergence runtime and shared source registry for final-answer checks."
+    ),
     test_suite="tests/cognition/test_convergence_policy_plugin.py",
     kind=PluginKind.PRIMITIVE,
     functional_group=FunctionalGroup.G6_DECISION,
@@ -46,7 +49,7 @@ class Config(BaseModel):
             group=FunctionalGroup.G6_DECISION,
             control_slots=(ControlSlot.THINK_GUARD, ControlSlot.STOP_DECIDE),
         ),
-        lifecycle=LifecycleContract(allowed_scopes=(Scope.AGENT, Scope.RUN)),
+        lifecycle=LifecycleContract(allowed_scopes=(Scope.RUN,)),
         authority=AuthorityContract(grants=("convergence.read", "convergence.evaluate")),
         observability=EvidenceContract(
             descriptors=(
@@ -65,5 +68,10 @@ class Config(BaseModel):
 async def setup(ctx: PluginContext, config: Config) -> None:
     del config
     policy = DefaultConvergencePolicy()
+    source_registry = SourceRegistry()
     ctx.provide(CONVERGENCE_POLICY.key, policy)
-    ctx.provide("convergence_runtime", ConvergenceRuntime(policy=policy))
+    ctx.provide("source_registry", source_registry)
+    ctx.provide(
+        "convergence_runtime",
+        ConvergenceRuntime(policy=policy, source_registry=source_registry),
+    )

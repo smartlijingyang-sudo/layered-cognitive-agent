@@ -21,7 +21,6 @@ cursor 不持本组件实例 —— 由 ObservabilityRuntime 持有,
 
 from __future__ import annotations
 
-import logging
 from collections.abc import Iterator
 from dataclasses import dataclass
 from pathlib import Path
@@ -55,9 +54,6 @@ class PersistenceStats:
     def zero(cls) -> PersistenceStats:
         """Deprecated — use :meth:`unavailable` for backends lacking counters."""
         return cls(total_appended=-1, last_seq=-1, bytes_written=0)
-
-
-log = logging.getLogger(__name__)
 
 
 @runtime_checkable
@@ -155,20 +151,23 @@ class FilePersistenceCoordinator:
         return self._sink.path
 
     def flush(self) -> None:
-        """通过 FileSink 的 fd 调 fsync(不关闭文件描述符)。"""
-        try:
-            flush_method = getattr(self._sink, "flush", None)
-            if callable(flush_method):
-                flush_method()
-            else:
-                # FileSink 无显式 flush —— 调 fsync 但不 close
-                fd = getattr(self._sink, "_fd", None)
-                if fd is not None and not getattr(self._sink, "_closed", True):
-                    import os
+        """通过 FileSink 的 fd 调 fsync(不关闭文件描述符)。
 
-                    os.fsync(fd)
-        except Exception as exc:
-            log.warning("FilePersistenceCoordinator.flush failed: %s", exc, exc_info=True)
+        不在协调器中降级或吞掉异常；由 CloseBarrier 捕获并将失败写入
+        ``CloseReport.persistence_error``。
+        """
+        flush_method = getattr(self._sink, "flush", None)
+        if callable(flush_method):
+            flush_method()
+            return
+
+        # Backward-compatible fallback for sink adapters without ``flush``.
+        fd = getattr(self._sink, "_fd", None)
+        if fd is None or getattr(self._sink, "_closed", True):
+            raise RuntimeError("persistence sink has no open descriptor to flush")
+        import os
+
+        os.fsync(fd)
 
     def close(self) -> None:
         """关闭 sink。"""

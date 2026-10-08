@@ -17,6 +17,12 @@ from pathlib import Path
 
 import typer
 
+from scripts.ci_baseline_waivers import (
+    BaselineWaiverError,
+    check_waiver,
+    load_waivers,
+)
+
 
 def _repo_root() -> Path:
     for parent in Path(__file__).resolve().parents:
@@ -64,6 +70,12 @@ def register(app: typer.Typer) -> None:
             print(f"Unknown gate(s): {gate}. Known: {[g[0] for g in GATES]}")
             raise typer.Exit(2)
 
+        try:
+            waivers = load_waivers()
+        except BaselineWaiverError as exc:
+            print(f"package-organization: invalid CI baseline waiver manifest: {exc}")
+            raise typer.Exit(2) from exc
+
         failures: list[str] = []
         for name, script in targets:
             if not script.exists():
@@ -78,7 +90,12 @@ def register(app: typer.Typer) -> None:
             if result.returncode == 0:
                 print(f"  ✓ {name}")
             else:
-                print(f"  ✗ {name}")
+                output = result.stdout + result.stderr
+                waived, detail = check_waiver(name, output, waivers)
+                if waived:
+                    print(f"  ⚠ {name}: {detail}")
+                    continue
+                print(f"  ✗ {name}: {detail}")
                 if verbose:
                     print(result.stdout)
                     print(result.stderr, file=sys.stderr)

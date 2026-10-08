@@ -83,3 +83,55 @@ def test_all_python_files_excludes_vendor():
     assert not any("node_modules/" in p for p in paths)
     assert not any(".git/" in p for p in paths)
     assert not any("__pycache__" in p for p in paths)
+
+
+def test_main_rejects_new_violation_when_baseline_fingerprint_drifts(
+    tmp_path: Path, monkeypatch, capsys
+) -> None:
+    import hashlib
+    import json
+
+    import check_filename_boundaries as checker
+
+    manifest = tmp_path / "waivers.json"
+    manifest.write_text(
+        json.dumps(
+            {
+                "version": 1,
+                "waivers": {
+                    "filename-boundaries": {
+                        "owner": "maintainer",
+                        "expires": "2099-12-31",
+                        "reason": "test baseline",
+                        "output_sha256": hashlib.sha256(b"old baseline").hexdigest(),
+                    }
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(checker, "WAIVER_PATH", manifest)
+    monkeypatch.setattr(
+        checker,
+        "all_python_files",
+        lambda: [checker.ROOT / "lca" / "fake" / "util.py"],
+    )
+
+    exit_code = checker.main([])
+
+    output = capsys.readouterr().out
+    assert exit_code == 1
+    assert "filename-boundaries: output fingerprint changed" in output
+
+
+def test_all_python_files_excludes_generated_cordis_scratch(tmp_path: Path, monkeypatch) -> None:
+    import check_filename_boundaries as checker
+
+    for directory in (".scratch_cordis_creator", ".scratch_cordis_creator_real"):
+        generated = tmp_path / directory / "generated_util.py"
+        generated.parent.mkdir(parents=True)
+        generated.write_text("# ignored test fixture output\n", encoding="utf-8")
+
+    monkeypatch.setattr(checker, "ROOT", tmp_path)
+
+    assert checker.all_python_files() == []

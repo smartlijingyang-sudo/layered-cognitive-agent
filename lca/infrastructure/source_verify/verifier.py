@@ -19,7 +19,7 @@ from __future__ import annotations
 
 import logging
 import re
-from typing import Protocol
+from typing import Literal, Protocol
 
 from lca.contracts.models.cognition.source_verify import (
     ClaimVerdict,
@@ -83,7 +83,7 @@ class SourceVerifier:
 
     def verify(self, answer: str, registry: SourceRegistry) -> VerifyDecision:
         mode = self._policy.mode
-        if mode == VerifyMode.OFF or not answer.strip() or not registry:
+        if mode == VerifyMode.OFF or not answer.strip():
             return VerifyDecision(decision="pass", verdicts=(), mode=mode)
 
         verdicts: list[SourceClaimVerdict] = []
@@ -95,6 +95,7 @@ class SourceVerifier:
                 verdicts.append(self._judge_claim(claim, sid, registry))
 
         bad = [v for v in verdicts if v.verdict != ClaimVerdict.SUPPORTED]
+        decision: Literal["pass", "needs_review", "block"]
         if not bad:
             decision = "pass"
         elif mode == VerifyMode.ENFORCE:

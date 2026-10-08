@@ -18,15 +18,25 @@ import tomllib
 from dataclasses import dataclass
 from pathlib import Path
 
+from ci_baseline_waivers import (
+    DEFAULT_WAIVER_PATH,
+    BaselineWaiverError,
+    check_waiver,
+    load_waivers,
+)
+
 ROOT = Path(__file__).parent.parent
 PYPROJECT = ROOT / "pyproject.toml"
 LEGACY = ROOT / "legacy_blacklist.txt"
+WAIVER_PATH = DEFAULT_WAIVER_PATH
 
 EXCLUDE_DIRS = {
     "lobehub-ui",
     "vendor",
     "node_modules",
     ".git",
+    ".scratch_cordis_creator",
+    ".scratch_cordis_creator_real",
     "__pycache__",
     "build",
     "dist",
@@ -78,6 +88,8 @@ def package_for_path(rel_path: str) -> str | None:
         return None
     if parts[0] not in ("lca", "gateway"):
         return None
+    if len(parts) == 2 and parts[1] == "__init__.py":
+        return parts[0]
     if len(parts) < 2:
         return parts[0]
     # lca/agent/foo.py -> lca.agent
@@ -137,17 +149,25 @@ def check_file(rel_path: str, pkg_overrides: dict[str, dict[str, list[str]]]) ->
     return None
 
 
-def main() -> int:
+def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--strict", action="store_true", help="treat legacy as error")
     parser.add_argument("--report-only", action="store_true", help="just report counts")
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
+
+    waivers = {}
+    if not args.report_only:
+        try:
+            waivers = load_waivers(WAIVER_PATH)
+        except BaselineWaiverError as exc:
+            print(f"ERROR: invalid CI baseline waiver manifest: {exc}")
+            return 2
 
     legacy = load_legacy_blacklist()
     pkg_overrides = load_package_overrides()
 
     files = all_python_files()
-    print(f"Scanning {len(files)} Python files...")
+    report_lines = [f"Scanning {len(files)} Python files..."]
 
     new_violations: list[Issue] = []
     legacy_warnings: list[Issue] = []
@@ -164,19 +184,31 @@ def main() -> int:
         else:
             new_violations.append(issue)
 
-    print(f"new violations: {len(new_violations)}")
-    print(f"legacy warnings: {len(legacy_warnings)}")
-    print(f"package overrides: {len(pkg_overrides)}")
+    new_violations.sort(key=lambda issue: issue.path)
+    legacy_warnings.sort(key=lambda issue: issue.path)
+    report_lines.extend(
+        (
+            f"new violations: {len(new_violations)}",
+            f"legacy warnings: {len(legacy_warnings)}",
+            f"package overrides: {len(pkg_overrides)}",
+        )
+    )
 
     if args.report_only:
+        print("\n".join(report_lines))
         return 0
 
-    for issue in new_violations:
-        print(issue.render())
-    for issue in legacy_warnings:
-        print(issue.render())
+    report_lines.extend(issue.render() for issue in new_violations)
+    report_lines.extend(issue.render() for issue in legacy_warnings)
+    report = "\n".join(report_lines) + "\n"
+    print(report, end="")
 
     if new_violations:
+        waived, detail = check_waiver("filename-boundaries", report, waivers)
+        if waived:
+            print(f"WARNING: filename-boundaries baseline {detail}")
+            return 0
+        print(f"BLOCKED: {detail}")
         return 1
     if args.strict and legacy_warnings:
         return 1

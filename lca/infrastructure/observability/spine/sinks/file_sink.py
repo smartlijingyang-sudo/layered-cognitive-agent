@@ -348,8 +348,21 @@ class FileSink:
     def _fsync_fd(self, fd: int) -> None:
         try:
             os.fsync(fd)
-        except OSError as exc:
-            log.error("file_sink: fsync failed run_id=%s err=%s", self._run_id, exc)
+        except OSError:
+            log.exception("file_sink: fsync failed run_id=%s", self._run_id)
+            raise
+
+    def flush(self) -> None:
+        """Persist pending writes without closing the underlying descriptors.
+
+        Unlike :meth:`close`, a failed fsync is surfaced to the caller so a
+        ``CloseBarrier`` can record the durability failure in its report.
+        """
+        if self._closed:
+            raise RuntimeError("cannot flush a closed FileSink")
+        self._fsync_fd(self._fd)
+        if self._exceptions_fd is not None:
+            self._fsync_fd(self._exceptions_fd)
 
     def close(self) -> None:
         if self._closed:

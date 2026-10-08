@@ -174,3 +174,31 @@ def test_default_extractor_keeps_pipeline_semantics() -> None:
     d = SourceVerifier().verify("根据政策文档, 退款窗口为 30 天。", r)
     assert d.decision == "pass"
     assert d.verdicts[0].verdict == ClaimVerdict.SUPPORTED
+
+
+def test_empty_registry_does_not_pass_explicit_unknown_source() -> None:
+    from lca.contracts.models.core.state.state import AgentState, Budget
+    from lca.framework.graph.host_wiring import NodeRuntimeView
+    from lca.infrastructure.source_verify.registry import ensure_registry
+    from lca.runtime.support.runtime_bindings import RuntimePhaseCapabilities
+
+    registry = SourceRegistry()
+    state = AgentState(
+        trace_id="source-empty-registry",
+        task="verify source",
+        budget=Budget(),
+        extra={"keep": "reducer-owned"},
+    )
+    runtime = NodeRuntimeView(
+        state=state,
+        scope=RuntimePhaseCapabilities({"source_registry": registry}),
+    )
+    assert ensure_registry(runtime) is registry
+
+    decision = verify_final_answer("详见 [source:tool:call_missing] 的原始记录。", registry)
+
+    assert decision.decision == "needs_review"
+    assert decision.mode == VerifyMode.WARN
+    assert len(decision.verdicts) == 1
+    assert decision.verdicts[0].verdict == ClaimVerdict.UNRESOLVABLE
+    assert state.extra == {"keep": "reducer-owned"}

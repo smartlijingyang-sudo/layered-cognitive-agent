@@ -317,6 +317,11 @@ entries:
   name: phase_concept_act_subgraph_act_observe_terminate_decide
   $module: lca.nodes.act.observe.terminate_decide
   config: {}
+# Shared run-scoped convergence/source-registry provider for profiles using base.
+- id: convergence.policy.default
+  name: convergence_policy_default
+  $module: lca.plugins.cognitive.convergence.policy.plugin
+  config: {}
 - id: phase.concept.effect_execute.effect_execute
   name: phase_concept_effect_execute_effect_execute
   $module: lca.nodes.concept.effect.execute

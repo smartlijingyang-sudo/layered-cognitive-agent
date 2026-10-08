@@ -622,3 +622,4 @@
 | ARCH-R10-INFRA-FILE-STORE | Round 10 - Infrastructure File / Attachment / Storage Roots 单向依赖与无用抽象清理 | Pending | 待执行 |
 | ARCH-R11-HARNESS-PROFILE | Round 11 - Harness Activation & Profile Resolution 声明式解析与 DAG 验证深度聚合 | Pending | 待执行 |
 | ARCH-R12-CONVERGENCE-AUDIT | Round 12 - 全系统架构不变量终审、契约门禁全量回归与架构基准对齐 | Pending | 待执行 |
+| LCA-2026-10-08-RELIABILITY | 修复刷盘报告、账本恢复、CI基线门禁与来源校验接入；仅改这四项及必要测试/豁免配置，不改无关基线和非LCA资产 | Completed | 聚焦回归 149/149 通过；profile closure、capability snapshot 与 plan_ref 3/3 通过；文件名、typed-port、package-organization 和 README 严格门禁全通过（既存失败使用 2026-11-07 到期的责任人/精确指纹豁免）。全量 pytest：12,330 passed、192 failed、160 skipped、13 deselected、8 xfailed、13 errors；相较修复前全量结果无新增失败节点、6 项失败已消除；干净 HEAD 复跑的 19 个相关失败节点均可重现，因此不宣称全量测试全绿。 |

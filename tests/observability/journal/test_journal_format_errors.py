@@ -159,3 +159,101 @@ def test_filesystem_load_accepts_known_event_at_current_version(tmp_path: Path) 
     store = FilesystemJournalStore(tmp_path)
     assert len(store.events()) == 1
     assert store.events()[0].event_type == "AgentRunStarted"
+
+
+def _encoded_event(seq: int) -> bytes:
+    payload = _line_with_event_type("AgentRunStarted")
+    payload["seq"] = seq
+    return (json.dumps(payload, ensure_ascii=False) + "\n").encode("utf-8")
+
+
+def test_filesystem_load_rejects_corrupt_complete_middle_line(tmp_path: Path) -> None:
+    path = tmp_path / "default-run.spine.jsonl"
+    path.write_bytes(_encoded_event(1) + b"{broken json}\n" + _encoded_event(2))
+
+    with pytest.raises(JournalFormatError, match=r"line 2.*invalid JSON"):
+        FilesystemJournalStore(tmp_path)
+
+
+def test_filesystem_load_rejects_sequence_gap(tmp_path: Path) -> None:
+    path = tmp_path / "default-run.spine.jsonl"
+    path.write_bytes(_encoded_event(1) + _encoded_event(3))
+
+    with pytest.raises(JournalFormatError, match=r"line 2.*expected seq=2.*got seq=3"):
+        FilesystemJournalStore(tmp_path)
+
+
+def test_filesystem_load_repairs_only_unterminated_partial_tail(
+    tmp_path: Path, caplog: pytest.LogCaptureFixture
+) -> None:
+    path = tmp_path / "default-run.spine.jsonl"
+    complete = _encoded_event(1)
+    path.write_bytes(complete + b'{"seq":2,"event_type":"AgentRunStarted"')
+
+    store = FilesystemJournalStore(tmp_path)
+    try:
+        assert [event.seq for event in store.events()] == [1]
+        assert path.read_bytes() == complete
+        assert any(
+            "repaired trailing partial journal record" in record.message
+            for record in caplog.records
+        )
+    finally:
+        store.close()
+
+
+def test_filesystem_load_reports_read_failure(tmp_path: Path, monkeypatch) -> None:
+    path = _write_line(tmp_path, _line_with_event_type("AgentRunStarted"))
+    original_read_bytes = Path.read_bytes
+    original_read_text = Path.read_text
+
+    def fail_read_bytes(self: Path) -> bytes:
+        if self == path:
+            raise PermissionError("permission denied")
+        return original_read_bytes(self)
+
+    def fail_read_text(self: Path, *args, **kwargs) -> str:
+        if self == path:
+            raise PermissionError("permission denied")
+        return original_read_text(self, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "read_bytes", fail_read_bytes)
+    monkeypatch.setattr(Path, "read_text", fail_read_text)
+
+    with pytest.raises(JournalFormatError, match="permission denied"):
+        FilesystemJournalStore(tmp_path)
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        ("scope", "not-an-object"),
+        ("scope", []),
+        ("scope", None),
+        ("data", []),
+        ("data", None),
+    ],
+)
+def test_filesystem_load_reports_reconstruction_failure(
+    tmp_path: Path, field: str, value: object
+) -> None:
+    payload = _line_with_event_type("AgentRunStarted")
+    payload[field] = value
+    _write_line(tmp_path, payload)
+
+    with pytest.raises(JournalFormatError, match=r"line 1"):
+        FilesystemJournalStore(tmp_path)
+
+
+@pytest.mark.parametrize("tail", [b"{broken json}", b" \t "])
+def test_filesystem_load_rejects_corrupt_unterminated_final_line(
+    tmp_path: Path, tail: bytes
+) -> None:
+    path = tmp_path / "default-run.spine.jsonl"
+    corrupt = _encoded_event(1) + tail
+    path.write_bytes(corrupt)
+
+    with pytest.raises(JournalFormatError, match=r"line 2.*invalid JSON"):
+        FilesystemJournalStore(tmp_path)
+
+    assert path.read_bytes() == corrupt

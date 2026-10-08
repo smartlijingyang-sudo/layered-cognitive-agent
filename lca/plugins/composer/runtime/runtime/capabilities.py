@@ -29,6 +29,7 @@ from lca.contracts.protocols.session.resume.input import (
     ResumeInputAdapter,
     ResumeInputAdapterFactory,
 )
+from lca.infrastructure.source_verify.registry import SourceRegistry
 from lca.plugins.composer.composition.capability_resolution import (
     CapabilityResolutionError,
     ScopeCapabilityResolver,
@@ -86,6 +87,7 @@ _RUNTIME_CAPABILITY_KEYS = (
     RUNTIME_LIFECYCLE_PUBLISHER.key,
     "reducer",
     RESUME_INPUT_ADAPTERS.key,
+    "source_registry",
 )
 
 
@@ -108,6 +110,7 @@ class RuntimeCapabilityClosure:
     result_finalizer_factory: ResultFinalizerFactory
     runtime_factory: RuntimeFactory
     lifecycle_publisher: RuntimeLifecyclePublisher
+    source_registry: SourceRegistry
 
 
 def require_complete_runtime_graph(graph: AgentGraph) -> None:
@@ -138,6 +141,11 @@ def resolve_runtime_capabilities(
         )
     except CapabilityResolutionError as exc:
         raise MissingCapabilityError(f"runtime capability closure failed: {exc}") from exc
+    source_registry = capabilities["source_registry"]
+    if not isinstance(source_registry, SourceRegistry):
+        raise MissingCapabilityError(
+            "runtime capability closure failed: 'source_registry' provider must be SourceRegistry"
+        )
     return RuntimeCapabilityClosure(
         reducer=cast("Reducer", capabilities["reducer"]),
         effect_handler_registry=cast(
@@ -169,6 +177,7 @@ def resolve_runtime_capabilities(
         lifecycle_publisher=cast(
             "RuntimeLifecyclePublisher", capabilities[RUNTIME_LIFECYCLE_PUBLISHER.key]
         ),
+        source_registry=source_registry,
     )
 
 

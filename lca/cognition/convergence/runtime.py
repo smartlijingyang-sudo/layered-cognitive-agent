@@ -2,11 +2,12 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from lca.cognition.convergence.delivery_synth import synthesize_delivery_response
 from lca.cognition.convergence.evidence import build_delivery_evidence
 from lca.cognition.convergence.policy import DefaultConvergencePolicy
+from lca.contracts.models.cognition.source_verify import VerifyDecision
 from lca.contracts.models.core.policy.convergence import ConvergenceVerdict, DeliveryEvidence
 from lca.contracts.models.core.state.state import AgentState
 from lca.contracts.protocols.think.convergence import ConvergencePolicy
@@ -14,6 +15,9 @@ from lca.infrastructure.session.emit.convergence_emit import (
     emit_convergence_evaluated,
     emit_delivery_evidence,
 )
+from lca.infrastructure.source_verify.policy import VerifyPolicy
+from lca.infrastructure.source_verify.registry import SourceRegistry
+from lca.infrastructure.source_verify.verifier import verify_final_answer as verify_source_answer
 
 
 @dataclass(frozen=True, slots=True)
@@ -21,10 +25,11 @@ class ConvergenceRuntime:
     """Profile-selected convergence control plane seam for gates and stop."""
 
     policy: ConvergencePolicy
+    source_registry: SourceRegistry = field(default_factory=SourceRegistry)
 
     @classmethod
     def default(cls) -> ConvergenceRuntime:
-        return cls(policy=DefaultConvergencePolicy())
+        return cls(policy=DefaultConvergencePolicy(), source_registry=SourceRegistry())
 
     def evidence(self, state: AgentState) -> DeliveryEvidence:
         return build_delivery_evidence(state)
@@ -68,7 +73,13 @@ class ConvergenceRuntime:
         *,
         existing_text: str = "",
     ) -> str:
-        return synthesize_delivery_response(state, evidence, existing_text=existing_text)
+        response = synthesize_delivery_response(state, evidence, existing_text=existing_text)
+        self.verify_final_answer(state, response)
+        return response
+
+    def verify_final_answer(self, state: AgentState, answer: str) -> VerifyDecision:
+        """Verify a user-facing answer in WARN mode without changing its text."""
+        return verify_source_answer(answer, self.source_registry, VerifyPolicy.default())
 
     def evaluate_and_emit(
         self,
