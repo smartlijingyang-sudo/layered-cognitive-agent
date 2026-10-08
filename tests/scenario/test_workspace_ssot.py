@@ -215,7 +215,8 @@ def test_wsot08_session_root_follows_run_assistant(monkeypatch, tmp_path):
 
 
 def test_wsot09_guest_scripts_honor_session_root(monkeypatch, tmp_path):
-    """Local 平面 guest 脚本的 ROOT 跟随会话根，不落宿主字面 /mnt/data。"""
+    """Local 平面 guest 脚本的 ROOT 跟随会话根，不落宿主字面 /mnt/data；
+    展示层按 RA-040 投影回 guest 视图，宿主路径不泄漏。"""
     import asyncio
 
     from lca.contracts.models.core.execution.sandbox import SessionConfig

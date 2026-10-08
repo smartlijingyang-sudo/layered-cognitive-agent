@@ -1,17 +1,16 @@
 """A staged attachment must open at the path the tool surface advertises.
 
-``SandboxRuntime._stage_files`` writes run attachments to the guest mount
-root and ``activate_skill`` tells the model they are ready at
-``/mnt/data/<name>``. The local adapter used to rewrite every mount
-reference in a *shell command* onto the per-session cwd, so ``runCommand``
-answered ``File not found`` for a path ``executeCode`` (whose paths live in
-the code body, which is never rewritten) read fine — ``run_b695b0b85115``
-burned a turn on exactly that.
+``SandboxRuntime._stage_files`` stages run attachments under the run's
+session root, and the local adapter rewrites guest ``/mnt/data`` references
+in shell commands onto that same session root — so the agent's ``/mnt/data``
+is its own assistant directory and the shared host mount stays invisible.
+``activate_skill`` still advertises ``/mnt/data/<name>`` as the virtual name;
+the command rewrite (and the ``LCA_GUEST_ROOT`` knob for code) resolves it.
 
-The production local layout has the host directory *be* the guest mount
-(``default_local_root()`` prefers a writable ``/mnt/data``), so the
-path-resolution cases below pin that shape; the session-scoping case keeps
-the fallback shape where host root and mount differ and rewriting is needed.
+The cases below pin the session-root contract on both the production shape
+(host dir == guest mount) and the fallback shape (host root != mount):
+staging lands in ``.sessions/<sid>/``, never at the shared mount root, and
+per-session workspaces stay isolated from each other.
 """
 
 from __future__ import annotations
@@ -29,14 +28,30 @@ def _mount_backed_adapter(tmp_path) -> LocalSandboxAdapter:
     return LocalSandboxAdapter(root=str(tmp_path), layout=GuestLayout.from_root(str(tmp_path)))
 
 
+def _session_root(tmp_path, session_id: str):
+    return tmp_path / ".sessions" / session_id
+
+
 @pytest.mark.asyncio
-async def test_run_command_opens_attachment_staged_at_the_mount_root(tmp_path) -> None:
+async def test_run_command_opens_attachment_staged_in_session_root(tmp_path) -> None:
+    """Staging follows the session: the file lands under the session root,
+    the shared mount root stays clean, and the mount reference in the shell
+    command round-trips through the rewrite onto the staged file."""
     adapter = _mount_backed_adapter(tmp_path)
     session = await adapter.create_session()
     assert session is not None
+    session_root = _session_root(tmp_path, session.session_id)
 
-    staged = await adapter.write_files({ATTACHMENT: b"workbook-bytes"}, base_dir=str(tmp_path))
+    staged = await adapter.write_files(
+        {ATTACHMENT: b"workbook-bytes"},
+        base_dir=str(tmp_path),
+        session_id=session.session_id,
+    )
     assert staged.success, staged.error
+
+    # New contract: session-root staging; the shared mount root is invisible.
+    assert (session_root / ATTACHMENT).is_file()
+    assert not (tmp_path / ATTACHMENT).exists()
 
     result = await adapter.run_terminal(
         f"cat {tmp_path}/{ATTACHMENT}", session_id=session.session_id
@@ -47,19 +62,28 @@ async def test_run_command_opens_attachment_staged_at_the_mount_root(tmp_path) -
 
 
 @pytest.mark.asyncio
-async def test_shell_and_code_agree_on_the_same_absolute_path(tmp_path) -> None:
-    """``runCommand`` and ``executeCode`` must resolve one advertised path identically."""
+async def test_shell_and_code_agree_on_the_session_root(tmp_path) -> None:
+    """``runCommand`` (via the mount-reference rewrite) and ``executeCode``
+    (via ``LCA_GUEST_ROOT``) must resolve the advertised attachment path to
+    the same session-root file."""
     adapter = _mount_backed_adapter(tmp_path)
     session = await adapter.create_session()
     assert session is not None
-    await adapter.write_files({ATTACHMENT: b"workbook-bytes"}, base_dir=str(tmp_path))
+    await adapter.write_files(
+        {ATTACHMENT: b"workbook-bytes"},
+        base_dir=str(tmp_path),
+        session_id=session.session_id,
+    )
 
     shell = await adapter.run_terminal(
         f"cat {tmp_path}/{ATTACHMENT}", session_id=session.session_id
     )
     code = await adapter.run_in_session(
         session.session_id,
-        f"print(open({str(tmp_path / ATTACHMENT)!r},'rb').read().decode())",
+        "import os\n"
+        "root = os.environ['LCA_GUEST_ROOT']\n"
+        f"data = open(os.path.join(root, {ATTACHMENT!r}), 'rb').read()\n"
+        "print(data.decode())\n",
         language="python",
     )
 
@@ -70,34 +94,53 @@ async def test_shell_and_code_agree_on_the_same_absolute_path(tmp_path) -> None:
 
 
 @pytest.mark.asyncio
-async def test_session_root_still_scopes_relative_writes(tmp_path) -> None:
-    """The fix must not merge per-session workspaces: relative paths stay session-scoped.
-
-    Fallback shape (host root != guest mount): the mount reference in the
-    command is rewritten onto the host root, while the cwd stays the session
-    directory so ``outputs/`` harvests per run.
-    """
+async def test_session_root_scopes_relative_writes_and_hides_host_paths(tmp_path) -> None:
+    """Per-session isolation survives the display projection: relative writes
+    stay in the session's own tree (harvestable per run), the host session
+    path never leaks into what the agent sees, and sibling sessions stay
+    isolated from each other."""
     adapter = LocalSandboxAdapter(root=str(tmp_path))
     session = await adapter.create_session()
     assert session is not None
+    session_root = _session_root(tmp_path, session.session_id)
 
     result = await adapter.run_terminal(
         "pwd && touch outputs/report.pdf && ls outputs", session_id=session.session_id
     )
 
     assert result.success, f"{result.exit_code} {result.stderr} {result.error}"
-    assert str(tmp_path / ".sessions" / session.session_id) in result.stdout
+    # RA-040 projects the host session path back to the guest view, so the
+    # agent sees /mnt/data — never the real host directory.
+    assert str(session_root) not in result.stdout
+    assert "/mnt/data" in result.stdout
     assert "report.pdf" in result.stdout
+    # ...but on the host the file really landed in this session's tree.
+    assert (session_root / "outputs" / "report.pdf").is_file()
+
+    other = await adapter.create_session()
+    assert other is not None
+    assert not (_session_root(tmp_path, other.session_id) / "outputs" / "report.pdf").exists()
 
 
 @pytest.mark.asyncio
-async def test_mount_reference_in_command_maps_onto_host_root_not_session(tmp_path) -> None:
-    """Fallback shape: a staged mount-root file stays openable from a session command."""
+async def test_mount_reference_in_command_maps_onto_session_root(tmp_path) -> None:
+    """Fallback shape (host root != guest mount): a session-staged file is
+    openable from a session command via the advertised ``/mnt/data`` path,
+    and never lands on the shared host root."""
     adapter = LocalSandboxAdapter(root=str(tmp_path))
     session = await adapter.create_session()
     assert session is not None
-    staged = await adapter.write_files({ATTACHMENT: b"workbook-bytes"}, base_dir="/mnt/data")
+    session_root = _session_root(tmp_path, session.session_id)
+
+    staged = await adapter.write_files(
+        {ATTACHMENT: b"workbook-bytes"},
+        base_dir="/mnt/data",
+        session_id=session.session_id,
+    )
     assert staged.success, staged.error
+
+    assert (session_root / ATTACHMENT).is_file()
+    assert not (tmp_path / ATTACHMENT).exists()
 
     result = await adapter.run_terminal(
         f"cat /mnt/data/{ATTACHMENT}", session_id=session.session_id

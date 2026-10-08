@@ -187,22 +187,25 @@ class RunBoundSandboxRuntime(SandboxRuntime):
         return None
 
     async def _stage_files(self, files: Mapping[str, bytes | str]) -> SandboxResult | None:
-        """Write not-yet-staged files to the guest mount root; ``None`` when nothing to do.
+        """Write not-yet-staged files under the run's session root; ``None`` when nothing to do.
 
-        Staged at the canonical mount root rather than a session sub-tree:
-        guest paths are read verbatim by user code, so a session-scoped write
-        would leave ``/mnt/data/<name>`` unresolvable on backends that map the
-        guest root onto a real host directory.
+        Staging follows the session id so the agent's ``/mnt/data`` is its own
+        assistant directory: on the Local plane the adapter rewrites guest
+        ``/mnt/data`` references onto this same session root (and projects host
+        paths back on display), so the shared host mount stays invisible to
+        the agent. Backends that ignore ``session_id`` for placement
+        (Onlyboxes) keep writing at the canonical mount root.
         """
         new_files = {
             name: data for name, data in files.items() if name not in self._staged_file_keys
         }
         if not new_files:
             return None
+        session_id = self._session.session_id if self._session else ""
         result = await self._sandbox.write_files(
             new_files,
             base_dir=self.layout.root,
-            session_id="",
+            session_id=session_id,
         )
         # Only remember keys on success: a failed stage must stay retryable on
         # the next ``ensure_ready`` instead of being skipped as already staged.

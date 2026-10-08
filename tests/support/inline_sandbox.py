@@ -190,6 +190,9 @@ class InlineSandbox:
         os_mod.walk = _walk
         os_mod.path = fake_path
         os_mod.makedirs = _makedirs
+        # The real os module always has environ; the guest prelude reads
+        # LCA_GUEST_ROOT from it. Empty keeps the mount-root fallback.
+        os_mod.environ = {}
         prev_os = sys.modules.get("os")
         sys.modules["os"] = os_mod
 

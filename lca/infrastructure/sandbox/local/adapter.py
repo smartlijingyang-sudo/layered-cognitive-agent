@@ -130,7 +130,7 @@ class LocalSandboxAdapter(Sandbox):
         return str(root / guest.lstrip("/"))
 
     def _rewrite_command(self, command: str, root: str) -> str:
-        """Map guest ``/mnt/data`` references onto the host directory backing the mount.
+        """Map guest ``/mnt/data`` references onto the host session root backing the agent's workspace.
 
         Absolute guest paths resolve against the mount root — that is where
         ``SandboxRuntime._stage_files`` writes run attachments, and what the
