@@ -53,10 +53,17 @@ def test_resolved_profile_is_a_frozen_resolution_fact() -> None:
     """Profile 解析产物不得反向持有计划编译策略或无类型捷径。"""
 
     resolved = resolve_profile(DEFAULT)
-    source = Path("lca/harness/profile/resolve.py").read_text(encoding="utf-8")
+    # The resolve implementation moved into the lca/harness/profile/resolve/
+    # package; scan every module so the invariant keeps covering the full
+    # implementation rather than a single stale path.
+    sources = [
+        p.read_text(encoding="utf-8")
+        for p in Path("lca/harness/profile/resolve").glob("*.py")
+    ]
+    assert sources, "resolve package must keep at least one module"
 
     assert not hasattr(resolved, "compile_plan")
-    assert "harness.profile.plan_compiler" not in source
+    assert all("harness.profile.plan_compiler" not in src for src in sources)
 
 
 def test_plugin_definition_with_config_preserves_manifest_declarations() -> None:
@@ -287,8 +294,12 @@ def test_boot_resolved_preflights_products_before_plugin_lifecycle(
         events.append("boot")
         raise AssertionError("plugin lifecycle must not start after preflight failure")
 
+    # K2 preflight seam after the boot-module retirement: run_resolved_kernel
+    # compiles the run plan via compile_run_plan (name re-exported into
+    # lca_kernel.boot.boot) before _boot_context, so a rejected plan raises
+    # here and the plugin lifecycle seam is never entered.
     monkeypatch.setattr(
-        "lca_kernel.boot.boot.compile_profile_boot_products",
+        "lca_kernel.boot.boot.compile_run_plan",
         reject_preflight,
     )
     monkeypatch.setattr("lca_kernel.boot.boot._boot_context", unexpected_boot)
@@ -384,4 +395,10 @@ def test_boot_test_default_profile_allows_an_inspectable_non_runnable_plan() -> 
     products = profile_boot_products_from_scope(ctx)
     assert products is not None
     assert products.compiled_run_plan is not None
-    assert products.compiled_run_plan.phase_bindings == ()
+    # ADR-0221 P3 removed phase_bindings; the v2 executable phases live in
+    # graph_spec["nodes"] (PlanInterpreter walks the v2 graph directly), so
+    # "no production phases" is now "empty top-level node list".
+    plan = products.compiled_run_plan
+    graph_spec = getattr(plan, "graph_spec", None)
+    assert isinstance(graph_spec, dict), "v2 plan must carry its graph spec"
+    assert list(graph_spec.get("nodes", []) or []) == []
