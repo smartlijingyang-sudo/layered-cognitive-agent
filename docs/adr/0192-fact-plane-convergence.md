@@ -4,6 +4,8 @@
 
 Implemented（2026-09-06）。延伸 ADR-0186（Session SSOT）、0183（event bus + spine.jsonl）、0191（runtime DSH 收敛）、0065（RunLedger 三平面）、0075（declarative phase graph）。
 
+**修正案注记 — 2026-10-09（见 §3.5）**：§3.4 I-FACT-3/5 的 v1 载体随 ADR-0221 P3 切流退役；意图经 arch lane 裁决 (a) 确认存活，v2 载体与架构测试 pins 见 §3.5。
+
 **实施路径**：本 ADR 描述的终态通过 ADR-0186（Session SSOT）、ADR-0194（FactGateway 单轨 + FactCommitter）、ADR-0195（全栈平台收敛）分步落地，未按本文 E0–E4 分波独立执行。截至 Proposed 日期，所有目标已闭环：
 
 - E0 `FactCommitter` + `SessionFactCommitter` → `lca/contracts/protocols/observability/fact_committer.py` + `lca/infrastructure/session/commit/fact_committer.py`
@@ -104,6 +106,13 @@ Journal 平面（`RunStore.append` + `ProjectionRegistry.on_event`）在 ADR-018
 | **I-FACT-3** | `PhaseExecutionTransaction` 是唯一 declarative commit 边界 | `test_i_fact_3_*` |
 | **I-FACT-4** | fold / projection 无写路径 | 延伸 I-SESSION-2 |
 | **I-FACT-5** | catalog 事件生产者闭集 + 架构测试 | `test_i_fact_5_*` |
+
+### 3.5 修正案注记（2026-10-09）：I-FACT-3/5 的 v2 载体
+
+> 本节为 ADR-0221 P3 切流后的修正案注记，不改写 §3.4 原文（历史语境保留）。
+
+- **I-FACT-3**：v1 载体 `PhaseExecutionTransaction`（`lca/loop/transaction.py`）已于 `63a68a4da`（ADR-0221 v2 PlanInterpreter 切流）刻意删除；"集中 commit 边界"的**意图经 arch lane 2026-10-09 裁决 (a) 确认存活**（iteration-backlog todo-87）。v2 载体：`append_catalog_bound` → `DefaultFactGateway.append_catalog`（`lca/loop/fact_gateway.py`；`SessionFactCommitter` 实现 `FactCommitter` 契约）。架构测试：`tests/architecture/test_fact_plane_invariants.py::TestIFact3V2Seam`（`bea0ab76a`）：委托透传、未绑定 loud drop、lca/ 内零旁路。
+- **I-FACT-5**：v2 载体为 catalog 事件生产者闭集（17 模块白名单，`TestIFact5V2ProducerClosedSet::test_producer_closed_set`）。`emit_context_manifested_for_state`（`gate_events.py`）零生产调用，已于 `86354e500`（todo-87）删除——**刻意不将其存在性钉为 pin**（钉死代码）。
 
 ## 4. 实施记录（E0–E4 已全部闭环）
 
