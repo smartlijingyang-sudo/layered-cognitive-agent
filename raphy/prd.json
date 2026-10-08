@@ -997,7 +997,7 @@
       "description": "As an LCA maintainer, I want the boot-products seam to mount through one idiom, so the seam contract stops depending on cordis Context's private __dict__ layout. Evidence (Round 13, profile/boot zone): products.py L48-60 does scope.__dict__[_BOOT_PRODUCTS_CONTEXT_KEY] = products while observability on the same ctx uses the legitimate ctx.provide('observability', bound) — one object, two mounting idioms. The architecture tests themselves enforce at __dict__ level (assert 'entries' not in ctx.__dict__) and forge dirty data via ctx.__dict__['entries'] = ... — the tests are evidence of the leak. Possibly ADR-0195 P4-K03 was deliberate (read it first).",
       "id": "RA-069",
       "notes": "Source: Round 13 friction walk (Worth exploring; framework leak into seam). Check ADR-0195 P4-K03 before touching.",
-      "passes": false,
+      "passes": true,
       "priority": 3,
       "title": "Fix the seam's Context.__dict__ backdoor mount (or make the constraint explicit on cordis)"
     },

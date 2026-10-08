@@ -1846,3 +1846,12 @@
   - `lca/harness/README.md` 与 `lca/harness/profile/README.md` 里 `boot_projection.py` 的条目本就是错的（路径从未存在过），属 pre-existing staleness，本轮未动——删模块不背这个锅，但 commit body 记一笔。
   - boot.py 的 `__all__` 里 "BootEntry" 是死 re-export：无任何测试/生产 import，删得干净。
 ---
+
+## 2026-10-09 07:15 CST - RA-069
+- 干掉了 boot-products 缝的 `Context.__dict__` 后门：`attach_profile_boot_products` 改走 `scope.provide(key, products)`，`profile_boot_products_from_scope` 改走 `scope.inject(key, default=None)`——与 observability 缝完全同一套公开 idiom（`ctx.provide("observability", ...)` + `ctx.inject(...)`）。no-reinterpret 守卫（attach 拒绝*不同*的 products 对象）保留在 seam 函数里，不依赖框架私有布局。
+- Files changed: `lca/harness/profile/boot/products.py`（两处挂载 + 模块 docstring 记录挂载决策）；`tests/application/test_spawn_bind_plan.py`（_StubScope 加 provide/inject，合并原有 inject，用 _MISSING sentinel 区分 default=None）；new `tests/harness/profile/boot/test_products.py`（6 个 seam pin：round-trip、空读 None、等值幂等、异值 RuntimeError、非法类型 RuntimeError、"key 不在 __dict__ 但 inject 可见"）。
+- **Learnings for future iterations (重要，cordis 陷阱）：**
+  - `Context.provide` 只写 `own_bindings`；`Context.get` / `ctx[...]` 走 Reflect 的 service store（isolate_map），**看不见** provide 的值——读侧必须用 `inject`（observability 缝就是这么读的）。第一版用了 get，11 个测试红了才发现。
+  - `provide` 里 `self.reflect._service_provide_simple(...)` 根本不存在（AttributeError 被 `except Exception: pass` 吞掉）——"mirror to Reflect" 是 no-op，别信那行注释。
+  - stub 的 `inject` 签名必须用 sentinel 区分"没传 default"和"default=None"（cordis 本体用 `_MISSING` 同理），否则 `inject(key, default=None)` 会被误判成无 default 抛 KeyError——这个 bug 在本轮真实踩中。
+---

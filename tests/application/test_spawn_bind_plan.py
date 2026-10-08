@@ -72,14 +72,29 @@ class TestGraphContracts:
             merge_agent_graphs(primary, replacement)
 
 
+_MISSING_SCOPE_VALUE: Any = object()
+
+
 class _StubScope:
     def __init__(self, capabilities: dict[str, object] | None = None) -> None:
         self._capabilities = capabilities or {}
+        self._provided: dict[str, Any] = {}
 
-    def inject(self, key: str) -> Any:
-        if key not in self._capabilities:
-            raise KeyError(f"missing: {key}")
-        return self._capabilities[key]
+    # Public cordis binding idiom (RA-069): the boot-products seam mounts
+    # through provide/inject (Context.get routes through Reflect's service
+    # store and does not see provide()d bindings), never through
+    # Context.__dict__.
+    def provide(self, key: str, value: Any) -> None:
+        self._provided[key] = value
+
+    def inject(self, key: str, default: Any = _MISSING_SCOPE_VALUE) -> Any:
+        if key in self._provided:
+            return self._provided[key]
+        if key in self._capabilities:
+            return self._capabilities[key]
+        if default is not _MISSING_SCOPE_VALUE:
+            return default
+        raise KeyError(f"missing: {key}")
 
 
 class _AgentComposer:
