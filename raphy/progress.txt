@@ -1649,3 +1649,19 @@
 - 测试：tests/transport/test_lifecycle_observe_failure.py 2 passed（回归）；
   ruff clean。
 - 实现与评估一致，无差异。
+
+
+## 2026-10-09 01:07 CST - Round 13 assess（branch raphy/arch-20261009-0107，基线 ed3f496aa）
+
+- 上下文：上一轮 raphy/arch-20261008-2205 已合 main（merge d8ace6aa1），RA-048/049/050 全 done，无残留；50 stories 全 done。
+- 摩擦漫步三区拆给 3 个全新会话子任务（5 问必答、端到端精读）：skills 包生命周期（32 文件：overlay/frontmatter/disk/catalog/factory/bundled/settings/activation + commits f6c6a1e84/71515dace/997705416/0c32cc411/df03d0cf1）、CLI doctor 链（facade 6 pass 全读 + CLI/stack_heal/debug-trace）、profile resolve-boot+kernel boot 诊断（resolve 582 行/boot 558 行/vault/connected_services）。禁区全部遵守（preamble.py、gate_chain_strategy.py、ralph Round 2、sandbox、dispatch、typed ports）。
+- **运行时验证（实跑，LLM_API_KEY=dummy，探针脚本 ~/workspace/raphy-probe-r13.py 留存复用）：basic COMPLETED；one-shot tool call COMPLETED 且 marker 真写出（llm_calls=2）；同一 agent 双 run COMPLETED x2；RA-023 无限循环 mock（max_steps=3）-> failed Result 无泄漏（工具执行 4 次后被终止）；RA-046 run(None)/RA-047 arguments=str 守卫健在。无新 P0/P1。**
+- **30 个 stories 入 prd.json（RA-051~RA-080）**：Strong 16 个（RA-051 doctor pass 3-6 生产恒 None——slots dataclass 无该属性，getattr 吞掉契约缺失；RA-052 activation_ref 四链断链——stub 测试掩盖真实 producer；RA-053 doctor CLI 从未挂载进 lca-ops 根 app；RA-054 _emit_boot_events 读 .path 而非 .profile_path——fake 掩盖；RA-055 activate_skill 工具不验 retired/verified 就注入内容；RA-056 同一 digest 字段两种约定；RA-057 写守卫落地（提案 df03d0cf1 今晨已落盘）；RA-058 resolve_skill_store 解析即写入；RA-059 getattr(store,"root") 穿透 Protocol x3；RA-060 PluginShapeDoctor 审计 ambient cwd；RA-061 debug_seam 零消费者装饰 seam；RA-062 quarantine.py 死模块；RA-063 external_filter.py 死过滤器；RA-064 boot_compile.py 死编译入口；RA-065 facade 4 次全量 resolve+双胞胎 helper+_has_compile_errors；RA-066 pip 信任分类生产降级"assume bundled"——Strong bug），Worth exploring 14 个（RA-067 SinglePluginDoctor 孤儿；RA-068 BootEntry 内联；RA-069 Context.__dict__ 挂载——先读 ADR-0195 P4-K03；RA-070 fail-loud 走 stdlib 日志；RA-071 vault suppress 静默归零；RA-072 except 过宽误诊；RA-073 plugin_shape 第二规则引擎；RA-074 ADR-0115 倒置迁移收尾——需架构拍板；RA-075 frontmatter 双解析器；RA-076 safe_rel_path 归一化/拒绝分歧；RA-077 importer 字节手术；RA-078 store 构造 mkdir+lru_cache；RA-079 EP 只走 log 降级分支；RA-080 rglob 三份拷贝）。
+- Top 推荐 **RA-051**：doctor 是旗舰"信我，我帮你查 profile"工具，生产上 6 pass 只跑 2 个——"测试全绿、生产半残"正是 RA-033 回归的形状；与 RA-065 同文件可顺手一起做。Runner-up：RA-053（CLI 根本没挂载）、RA-066（信任分类）。
+- diversity quota 满足：30 个全部来自 friction walk（shallow/leaky seam/no-locality/testability），零纯 duplication。
+- **Learnings for future iterations:**
+  - 测试 fake 必须从真实类型构造：_emit_boot_events 的 _FakeResolved(path='<test>') 与真实 dataclass 字段名分叉（RA-054）——assess 时看到"直接 import 私有函数+手造 fake"的测试，先对字段名。
+  - CLI register() 测试必须走真实根 app：doctor 的现场 typer.Typer()+register 永远发现不了根 app 没挂载（RA-053）——新 CLI 命令 assess 时 grep 根 app 注册表。
+  - "叫 resolve 的函数不能写生产数据"：71515dace 的根因不是测试隔离，是 resolve_skill_store 的命名-行为错位（RA-058）——assess "resolve" 命名时查副作用。
+  - 运行时探针陷阱（实证）：think.llm.invoke 走 adapter.stream() 而非 complete()，Protocol 默认 stream 直接 yield 空 COMPLETED 不调 complete；bash 在 _STANDARD_SHELL_TOOLS 特权名单里，ADR-0292 §10 grant-absence fail-closed 的报错与 RA-033 回归一字不差（"Agent 运行结束但未产生任何输出"）——探针必须用自研非特权工具。探针脚本 ~/workspace/raphy-probe-r13.py 留存。
+  - 丢弃：exec/bootstrap.py + format/routing.py 的 shallow（收益仅 2 跳转点，太弱）；doctor 的 except Exception return None（已并入 RA-051）；_revision_of 第三处未出现不立案（纪律）。
