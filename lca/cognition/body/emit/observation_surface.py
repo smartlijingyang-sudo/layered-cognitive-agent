@@ -40,7 +40,6 @@ from lca.contracts.models.core.execution.external_content import (
     ContentOrigin,
     fence_external_content,
 )
-from lca.infrastructure.session.projections.display_paths import project_display_paths
 
 
 def observation_content(observation: Observation) -> str:
@@ -62,11 +61,11 @@ def observation_content(observation: Observation) -> str:
     elif isinstance(payload, str):
         text = payload
     elif isinstance(payload, (dict, list, tuple)):
-        # Display projection (ADR-0121): the model sees workspace-relative
-        # guest paths. The journal persists this same projected text
-        # (journal == display surface, RA-034) — no absolute-path copy exists
-        # on the write path.
-        text = json.dumps(project_display_paths(payload), ensure_ascii=False)
+        # Guest scripts project structured path fields to workspace-relative
+        # form inside emit() (computer/guest/preamble.py), so the text built
+        # here is already the display form on every plane. The journal
+        # persists this same text (journal == display surface, RA-034).
+        text = json.dumps(payload, ensure_ascii=False)
     else:
         text = str(payload)
     origin = getattr(observation, "content_origin", ContentOrigin.EXTERNAL)

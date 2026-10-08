@@ -238,11 +238,21 @@ def test_wsot09_guest_scripts_honor_session_root(monkeypatch, tmp_path):
     assert result.success, result.error
     assert (session_root / "probe.txt").is_file()
 
-    # Composed guest scripts read ROOT from the same env knob.
+    # Composed guest scripts read ROOT from the same env knob: the probe file
+    # written in part one is visible at ROOT, and the adapter projects the
+    # host session root back to the guest view in stdout.
+    import json as _json
+
     from lca.infrastructure.computer.guest.json_script import compose_json_script
     from lca.infrastructure.computer.guest.preamble import SCRIPT_PRELUDE
 
-    composed = compose_json_script(SCRIPT_PRELUDE + "def main(encoded):\n    emit(ROOT)\n", {})
+    composed = compose_json_script(
+        SCRIPT_PRELUDE
+        + "def main(encoded):\n    emit({'probe': Path(ROOT, 'probe.txt').is_file(), 'root_view': ROOT})\n",
+        {},
+    )
     rooted = asyncio.run(adapter.run_in_session(info.session_id, composed, language="python"))
     assert rooted.success, rooted.error
-    assert rooted.stdout.strip().splitlines()[-1].strip('"') == str(session_root)
+    shown = _json.loads(rooted.stdout.strip().splitlines()[-1])
+    assert shown["probe"] is True
+    assert shown["root_view"] == "/mnt/data"

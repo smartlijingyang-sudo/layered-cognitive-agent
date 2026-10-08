@@ -7,7 +7,51 @@ from __future__ import annotations
 
 from lca.infrastructure.sandbox.factory.factory import ONLYBOXES
 
-SCRIPT_PRELUDE = f"""
+_SCRIPT_HELPERS = """
+_DISPLAY_PATH_KEYS = ("path", "paths", "directoryPath", "directory", "directory_path", "file", "target")
+
+def _display_path_value(value):
+    if value == ROOT:
+        return "."
+    if value.startswith(ROOT + "/"):
+        return value[len(ROOT) + 1:]
+    return value
+
+def _display_paths(node):
+    if isinstance(node, dict):
+        return {
+            key: (
+                _display_path_value(val)
+                if key in _DISPLAY_PATH_KEYS and isinstance(val, str)
+                else _display_paths(val)
+            )
+            for key, val in node.items()
+        }
+    if isinstance(node, list):
+        return [_display_paths(item) for item in node]
+    return node
+
+def load_args(encoded):
+    return json.loads(base64.b64decode(encoded).decode())
+
+def resolve(path):
+    p = Path(path or ROOT)
+    if not p.is_absolute():
+        p = Path(ROOT) / p
+    try:
+        return p.resolve()
+    except OSError:
+        return p
+
+def emit(value):
+    # Single model-visible projection point: every guest script exits through
+    # emit, so structured path fields reach the model workspace-relative on
+    # every plane, while receipts keep the raw guest stdout as the fact.
+    print(json.dumps(_display_paths(value), ensure_ascii=False), flush=True)
+"""
+
+SCRIPT_PRELUDE = (
+    f"""
 import base64
 import fnmatch
 import glob
@@ -26,19 +70,6 @@ from pathlib import Path
 # unset and keep the image contract root.
 ROOT = os.environ.get("LCA_GUEST_ROOT") or {ONLYBOXES.root!r}
 BG_DIR = str(Path(ROOT) / ".lca" / "background")
-
-def load_args(encoded):
-    return json.loads(base64.b64decode(encoded).decode())
-
-def resolve(path):
-    p = Path(path or ROOT)
-    if not p.is_absolute():
-        p = Path(ROOT) / p
-    try:
-        return p.resolve()
-    except OSError:
-        return p
-
-def emit(value):
-    print(json.dumps(value, ensure_ascii=False), flush=True)
 """
+    + _SCRIPT_HELPERS
+)
