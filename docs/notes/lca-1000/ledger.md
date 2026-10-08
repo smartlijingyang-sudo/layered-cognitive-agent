@@ -1170,3 +1170,17 @@
 - 验证结果: 无代码改动，无需验证门。扫描脚本全部 exit 0（ast0527.py/dead0527.py/dead0522b.py/sndb0527.py 确定性重跑，0534 输出逐字节对齐 0533）；开工/收工工作区 on main（并发会话的未提交改动始终不动）。
 - commit: 无代码 commit；本台账单独 docs commit（沿用 0521–0533 `docs(lca-1000): 第NNNN轮台账` 模式）。
 - 备注: 只 commit docs/notes/lca-1000/ledger.md（`git add` + `git commit -- <path>` 显式路径；-m 须在 -- 之前，见 AGENTS.md 教训）。台账文本经 base64 编码走 stdin 管道追加（沿用 0525 教训）。扫描输出存 252 /tmp（ast0534_out.txt、dead0534_out.txt、dead0534b_out.txt、sndb0534_out.txt）。教训：deslop 裸 grep 会命中 __pycache__/.pyc 二进制误报（TODO 14、except 451），计数必须加 --include='*.py'（新教训，0521–0533 各轮裸 grep 结果侥幸与基线一致是误报恰好抵消）。
+
+--
+
+## 第0535轮 (2026-10-09 04:33-04:51 CST)
+- 改了什么: 无代码改动。**本轮未发现新的实质机会**（依据 body 规则 4：不硬凑 trivial commit）。
+- 依据 skill 哪一节: SKILL.md Deletion test + LANGUAGE.md（深度即杠杆/真实 seam/接口即测试面）+ DEEPENING.md Seam discipline（One adapter = hypothetical seam）+ SKILL.md 的 ADR 不 re-litigate 规则 —— 见候选清单的驳回依据。
+- 关键设计决策（夜间跳过 grilling，记台账）: 自 0534（04:22）后无新落盘 —— HEAD 仍为 a73d386f3（`docs(lca-1000): 第0534轮台账`）。唯一未提交改动为 .agent/skills/airtap-automation/SKILL.md，属并发会话，按 0.5/规则 5 绝不动、不细看（沿用 0522/0528–0534 判例）。时间窗（04:33）与分支（main）两硬门槛均过，skill 四文件（SKILL.md/DEEPENING.md/LANGUAGE.md/INTERFACE-DESIGN.md）完整重读。
+- 候选清单（本轮 explore：0530–0534 四大家族扫描已全收敛到基线，本轮走此前没系统做过的角度 —— AST shallow-facade 扫描（lca/ 2582 文件 + lca_kernel/ 95 文件；≥4 公开函数且 ≥60% 单语句委托；61 个 shallow module；脚本 252 /tmp/shallow_scan.py，可确定性重跑）+ 对最浅未裁决项的 grilling 式深读；探索工作已委托子 agent 执行，只读，未改代码）:
+  1. 候选 1（emit_*_for_state ×22）/ 候选 2（RunRegistry 兼容 facade）/ 候选 3（RunStatus = RunLifecycleStatus COMPAT 别名）/ 候选 4（_EP_DISPATCH["reasoner_meta"] = None）—— 均为既往裁决（0521 B-091 / 两测试仍在用 RunStatus.COMPLETED、窗内守住 / node_emitter.py docstring 刻意设计的 None marker），不 re-litigate。
+  2. 候选 5 最浅项 **SpineEnvelopeEmitter**（lca/runtime/projection/envelope_emitter.py，10/10 委托）深读裁决：驳回。Deletion test：若删去该 Module 连同其 Protocol 伴生对（lca/contracts/protocols/runtime/envelope/emitter.py），fire-and-forget suppress 策略（_safe_emit 统一 wrap BaseException）与 ADR-0194 路由知识（runtime EPs → lca.infrastructure.session.runtime_emit；agent-loop EPs → lca.loop.agent_spawn_emit）将散到 N 个 caller —— 复杂度不消失，是真实 seam。接口即测试面：EnvelopeEmitter Protocol 是 ADR-0177 立项的 SSOT，tests/runtime/test_envelope_emitter_binding.py 守住。DEEPENING.md 的 "One adapter = hypothetical seam" 在此不构成删除理由：该 heuristic 针对无依据的 indirection；此处 seam 由 ADR-0177/ADR-0194 立项设计且 deletion test 判 keep，按 SKILL.md 的 ADR 规则不 re-litigate。附带发现：protocol docstring 提到的 lca.plugins.events.publishers.spine_reflector_runtime / spine_reflector_agent_spawn 两个插件实现目录在当前工作树不存在（目录下只有 delegation_cache / model_visible / _session_publish.py），但这只是 docstring 陈旧嫌疑，不构成实质改动，不动。
+  3. 候选 5 其余（lca/runtime/support/runtime_bindings.py 15/20、lca/application/api/api.py 14/18、lca/framework/graph/plan_sdk.py 12/16、lca/harness/plan.py 7/11）：deletion-test 初判同构 —— 删除会把"子模块布局知识"散到各 caller，是真实 seam，多为刻意窄接口设计。驳回。
+- 验证结果: 无代码改动，无需验证门。开工/收工工作区 on main（并发会话的未提交改动始终不动）；自 0534 起无新落盘（HEAD a73d386f3）。
+- commit: 无代码 commit；本台账单独 docs commit（沿用 0521–0534 `docs(lca-1000): 第NNNN轮台账` 模式）。
+- 备注: 只 commit docs/notes/lca-1000/ledger.md（`git add` + `git commit -- <path>` 显式路径；-m 须在 -- 之前，见 AGENTS.md 教训）。台账文本经 base64 编码走 stdin 管道追加（沿用 0525 教训）。探索脚本存 252 /tmp/shallow_scan.py（子 agent 本轮新建）；61 个 shallow module 完整列表可重跑输出。
