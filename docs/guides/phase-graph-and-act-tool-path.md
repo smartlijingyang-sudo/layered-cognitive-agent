@@ -130,8 +130,9 @@ RegistryEffectDispatcher.execute(envelope, policy, *, state=None, decision=None)
   ├─ 校验 effect_class / approval / idempotency cache
   ├─ operation = envelope.metadata["operation"]   # "body.act"
   ├─ handler = EffectHandlerRegistry.resolve("body.act")
-  ├─ active_decision = decision if decision is not None else self._decision
-  └─ BodyActEffectHandler.handle(envelope, policy, capabilities, state=state, decision=active_decision)
+  ├─ active_decision = decision if decision is not None else self._decision   # RA-043
+  ├─ active_state = state if state is not None else self._state                # RA-043：构造捕获值同样转发
+  └─ BodyActEffectHandler.handle(envelope, policy, capabilities, state=active_state, decision=active_decision)
         # state / decision 走 typed kwargs；为 None → PG-003 fail-loud（RA-033）
         return await capabilities.body.act(decision, state)
 ```
