@@ -165,6 +165,9 @@ class DiskSkillPackageStore(SkillPackageInstaller, SkillPackageStore):
             )
         name = skill_title(meta_front, sid)
         summary = meta_front.get("description", "").strip()
+        # 调用方只在继承既有包时才带 version；其余路径由 frontmatter 提供，
+        # 否则 render_skill_discovery 会渲染出空的 "(v)"。
+        resolved_version = version.strip() or str(meta_front.get("version") or "").strip()
         digest = content_hash(skill_md_text.encode("utf-8"))
 
         dest = self._root / sid
@@ -210,7 +213,7 @@ class DiskSkillPackageStore(SkillPackageInstaller, SkillPackageStore):
             "summary": summary,
             "source_url": source_url,
             "content_hash": digest,
-            "version": version,
+            "version": resolved_version,
             "resource_paths": normalized_resources,
             "references": list(declared_refs),
             "imported_at": datetime.now(tz=UTC).isoformat(),
@@ -229,7 +232,7 @@ class DiskSkillPackageStore(SkillPackageInstaller, SkillPackageStore):
             resource_paths=tuple(normalized_resources),
             source_url=source_url,
             content_hash=digest,
-            version=version,
+            version=resolved_version,
             references=tuple(declared_refs),
         )
 
