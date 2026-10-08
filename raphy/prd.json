@@ -942,8 +942,8 @@
    "branchName": "raphy/arch-20261009-0107",
    "description": "As an LCA maintainer, I want one doctor_profile call to resolve at most once and share the result across passes, so 3/4 of K1+K2 work and the compile-vs-downstream plan fork disappear. Evidence (Round 13, doctor zone): facade.py L126-157 calls _optional_resolve_contracts 3x (capability/privilege/trust) + _optional_resolve_phase_graph 1x; each builds a new PlanResolutionService() and runs full resolve_refs (K1+K2), while the compile pass itself uses a lower-level direct path with different fallback semantics (service version falls back to profiles/<name>.yaml, direct version doesn't) — two compile paths that can fork. Additionally the two helpers are 10-of-11-lines identical (only the getattr field differs), and _has_compile_errors (facade.py L198-199) is a verbatim restatement of DoctorReport.has_errors() (contracts/diagnostics/doctor.py L155-156) with 4 call sites.",
    "id": "RA-065",
-   "notes": "Source: Round 13 friction walk (Strong; sprawl + shallow-module twins). Same file as RA-051; coordinate with it.",
-   "passes": false,
+   "notes": "Source: Round 13 friction walk (Strong; sprawl + shallow-module twins). Verified 2026-10-09: already fully satisfied by RA-051 (commit 8048776cf 'Fix DoctorFacade pass 3-6 dead inputs'). _optional_resolve_contracts/_optional_resolve_phase_graph were DELETED outright (stronger than 'converge into one resolve': zero resolves now, not one); _has_compile_errors has zero references repo-wide. The pin exists as test_facade_has_no_dead_pass_seams asserting the helpers' absence. doctor_profile does a single compile dry-run + shape pass. No code change needed; doctor suites green (301 passed in the RA-060 verification run).",
+   "passes": true,
    "priority": 2,
    "title": "Resolve once in DoctorFacade: converge _optional_resolve_contracts/_optional_resolve_phase_graph + drop _has_compile_errors"
   },

@@ -1778,3 +1778,10 @@
   - Facade tests stub the shape pass (`_RecordingStub`), so the derivation change didn't ripple there — but CLI/golden tests run the real pass; they stayed green (301 passed) because the walk-up finds the real repo marker from real profiles.
   - When a `run(x)` parameter exists "for facade-shape parity", check whether the parity is load-bearing: here the facade actually passes profile_path through, so the parameter was a real input being discarded, not just a signature nicety.
 ---
+---
+## 2026-10-09 05:35 - RA-065 (already done by RA-051, verified)
+- Verified: RA-065's substance was fully completed by RA-051 (commit 8048776cf). `_optional_resolve_contracts` / `_optional_resolve_phase_graph` no longer exist in facade.py — deleted outright rather than converged (zero resolves per doctor_profile call, which is stronger than the AC's "at most once"). `_has_compile_errors` has zero references repo-wide (grep). The AC's pin exists as `test_facade_has_no_dead_pass_seams` (asserts the helpers' absence). Assessment evidence (facade.py L126-157, L198-199) was stale — RA-051 rewrote the file. No code change; marked passes=true with verification note. Doctor suites green (301 passed).
+- Files changed: raphy/prd.json, raphy/progress.txt
+- **Learnings for future iterations:**
+  - Assessment evidence can go stale within the same round when an earlier story (RA-051) touches the same file — the story even said "Same file as RA-051; coordinate with it". Before implementing, grep the CURRENT tree for the named symbols; if they're gone, verify via git log -S which commit removed them and close the story as already-satisfied instead of re-implementing.
+---
