@@ -2001,3 +2001,25 @@
     值形状；只跟常量走会漏掉"常量值被改"的回归。
 - Tests: test_skill_overlay.py 37 passed；overlay/global_link/tool_overlay/
   ep_closure/invariants 共 101 passed。ruff 全过。
+
+## 2026-10-09 06:12 CST - RA-080
+
+- Done: 三处技能源目录 walk 收敛为 `disk/store.py::walk_skill_source_files`
+  唯一接缝：`_import_local_path`（walk=src 跳过 SKILL.md）、
+  `_stage_edited_package`（walk=staging/resources，rel 相对 staging_dir 带
+  resources/ 前缀）、bundled `_load_resources`（walk=resources_dir，rel 扁平；
+  函数删除，调用点内联）。三处差异由接缝参数（walk_root/rel_root/skip_paths）
+  表达，`safe_rel_path` vs `as_posix()` 在接缝内按 RA-076 策略统一为
+  `require_canonical_rel_path`（fail-loud）。
+- Learnings:
+  - rglob 产出的 rel 本来就是 canonical —— 三处旧代码的归一化在实践中是
+    no-op，漂移是"表达"层面的，不是行为层面的；收敛的价值是让策略只有一处可审计。
+  - rglob 对不存在的目录直接返回空（实测），旧代码里的 `is_dir()` 守卫是冗余的，
+    收敛时一并删掉（_stage_edited_package 的 if res_dir.is_dir / _load_resources
+    的 early-return）。
+  - 反斜杠文件名在 Linux 上是合法文件名：接缝的 fail-loud pin 用它构造出
+    旧代码会静默改写的输入，证明新策略真的"盖住"了接缝。
+  - RA-076 先落地让 RA-080 的接缝直接复用谓词 —— 评估里写的依赖顺序是对的，
+    跨 story 的 policy 依赖要按顺序做。
+- Tests: 新 pin 文件 5 passed；skills/overlay/global_link/materialize_link/
+  invariants/merged_store 共 162 passed。ruff 全过。

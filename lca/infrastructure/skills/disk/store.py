@@ -6,6 +6,7 @@ import json
 import os
 import re
 import shutil
+from collections.abc import Collection
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -338,6 +339,36 @@ def require_canonical_rel_path(name: str) -> str:
             "调用方先自行归一化，或显式用 safe_rel_path 转换。"
         )
     return name
+
+
+def walk_skill_source_files(
+    walk_root: Path,
+    *,
+    rel_root: Path | None = None,
+    skip_paths: Collection[Path] = (),
+) -> dict[str, bytes]:
+    """RA-080: 技能源目录 walk 的唯一接缝。
+
+    rglob ``walk_root`` 下所有文件，返回 ``{rel: bytes}``；``rel`` 是相对
+    ``rel_root``（缺省 ``walk_root``）的 canonical 相对路径；``skip_paths``
+    命中的文件跳过（如 ``_import_local_path`` 的 SKILL.md 本体）。
+
+    收敛三处实现（overlay/importing 的 ``_import_local_path``、
+    overlay 的 ``_stage_edited_package``、bundled 的 ``_load_resources``）：
+    ``safe_rel_path`` vs ``as_posix()`` 的差异在此统一 —— 直接用 RA-076 的
+    ``require_canonical_rel_path``，非 canonical 的 rel fail-loud，不再静默
+    归一化（rglob 产出的 rel 本来就是 canonical，正常路径行为不变）。
+    不存在的 walk_root 返回空 dict（rglob 语义）。
+    """
+    base = walk_root if rel_root is None else rel_root
+    skipped = set(skip_paths)
+    out: dict[str, bytes] = {}
+    for path in sorted(walk_root.rglob("*")):
+        if not path.is_file() or path in skipped:
+            continue
+        rel = require_canonical_rel_path(path.relative_to(base).as_posix())
+        out[rel] = path.read_bytes()
+    return out
 
 
 def _strip_resources_prefix(path: str) -> str:

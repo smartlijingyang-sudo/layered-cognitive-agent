@@ -15,6 +15,7 @@ from lca.infrastructure.skills.disk.store import (
     DiskSkillPackageStore,
     content_hash,
     sanitize_skill_id,
+    walk_skill_source_files,
 )
 from lca.infrastructure.skills.frontmatter.frontmatter import (
     split_frontmatter,
@@ -66,7 +67,9 @@ def ensure_bundled_skills(
         digest = content_hash(text.encode("utf-8"))
         if _already_current(store, skill_id, digest):
             continue
-        resources = _load_resources(child / _RESOURCES)
+        # RA-080: 经 disk/store.py 的 walk 接缝（as_posix 与 safe_rel_path 的
+        # 差异在接缝内按 RA-076 策略统一）。
+        resources = walk_skill_source_files(child / _RESOURCES)
         version = _version_from_skill_md(text)
         store.install_package(
             skill_id=skill_id,
@@ -86,18 +89,6 @@ def _already_current(store: DiskSkillPackageStore, skill_id: str, digest: str) -
     except SkillNotFoundError:
         return False
     return package.content_hash == digest
-
-
-def _load_resources(resources_dir: Path) -> dict[str, bytes]:
-    if not resources_dir.is_dir():
-        return {}
-    out: dict[str, bytes] = {}
-    for path in sorted(resources_dir.rglob("*")):
-        if not path.is_file():
-            continue
-        rel = path.relative_to(resources_dir).as_posix()
-        out[rel] = path.read_bytes()
-    return out
 
 
 def _version_from_skill_md(text: str) -> str:

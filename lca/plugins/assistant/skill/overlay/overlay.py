@@ -43,8 +43,8 @@ from lca.contracts.protocols.memory.operational_skills import (
 from lca.infrastructure.assistant.io import skill_index_digest
 from lca.infrastructure.skills.disk.store import (
     DiskSkillPackageStore,
-    safe_rel_path,
     sanitize_skill_id,
+    walk_skill_source_files,
 )
 from lca.infrastructure.skills.settings.settings import SkillSettings, get_skill_settings
 from lca.plugins.assistant.events._events import (
@@ -521,14 +521,11 @@ class _AssistantSkillOverlayImpl(AssistantSkillOverlay):
             shutil.copytree(src_resources, staging_dir / "resources", dirs_exist_ok=True)
         (staging_dir / "SKILL.md").write_text(skill_md, encoding="utf-8")
 
-        resource_files: dict[str, bytes] = {}
-        res_dir = staging_dir / "resources"
-        if res_dir.is_dir():
-            for path in sorted(res_dir.rglob("*")):
-                if path.is_file():
-                    rel = safe_rel_path(str(path.relative_to(staging_dir)))
-                    if rel:
-                        resource_files[rel] = path.read_bytes()
+        # RA-080: 经 disk/store.py 的 walk 接缝；rel 相对 staging_dir（含
+        # resources/ 前缀）。res_dir 不存在时接缝返回空 dict（rglob 语义）。
+        resource_files = walk_skill_source_files(
+            staging_dir / "resources", rel_root=staging_dir
+        )
 
         meta: dict[str, Any] = {}
         old_manifest = skill_dir / "manifest.json"

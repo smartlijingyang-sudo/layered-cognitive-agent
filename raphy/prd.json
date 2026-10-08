@@ -1150,8 +1150,8 @@
       "branchName": "raphy/arch-20261009-0107",
       "description": "As an LCA maintainer, I want one 'walk a skill source dir -> {rel: bytes}' seam, so traversal-safety details stop drifting across copies. Evidence (Round 13, skills zone): three implementations of the same operation — importing.py::_import_local_path (rglob + safe_rel_path), overlay.py::_stage_edited_package (another rglob + safe_rel_path, plus extra skip logic), bundled/bundled.py::_load_resources (third rglob, as_posix() instead of safe_rel_path). Details differ (skip SKILL.md or not; normalize path or not). Deletion test: extract one function (disk/store.py is the natural home), three call sites.",
       "id": "RA-080",
-      "notes": "Source: Round 13 friction walk (Worth exploring; mechanical duplication x3 with drifting details — secondary class, but the drift is the friction).",
-      "passes": false,
+      "notes": "Source: Round 13 friction walk (Worth exploring; mechanical duplication x3 with drifting details). | Implemented 2026-10-09: one walk seam walk_skill_source_files() in disk/store.py (walk_root + rel_root + skip_paths params cover all three shapes); _import_local_path, _stage_edited_package and bundled._load_resources (deleted, inlined) call it; safe_rel_path vs as_posix unified via RA-076 require_canonical_rel_path (fail-loud). Pins in tests/infrastructure/skills/test_skill_source_walk_seam.py.",
+      "passes": true,
       "priority": 3,
       "title": "Converge the three skill-source directory walks (importing/overlay/bundled rglob trio)"
     }
