@@ -14,7 +14,7 @@ references:
 
 ## 前置检查
 
-- 工具列表里**必须有** `create_assistant_skill`。没有 ⇒ 当前 run 未绑定助理（或部署未启用 assistant-runtime），直接告知用户无法创建技能。
+- 工具列表里没有 `create_assistant_skill` ⇒ 先 `tool_search(namespace="agent")` 再看。它在延迟加载的 `agent` 命名空间里（ADR-0256），未加载时本来就不出现在工具列表，这与是否绑定助理无关。加载后仍然没有 ⇒ 才是当前 run 未绑定助理（或部署未启用 assistant-runtime），此时告知用户无法创建技能。
 - 已有技能用 `list_assistant_skills` 查看，避免 skill_id 冲突。
 
 ## 流程
@@ -37,6 +37,7 @@ references:
 先用 `read_skill_reference_once` 读取 `resources/skill-writing-guide.md`，再动笔。要点：
 
 - frontmatter 必须有 `name` 和 `description`。`name` 即 skill_id（小写、连字符）。`description` 是触发主机制：写清「做什么」+「什么时候用」，宁可 pushy 一点。
+- frontmatter 还必须声明 `references`（ADR-0214 §7）。没有附属文件就写 `references: []`；有则列出包内相对路径。缺这个字段安装会被直接拒绝。
 - 正文 < 500 行；需要更多时用 `references/` / `scripts/` 渐进披露。
 - 用祈使句、给示例、说明「为什么」而不是堆砌 MUST。
 
@@ -79,5 +80,5 @@ references:
 - 不要用 `import_skill` 代替（那是装 Market / URL 的全局技能，与角色身份无关）。
 - 不要编造 `skill_id` / 安装路径 / frontmatter 校验结果。
 - 不要跳过 STEP 1 / 2 直接写 SKILL.md。
-- 不要创建没有 `name` + `description` frontmatter 的 SKILL.md（安装校验会拒绝）。
+- 不要创建没有 `name` + `description` + `references` frontmatter 的 SKILL.md（安装校验会拒绝）。
 - 不要声称技能对其它助理可见（它是当前助理 Home 私有的）。
