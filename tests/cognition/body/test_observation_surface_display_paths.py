@@ -1,8 +1,9 @@
 """Model-visible tool results show workspace-relative guest paths (ADR-0121).
 
 The projection lives in the single live seam
-``cognition.body.emit.observation_surface.observation_content``; receipts
-and the journal keep guest absolute process paths.
+``cognition.body.emit.observation_surface.observation_content``. The journal
+persists this projected text verbatim (journal == display surface); there is
+no absolute-path copy on the write path (RA-034).
 """
 
 from __future__ import annotations

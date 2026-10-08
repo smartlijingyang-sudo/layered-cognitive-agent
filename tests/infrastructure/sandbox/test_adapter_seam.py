@@ -91,3 +91,25 @@ def test_factory_resolve_sandbox_returns_typed_sandbox() -> None:
 def test_no_local_adapter_without_base_class() -> None:
     """Regression guard: the local adapter must keep the explicit base class."""
     assert LocalSandboxAdapter.__mro__[1] is Sandbox
+@pytest.mark.asyncio
+async def test_local_run_in_session_unknown_id_fails_loud(tmp_path) -> None:
+    """RA-037: unknown session_id raises instead of silently rebuilding
+    a directory under the boot-time host root."""
+    from lca.infrastructure.sandbox.local.adapter import UnknownSandboxSessionError
+
+    adapter = LocalSandboxAdapter(root=str(tmp_path / "host_root"))
+    with pytest.raises(UnknownSandboxSessionError):
+        await adapter.run_in_session("never-created", "print(1)")
+    # no directory was silently materialized for the unknown id
+    assert not (tmp_path / "host_root" / ".sessions" / "never-created").exists()
+
+
+@pytest.mark.asyncio
+async def test_local_run_in_session_known_id_still_works(tmp_path) -> None:
+    """RA-037: the fail-loud change does not break the create_session-first path."""
+    adapter = LocalSandboxAdapter(root=str(tmp_path / "host_root"))
+    info = await adapter.create_session()
+    assert info is not None
+    result = await adapter.run_in_session(info.session_id, "print('ok')")
+    assert result.success
+    assert "ok" in result.stdout

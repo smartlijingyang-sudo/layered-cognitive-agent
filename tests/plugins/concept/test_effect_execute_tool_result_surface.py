@@ -36,6 +36,7 @@ from lca.contracts.models.core.execution.decision import (
     Observation,
     ToolCall,
 )
+from lca.contracts.protocols.act.command.envelope import tools_meta_of
 from lca.contracts.protocols.declarative.declarative_1.node_executor import (
     NodeContext,
     NodeInput,
@@ -157,33 +158,14 @@ def _decision() -> Decision:
     )
 
 
-def _mint(decision: Decision, call_index: int = 0) -> Any:
-    """Mint one envelope the way ``act.envelope`` does, call id included."""
-    from lca.contracts.protocols.act.command.envelope import (
-        CapabilityGrant,
-        mint_envelope,
-    )
-
-    return mint_envelope(
-        plan_ref="act.subgraph",
-        scope_ref="act.envelope",
-        decision=decision,
-        provider="effect.body",
-        grant=CapabilityGrant(capability="body.act", scope="run", effect_class="tools"),
-        idempotency_key=f"act.subgraph:act.envelope:{decision.decision_id}:{call_index}",
-        metadata={
-            "effect_class": "tools",
-            "operation": "body.act",
-            "state": None,
-            "decision": decision,
-            "tool_call_index": call_index,
-            "tool_call_id": decision.tool_calls[call_index].call_id,
-        },
-    )
+# RA-033: the hand-written ``_mint`` copy is deleted. Tests mint through the
+# real ``ActEnvelopeExecutor`` (``_mint_via_node``, defined below) so a
+# producer-side contract drift turns these tests red instead of staying green.
 
 
-def _envelope() -> Any:
-    return _mint(_decision())
+async def _envelope() -> Any:
+    """One envelope minted by the real ``act.envelope`` node."""
+    return (await _mint_via_node(_decision()))[0]
 
 
 def _multi_call_decision() -> Decision:
@@ -235,7 +217,7 @@ async def test_effect_execute_appends_tool_result_surface() -> None:
 
     output = await EffectExecuteExecutor().node_execute(
         _ctx(writer, gateway),
-        NodeInput(port_values={"envelope": _envelope()}),
+        NodeInput(port_values={"envelope": await _envelope()}),
     )
 
     assert writer.tool_results, (
@@ -267,7 +249,7 @@ async def test_appended_call_id_matches_assistant_tool_call_id() -> None:
 
     await EffectExecuteExecutor().node_execute(
         _ctx(writer, gateway),
-        NodeInput(port_values={"envelope": _envelope()}),
+        NodeInput(port_values={"envelope": await _envelope()}),
     )
 
     row = writer.tool_results[0]
@@ -295,7 +277,7 @@ async def test_appended_content_is_clean_payload_not_repr() -> None:
 
     await EffectExecuteExecutor().node_execute(
         _ctx(writer, gateway),
-        NodeInput(port_values={"envelope": _envelope()}),
+        NodeInput(port_values={"envelope": await _envelope()}),
     )
 
     content = writer.tool_results[0]["content"]
@@ -319,7 +301,7 @@ async def test_failed_tool_still_appends_so_model_sees_error() -> None:
 
     await EffectExecuteExecutor().node_execute(
         _ctx(writer, gateway),
-        NodeInput(port_values={"envelope": _envelope()}),
+        NodeInput(port_values={"envelope": await _envelope()}),
     )
 
     assert writer.tool_results
@@ -347,7 +329,7 @@ async def test_unbound_writer_does_not_crash_execution() -> None:
 
     output = await EffectExecuteExecutor().node_execute(
         _ctx(None, gateway),
-        NodeInput(port_values={"envelope": _envelope()}),
+        NodeInput(port_values={"envelope": await _envelope()}),
     )
 
     assert output.port_values["receipts"][0].outcome is EffectOutcome.SUCCEEDED
@@ -396,7 +378,7 @@ async def test_multi_call_turn_answers_every_declared_call_id() -> None:
     """N declared calls ⇒ N ``surface/tool_result`` rows, each with its own id."""
     decision = _multi_call_decision()
     envelopes = await _mint_via_node(decision)
-    assert [e.metadata["tool_call_id"] for e in envelopes] == ["toolu_office", "toolu_pdf"]
+    assert [tools_meta_of(e).tool_call_id for e in envelopes] == ["toolu_office", "toolu_pdf"]
 
     aggregate = await _batch_aggregate(decision)
     writer = _FakeWriter()
@@ -429,7 +411,7 @@ async def test_failed_batch_surfaces_the_classified_error_per_call() -> None:
 
     await EffectExecuteExecutor().node_execute(
         _ctx(writer, gateway),
-        NodeInput(port_values={"envelope": _mint(decision), "decision": decision, "state": None}),
+        NodeInput(port_values={"envelope": (await _mint_via_node(decision))[0], "decision": decision, "state": None}),
     )
 
     assert [row["call_id"] for row in writer.tool_results] == ["toolu_office", "toolu_pdf"]
@@ -445,7 +427,7 @@ async def test_dispatch_failure_still_answers_the_declared_call() -> None:
 
     output = await EffectExecuteExecutor().node_execute(
         _ctx(writer, gateway),
-        NodeInput(port_values={"envelope": _envelope()}),
+        NodeInput(port_values={"envelope": await _envelope()}),
     )
 
     assert output.port_values["receipts"][0].outcome is EffectOutcome.FAILED
@@ -464,11 +446,16 @@ async def test_unattributable_result_fails_loud() -> None:
     """
     from lca.contracts.protocols.act.command.envelope import (
         CapabilityGrant,
+        ToolsEnvelopeMeta,
         mint_envelope,
     )
     from lca.nodes.concept.effect.execute import ToolResultAttributionError
 
     decision = _decision()
+    # RA-033: the unattributable envelope is still minted by hand, but through
+    # the typed seam (no tool_call_id, no live objects) — this is the
+    # regression pin proving _owed_rows fails loud when the contract is
+    # violated (e.g. act.envelope ever stops minting tool_call_id).
     bare = mint_envelope(
         plan_ref="act.subgraph",
         scope_ref="act.envelope",
@@ -476,7 +463,11 @@ async def test_unattributable_result_fails_loud() -> None:
         provider="effect.body",
         grant=CapabilityGrant(capability="body.act", scope="run", effect_class="tools"),
         idempotency_key="act.subgraph:act.envelope:decision_test",
-        metadata={"effect_class": "tools", "operation": "body.act", "decision": decision},
+        metadata=ToolsEnvelopeMeta(
+            effect_class="tools",
+            operation="body.act",
+            decision_ref=decision.decision_id,
+        ).to_metadata(),
     )
     obs = Observation(
         observation_id="obs_1",

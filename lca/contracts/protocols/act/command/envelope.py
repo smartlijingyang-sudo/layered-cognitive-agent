@@ -78,6 +78,67 @@ class CapabilityGrant:
 
 
 @dataclass(frozen=True, slots=True)
+class ToolsEnvelopeMeta:
+    """act.envelope <-> effect.execute 的 metadata 类型化契约 (RA-033)。
+
+    生产者（``act.envelope`` 节点）与消费者（``effect.execute._owed_rows``）
+    对 ``tool_call_id`` / ``effect_class`` 的约定曾靠无类型字符串 key +
+    运行时 raise 维系；本 frozen dataclass 是唯一的 seam：生产者经
+    :meth:`to_metadata` 构造 metadata，消费者经 :func:`tools_meta_of` 读取。
+
+    只允许 JSON 友好的标量 —— 活对象（state / decision / observation /
+    reflection）禁止出现在此；生产者只放 id/ref，handler 经
+    ``EffectHandler.handle`` 的 typed kwargs 拿对象（ADR-0235 方向）。
+    """
+
+    effect_class: str
+    operation: str
+    tool_call_id: str | None = None
+    tool_call_index: int | None = None
+    delegation_index: int | None = None
+    decision_ref: str = ""
+
+    def to_metadata(self) -> dict[str, Any]:
+        """渲染为 envelope ``metadata`` 映射（JSON 友好）。"""
+        meta: dict[str, Any] = {
+            "effect_class": self.effect_class,
+            "operation": self.operation,
+        }
+        if self.tool_call_id is not None:
+            meta["tool_call_id"] = self.tool_call_id
+        if self.tool_call_index is not None:
+            meta["tool_call_index"] = self.tool_call_index
+        if self.delegation_index is not None:
+            meta["delegation_index"] = self.delegation_index
+        if self.decision_ref:
+            meta["decision_ref"] = self.decision_ref
+        return meta
+
+
+def tools_meta_of(envelope: CommandEnvelope) -> ToolsEnvelopeMeta:
+    """从 envelope 读出类型化 metadata seam（RA-033）。
+
+    宽容读取：seam 落地前铸造的 envelope（或其它生产者）可能缺 key，
+    缺失值以 ``None`` / ``""`` 呈现，不抛错。
+    """
+    metadata = envelope.metadata or {}
+
+    def _opt_int(key: str) -> int | None:
+        value = metadata.get(key)
+        return int(value) if isinstance(value, int) else None
+
+    tool_call_id = metadata.get("tool_call_id")
+    return ToolsEnvelopeMeta(
+        effect_class=str(metadata.get("effect_class", "") or ""),
+        operation=str(metadata.get("operation", "") or ""),
+        tool_call_id=str(tool_call_id) if tool_call_id is not None else None,
+        tool_call_index=_opt_int("tool_call_index"),
+        delegation_index=_opt_int("delegation_index"),
+        decision_ref=str(metadata.get("decision_ref", "") or ""),
+    )
+
+
+@dataclass(frozen=True, slots=True)
 class CommandEnvelope:
     """外部世界 effect 唯一入口（ADR-0068 §五 + ADR-0074 PR-7 V4 hard constraint）。
 
@@ -264,6 +325,30 @@ def mint_envelope(
     )
 
 
+def idempotency_key_for(
+    *,
+    plan_ref: str,
+    scope_ref: str = "",
+    decision_id: str = "",
+    discriminator: str | int = "",
+) -> str:
+    """Build a ':'-joined envelope idempotency key (RA-036).
+
+    The single seam for the "same decision + same params -> same key"
+    invariant. Four hand-written f-string formulas used to live at the
+    mint sites; they are now all constructed here. Empty components are
+    skipped so producers with fewer parts keep their byte-identical keys.
+
+    Case table — every row byte-identical to its pre-seam formula:
+      act.envelope tools:       plan_ref, node_ref, decision_id, call_index
+      act.envelope delegations: plan_ref, node_ref, decision_id, del_index
+      remember.write:           plan_ref, node_id, decision_id
+      wire transport:           operation, decision_ref, target
+      legacy executor:          invocation_id, tool_name
+    """
+    return ":".join(str(part) for part in (plan_ref, scope_ref, decision_id, discriminator) if str(part))
+
+
 def command_envelope_to_dict(envelope: CommandEnvelope) -> dict[str, Any]:
     """JSON 友好字典（PR-7 V4 architecture test 输出）。"""
     return {
@@ -347,10 +432,13 @@ __all__ = [
     "EnvelopeVerdict",
     "RunDelta",
     "RunFact",
+    "ToolsEnvelopeMeta",
     "Verdict",
     "command_envelope_to_dict",
     "envelope_aggregate_verdict",
     "envelope_is_authorized",
+    "idempotency_key_for",
     "mint_envelope",
+    "tools_meta_of",
     "warn_deprecated_envelope_constructor",
 ]

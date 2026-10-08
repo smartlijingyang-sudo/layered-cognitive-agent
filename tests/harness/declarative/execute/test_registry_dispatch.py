@@ -46,7 +46,7 @@ class _FakeEffectHandler:
         if receipt_name is not None:
             self.receipt_name = receipt_name
 
-    async def handle(self, envelope: Any, policy: Any, capabilities: Any) -> Any:
+    async def handle(self, envelope: Any, policy: Any, capabilities: Any, **_: Any) -> Any:
         self.calls.append((envelope, policy, capabilities))
         return self._result
 

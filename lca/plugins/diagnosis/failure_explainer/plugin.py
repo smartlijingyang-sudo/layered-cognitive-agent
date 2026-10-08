@@ -1,18 +1,18 @@
-"""diagnosis.failure_explainer —— 根因链生成(纯函数 + 模板表)。
+"""diagnosis.failure_explainer —— 根因链生成(纯函数,3 个硬编码分支)。
 
 module M8: lca/contracts/observability/observation/m8_explanation/
 
-设计模式: 模板方法 + 数据驱动规则表。
-  ROOT_CAUSE_TEMPLATES 是纯数据,每条规则 = (kind, evidence_fact_kind, statement_template, contract_clause)。
-  算法 = 反向遍历 DiffReport + ControlTrace facts,匹规则表,产出 RootCauseStep 列表。
+算法 = 3 个硬编码循环(不是模板表/规则引擎):
+  1. control_traces 里 verdict=deny 的控制面拒绝 → 第一根因节点;
+  2. diff.contract_violations 里 artifact_key == "decision" 的缺失 → act 决策缺失;
+  3. diff.missing_nodes → 根因往 plan 蓝图走。
 
-不是 LLM,不是 fuzzy match;纯 deterministic rule-based。可单测、可扩展、可固化 snapshot。
+不是 LLM,不是 fuzzy match;纯 deterministic。可单测。
 """
 
 from __future__ import annotations
 
 from collections.abc import Iterable
-from dataclasses import dataclass
 from typing import Any
 
 from lca.contracts.observability.observation import (
@@ -28,56 +28,7 @@ from lca.loop.observation import now_iso, publish_ep_observation
 _EV_EXPLANATION = "diagnosis.failure_explanation"
 
 
-@dataclass(frozen=True)
-class _Template:
-    kind: str
-    statement: str
-    evidence_fact_kind: str | None = None
-    contract_clause: str | None = None
-
-
-# 根因规则表 —— 纯数据,可扩展。每条对应一类可解释失败。
-ROOT_CAUSE_TEMPLATES: tuple[_Template, ...] = (
-    _Template(
-        "act_decision_missing",
-        "act.main.results_by_phase[THINK].payload = None",
-        evidence_fact_kind="NodeExit",
-        contract_clause="art.action.action_type",
-    ),
-    _Template(
-        "artifact_think_missing",
-        "results_by_phase[THINK] = None",
-        evidence_fact_kind="ArtifactSnapshot",
-        contract_clause="art.think",
-    ),
-    _Template(
-        "node_never_entered",
-        "node 从未进入",
-        evidence_fact_kind="NodeEnter",
-        contract_clause="plan.node.enter",
-    ),
-    _Template(
-        "subgraph_resolve_failed",
-        "sub_spec_ref 解析失败",
-        evidence_fact_kind="SubgraphResolve",
-        contract_clause="subgraph.resolve",
-    ),
-    _Template(
-        "bundle_plugin_missing",
-        "bundle plugin 装载失败",
-        evidence_fact_kind="BundleLoad",
-        contract_clause="bundle.load",
-    ),
-    _Template(
-        "control_unauthorized",
-        "控制面 verdict=deny",
-        evidence_fact_kind="ControlTrace",
-        contract_clause="ctl.authorize",
-    ),
-)
-
-
-def explain_failure(
+def explain_from_diff(
     *,
     run_id: str,
     diff: DiffReport,
@@ -169,7 +120,7 @@ def observe_explanation(
     control_traces: Iterable[ControlTrace],
 ) -> FailureExplanation:
     """Caller-facing wrapper:计算 + emit。"""
-    explanation = explain_failure(run_id=run_id, diff=diff, control_traces=control_traces)
+    explanation = explain_from_diff(run_id=run_id, diff=diff, control_traces=control_traces)
     publish_ep_observation(
         _EV_EXPLANATION,
         explanation.model_dump(mode="json"),
@@ -186,7 +137,7 @@ def observe_explanation(
     kind=PluginKind.PROVIDER,
     effects="none",
     description=(
-        "Failure explanation —— 纯函数 + 模板表;从 DiffReport + ControlTrace 推根因链 + 修复提示。"
+        "Failure explanation —— 纯函数(3 个硬编码分支);从 DiffReport + ControlTrace 推根因链 + 修复提示。"
     ),
 )
 async def setup(ctx: PluginContext, config: Any) -> None:
@@ -195,8 +146,7 @@ async def setup(ctx: PluginContext, config: Any) -> None:
 
 
 __all__ = [
-    "ROOT_CAUSE_TEMPLATES",
-    "explain_failure",
+    "explain_from_diff",
     "observe_explanation",
     "setup",
 ]

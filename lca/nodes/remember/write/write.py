@@ -23,7 +23,11 @@ from lca.contracts.harness.composition.plugin_contract import (
     PluginContract,
     PluginIdentity,
 )
-from lca.contracts.protocols.act.command.envelope import CapabilityGrant, mint_envelope
+from lca.contracts.protocols.act.command.envelope import (
+    CapabilityGrant,
+    idempotency_key_for,
+    mint_envelope,
+)
 from lca.contracts.protocols.declarative.declarative_1.node_executor import (
     NodeContext,
     NodeInput,
@@ -89,15 +93,21 @@ class RememberWriteExecutor(FastPathCounter):
             decision=decision,
             provider="effect.memory",
             grant=CapabilityGrant(capability="memory.update", scope="run", effect_class="memory"),
-            idempotency_key=f"{plan_ref}:{node_id}:{_decision_id(decision)}",
+            idempotency_key=idempotency_key_for(
+                plan_ref=plan_ref,
+                scope_ref=node_id,
+                decision_id=_decision_id(decision),
+            ),
+            # RA-033: metadata 只放 id/ref，不放活对象 —— state / decision /
+            # observation / reflection 经 gateway.execute 的 typed kwargs 传给
+            # handler（EffectHandler.handle 的 keyword-only 参数）。
             metadata={
                 "effect_class": "memory",
                 "operation": "memory.update",
-                "state": state,
-                "decision": decision,
-                "observation": observation,
-                "reflection": reflection,
-                "candidate": candidate,
+                "decision_ref": _decision_id(decision),
+                "observation_ref": getattr(observation, "observation_id", "") or "",
+                "reflection_ref": getattr(reflection, "reflection_id", "") or "",
+                "candidate_ref": getattr(candidate, "candidate_id", "") or "",
             },
         )
         gateway = input.port_values.get(PortName("effect_gateway"))
@@ -114,7 +124,14 @@ class RememberWriteExecutor(FastPathCounter):
                 approval_required=(),
                 idempotency_required=(),
             )
-            receipt = await gateway.execute(envelope, policy)
+            receipt = await gateway.execute(
+                envelope,
+                policy,
+                state=state,
+                decision=decision,
+                observation=observation,
+                reflection=reflection,
+            )
         # Forward both the envelope (typed side-effect wire) and the receipt
         # to the fold node so downstream can render a typed ``memory_receipt``.
         return NodeOutput(

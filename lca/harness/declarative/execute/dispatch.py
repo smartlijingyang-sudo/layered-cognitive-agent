@@ -13,7 +13,7 @@ are visible inline.
 
 from __future__ import annotations
 
-from typing import cast
+from typing import Any, cast
 
 from lca.contracts.exceptions.registry import RegistryKeyError
 from lca.contracts.models.core.execution.decision import Decision
@@ -72,12 +72,12 @@ class RegistryEffectDispatcher(EffectDispatcher):
         *,
         state: AgentState | None = None,
         decision: Decision | None = None,
+        **handler_kwargs: Any,
     ) -> object:
+        # RA-033: typed kwargs 不再只做 admission 对称 —— dispatcher 把它们
+        # 原样转发给 handler（EffectHandler.handle 的 keyword-only 参数），
+        # handler 不再从 ``envelope.metadata`` 读活对象。
         # typed kwargs take precedence over the constructor-captured values
-        del state  # state is accepted for typed-Contract symmetry; admission
-        # / dispatch do not read it. Handlers that need state must read it
-        # from the typed envelope / CapabilityGrant (not from the dispatcher's
-        # constructor state).
         active_decision = decision if decision is not None else self._decision
 
         # --- policy admission (was _validated_effect_class) ---------------
@@ -131,7 +131,9 @@ class RegistryEffectDispatcher(EffectDispatcher):
         if handler is None:
             raise DeclarativeValidationError("PG-003", f"undeclared effect operation: {operation}")
 
-        effect_output = await handler.handle(envelope, policy, self._capabilities)
+        effect_output = await handler.handle(
+            envelope, policy, self._capabilities, state=state, decision=decision, **handler_kwargs
+        )
         if not envelope.idempotency_key:
             return cast("object", effect_output)
 

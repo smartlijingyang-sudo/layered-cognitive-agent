@@ -172,6 +172,64 @@ class TestSubgraphStrategy:
         assert ports is not None
         assert ports.snapshot()["response"] == "fake_llm_response_object"
 
+    async def test_execute_seeds_inner_registry_from_formal_outer_ports_field(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """RA-041: the kernel hands the outer PortRegistry through the formal
+        ``StrategyContext.outer_ports`` field — not the old
+        ``node_config["_port_registry"]`` string backdoor."""
+        from lca.framework.graph.port_registry import PortRegistry
+        from lca.framework.graph.strategies import subgraph_run as sg_mod
+
+        captured: dict[str, Any] = {}
+
+        def _recursive_runner(
+            sub_plan: Any,
+            outer_state: Any,
+            depth: int,
+            port_registry: Any = None,
+            outer_mirror: Any = None,
+        ) -> dict:
+            captured["port_registry"] = port_registry
+            return {"observation": "ok"}
+
+        monkeypatch.setattr(
+            sg_mod,
+            "load_subgraph_plan",
+            lambda plan_ref, entry_node: Plan(
+                id="inner",
+                nodes=(),
+                edges=(),
+                declared_inputs=(),
+            ),
+        )
+
+        outer = PortRegistry()
+        outer.set_outer_input({"tools": "fake-tools-service"})
+
+        ref = SubgraphReference(plan_ref="inner.yaml", entry_node="a", binding_edge="x")
+        strategy = SubgraphStrategy(recursive_runner=_recursive_runner, max_depth=4)
+        ctx = StrategyContext(
+            plan_ref="outer.yaml",
+            node_id="dispatch",
+            binding_kind=BindingKind.SUBGRAPH,
+            node_config={},  # notably: no "_port_registry" string key
+            subgraph_ref=ref,
+            outer_ports=outer,
+        )
+        await strategy.execute(
+            ctx,
+            NodeInput(
+                port_values={"response": "fake_llm_response_object"},
+                consumer_node="dispatch",
+            ),
+        )
+
+        ports = captured["port_registry"]
+        assert ports is not None
+        assert ports.snapshot()["tools"] == "fake-tools-service"
+        assert ports.snapshot()["response"] == "fake_llm_response_object"
+
     async def test_max_depth_enforced(self, monkeypatch: pytest.MonkeyPatch) -> None:
         from lca.framework.graph.strategies import subgraph_run as sg_mod
 

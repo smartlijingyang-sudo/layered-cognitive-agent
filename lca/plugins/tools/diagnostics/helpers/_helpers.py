@@ -9,7 +9,7 @@ ADR-2026-09-02-i17-stream-align §C: spine is the SSOT
 
 from __future__ import annotations
 
-from collections.abc import Mapping, Sequence
+from collections.abc import Mapping
 from datetime import datetime
 from pathlib import Path
 
@@ -225,9 +225,4 @@ def _serialize_report(report: object) -> dict[str, object]:
     }
 
 
-__all__ = ["_inspector_events", "_load_inspector_from_jsonl", "_serialize_report"]
-
-
-def _inspector_events(inspector: TraceInspector) -> Sequence[StampedEvent]:
-    """从 TraceInspector 派生 events 序列(从 internal _events 读取)。"""
-    return list(getattr(inspector, "_events", ()))
+__all__ = ["_load_inspector_from_jsonl", "_serialize_report"]

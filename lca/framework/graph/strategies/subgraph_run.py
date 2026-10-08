@@ -78,14 +78,13 @@ class DefaultSubgraphRun:
         # subgraph delegate's declared inputs (e.g. ``in_assembled_manifest``
         # for think.main) — it does NOT carry kernel-seeded ports like
         # ``tools`` / ``bindings``. The interpreter stashes the outer
-        # plan's full ``PortRegistry`` on ``context.node_config["_port_registry"]``
-        # (a kernel-private key that ``StrategyContext`` allows via its
-        # ``node_config`` mapping — no Protocol change required). We
-        # layer the full outer registry first, then the projected
-        # declared inputs on top via ``setdefault`` (which preserves
-        # outer values when keys collide — iron rule 1).
+        # plan's full ``PortRegistry`` on the formal ``context.outer_ports``
+        # field (RA-041; was the ``node_config["_port_registry"]`` string
+        # backdoor). We layer the full outer registry first, then the
+        # projected declared inputs on top via ``setdefault`` (which
+        # preserves outer values when keys collide — iron rule 1).
         outer_ports: PortRegistry | None = None
-        outer_registry = context.node_config.get("_port_registry") if context.node_config else None
+        outer_registry = context.outer_ports
         outer_snapshot: Mapping[PortName, Any] = (
             outer_registry.snapshot() if isinstance(outer_registry, PortRegistry) else {}
         )

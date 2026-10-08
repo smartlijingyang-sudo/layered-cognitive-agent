@@ -1,5 +1,13 @@
 ## Codebase Patterns
 
+- **metadata 走私 → typed kwargs 迁移纪律（RA-033）：** envelope metadata
+  只放 JSON 友好的 id/ref 标量；需要活对象的 handler 从
+  `EffectHandler.handle` 的 keyword-only 参数拿（`state`/`decision`/
+  `observation`/`reflection`），dispatcher 经 `execute(**handler_kwargs)`
+  原样转发。新增 effect 操作时 handler 签名直接加 kwarg，不要回头往
+  metadata 塞对象。fail-loud：handler 缺必需 kwarg 时 raise
+  DeclarativeValidationError（PG-003），不要 KeyError 裸奔。
+
 （raphy 轮共享的模式/禁区登记，供后续 assess/optimize 轮参考）
 
 - **pair-seam 收敛先列 case 表（RA-032）：** seam 只返回 pair 一半（如 store）
@@ -127,6 +135,36 @@
   含它，否则 lift 直接 `PlanLiftError`。只改消费侧 yaml 不够，生产侧
   （本轮是 `act.authorize`）的 outputs 也要同步；lift probe 当场验。
  node 读端口时查三处——executor `declared_inputs`、yaml inputs、实际 `port_values.get` 调用；三处名字不一致即 declared interface 说谎。
+
+- **envelope metadata 类型化 seam（RA-033 教训）：** 跨 phase 的生产者/消费者
+  metadata 约定不能靠字符串 key + 运行时 raise；消费者测试手抄 `_mint` 副本 =
+  契约漂移时测试照样绿——producer→consumer 契约必须由真实生产者 pin 住。另：
+  号称 JSON 友好的 envelope metadata 不得塞活对象（state/decision/observation）。
+- **display/process 叙事债务（RA-034 教训）：** `observation_content` 自称"单 seam
+  双消费者、journal 存绝对路径"，实测 tool_journal 是第三个调用者且 journal 存的
+  就是投影文本；删掉叙事零复杂度变化 = 叙事债务的证据。修法二选一：承认
+  journal=display 面，或拆双视图。
+- **guest ROOT 三视图同源（f21cd0af2 实证）：** preamble 模板烘焙 / adapter env
+  导出（LCA_GUEST_ROOT）/ `_rewrite_command` 文本重写三处必须一致；
+  `command.replace(mount, root)` 全文替换会把 host 会话根写进命令文本，display
+  投影豁免自由文本 → host 路径泄漏给模型（RA-040）；修的一侧是 adapter 出口
+  逆向投影，不是去掉豁免。
+- **run_in_session 未知 sid 静默回落（RA-037）：** per-run 绑定只活在内存
+  `_sessions` dict，`run_in_session` 对未知 sid 用 boot-time `_host_root` 重建目录
+  继续执行——静默错目录；修法 fail-loud。
+- **doctor facade 的 SINGLE-entry 承诺（RA-039 教训）：** Privilege/Trust/Resource
+  三 pass 在 facade 之外，`doctor profile --ci` 自称 fail-closed 却跑不到——
+  deletion test 在这里测的是承诺："删掉承诺"也是诚实解。
+- **TraceInspector 私有属性穿透（RA-038）：** `_helpers._inspector_events` 用 getattr
+  读 `_events`——adapter 拿事件序列必须走显式访问器，不伸手进内脏。
+- **idempotency_key 公式（RA-036）：** 四个铸造点各自发明公式，不变量只写
+  docstring——无 observed bug 前强度上限 Worth exploring。
+- **`_port_registry` kernel 私有 key（RA-041）：** `node_config["_port_registry"]`
+  字符串后门绕过 frozen StrategyContext——能工作，风险假设性，上限 Speculative。
+- **流程（本轮教训）：** 并发 lane 直接在 raphy 分支主 checkout 提交
+  （f21cd0af2，12:11:45），评估中途 HEAD 移动——长评估里读文件用
+  `git show <sha>:` 锁定版本；子任务误报写树时先查 reflog 再定论。
+
 ---
 
 ## Round 6 — assess (2026-10-07 23:15, branch raphy/arch-20261007-2315)
@@ -1102,3 +1140,295 @@
     6 个摸过的文件 `ruff check` clean。零行为变更由 case 表 + 全绿背书。
 ---
 
+
+## Round 10 — assess (2026-10-08 12:06, branch raphy/arch-20261008-1206)
+
+- 按硬化版 `raphy-assess.md` 执行：读 `skills/improve-codebase-architecture/SKILL.md`；
+  `git log -45` 定热点（sandbox/computer workspace 绑定、CLI doctor/stack_heal/debug-trace、
+  act envelope/graph translate_outputs）；CONTEXT.md + ADR 目录；三区 friction walk 拆给
+  3 个全新会话子任务（5 问必答、端到端精读）；mandatory runtime verification
+  （MockLLMAdapter：basic / tool-call / 双 run 全 completed；RA-023 非收敛回归返回
+  failed Result 无抛错——修复生效；无新 P0）；duplication 副扫描；self-grilling 写进
+  assessment.md；diversity quota 满足（3 Strong 全部来自 friction walk，非 duplication 类）。
+- 评估中途并发 lane 在本分支主 checkout 上直接提交 f21cd0af2
+  （fix(sandbox): guest script ROOT 指回 session root，12:11:45），HEAD 移动；
+  A 区结论以 f21cd0af2 之后为准。子任务 A 一度被误判写树，reflog 证实为并发提交——
+  已记录，树当前干净。
+- 9 个 stories（RA-033~RA-041）：RA-033 envelope metadata 类型化 seam（Strong）、
+  RA-034 observation_content 三消费者/journal 叙事（Strong）、RA-035
+  ROOT_CAUSE_TEMPLATES 死抽象（Strong）、RA-036 idempotency_key 公式收敛
+  （Worth exploring）、RA-037 run_in_session 未知 sid 回落（Worth exploring）、
+  RA-038 TraceInspector 显式访问器（Worth exploring）、RA-039 doctor 三 pass 接入
+  facade（Worth exploring）、RA-040 _rewrite_command host 路径泄漏（Worth exploring）、
+  RA-041 _port_registry 进 StrategyContext 正式字段（Speculative）。
+- 丢弃/未立案：`assistant_scope.py` 的 ContextVar 换皮（命名封装，只搬移复杂度）；
+  `display_paths.py` 删模块只搬移复杂度（浅但无害）；`warn_deprecated_envelope_constructor`
+  零调用者（死代码，机械清理未立案）；run(None) / `NativeToolCall.arguments` 传 str
+  的 10-07 P2 仍 defer 给 iter-quality。
+
+## 2026-10-08 12:45 CST - RA-033
+- 实现了 envelope metadata 的类型化 seam：`ToolsEnvelopeMeta` frozen dataclass
+  （effect_class / operation / tool_call_id / tool_call_index /
+  delegation_index / decision_ref，只允许 JSON 友好标量）+ 模块级访问器
+  `tools_meta_of`，落在 `lca/contracts/protocols/act/command/envelope.py`
+  （ADR-0015 module-level 访问器纪律），`__all__` 导出。
+- `act.envelope` 节点（tools / delegations 两分支）经 `ToolsEnvelopeMeta`
+  构造 metadata；`effect.execute._owed_rows` 经 `tools_meta_of` 读取 ——
+  两边不再手写 `metadata["tool_call_id"]` / `metadata["effect_class"]` 字符串 key。
+- 删掉了两处铸造点往 metadata 塞的活对象：act.envelope 的 `state`/`decision`、
+  remember/write 的 `state`/`decision`/`observation`/`reflection`/`candidate`，
+  改放 `*_ref` id（JSON 友好）。
+- 为承接被拿掉的活对象，`EffectHandler.handle` Protocol 加 typed
+  keyword-only 参数（state / decision / observation / reflection），
+  `RegistryEffectDispatcher.execute` 原样转发（**handler_kwargs 透传）；
+  `BodyActEffectHandler` / `MemoryUpdateEffectHandler` 改读 typed kwargs，
+  缺失时 fail-loud（DeclarativeValidationError PG-003）。
+  remember/write 经 `gateway.execute(..., state=..., decision=...,
+  observation=..., reflection=...)` 传对象。
+- 测试：删掉 `test_effect_execute_tool_result_surface.py` 的手写 `_mint`
+  副本，全部改走真实 `ActEnvelopeExecutor`（既有 `_mint_via_node`）；
+  `test_unattributable_result_fails_loud` 保留为回归 pin（经类型化 seam
+  手工铸造无 tool_call_id 的 envelope，仍期望 raise）；
+  断言 `metadata["candidate"]` / `metadata["state"]` 的两个 integration
+  测试改为 ref 断言；dispatch/substitutability 的 fake handler 加 `**_`。
+- 文件：lca/contracts/protocols/act/command/envelope.py、
+  lca/contracts/protocols/act/effect/handler.py、
+  lca/harness/declarative/execute/dispatch.py、
+  lca/nodes/act/envelope/envelope.py、lca/nodes/concept/effect/execute.py、
+  lca/nodes/remember/write/write.py、lca/plugins/act/effect/handlers_provider.py、
+  tests/plugins/concept/test_effect_execute_tool_result_surface.py、
+  tests/harness/declarative/execute/test_registry_dispatch.py、
+  tests/architecture/test_handler_substitutability.py、
+  tests/integration/test_memory_and_procedural_distillation.py、
+  tests/integration/test_semantic_memory_candidate.py
+- **Learnings for future iterations:**
+  - live 对象走私点检查清单：评估"metadata 只放 id/ref"类 story 时，
+    先 rg 全仓 `envelope.metadata` 读点 —— handlers_provider 的两个默认
+    handler 是生产级消费者，漏了会直接 KeyError；另有 integration 测试
+    把走私行为 pin 住（`metadata["candidate"] == candidate`），必须同步改。
+  - deletion test 是验证"测试 pin 住真实生产者"的最廉价手段：临时删掉
+    生产者构造行 → 期望红的测试变红 → 恢复。本轮删 `tool_call_id` 构造
+    后 `test_multi_call_turn_answers_every_declared_call_id` 与
+    `test_dispatch_failure_still_answers_the_declared_call` 变红，契约成立。
+  - 预存坏测试先 `git stash` 跑一遍确认再下结论：本轮
+    `test_runtime_binding_has_one_declarative_driver_construction_path`
+    在干净树同样失败（引用的 `lca/runtime/runtime_bindings.py` 早已搬走），
+    与本 story 无关，不纳入本轮修复范围。
+---
+
+## 2026-10-08 12:51 CST - RA-034
+- 方向拍板：选 option (a) 纯文档修正，不做 (b)。理由：journal 存 display 投影
+  是正确行为 —— 持久记录与模型所见完全一致（可审计），且 host 绝对路径不进
+  durable store 正合 ADR-0121 的边界意图；(b) 的 process 视图无任何已验证
+  的消费者，属为不存在的需求改行为。叙事债务 → 叙事修复。
+- 修正 `lca/cognition/body/emit/observation_surface.py` 模块 docstring：
+  "both consumers" → 三个消费者（补上
+  `tool_journal.commit_body_tool_execute_end` 经 `RunSessionWriter` 的 journal
+  写路径），并写明 journal == display surface 立场；
+  `observation_content` 内联注释删掉"receipts and the journal keep absolute
+  process paths" false claim。
+- 修正 `tests/cognition/body/test_observation_surface_display_paths.py`
+  docstring 的同款 false claim。
+- 新增 pin 测试 `test_journal_persists_display_projection_not_absolute_paths`
+  （tests/loop/test_tool_surface_commit.py）：经真实 Session 跑
+  `commit_body_tool_execute_end`，断言 journal 事件的 content ==
+  `observation_content(obs)` 且不含绝对路径。实现细节：事件类型是
+  `SURFACE_TOOL_RESULT_TYPE`（='spine.body.tool.execute.end'），payload
+  即 data dict 本身（`payload["content"]`，不是 `payload["payload"]`）。
+- 验证过 receipts 侧：`EffectReceipt.output_ref=str(observation)` 的 repr
+  确实带绝对路径 —— 属 debug 副产品，非设计的 process 视图，docstring
+  未将其宣称为正式契约。
+- 文件：lca/cognition/body/emit/observation_surface.py、
+  tests/cognition/body/test_observation_surface_display_paths.py、
+  tests/loop/test_tool_surface_commit.py
+- **Learnings for future iterations:**
+  - "journal 存什么"类叙事先实证再定方向：本轮逐行验证了三个调用者与
+    journal 写路径，才敢选 (a)；若直接按字面修 docstring 会漏掉第 3 个
+    调用者。
+  - `Session.snapshot_events()` 的事件类型用 kernel 常量
+    `SURFACE_TOOL_RESULT_TYPE`（spine.body.tool.execute.end），不是字面的
+    "surface/tool_result"；payload 即 data 本体。
+---
+
+## 2026-10-08 12:54 CST - RA-035
+- 删掉 `lca/plugins/diagnosis/failure_explainer/plugin.py` 的死抽象：
+  `_Template` dataclass + `ROOT_CAUSE_TEMPLATES`（6 条目，从未被算法引用）；
+  模块 docstring 重写为真实算法（3 个硬编码循环：control deny → decision
+  缺失 → missing_nodes）；plugin description 同步修正；`dataclass` import
+  一并清理。
+- 顺手做了 AC 允许的 rename：diagnosis 侧 `explain_failure` →
+  `explain_from_diff`，与 `TraceInspector.explain_failure` 消歧。调用者只有
+  `observe_explanation`（内部）+ 两个测试文件，一并改完；`__all__` 同步。
+- 重写 `tests/observation/test_explainer_algorithm.py`：删掉断言模板表的
+  `test_explainer_template_data_driven`，新增
+  `test_explainer_three_hardcoded_branches` pin 住 3 个分支的
+  evidence_fact_kind 顺序（ControlTrace → NodeExit → PlanBlueprint）与
+  step_index（1,2,3）；h6 fixtures 恰好同时触发全部三分支。
+- 全仓（lca/tests/commands）grep ROOT_CAUSE_TEMPLATES 零命中；历史设计文档
+  `docs/notes/implemented/seam/2026-09-10-observation-9module-mechanism.md`
+  是 dated 记录，留作历史未动。
+- 约束遵守：`explain_from_diff(run_id, diff, control_traces)` 纯函数签名与
+  返回语义不变。测试 18 passed；ruff clean。
+- 文件：lca/plugins/diagnosis/failure_explainer/plugin.py、
+  tests/observation/test_explainer_algorithm.py、
+  tests/observation/test_plugins_emit.py
+- **Learnings for future iterations:**
+  - "死抽象"类 story 动手前先数引用者：本轮 `ROOT_CAUSE_TEMPLATES` 除定义
+    外只有测试引用 + `__all__`，删除面干净；`explain_failure` 的重命名面
+    也小（3 处），才敢顺手做。引用者多就别"顺手"。
+  - 历史设计文档（docs/notes/implemented/... dated）不随代码改 —— 它是
+    时间胶囊；改它反而破坏可追溯性。live 文档（docstring/description）
+    才跟代码走。
+---
+
+## 2026-10-08 12:57 CST - RA-036
+- 在 `mint_envelope` 旁新增 `idempotency_key_for(*, plan_ref, scope_ref="",
+  decision_id="", discriminator="")`（contracts/protocols/act/command/envelope.py，
+  `__all__` 导出）：':' 连接非空成分，空成分跳过。
+- 5 处铸造点全部经它构造 key：act.envelope tools（plan,node,decision,call_index）、
+  act.envelope delegations（plan,node,decision,del_index）、remember/write
+  （plan,node,decision）、wire transport（operation,decision_ref,target）、
+  pipeline legacy（invocation_id,tool_name）。
+- case table 实证字节一致：6 行样本（tools idx0/idx3、delegations、remember、
+  wire、pipeline）新旧公式输出逐字相同。
+- 刻意排除：`delegate/compose.py` 的 `DelegationRequest.idempotency_key`
+ （另一 seam，非 envelope）和 `command_endpoints.py` 的 approval resume key
+  —— 收敛面只覆盖 envelope 铸造点，不扩大。
+- 测试 34 passed（envelope n_to_n、transport、tool_result_surface、
+  两个 memory integration、tool_pipeline）；ruff clean。
+- 文件：lca/contracts/protocols/act/command/envelope.py、
+  lca/nodes/act/envelope/envelope.py、lca/nodes/remember/write/write.py、
+  lca/cognition/wire/envelope.py、lca/cognition/body/executor/pipeline_safe_executor.py
+- **Learnings for future iterations:**
+  - "收敛 N 个公式"类 story 先穷举构造点再动手：本轮 grep 发现 5 处
+    envelope 公式 + 2 处非 envelope 同名 key（delegate/compose、
+    command_endpoints），后者刻意排除 —— 同名 key 不等于同 seam。
+  - keyword seam 对异形公式的映射要在 docstring 留 case table：wire 的
+    `(operation, decision_ref, target)` 映射到
+    `(plan_ref=operation, decision_id=decision_ref, discriminator=target)`，
+    不看 case table 的人会觉得参数名"驴唇不对马嘴"。
+---
+
+## 2026-10-08 13:01 CST - RA-037
+- `lca/infrastructure/sandbox/local/adapter.py`：`run_in_session` 对未知
+  session_id 不再静默重建目录，改为抛 `UnknownSandboxSessionError(ValueError)`
+  （模块级新错误，`__all__` 导出）；docstring 明确两条语义：未知非空 id →
+  fail-loud（必须先 `create_session`），空 id "" → 显式降级的 stateless
+  回落（boot-time host root，无 per-session 隔离）。
+- 调用者核查（grep）：生产调用者只有 capability facade 透传 +
+  `RunBoundSandboxRuntime`（`self._session.session_id`，create_session 产物）；
+  测试调用者全部先 create_session；onlyboxes adapter 无同款静默重建；
+  `delegate/compose` 等非 envelope key 不在本轮范围。无调用者依赖静默重建。
+- 新增 pin 测试（tests/infrastructure/sandbox/test_adapter_seam.py）：
+  `test_local_run_in_session_unknown_id_fails_loud`（抛错 + 未静默建目录）、
+  `test_local_run_in_session_known_id_still_works`（create_session-first 路径照常）。
+- 测试：seam 文件 13 passed（含 2 个新测试）；workspace_ssot 通过；
+  test_local_sandbox_attachment_path.py 的 3 个失败经 `git stash` 验证为
+  预存坏（干净树同样 3 failed），与本轮无关。ruff clean。
+- 文件：lca/infrastructure/sandbox/local/adapter.py、
+  tests/infrastructure/sandbox/test_adapter_seam.py
+- **Learnings for future iterations:**
+  - fail-loud 类 story 必须先 grep 穷举调用者再动手：本轮确认只有
+    runtime 用 `self._session.session_id`（合法），才敢把静默重建改成抛错；
+    若有调用者依赖重建，故事方向就得改成"先修调用者"。
+  - 预存坏测试用 `git stash` 留证据再下结论：attachment_path 的 3 个失败
+    在干净树复现，属环境/预存问题，不纳入本轮修复（也不背锅）。
+---
+
+## 2026-10-08 13:06 CST - RA-038
+- `TraceInspector` 加只读 `events` property（tuple，不可变视图），替代
+  `_helpers._inspector_events` 的 `getattr(inspector, "_events", ())` 后门；
+  docstring 记明"diff adapter 走这里，inspector 内部可重构"。
+- 两处生产调用点改走访问器：`diff/context.py`（DiffContext）、
+  `run/diff.py`（RunDiffToolAdapter）；`_helpers.py` 删 `_inspector_events`
+  + `__all__` 条目 + 孤儿 `Sequence` import。
+- `tests/scenario/coding/test_explain_failure_ledger.py` 的调用点同步改走
+  `inspector.events`。全仓 grep `_inspector_events` 零命中（含 docstring
+  措辞避开字面旧名）。
+- 插曲：RA-038 测试暴露 RA-035 rename 漏了一处调用者
+  （`lca/infrastructure/cli/commands/observation/run_explain.py`，
+  RA-035 轮 grep 错了目录只查了 repo 根 `commands/`）。已补改，并用
+  `git commit --fixup` + `git rebase -i --autosquash` 把它并回 RA-035
+  commit（分支未 push，重写安全），RA-038 diff 保持干净。
+- 测试 12 passed（ledger）；ruff clean。
+- 文件：lca/infrastructure/observability/stream/trace_inspector.py、
+  lca/plugins/tools/diagnostics/helpers/_helpers.py、
+  lca/plugins/tools/diagnostics/diff/context.py、
+  lca/plugins/tools/diagnostics/run/diff.py、
+  tests/scenario/coding/test_explain_failure_ledger.py
+  （另：RA-035 补改 lca/infrastructure/cli/commands/observation/run_explain.py）
+- **Learnings for future iterations:**
+  - rename 类改动 grep 范围要用 repo 根全仓（`rg -l` 不设路径），不要凭
+    记忆猜目录：本轮漏 `lca/infrastructure/cli/commands/` 就是教训。
+    commit 前跑一遍引用该符号的测试文件做冒烟。
+  - 私有分支未 push 时，`--fixup` + `rebase -i --autosquash` 是把"漏改"
+    并回原 story commit 的干净手法（注意 `--autosquash` 必须配 `-i`，
+    光 `--autosquash` 不生效）；rebase 前先 stash 未提交改动。
+---
+
+## 2026-10-08 13:16 CST - RA-039
+- `DoctorFacade` 接入 PrivilegeDoctor + TrustDoctor（include_privilege /
+  include_trust 开关，默认 True，与现有风格一致）；pass 顺序 5/6 写进模块
+  docstring（C8 确定性）。
+- 输入复用 facade 已有的 `_optional_resolve_contracts`（与 capability 同源）；
+  TrustDoctor 的 `external_kind_by_plugin` 经构造函数注入（operator override
+  map），缺省 `{}`——缺席插件按 TrustDoctor 契约默认 inprocess，仍是有效审计。
+- ResourceDoctor 明确不接入：doctor 时刻无 live ResourceRegistry 与 harness
+  provider 名单来源（I-HPC-7 只读约束），空 provider 集接入会每轮误报
+  DOC-RES-* orphans；理由写进 facade 模块 docstring（AC 允许的诚实选项），
+  并注明未来接线路径（contracts.resources 建 registry + include_resource 开关）。
+- CLI `doctor profile` 加 `--skip-privilege` / `--skip-trust`。
+- 测试：test_facade.py 新增 `_RecordingContractsStub`（trust 的 kwarg 签名）、
+  construction/aggregation/order 断言扩展到 6 pass；两个 opt-out 测试注入
+  新 stub；跑 doctor 目录 223 passed、architecture golden/CI gate + CLI
+  73 passed（1 skipped，baseline update opt-in）；ruff clean。
+- 文件：lca/harness/diagnostics/doctor/facade.py、
+  lca/infrastructure/cli/commands/doctor/profile.py、
+  tests/harness/diagnostics/doctor/test_facade.py
+- **Learnings for future iterations:**
+  - 给 facade 加 pass 时，旧测试的"全 stub 注入"假设会碎：凡是 patch
+    `_optional_resolve_*` 返回假数据的测试，必须给新 pass 也注入 stub，
+    否则真实 pass 会在假数据上 AttributeError。改 facade 先跑
+    tests/harness/diagnostics/doctor/ 全目录。
+  - 传脚本给 ssh252 时文件名别写错（本轮曾把 edit3 传成 edit5 的内容，
+    TestOrder 改动漏执行——靠 git diff 逐 hunk 核对才发现）。
+---
+
+## 2026-10-08 13:20 CST - RA-040
+- `LocalSandboxAdapter` 加 `_project_host_to_guest(text, root)`：
+  `_rewrite_command` 的逆操作，把 stdout/stderr 里的 host session root
+  投影回 guest mount（`/mnt/data`），与重写共用同一对 root/mount 常量；
+  匹配是 boundary-aware（root 后不跟路径延续字符才替换），共享前缀的
+  兄弟路径（`<root>2/...`）不动。
+- 投影点在 `_exec_shell` 的 decode 之后、emitter 发射之前——live stream
+  与最终 SandboxResult 同时干净；display_paths 的自由文本豁免原样保留
+  （豁免测试 21 passed 仍绿）。
+- 新测试 tests/infrastructure/sandbox/test_adapter_host_path_projection.py：
+  pwd/stdout 与 LCA_GUEST_ROOT/stderr 的真机投影断言 + 边界单测；3 passed。
+- ruff clean（修掉 S108：单测里硬编码 /tmp 路径改走 tmp_path）。
+- 文件：lca/infrastructure/sandbox/local/adapter.py（+import re）、
+  tests/infrastructure/sandbox/test_adapter_host_path_projection.py（新）
+- **Learnings for future iterations:**
+  - display/process split 的泄漏修在 process 侧出口（adapter），不碰
+    display 侧——豁免是刻意的（删豁免会 corrupt 文件内容），两边各守
+    一条线。
+---
+
+## 2026-10-08 13:23 CST - RA-041
+- `StrategyContext` 加正式可选字段 `outer_ports`（frozen 模型声明字段，
+  docstring 注明 ADR-0241 §4）；interpreter 在构造时填它，subgraph_run
+  改读 `context.outer_ports`；`node_config` 不再携带 `"_port_registry"`
+  字符串 key（lca 内零存活读写，只剩注释里的历史指代）。
+- 实现与评估的差异：字段类型用 `Any` 而非 `PortRegistry`——concrete
+  PortRegistry 住在 `lca.framework.graph`，contracts 反向 import 会破分层
+  （全仓零先例）；读侧保留 `isinstance(PortRegistry)` 检查保运行时安全。
+- 新 pin 测试 `test_execute_seeds_inner_registry_from_formal_outer_ports_field`
+ （node_config 刻意不带旧 key，断言 inner registry 同时拿到 outer 的 tools
+  与 projected input）。
+- 测试：tests/unit/framework/graph/ 104 passed、
+  tests/integration/cutover/test_tool_call_e2e.py 3 passed；ruff clean。
+- 文件：lca/contracts/protocols/graph/strategy.py、
+  lca/framework/graph/interpreter.py、
+  lca/framework/graph/strategies/subgraph_run.py、
+  tests/unit/framework/graph/test_strategies.py
+---

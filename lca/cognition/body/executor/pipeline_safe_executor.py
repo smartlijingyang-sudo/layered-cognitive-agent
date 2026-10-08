@@ -309,6 +309,7 @@ class PipelineSafeExecutor(SafeExecutor):
         from lca.contracts.protocols.act.command.envelope import (
             BudgetReservation,
             CapabilityGrant,
+            idempotency_key_for,
             mint_envelope,
         )
 
@@ -323,7 +324,10 @@ class PipelineSafeExecutor(SafeExecutor):
             provider=_LegacyToolProvider.provider_id,
             grant=CapabilityGrant(capability=tool.name, scope="turn", effect_class="tools"),
             budget_reservation=BudgetReservation(tool_calls=1),
-            idempotency_key=f"{invocation_id}:{tool.name}",
+            idempotency_key=idempotency_key_for(
+                plan_ref=invocation_id,
+                decision_id=tool.name,
+            ),
             metadata={"tool_name": tool.name},
         )
 

@@ -1,7 +1,7 @@
 {
   "project": "LCA Raphy Architecture Optimization",
-  "branchName": "raphy/arch-20261007-2005",
-  "description": "Continuous architecture deepening for the LCA cognitive-agent codebase via the raphy fresh-session loop. Round 1 (2026-10-06, old prompt): RA-001/RA-002 converged, RA-003 dropped with evidence. Round 2 (2026-10-06, hardened prompt): RA-004..RA-009 all done (merged to main 2026-10-07, merge 1b1526a94). Round 3 (2026-10-07, hardened prompt): friction walk over session plugins, loop_cursor, delegation/body executor; RA-010..RA-013 below. Out of scope: ralph Round 2 areas (DecisionGates, Ingest, ContextFiles shims, Read Runs micro-dirs, MemoryTools directory seam), lca/cognition/memory/ (frozen per Round 2 AP-01), CLI surface must not import contracts (deliberate rule), gate_chain_strategy.py (hands-off: another party's uncommitted work + pre-existing red test).",
+  "branchName": "raphy/arch-20261008-1206",
+  "description": "Continuous architecture deepening for the LCA cognitive-agent codebase via the raphy fresh-session loop. Round 1 (2026-10-06, old prompt): RA-001/RA-002 converged, RA-003 dropped with evidence. Round 2 (2026-10-06, hardened prompt): RA-004..RA-009 all done (merged to main 2026-10-07, merge 1b1526a94). Round 3 (2026-10-07, hardened prompt): friction walk over session plugins, loop_cursor, delegation/body executor; RA-010..RA-013 below. Out of scope: ralph Round 2 areas (DecisionGates, Ingest, ContextFiles shims, Read Runs micro-dirs, MemoryTools directory seam), lca/cognition/memory/ (frozen per Round 2 AP-01), CLI surface must not import contracts (deliberate rule), gate_chain_strategy.py (hands-off: another party's uncommitted work + pre-existing red test). Round 10 (2026-10-08 12:06, branch raphy/arch-20261008-1206): RA-033..RA-041 below (3 Strong + 5 Worth exploring + 1 Speculative; all from friction walk, none duplication-class).",
   "userStories": [
     {
       "id": "RA-001",
@@ -480,6 +480,141 @@
       "passes": true,
       "branchName": "raphy/arch-20261008-0118",
       "notes": "Strength: Worth exploring. Two = real: safe_executor._resolve_evidence_pair and approve_gate._route_refusal_to_evidence share the verbatim 'current_bound -> evidence_binding().store -> no-ref when unbound' ritual (the approve_gate docstring even says 'exactly like safe_executor._resolve_evidence_pair'). Deletion test: concentrates ('how to reach the evidence store from the ambient seam' becomes the observability package's own knowledge)."
+    },
+    {
+      "acceptanceCriteria": [
+        "A frozen dataclass (e.g. ToolsEnvelopeMeta with tool_call_id / tool_call_index / effect_class, optional operation) exists next to act.envelope; act.envelope constructs metadata through it and _owed_rows reads through it (no hand-written metadata[\"tool_call_id\"] string lookups on either side)",
+        "No live objects (state / decision / observation / reflection) in CommandEnvelope metadata: act.envelope and remember/write put only ids/refs",
+        "The hand-written _mint in tests/plugins/concept/test_effect_execute_tool_result_surface.py is deleted; the test calls the real ActEnvelopeExecutor (or a shared test helper)",
+        "Deleting the tool_call_id construction from act.envelope turns test_unattributable_result_fails_loud red (contract load-bearing proof, kept as a regression pin)",
+        "tests/nodes/act/test_envelope_n_to_n.py passes; ruff check passes on all touched files"
+      ],
+      "branchName": "raphy/arch-20261008-1206",
+      "description": "As an LCA maintainer, I want the act.envelope <-> _owed_rows metadata contract (tool_call_id / effect_class) held by a typed seam instead of untyped string keys plus a runtime raise, so a producer-side change cannot silently drift past the consumer test.",
+      "id": "RA-033",
+      "notes": "Source: Round 10 friction walk C (Strong). Deletion test: removing tool_call_id from act.envelope fails test_unattributable_result_fails_loud -> contract is real load-bearing; deleting the test's _mint copy keeps all green -> the copy is redundant. Overlap: RA-013 converged EffectReceipt construction (SimpleBody); this story touches only the CommandEnvelope metadata side. RA-032 (evidence-store seam) is adjacent but not overlapping.",
+      "passes": true,
+      "priority": 1,
+      "title": "Give envelope metadata a typed seam; delete the hand-written _mint copy in the consumer test"
+    },
+    {
+      "acceptanceCriteria": [
+        "The 'two consumers' claim in observation_surface.py docstring is corrected to three (or split into display/process views and updated)",
+        "Either (a) the 'journal keeps absolute process paths' claim is removed and the journal=display-surface position is documented in the docstring/ADR, or (b) observation_content is split into display/process views and the journal writes the process view",
+        "If (b): a new test pins journal-absolute-paths vs model-visible-projected-text; if (a): a test pins journal content == display projection",
+        "tests/cognition/body/test_observation_surface_display_paths.py passes; ruff check passes on touched files",
+        "No overlap with RA-029 (typed turn seam); adjacent only"
+      ],
+      "branchName": "raphy/arch-20261008-1206",
+      "description": "As an LCA maintainer, I want the observation_content docstring and journal-path narrative to match reality (tool_journal is a third consumer and the journal persists the projected text), so nobody trusts a journal 'absolute path' copy that does not exist.",
+      "id": "RA-034",
+      "notes": "Source: Round 10 friction walk A (Strong). Verified line-by-line: tool_journal.commit_body_tool_execute_end is the third caller; RunSessionWriter.append_tool_result persists the projected content; no absolute-path copy exists on the write path. Deletion test: deleting the 'journal keeps absolute paths' sentence changes zero complexity -> narrative debt. Overlap: none (RA-029 is the turn typed seam).",
+      "passes": true,
+      "priority": 2,
+      "title": "Fix the observation_content dual-consumer narrative: journal stores the projected text, not absolute paths"
+    },
+    {
+      "acceptanceCriteria": [
+        "ROOT_CAUSE_TEMPLATES and the _Template dataclass are deleted from lca/plugins/diagnosis/failure_explainer/plugin.py; the docstring no longer describes a rule-table algorithm",
+        "tests/observation/test_explainer_algorithm.py is rewritten to assert the real 3 hard-coded loop branches",
+        "Repo-wide grep for ROOT_CAUSE_TEMPLATES returns zero hits",
+        "Optionally rename the diagnosis-side explain_failure to explain_from_diff to disambiguate from TraceInspector.explain_failure (cheap while here)",
+        "Related tests pass; ruff check passes on touched files"
+      ],
+      "branchName": "raphy/arch-20261008-1206",
+      "description": "As an LCA maintainer, I want the diagnosis failure_explainer module to stop claiming a template-method design it does not implement, so readers are not misled into believing the algorithm is a data-driven rule table.",
+      "id": "RA-035",
+      "notes": "Source: Round 10 friction walk B (Strong). Deletion test: after deletion only that one test needs rewriting -> pure dead abstraction. Overlap: none with RA-001..RA-032.",
+      "passes": true,
+      "priority": 3,
+      "title": "Delete the dead ROOT_CAUSE_TEMPLATES abstraction in diagnosis failure_explainer"
+    },
+    {
+      "acceptanceCriteria": [
+        "An idempotency_key_for(*, plan_ref, scope_ref, decision_id, discriminator) helper exists next to mint_envelope; all four call sites construct keys through it",
+        "Constructed keys are byte-identical to the old per-site formulas (proven by a case table)",
+        "Relevant tests pass; ruff check passes on touched files"
+      ],
+      "branchName": "raphy/arch-20261008-1206",
+      "description": "As an LCA maintainer, I want the four envelope idempotency_key formulas converged into one seam, so the 'same decision + same params -> same key' invariant is enforced in one place instead of living in four docstrings.",
+      "id": "RA-036",
+      "notes": "Source: Round 10 friction walk C (Worth exploring). Deletion test (honest): inlining the formulas back keeps all green -> the seam is conventional, value is preventive not load-bearing today. Overlap: none.",
+      "passes": true,
+      "priority": 4,
+      "title": "Converge the four envelope idempotency_key formulas into one seam"
+    },
+    {
+      "acceptanceCriteria": [
+        "run_in_session raises an explicit error for unknown session_id instead of silently rebuilding under the boot-time _host_root",
+        "All legitimate callers (capability registry, run_terminal, etc.) go through create_session first (verified by grep; no caller depends on the silent rebuild)",
+        "A new test pins: unknown session_id -> explicit error",
+        "Stateless fallback (session_id='') is explicitly documented as degraded or refuses isolation-requiring operations",
+        "Relevant tests pass; ruff check passes on touched files"
+      ],
+      "branchName": "raphy/arch-20261008-1206",
+      "description": "As an LCA maintainer, I want run_in_session to fail loud on unknown session ids instead of silently executing under a different directory, so per-run workspace binding has a single source of truth.",
+      "id": "RA-037",
+      "notes": "Source: Round 10 friction walk A (Worth exploring). Deletion test: removing the fallback concentrates complexity on callers (must create_session first) and kills the silent-wrong-directory failure mode. Overlap: none; adjacent to f21cd0af2's session-root fix.",
+      "passes": true,
+      "priority": 5,
+      "title": "Fail loud on unknown session_id in run_in_session instead of silently rebuilding under the boot root"
+    },
+    {
+      "acceptanceCriteria": [
+        "TraceInspector gains a read-only accessor (e.g. events_for(run_id) or an events property); _helpers._inspector_events is deleted",
+        "lca/plugins/tools/diagnostics/diff/context.py and lca/plugins/tools/diagnostics/run/diff.py use the accessor",
+        "Repo-wide grep for _inspector_events returns zero hits",
+        "tests/scenario/coding/test_explain_failure_ledger.py and related tests pass; ruff check passes on touched files"
+      ],
+      "branchName": "raphy/arch-20261008-1206",
+      "description": "As an LCA maintainer, I want the diff adapters to read trace events through an explicit TraceInspector accessor instead of getattr-piercing its private _events, so inspector internals can be refactored without silently breaking the diff tools.",
+      "id": "RA-038",
+      "notes": "Source: Round 10 friction walk B (Worth exploring). Deletion test: after adding the accessor, deleting the helper only requires call-site edits -> the seam is real. Overlap: none with RA-001..RA-032.",
+      "passes": true,
+      "priority": 6,
+      "title": "Give TraceInspector an explicit accessor; delete the _inspector_events private-attribute backdoor"
+    },
+    {
+      "acceptanceCriteria": [
+        "PrivilegeDoctor and TrustDoctor run through DoctorFacade (include switches in the existing style; default behavior consistent with the other passes)",
+        "ResourceDoctor is either wired to a ResourceRegistry source or explicitly marked 'not wired in CI' with the reason in the facade docstring",
+        "doctor-related tests pass; ruff check passes on touched files"
+      ],
+      "branchName": "raphy/arch-20261008-1206",
+      "description": "As an LCA maintainer, I want the doctor facade's SINGLE-entry-point promise to be true for the privilege/trust/resource passes, so doctor profile --ci actually reports the DOC-PRIV-*/DOC-TRUST-*/DOC-RES-* findings it claims to.",
+      "id": "RA-039",
+      "notes": "Source: Round 10 friction walk B (Worth exploring; resource part leans Speculative pending a registry source). Deletion test: here the test measures the promise, not the code - 'delete the SINGLE-entry claim' is the honest alternative if wiring is rejected. Overlap: none with RA-001..RA-032.",
+      "passes": true,
+      "priority": 7,
+      "title": "Wire the unwired doctor passes (privilege/trust/resource) into DoctorFacade"
+    },
+    {
+      "acceptanceCriteria": [
+        "A new test pins that host session-root paths in shell output are projected back to the guest view on the model-visible surface (or no longer appear)",
+        "The display_paths free-text exemption is preserved (no rewriting of file contents)",
+        "Relevant tests (incl. tests/cognition/body/test_observation_surface_display_paths.py) pass; ruff check passes on touched files"
+      ],
+      "branchName": "raphy/arch-20261008-1206",
+      "description": "As an LCA maintainer, I want host absolute paths injected into command text by _rewrite_command to be reverse-projected at the adapter exit, so the model does not see host session roots that the display projection deliberately exempts.",
+      "id": "RA-040",
+      "notes": "Source: Round 10 friction walk A (Worth exploring). Deletion test: removing the free-text exemption would concentrate complexity but risk corrupting file contents -> the exemption is deliberate; the fix belongs on the adapter exit, not the display side. Overlap: none (duplication stories did not touch this seam).",
+      "passes": true,
+      "priority": 8,
+      "title": "Reverse-project host paths injected by _rewrite_command at the sandbox adapter exit"
+    },
+    {
+      "acceptanceCriteria": [
+        "StrategyContext gains a formal optional field (e.g. outer_ports); the interpreter fills it and subgraph_run reads it",
+        "node_config no longer carries the '_port_registry' string key",
+        "Graph tests (incl. tests/unit/framework/graph/) pass; ruff check passes on touched files"
+      ],
+      "branchName": "raphy/arch-20261008-1206",
+      "description": "As an LCA maintainer, I want the kernel-to-strategy port handoff to go through a formal StrategyContext field instead of the _port_registry string backdoor, so the frozen seam means what it says.",
+      "id": "RA-041",
+      "notes": "Source: Round 10 friction walk C (Speculative). Deletion test: deleting the injection breaks subgraph kernel-seeded ports -> the mechanism is load-bearing; the string backdoor itself is the smell. Overlap: none.",
+      "passes": true,
+      "priority": 9,
+      "title": "Move the _port_registry kernel-private key into a formal StrategyContext field"
     }
   ]
 }

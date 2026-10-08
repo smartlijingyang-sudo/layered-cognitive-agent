@@ -48,8 +48,10 @@ class MockEffectGateway:
         *,
         state: Any = None,
         decision: Any = None,
+        observation: Any = None,
+        reflection: Any = None,
     ) -> dict[str, Any]:
-        del policy, state, decision
+        del policy, state, decision, observation, reflection
         self.dispatched_envelopes.append(envelope)
         return {"status": "persisted", "idempotency_key": envelope.idempotency_key}
 
@@ -310,7 +312,7 @@ async def test_remember_write_c10_narrow_door() -> None:
     envelope = out_admitted.port_values["envelope"]
     assert envelope is not None
     assert envelope.provider == "effect.memory"
-    assert envelope.metadata["candidate"] == candidate
+    assert envelope.metadata["candidate_ref"] == candidate.candidate_id  # RA-033: refs, not live objects
     assert len(gateway.dispatched_envelopes) == 1
     receipt = out_admitted.port_values["memory_receipt"]
     assert receipt == {"status": "persisted", "idempotency_key": envelope.idempotency_key}

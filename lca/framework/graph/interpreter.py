@@ -226,16 +226,14 @@ class PlanInterpreter:
                 node_config={
                     "agent_state": outer_state,
                     "results_by_phase": results_so_far,
-                    # ADR-0241 §4: kernel exposes the outer plan's
-                    # port registry to subgraph delegates via
-                    # ``node_config`` so nested subgraph strategies can
-                    # seed the inner ``PortRegistry`` with the full
-                    # outer port set (kernel-seeded ``tools`` /
-                    # ``bindings`` included). Subgraph strategies read
-                    # this key — non-subgraph strategies ignore it.
-                    "_port_registry": ports,
                     **dict(node.config),
                 },
+                # ADR-0241 §4 (RA-041): the kernel hands the outer plan's
+                # full port registry to subgraph delegates through this
+                # formal field (was the ``node_config["_port_registry"]``
+                # string backdoor). Subgraph strategies read it;
+                # non-subgraph strategies ignore it.
+                outer_ports=ports,
                 subgraph_ref=node.subgraph_ref,
                 chain=(),
                 inner_io_schema=node.inner_io_schema,

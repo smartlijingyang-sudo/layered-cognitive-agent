@@ -12,6 +12,7 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import os
+import re
 import shlex
 import tempfile
 from pathlib import Path
@@ -79,6 +80,16 @@ def _unlink_blocking(path: Path) -> None:
         path.unlink(missing_ok=True)
 
 
+class UnknownSandboxSessionError(ValueError):
+    """run_in_session got a session_id that create_session never issued (RA-037).
+
+    Fail-loud instead of silently rebuilding a directory under the boot-time
+    host root: an unknown id is always a caller bug (stale or destroyed
+    session), and executing code under the wrong directory is the worst
+    possible outcome. Callers must go through create_session() first.
+    """
+
+
 class LocalSandboxAdapter(Sandbox):
     """Host-backed Sandbox: real filesystem + subprocess shell/code exec."""
 
@@ -133,6 +144,27 @@ class LocalSandboxAdapter(Sandbox):
             return command
         return command.replace(mount, root)
 
+    def _project_host_to_guest(self, text: str, root: str) -> str:
+        """Project host session-root paths in TEXT back to the guest view.
+
+        Inverse of :meth:`_rewrite_command`: the rewrite maps the guest
+        mount (``/mnt/data``) onto the host session root inside the command
+        text, so the shell's stdout/stderr come back containing host
+        absolute paths. The display projection deliberately never rewrites
+        free text (pinned by ``test_observation_surface_display_paths``),
+        so the adapter exit is the one place that converts them back —
+        the model only ever sees the guest view.
+
+        The match is boundary-aware: ``root`` is only replaced when NOT
+        followed by a path-continuation character, so sibling paths that
+        merely share the prefix (``<root>2/...``) are left alone. Uses the
+        same ``root``/``mount`` constants as the forward rewrite.
+        """
+        mount = self._layout.root.rstrip("/")
+        if not text or root == mount:
+            return text
+        return re.sub(re.escape(root) + r"(?![A-Za-z0-9_.\-])", mount, text)
+
     async def _exec_shell(
         self,
         command: str,
@@ -171,8 +203,12 @@ class LocalSandboxAdapter(Sandbox):
             emitter.emit_stderr(err + "\n")
             return SandboxResult(success=False, exit_code=1, error=err, stderr=err + "\n")
 
-        stdout = (stdout_b or b"").decode("utf-8", errors="replace")
-        stderr = (stderr_b or b"").decode("utf-8", errors="replace")
+        stdout = self._project_host_to_guest(
+            (stdout_b or b"").decode("utf-8", errors="replace"), work
+        )
+        stderr = self._project_host_to_guest(
+            (stderr_b or b"").decode("utf-8", errors="replace"), work
+        )
         code = int(proc.returncode or 0)
         if stdout:
             emitter.emit_stdout(stdout)
@@ -273,10 +309,20 @@ class LocalSandboxAdapter(Sandbox):
         timeout_s: int = DEFAULT_SANDBOX_TIMEOUT_S,
         **kwargs: Any,
     ) -> SandboxResult:
+        """Execute code inside a session created by create_session().
+
+        RA-037: an unknown non-empty session_id raises
+        UnknownSandboxSessionError instead of silently rebuilding a
+        directory under the boot-time host root. The empty session_id ""
+        is the explicit stateless fallback: code runs under the boot-time
+        host root with no per-session isolation (degraded — callers that
+        need isolation must create_session() first).
+        """
         if session_id and session_id not in self._sessions:
-            path = Path(self._host_root) / ".sessions" / session_id
-            self._ensure_tree(path)
-            self._sessions[session_id] = path
+            raise UnknownSandboxSessionError(
+                f"local sandbox: unknown session_id {session_id!r} — "
+                "call create_session() first; refusing to rebuild under the boot root"
+            )
         return await self._run_code(
             code, language=language, timeout_s=timeout_s, session_id=session_id, **kwargs
         )
@@ -328,4 +374,4 @@ class LocalSandboxAdapter(Sandbox):
             _unlink_blocking(Path(code_path))
 
 
-__all__ = ["LocalSandboxAdapter", "default_local_root"]
+__all__ = ["LocalSandboxAdapter", "UnknownSandboxSessionError", "default_local_root"]
