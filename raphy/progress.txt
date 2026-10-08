@@ -1935,3 +1935,25 @@
 - Tests: 新 pin 文件 32 passed；tests/infrastructure/skills +
   test_skill_overlay.py + test_assistant_skill_overlay_invariants.py +
   test_materialize_link_seam.py 共 131 passed。ruff 全过。
+
+## 2026-10-09 05:55 CST - RA-077
+
+- Done: importer 的字节手术（_ensure_references_field）删除；install_package
+  新增显式具名参数 assume_empty_references（protocol 同步），缺 references 时
+  由安装方声明空列表并记录在 manifest.references_assumed_empty（SkillPackage
+  新增同名字段，get() 回读）。_import_single_markdown 传参代替改字节，
+  pulled bytes 保持原样；本地安装路径缺字段仍 fail-loud。
+- Direction chosen: 评估二选一中的"显式具名参数并记录"（非 fail-loud）——
+  裸 SKILL.md 的 URL 导入是真实用例（import_skill/source_url），直接 fail-loud
+  会误伤；contract 的 fail-loud 语义保留给本地安装路径。
+- Learnings:
+  - 记录位置选 manifest（安装收据）+ SkillPackage 字段回读，而不是只记参数：
+    "recorded" 要可审计，get() 之后还能查到哪批包是安装方代声明的。
+  - content_hash 现在按原始字节算 —— 手术时代哈希的是改写后的文本，完整性语义更正。
+  - 现有测试 test_http_importer_references.py 有 3 个用例是按"注入"语义写的，
+    按新语义重写（字节不动断言 + flag 断言 + manifest 记录断言 + 本地仍 fail-loud）。
+- Pre-existing red（与本 story 无关，基线 3f6b3d6ea 上同样红，已 bisect 确认）：
+  tests/infrastructure/test_skill_store_resolver.py::TestHomeSkillActivationViaMergedStore::test_activate_skill_resolves_home_skill
+ （merged store 解析 global-skill 返回 None）。未动，留给相关 lane。
+- Tests: test_http_importer_references.py 5 passed；tests/infrastructure/skills +
+  overlay/invariants/materialize_link/merged_store 共 135 passed。ruff 全过。

@@ -106,6 +106,7 @@ class DiskSkillPackageStore(SkillPackageInstaller, SkillPackageStore):
             content_hash=str(meta.get("content_hash") or ""),
             version=str(meta.get("version") or ""),
             references=references,
+            references_assumed_empty=bool(meta.get("references_assumed_empty", False)),
             retired=bool(meta.get("retired", False)),
             usage_count=int(meta.get("usage_count", 0) or 0),
         )
@@ -153,6 +154,7 @@ class DiskSkillPackageStore(SkillPackageInstaller, SkillPackageStore):
         resource_files: dict[str, bytes],
         source_url: str,
         version: str = "",
+        assume_empty_references: bool = False,
     ) -> SkillPackage:
         sid = sanitize_skill_id(skill_id)
         if len(skill_md_text) > SKILL_MAX_CONTENT_CHARS:
@@ -161,13 +163,19 @@ class DiskSkillPackageStore(SkillPackageInstaller, SkillPackageStore):
         meta_front, body = split_frontmatter(skill_md_text)
         # ADR-0214 §7: SKILL.md frontmatter 必须声明 references(可空)。
         # 单次解析:references 进 dict 即为 list;缺失或非 list 才 fail-loud。
+        # RA-077: 缺字段默认 fail-loud；只有调用方显式 assume_empty_references
+        #（如 URL 裸 SKILL.md 导入）才由安装方声明空列表，并记录在 manifest
+        # 的 references_assumed_empty —— 不再允许调用方做字节手术瞒过合约。
         raw_refs = meta_front.get("references")
         declared_refs = raw_refs if isinstance(raw_refs, list) else []
+        references_assumed_empty = False
         if "references" not in meta_front and not declared_refs:
-            raise SkillContractError(
-                f"SKILL.md frontmatter 缺 'references' 字段: {sid!r}"
-                " — 在 frontmatter 里加 'references: []' 声明打包清单。"
-            )
+            if not assume_empty_references:
+                raise SkillContractError(
+                    f"SKILL.md frontmatter 缺 'references' 字段: {sid!r}"
+                    " — 在 frontmatter 里加 'references: []' 声明打包清单。"
+                )
+            references_assumed_empty = True
         name = skill_title(meta_front, sid)
         _description = meta_front.get("description", "")
         summary = _description.strip() if isinstance(_description, str) else ""
@@ -225,6 +233,7 @@ class DiskSkillPackageStore(SkillPackageInstaller, SkillPackageStore):
             "version": resolved_version,
             "resource_paths": normalized_resources,
             "references": list(declared_refs),
+            "references_assumed_empty": references_assumed_empty,
             "imported_at": datetime.now(tz=UTC).isoformat(),
             "retired": False,
             "usage_count": 0,
@@ -243,6 +252,7 @@ class DiskSkillPackageStore(SkillPackageInstaller, SkillPackageStore):
             content_hash=digest,
             version=resolved_version,
             references=tuple(declared_refs),
+            references_assumed_empty=references_assumed_empty,
         )
 
     def materialize_link(self, skill_id: str, dest: Path) -> Path:

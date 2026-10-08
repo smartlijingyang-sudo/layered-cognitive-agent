@@ -1108,8 +1108,8 @@
       "branchName": "raphy/arch-20261009-0107",
       "description": "As an LCA maintainer, I want both install paths to honor the same 'missing references fails' semantic, so pulled content isn't silently rewritten to pass the contract. Evidence (Round 13, skills zone): ADR-0214 §7 requires frontmatter `references`; missing -> install_package fail-loud. But lca/infrastructure/skills/http/importer.py::_ensure_references_field (L33-48) silently splices 'references: []' into pulled bytes ('avoid URL installs being rejected by the contract'). 0c32cc411 just made `references` a hard requirement in the skill-creator guide (because run_cf67920f2e39 burned two installs guessing) — 'missing field should fail explicitly' is the established semantic, yet the importer papers over it on the network path. Content-integrity decisions hide in string surgery; split_frontmatter's pure tests can't cover it.",
       "id": "RA-077",
-      "notes": "Source: Round 13 friction walk (Worth exploring; call-site semantic split).",
-      "passes": false,
+      "notes": "Source: Round 13 friction walk (Worth exploring; call-site semantic split). | Implemented 2026-10-09: chose explicit-recorded-parameter direction — install_package gains assume_empty_references kwarg (protocol + manifest references_assumed_empty + SkillPackage field, get() round-trips); _import_single_markdown passes the flag instead of byte surgery (_ensure_references_field deleted); local path still fail-loud. Pins in tests/infrastructure/skills/test_http_importer_references.py.",
+      "passes": true,
       "priority": 3,
       "title": "Make the skill importer fail loud on missing references instead of byte-surgery"
     },
