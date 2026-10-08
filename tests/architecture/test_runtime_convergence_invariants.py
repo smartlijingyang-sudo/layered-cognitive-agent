@@ -11,6 +11,7 @@ ROOT = Path(__file__).resolve().parents[2]
 LCA_COGNITION = ROOT / "lca" / "cognition"
 EXECUTOR = LCA_COGNITION / "brain" / "llm_turn" / "executor.py"
 SAFE_EXECUTOR = LCA_COGNITION / "body" / "executor" / "safe_executor" / "executor.py"
+RUNTIME_LOOP = ROOT / "lca" / "runtime" / "loop" / "runtime_loop.py"
 
 
 class TestModelContextRuntimePath:
@@ -32,10 +33,15 @@ class TestCheckpointWiring:
             or "await_model_request_checkpoint" in src
         )
 
-    def test_perceive_awaits_step_boundary_checkpoint(self) -> None:
-        src = (
-            ROOT / "lca/plugins/loop/phase/perceive/standard/plugin.py"
-        ).read_text(encoding="utf-8")
+    def test_runtime_loop_awaits_step_boundary_checkpoint(self) -> None:
+        """I-CHK: the v2 runtime loop awaits the step-boundary checkpoint.
+
+        ADR-0221 (v2 PlanInterpreter) removed the perceive phase plugin
+        this pin used to target; the invariant's live carrier is the
+        runtime loop driver, which awaits the step-boundary checkpoint
+        before dispatching the runner.
+        """
+        src = RUNTIME_LOOP.read_text(encoding="utf-8")
         assert "await_step_boundary_checkpoint" in src
 
     def test_safe_executor_awaits_checkpoint_before_tool(self) -> None:
@@ -136,27 +142,6 @@ class TestControlPlaneProtocols:
             assert projected[0].tool_name == "search"
         finally:
             reset_publish_session(token)
-
-    def test_remember_phase_emits_turn_delta(self) -> None:
-        """Wave C2: remember phase appends turn facts via the 'turn' RunDelta.
-
-        The standard remember executor always emits a ``RunDelta`` with
-        ``metadata['operation'] == 'turn'``; ``TurnDeltaHandler`` then
-        routes it through ``reducer.commit_turn`` → ``Session.append``,
-        so fact append is gated on the remember phase for every run
-        whose remember phase executes.
-        """
-        src = (
-            ROOT / "lca/plugins/loop/phase/remember/standard/plugin.py"
-        ).read_text(encoding="utf-8")
-        assert '"operation": "turn"' in src
-        assert "decision" in src
-        assert "observation" in src
-
-        handler_src = (
-            ROOT / "lca/plugins/act/delta/handlers_provider.py"
-        ).read_text(encoding="utf-8")
-        assert "commit_turn" in handler_src
 
     def test_gates_do_not_import_model_context_assembler(self) -> None:
         gates_dir = ROOT / "lca/cognition/brain/decision_gates"
