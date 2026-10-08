@@ -26,7 +26,7 @@ from lca.plugins.loop.driver.plugin import (
     RunLoopDriverRegistry as RunLoopDriverRegistry,
 )
 from lca.plugins.loop.driver.plugin import (
-    _UnknownExecutionTargetError as _UnknownExecutionTargetError,
+    UnknownExecutionTargetError as UnknownExecutionTargetError,
 )
 from lca.plugins.transport.webserver.carrier.runs.lifecycle.runnable_assembly import (
     CognitiveRunnableAssembler,

@@ -90,6 +90,12 @@ class _UnknownExecutionTargetError(KeyError):
         )
 
 
+# Public alias (RA-048): the missing-target contract is caught by name across
+# the carrier (lifecycle / loop_drivers / intent). New code imports the public
+# name; the underscore class remains the definition for backward compatibility.
+UnknownExecutionTargetError = _UnknownExecutionTargetError
+
+
 def _looks_like_driver(obj: object) -> bool:
     """Heuristic: a driver exposes ``async execute(...)``."""
     return callable(getattr(obj, "execute", None))

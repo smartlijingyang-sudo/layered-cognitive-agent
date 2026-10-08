@@ -1590,3 +1590,62 @@
 ---
 
 **本轮 6 个 stories 全部完成（RA-042~047），无 open。**
+
+
+## 2026-10-08 22:20 CST - Round 12 assess（branch raphy/arch-20261008-2205）
+
+- 上下文：上一轮 raphy/arch-20261008-1505 已于 21:21 被正常合入 main
+  （merge 0ab9d67cd），分支已删，无残留；47 stories 全 done。
+- friction walk 3 区（sandbox 端到端 / effect dispatch / carrier run lifecycle
+  端到端），dispatch 区刚被 RA-033/042/043 深耕过、无新 friction。
+- 运行时验证复跑（worktree @0ab9d67cd，MockLLMAdapter）：basic completed；
+  one-shot tool call completed 且 marker 文件写出（RA-042 回归未复发）；
+  无限循环 mock（max_steps=3）返回 failed Result、无异常逃逸（RA-023 有效）；
+  同一 agent 双 run completed。无新 P0/P1。
+- 产出 3 stories：RA-048（Strong：收敛 RunLifecycleCoordinator 三处失败观测
+  仪式为一个 _observe_failure seam，附 _UnknownExecutionTargetError 公开化）、
+  RA-049（Worth exploring：resume 的 capability/tool/defer 手工 bind-reset
+  收进 contextmanager）、RA-050（Worth exploring：删 LocalSandboxAdapter 死
+  wrapper _rewrite_command/_project_host_to_guest，测试迁到 SandboxPaths seam）。
+- diversity quota 满足：RA-048/049 是 leaky-seam friction 发现，RA-050 是
+  deletion-test 发现，无纯机械 duplication。
+
+
+## 2026-10-08 22:32 CST - RA-050 done
+
+- 删 `LocalSandboxAdapter._rewrite_command` / `_project_host_to_guest`
+  （38 行）：生产 `_exec_shell` 本就内联构造 SandboxPaths，wrapper 只有测试
+  在调，且丢 `mounted` 标志——纯净删除，零逻辑转移。
+- 测试 1:1 迁移：集成测试走 `run_terminal` 本就 pin 生产 seam（不动）；
+  直接 wrapper 单测改名后直调 `SandboxPaths.for_local(...).present_text(...)`
+  （旧 body，mounted=False 默认，语义一致）；`_rewrite_command` 的 seam 覆盖
+  本就在 test_sandbox_paths.py，无覆盖丢失。
+- learnings：deletion-test 类 story 的验收关键是"引用清零证明"
+  （`git grep` 私有名字零残留 + `hasattr` False），比跑测试更能定心。
+- 测试：tests/infrastructure/sandbox/ 76 passed；ruff clean。
+- 实现与评估一致，无差异。
+
+## 2026-10-08 RA-048 done（recover：上一轮中断残留，本轮验证收尾）
+- 内容：RunLifecycleCoordinator 新增 `_observe_failure(session, exc, *, boundary, hub, user_message, emit_finally)` seam，
+  收敛 execute() 两个 except 块 + resume() 的 except 块的三段四步 ritual；
+  顺带把 `_UnknownExecutionTargetError` 的跨模块私有导入收敛为公开别名
+  `UnknownExecutionTargetError`（定义仍在 lca/plugins/loop/driver/plugin.py，RA-044 模式）。
+- learnings：中断残留的 diff 只要测试全绿 + ruff clean 就可直接收尾 commit，
+  不必重做；seam 的"bit-identical"验收用 monkeypatch 桩掉四个 emit
+  断言调用序列，比跑全量 lifecycle 更精准。
+- 测试：tests/transport/test_lifecycle_observe_failure.py 2 passed；
+  tests/plugins/assistant/ 42 passed；ruff clean。
+- 实现与评估一致，无差异（评估要求"helper 是 sync 的"，确认调用点全 sync，无 await）。
+
+## 2026-10-08 RA-049 done
+- 内容：新增模块级 `@contextmanager bind_resume_capabilities(session, bindings)`，
+  收敛 resume() 里的 capability_bindings / tools_service / defer_session 三元组
+  手动 set/reset ritual；resume() 改用单一 `with (...)` 合并 CM 与原有
+  ambit/identity/workspace/plane 四个 scope（ruff 要求合并嵌套 with）。
+- learnings：CM 里的 deferred import（函数内 import）是刻意为之，
+  避免 lifecycle<->capability_bindings 循环导入；None-guards 原样保留
+  （capability None 跳过三元组，tools None 跳过 tools+defer）；
+  ADR-0248 的 gated vocal mode -> agent namespace eager 镜像原样搬进 CM。
+- 测试：tests/transport/test_lifecycle_observe_failure.py 2 passed（回归）；
+  ruff clean。
+- 实现与评估一致，无差异。
