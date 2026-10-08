@@ -1,6 +1,6 @@
 """Behavioral tests for the DoctorFacade orchestrator (PR-0199-P2-07).
 
-Per ADR-0199 §5.1 + §5.3 DoctorFacade composes the four P2 doctor
+Per ADR-0199 §5.1 + §5.3 DoctorFacade composes the six wired doctor
 passes into a single ``doctor_profile(path) -> DoctorReport`` entry
 point. These tests assert: aggregation, ordering, opt-in/out toggling,
 skip-on-compile-failure semantics, deterministic subject, no K3 boot,
@@ -78,6 +78,27 @@ class _RecordingStub:
         return self.report
 
 
+@dataclass
+class _RecordingContractsStub:
+    """Stub pass with the contracts-style run signature (privilege/trust).
+
+    TrustDoctor.run takes a keyword-only external_kind_by_plugin, so the
+    stub accepts (and records) kwargs.
+    """
+
+    report: DoctorReport
+    name: str
+    calls: list[Any] = None  # type: ignore[assignment]
+
+    def __post_init__(self) -> None:
+        if self.calls is None:
+            self.calls = []
+
+    def run(self, contracts: Any, **kwargs: Any) -> DoctorReport:
+        self.calls.append((contracts, kwargs))
+        return self.report
+
+
 # ─────────── construction tests ───────────
 
 
@@ -91,6 +112,8 @@ class TestConstruction:
         assert facade._plugin_shape is not None
         assert facade._capability_cardinality is not None
         assert facade._phase_graph is not None
+        assert facade._privilege is not None
+        assert facade._trust is not None
 
     def test_facade_accepts_injected_passes(self) -> None:
         compile_stub = _RecordingStub(
@@ -109,16 +132,28 @@ class TestConstruction:
             report=_ok_report("phase_graph", []),
             name="phase_graph",
         )
+        priv_stub = _RecordingContractsStub(
+            report=_ok_report("privilege", []),
+            name="privilege",
+        )
+        trust_stub = _RecordingContractsStub(
+            report=_ok_report("trust", []),
+            name="trust",
+        )
         facade = DoctorFacade(
             compile_dry_run=compile_stub,  # type: ignore[arg-type]
             plugin_shape=shape_stub,  # type: ignore[arg-type]
             capability_cardinality=cap_stub,  # type: ignore[arg-type]
             phase_graph=pg_stub,  # type: ignore[arg-type]
+            privilege=priv_stub,  # type: ignore[arg-type]
+            trust=trust_stub,  # type: ignore[arg-type]
         )
         assert facade._compile_dry_run is compile_stub
         assert facade._plugin_shape is shape_stub
         assert facade._capability_cardinality is cap_stub
         assert facade._phase_graph is pg_stub
+        assert facade._privilege is priv_stub
+        assert facade._trust is trust_stub
 
 
 # ─────────── aggregation tests ───────────
@@ -158,11 +193,27 @@ class TestAggregation:
             ),
             name="phase_graph",
         )
+        priv_stub = _RecordingContractsStub(
+            report=_ok_report(
+                "privilege",
+                [_finding("DOC-PRIV-001", "error", "effect without privilege")],
+            ),
+            name="privilege",
+        )
+        trust_stub = _RecordingContractsStub(
+            report=_ok_report(
+                "trust",
+                [_finding("DOC-TRUST-001", "error", "kind conflict")],
+            ),
+            name="trust",
+        )
         facade = DoctorFacade(
             compile_dry_run=compile_stub,  # type: ignore[arg-type]
             plugin_shape=shape_stub,  # type: ignore[arg-type]
             capability_cardinality=cap_stub,  # type: ignore[arg-type]
             phase_graph=pg_stub,  # type: ignore[arg-type]
+            privilege=priv_stub,  # type: ignore[arg-type]
+            trust=trust_stub,  # type: ignore[arg-type]
         )
         # Stub the resolution helpers to silence the runtime import and
         # to supply deterministic inputs to capability/phase_graph.
@@ -186,6 +237,8 @@ class TestAggregation:
             "DOC-PS-001",
             "DOC-CAP-001",
             "DOC-PG-001",
+            "DOC-PRIV-001",
+            "DOC-TRUST-001",
         ]
 
     def test_doctor_profile_subject_is_profile_path(self) -> None:
@@ -330,6 +383,14 @@ class TestOrder:
         shape_stub = _make_stub("plugin_shape")
         cap_stub = _make_stub("capability")
         pg_stub = _make_stub("phase_graph")
+        priv_stub = _RecordingContractsStub(
+            report=_ok_report("privilege", []),
+            name="privilege",
+        )
+        trust_stub = _RecordingContractsStub(
+            report=_ok_report("trust", []),
+            name="trust",
+        )
 
         # Wrap each run() so we observe the call order without changing
         # the returned report.
@@ -337,6 +398,8 @@ class TestOrder:
         original_shape = shape_stub.run
         original_cap = cap_stub.run
         original_pg = pg_stub.run
+        original_priv = priv_stub.run
+        original_trust = trust_stub.run
 
         def _wrap(name: str, original: Any) -> Any:
             def _wrapped(profile_path: Any) -> DoctorReport:
@@ -345,16 +408,27 @@ class TestOrder:
 
             return _wrapped
 
+        def _wrap_contracts(name: str, original: Any) -> Any:
+            def _wrapped(contracts: Any, **kwargs: Any) -> DoctorReport:
+                order.append(name)
+                return original(contracts, **kwargs)
+
+            return _wrapped
+
         compile_stub.run = _wrap("compile", original_compile)  # type: ignore[method-assign]
         shape_stub.run = _wrap("plugin_shape", original_shape)  # type: ignore[method-assign]
         cap_stub.run = _wrap("capability", original_cap)  # type: ignore[method-assign]
         pg_stub.run = _wrap("phase_graph", original_pg)  # type: ignore[method-assign]
+        priv_stub.run = _wrap_contracts("privilege", original_priv)  # type: ignore[method-assign]
+        trust_stub.run = _wrap_contracts("trust", original_trust)  # type: ignore[method-assign]
 
         facade = DoctorFacade(
             compile_dry_run=compile_stub,  # type: ignore[arg-type]
             plugin_shape=shape_stub,  # type: ignore[arg-type]
             capability_cardinality=cap_stub,  # type: ignore[arg-type]
             phase_graph=pg_stub,  # type: ignore[arg-type]
+            privilege=priv_stub,  # type: ignore[arg-type]
+            trust=trust_stub,  # type: ignore[arg-type]
         )
         with (
             patch.object(facade, "_optional_resolve_contracts", return_value=["contracts"]),
@@ -362,7 +436,14 @@ class TestOrder:
         ):
             facade.doctor_profile("/fake/profile.yaml")
 
-        assert order == ["compile", "plugin_shape", "capability", "phase_graph"]
+        assert order == [
+            "compile",
+            "plugin_shape",
+            "capability",
+            "phase_graph",
+            "privilege",
+            "trust",
+        ]
 
 
 # ─────────── opt-out tests ───────────
@@ -433,6 +514,14 @@ class TestOptOut:
             plugin_shape=shape_stub,  # type: ignore[arg-type]
             capability_cardinality=cap_stub,  # type: ignore[arg-type]
             phase_graph=pg_stub,  # type: ignore[arg-type]
+            privilege=_RecordingContractsStub(  # type: ignore[arg-type]
+                report=_ok_report("privilege", []),
+                name="privilege",
+            ),
+            trust=_RecordingContractsStub(  # type: ignore[arg-type]
+                report=_ok_report("trust", []),
+                name="trust",
+            ),
         )
         with (
             patch.object(facade, "_optional_resolve_contracts", return_value=["contracts"]),
@@ -470,6 +559,14 @@ class TestOptOut:
             plugin_shape=shape_stub,  # type: ignore[arg-type]
             capability_cardinality=cap_stub,  # type: ignore[arg-type]
             phase_graph=pg_stub,  # type: ignore[arg-type]
+            privilege=_RecordingContractsStub(  # type: ignore[arg-type]
+                report=_ok_report("privilege", []),
+                name="privilege",
+            ),
+            trust=_RecordingContractsStub(  # type: ignore[arg-type]
+                report=_ok_report("trust", []),
+                name="trust",
+            ),
         )
         with (
             patch.object(facade, "_optional_resolve_contracts", return_value=["contracts"]),

@@ -1365,3 +1365,31 @@
     并回原 story commit 的干净手法（注意 `--autosquash` 必须配 `-i`，
     光 `--autosquash` 不生效）；rebase 前先 stash 未提交改动。
 ---
+
+## 2026-10-08 13:16 CST - RA-039
+- `DoctorFacade` 接入 PrivilegeDoctor + TrustDoctor（include_privilege /
+  include_trust 开关，默认 True，与现有风格一致）；pass 顺序 5/6 写进模块
+  docstring（C8 确定性）。
+- 输入复用 facade 已有的 `_optional_resolve_contracts`（与 capability 同源）；
+  TrustDoctor 的 `external_kind_by_plugin` 经构造函数注入（operator override
+  map），缺省 `{}`——缺席插件按 TrustDoctor 契约默认 inprocess，仍是有效审计。
+- ResourceDoctor 明确不接入：doctor 时刻无 live ResourceRegistry 与 harness
+  provider 名单来源（I-HPC-7 只读约束），空 provider 集接入会每轮误报
+  DOC-RES-* orphans；理由写进 facade 模块 docstring（AC 允许的诚实选项），
+  并注明未来接线路径（contracts.resources 建 registry + include_resource 开关）。
+- CLI `doctor profile` 加 `--skip-privilege` / `--skip-trust`。
+- 测试：test_facade.py 新增 `_RecordingContractsStub`（trust 的 kwarg 签名）、
+  construction/aggregation/order 断言扩展到 6 pass；两个 opt-out 测试注入
+  新 stub；跑 doctor 目录 223 passed、architecture golden/CI gate + CLI
+  73 passed（1 skipped，baseline update opt-in）；ruff clean。
+- 文件：lca/harness/diagnostics/doctor/facade.py、
+  lca/infrastructure/cli/commands/doctor/profile.py、
+  tests/harness/diagnostics/doctor/test_facade.py
+- **Learnings for future iterations:**
+  - 给 facade 加 pass 时，旧测试的"全 stub 注入"假设会碎：凡是 patch
+    `_optional_resolve_*` 返回假数据的测试，必须给新 pass 也注入 stub，
+    否则真实 pass 会在假数据上 AttributeError。改 facade 先跑
+    tests/harness/diagnostics/doctor/ 全目录。
+  - 传脚本给 ssh252 时文件名别写错（本轮曾把 edit3 传成 edit5 的内容，
+    TestOrder 改动漏执行——靠 git diff 逐 hunk 核对才发现）。
+---

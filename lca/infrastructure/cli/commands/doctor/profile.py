@@ -66,6 +66,16 @@ def _doctor_profile(
         "--skip-phase-graph",
         help="Disable the DOC-PG-* pass.",
     ),
+    skip_privilege: bool = typer.Option(
+        False,
+        "--skip-privilege",
+        help="Disable the DOC-PRIV-* pass.",
+    ),
+    skip_trust: bool = typer.Option(
+        False,
+        "--skip-trust",
+        help="Disable the DOC-TRUST-* pass.",
+    ),
 ) -> None:
     """Run the Doctor facade on a profile and print the report."""
     path = Path(profile_path)
@@ -79,6 +89,8 @@ def _doctor_profile(
         include_plugin_shape=not skip_plugin_shape,
         include_capability_cardinality=not skip_capability,
         include_phase_graph=not skip_phase_graph,
+        include_privilege=not skip_privilege,
+        include_trust=not skip_trust,
     )
 
     if json_output:
