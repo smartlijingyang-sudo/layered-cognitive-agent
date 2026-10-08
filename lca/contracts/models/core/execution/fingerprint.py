@@ -77,7 +77,7 @@ def fingerprint_payload(payload: object) -> str:
 
 def normalize_for_fingerprint(value: object) -> object | None:
     """Return a conservative JSON-safe canonical value or ``None`` when unknown."""
-    if value is None or isinstance(value, (bool, int, float, str)):
+    if value is None or isinstance(value, (int, float, str)):
         return value
     if isinstance(value, Mapping):
         normalized_mapping: dict[str, object] = {}

@@ -188,7 +188,7 @@ def _document_to_dict(doc: JournalDocument) -> dict[str, Any]:
             return {k: _to_jsonable(v) for k, v in obj.items()}
         if isinstance(obj, (list, tuple)):
             return [_to_jsonable(v) for v in obj]
-        if isinstance(obj, (str, int, float, bool, type(None))):
+        if isinstance(obj, (str, int, float, type(None))):
             return obj
         return repr(obj)
 

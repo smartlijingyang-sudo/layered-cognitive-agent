@@ -32,7 +32,7 @@ def _json_safe(value: object) -> object:
         return {str(k): _json_safe(v) for k, v in value.items()}
     if isinstance(value, (list, tuple)):
         return [_json_safe(v) for v in value]
-    if isinstance(value, (str, int, float, bool)) or value is None:
+    if isinstance(value, (str, int, float)) or value is None:
         return value
     return str(value)
 

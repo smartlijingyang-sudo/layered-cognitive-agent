@@ -142,7 +142,7 @@ class SqliteIdempotencyStore(IdempotencyStore):
 
 def _encode_receipt(value: object) -> object:
     """Encode receipt values using a closed, JSON-safe representation."""
-    if value is None or isinstance(value, (str, int, float, bool)):
+    if value is None or isinstance(value, (str, int, float)):
         return value
     if isinstance(value, Enum):
         return {"__lca_type__": "enum", "value": value.value}
