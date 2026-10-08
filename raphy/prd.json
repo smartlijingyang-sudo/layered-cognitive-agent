@@ -1053,7 +1053,7 @@
       "description": "As an LCA maintainer, I want the plugin_shape doctor to stop second-guessing the script's semantics, so new kinds can't silently degrade. Evidence (Round 13, doctor zone): plugin_shape.py docstring claims 'Doctor must NOT be a third parallel rule engine... WRAPS scripts/check_plugin_shape.py', but _CODE_BY_KIND/_SEVERITY_BY_KIND (L31-58) + _remediation_for (L226-265) are a second modeling of the script's semantics, kept in sync by 'Keep in sync with...' comments — human sync. A new kind silently falls into _UNKNOWN_KIND_CODE/DOC-PS-999 info under the name of 'defensive'. The subprocess stdout is parsed by 'find the first line starting with {' (_invoke_script L205-214) — IO parsing details living in the diagnosis pass.",
       "id": "RA-073",
       "notes": "Source: Round 13 friction walk (Worth exploring; leaky seam — second rule engine contradicting its own docstring).",
-      "passes": false,
+      "passes": true,
       "priority": 3,
       "title": "Move the plugin-shape kind->code/severity/remediation mapping into the machine contract"
     },

@@ -19,10 +19,8 @@ from typing import Any
 
 import pytest
 
-from lca.harness.diagnostics.doctor.plugin_shape import (
-    _CODE_BY_KIND,
-    PluginShapeDoctor,
-)
+from lca.contracts.diagnostics.doctor import PLUGIN_SHAPE_CODE_BY_KIND
+from lca.harness.diagnostics.doctor.plugin_shape import PluginShapeDoctor
 
 # Stable machine-code regex copied verbatim from
 # lca.contracts.diagnostics.doctor (DOC-<DOMAIN>-<NNN>).
@@ -246,11 +244,11 @@ class TestCodeMapping:
         assert finding.remediation  # non-empty (DoctorFinding.__post_init__)
 
     def test_dimension_to_code_mapping_is_complete(self) -> None:
-        """Every key in _CODE_BY_KIND maps to a DOC-PS-NNN code."""
-        assert len(_CODE_BY_KIND) >= 7, (
+        """Every key in PLUGIN_SHAPE_CODE_BY_KIND maps to a DOC-PS-NNN code."""
+        assert len(PLUGIN_SHAPE_CODE_BY_KIND) >= 7, (
             "Expected at least 7 dimension codes (Phase A + PR-1 + AGENTS §5)."
         )
-        for kind, code in _CODE_BY_KIND.items():
+        for kind, code in PLUGIN_SHAPE_CODE_BY_KIND.items():
             assert _CODE_RE.match(code), f"{kind!r} → {code!r} not DOC-XX-NNN"
             # Each code starts with DOC-PS- (this doctor's domain).
             assert code.startswith("DOC-PS-"), (

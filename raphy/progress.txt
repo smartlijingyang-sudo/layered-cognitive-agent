@@ -1879,3 +1879,11 @@
   - "收窄 except"类 story 的标准动作：先枚举 try 块每一步实际抛什么（读源码，不是猜），再决定每个异常类的归宿。TypeError 的归属必须有证据（这里是 canonical_json 的 json.dumps）。
   - 现有测试 `test_value_error_becomes_doc_compat_003_finding` 是 ValueError 路径的 pin，收窄后依然绿——收窄前先确认旧 pin 覆盖的是保留路径。
 ---
+
+## 2026-10-09 09:00 CST - RA-073
+- 把 plugin kind→code 映射收进机器契约：`plugin_shape.py` 私有的 `_CODE_BY_KIND` / `_SEVERITY_BY_KIND` / `_UNKNOWN_KIND_CODE` 搬进 `lca/contracts/diagnostics/doctor.py`，改名 `PLUGIN_SHAPE_CODE_BY_KIND` / `PLUGIN_SHAPE_SEVERITY_BY_KIND` / `PLUGIN_SHAPE_UNKNOWN_KIND_CODE`（进 `__all__`）。pass 只留 `_MISSING_SCRIPT_CODE`（doctor-internal，非 kind→code）。测试 `test_plugin_shape.py` 改从 contract import。
+- Files changed: `lca/contracts/diagnostics/doctor.py`，`lca/harness/diagnostics/doctor/plugin_shape.py`（删私有表 + `__all__` 去 `_CODE_BY_KIND`），`tests/harness/diagnostics/doctor/test_plugin_shape.py`。
+- **Learnings for future iterations:**
+  - "收进契约"类 story 的检查单：contract 加常量+`__all__`；原模块删定义+修 `__all__`（F822 会抓漏）；所有引用方（生产+测试）改 import。ruff 的 RUF022（`__all__` 排序）+ F822 是天然验收。
+  - 搬家时注意 import 排序：ruff isort 对 `from x import (CONST, Class)` 是大小写敏感排序（CONST 在前），按 ruff 为准。
+---

@@ -18,45 +18,18 @@ from pathlib import Path
 from typing import Any
 
 from lca.contracts.diagnostics.doctor import (
+    PLUGIN_SHAPE_CODE_BY_KIND,
+    PLUGIN_SHAPE_SEVERITY_BY_KIND,
+    PLUGIN_SHAPE_UNKNOWN_KIND_CODE,
     DoctorFinding,
     DoctorReport,
-    DoctorSeverity,
 )
 
 _OWNER_ADR: str = "ADR-0199"
 
-# DOC-PS-* stable codes per scripts/check_plugin_shape.py dimension (kind).
-# Source of truth for kinds: scripts/check_plugin_shape.py ALL_KINDS.
-# Keep in sync with docs/specs/0199-implementation-plan.md §5 P2-04.
-_CODE_BY_KIND: dict[str, str] = {
-    "missing_effects": "DOC-PS-001",
-    "dual_form_residue": "DOC-PS-002",
-    "duplicate_id": "DOC-PS-003",
-    "plugin_location": "DOC-PS-004",
-    "orphan_plugin": "DOC-PS-005",
-    "dead_bundle_ref": "DOC-PS-006",
-    "plugin_in_init": "DOC-PS-007",
-}
-
-# Severity bands mirror check_plugin_shape.py semantics:
-#   * structural / contract violations = error (must fix)
-#   * convention / orphan references = warning (should fix)
-# Unknown kinds default to "info" (defensive; never fail-loud on a
-# kind the doctor doesn't yet understand).
-_SEVERITY_BY_KIND: dict[str, DoctorSeverity] = {
-    "missing_effects": "error",
-    "dual_form_residue": "error",
-    "duplicate_id": "error",
-    "plugin_location": "error",
-    "orphan_plugin": "warning",
-    "dead_bundle_ref": "warning",
-    "plugin_in_init": "error",
-}
-
 # Suffix used when the wrapped script is missing — distinct from the
 # dimension codes (DOC-PS-9xx reserved for doctor-internal failures).
 _MISSING_SCRIPT_CODE: str = "DOC-PS-901"
-_UNKNOWN_KIND_CODE: str = "DOC-PS-999"
 
 _DEFAULT_SCRIPT_REL: str = "scripts/check_plugin_shape.py"
 
@@ -182,8 +155,8 @@ class PluginShapeDoctor:
         #   }
         for v in raw.get("violations", []):
             kind = v.get("kind", "")
-            code = _CODE_BY_KIND.get(kind, _UNKNOWN_KIND_CODE)
-            severity = _SEVERITY_BY_KIND.get(kind, "info")
+            code = PLUGIN_SHAPE_CODE_BY_KIND.get(kind, PLUGIN_SHAPE_UNKNOWN_KIND_CODE)
+            severity = PLUGIN_SHAPE_SEVERITY_BY_KIND.get(kind, "info")
             plugin_id_raw = v.get("id")
             plugin_id = plugin_id_raw if isinstance(plugin_id_raw, str) else None
             message = v.get("detail") or f"plugin shape violation: {kind}"
@@ -293,4 +266,4 @@ def _remediation_for(kind: str, location: str) -> str:
     )
 
 
-__all__ = ("_CODE_BY_KIND", "PluginShapeDoctor")
+__all__ = ("PluginShapeDoctor",)
