@@ -1,5 +1,11 @@
 ## Codebase Patterns
 
+- **digest 约定收敛先定 canonical 函数再改写入点（RA-056）：** 同一字段出现两种
+  hash 约定时，不要逐个改写入点——先在共享层立一个 canonical 函数
+  （`skill_index_digest(content_hash) -> sha256:<hex>`），把"约定"写成代码，
+  再让所有写入点调用它。旧数据用"版本标记 + 读时一次性迁移"
+  （`skills_index_digest_version`，缺失=旧约定），别留双约定并存窗口。
+
 - **metadata 走私 → typed kwargs 迁移纪律（RA-033）：** envelope metadata
   只放 JSON 友好的 id/ref 标量；需要活对象的 handler 从
   `EffectHandler.handle` 的 keyword-only 参数拿（`state`/`decision`/
@@ -1702,4 +1708,13 @@
 - **Learnings for future iterations:**
   - The tool's SkillPackage has no artifact_state and the package manifest.json doesn't carry it either (state lives only in the Home manifest) — so a contract change on SkillPackage would have been wrong; the duck-typed seam on the assistant-scoped store (same pattern as update_package_meta in this file) was the honest seam.
   - New-test budget gotcha: the per-run activation cap (8) is a process-wide ContextVar shared across test modules in one pytest run; wrap new activate tests in activated_skills_scope(()) for a clean budget.
+---
+---
+## 2026-10-09 04:35 - RA-056
+- Implemented: converged the three digest write paths for the Home manifest skills index 'digest' field onto one seam `skill_index_digest()` (lca/infrastructure/assistant/io.py) — full-text convention `sha256:<content_hash>`, same source as install_package's content_hash (incl. frontmatter). Changed: overlay's 8 `_package_digest` call sites + deleted `_package_digest` from gating.py (export removed from overlay/__init__.py); catalog `_materialize_global_skills` and `_copy_inherited_snapshot` now derive the digest from the skill manifest's content_hash instead of hashing the body-only SKILL.md file. Existing Homes: new `skills_index_digest_version=1` marker in build_manifest; `migrate_legacy_skills_digest()` runs on load_manifest read (one-time, idempotent, rewrites index digests + manifest_digest, unrecoverable -> sha256:unknown). Verified migration on a synthetic legacy home (first load migrates, second load no-op, build_manifest carries the marker).
+- Files changed: lca/infrastructure/assistant/io.py, lca/plugins/assistant/skill/overlay/gating.py, lca/plugins/assistant/skill/overlay/overlay.py, lca/plugins/assistant/skill/overlay/__init__.py, lca/plugins/domain/assistant/catalog/handlers.py, lca/plugins/assistant/home/_home_layout.py, raphy/prd.json, raphy/progress.txt
+- **Learnings for future iterations:**
+  - Call-site counts from assessment can be stale: assessed "three writers", the overlay alone had 8 call sites (7x package + 1x home_store.get) — always grep fresh before asserting counts.
+  - ssh252 wrapper mangles heredoc quoting and injects a main-workdir git-status header into stdout; use `python3 < local_script` via stdin redirect and anchor parsing on your own marker lines.
+  - Config-face digest validation (compute_digests/diff_digests) only covers CONFIG_FACE_FILES, so rewriting `digests["skills/*"]` + manifest_digest during migration does not trip catalog.get's fail-closed check — but this coupling is implicit; a future guard that also covers skills/* digests must be aware of the migration.
 ---

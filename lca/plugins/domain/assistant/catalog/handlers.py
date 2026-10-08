@@ -43,6 +43,7 @@ from lca.infrastructure.assistant.io import (
     load_grants,
     read_json,
     sha256_digest,
+    skill_index_digest,
     write_json,
 )
 from lca.plugins.assistant.events._events import (
@@ -136,7 +137,9 @@ def _materialize_global_skills(
             json.dumps(meta, ensure_ascii=False, indent=2, sort_keys=True),
             encoding="utf-8",
         )
-        digest = sha256_digest(dest / "SKILL.md")
+        # RA-056:全文约定——与 install_package 的 content_hash 同源，不再对
+        # 正文-only 的 SKILL.md 文件做 hash。
+        digest = skill_index_digest(str(meta.get("content_hash") or ""))
         index[skill_id] = {
             "digest": digest,
             "artifact_state": "verified",
@@ -849,11 +852,14 @@ class _AssistantCatalogImpl(_AssistantCatalogEventsMixin, AssistantCatalog):
             for child in sorted(source_skills.iterdir()):
                 if child.is_dir() and (child / "SKILL.md").is_file():
                     is_global_link = False
+                    skill_meta: dict[str, Any] = {}
                     meta_path = child / "manifest.json"
                     if meta_path.is_file():
                         try:
-                            meta = json.loads(meta_path.read_text(encoding="utf-8"))
-                            is_global_link = meta.get("source") == "global_link"
+                            loaded_meta = json.loads(meta_path.read_text(encoding="utf-8"))
+                            if isinstance(loaded_meta, dict):
+                                skill_meta = loaded_meta
+                            is_global_link = skill_meta.get("source") == "global_link"
                         except (OSError, ValueError):
                             is_global_link = False
                     dest = dest_skills / child.name
@@ -866,11 +872,13 @@ class _AssistantCatalogImpl(_AssistantCatalogEventsMixin, AssistantCatalog):
                         )
                     else:
                         shutil.copytree(child, dest, dirs_exist_ok=True)
-                    digest = sha256_digest(dest / "SKILL.md")
+                    # RA-056:全文约定——来源 Home 技能 manifest 的 content_hash
+                    # 同源（缺失则 sha256:unknown，不回退正文-only）。
+                    digest = skill_index_digest(str(skill_meta.get("content_hash") or ""))
                     index[child.name] = {
                         "digest": digest,
                         "artifact_state": "verified",
-                        "version": str(meta.get("version") or "") if is_global_link else "",
+                        "version": str(skill_meta.get("version") or "") if is_global_link else "",
                         "source": "global_link" if is_global_link else "local",
                         "installed_at": _iso_now(),
                         "actor": "system",

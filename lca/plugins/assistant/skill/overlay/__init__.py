@@ -42,7 +42,6 @@ from lca.plugins.assistant.skill.overlay.gating import (
     _link_global_package,
     _mark_global_link,
     _mark_local,
-    _package_digest,
     _place_package,
     _revision_of,
 )
@@ -74,7 +73,6 @@ __all__ = [
     "_link_global_package",
     "_mark_global_link",
     "_mark_local",
-    "_package_digest",
     "_place_package",
     "_receipt_from_disk",
     "_revision_of",

@@ -96,12 +96,6 @@ def _place_package(staging_root: Path, skills_root: Path, skill_id: str) -> Path
     return dest
 
 
-def _package_digest(package: SkillPackage) -> str:
-    """``sha256:<hex>`` 形式的包内容摘要(manifest digests 条目同形)。"""
-    digest = package.content_hash
-    return digest if digest.startswith("sha256:") else f"sha256:{digest}"
-
-
 def _mark_local(skill_dir: Path) -> None:
     """把落盘包的 ``manifest.json`` 标记为 ``source: "local"``（ADR-0243 D2）。
 

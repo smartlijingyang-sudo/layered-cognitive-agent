@@ -817,8 +817,8 @@
    "branchName": "raphy/arch-20261009-0107",
    "description": "As an LCA maintainer, I want one digest convention for the skills index, so future integrity checks (write guard) don't false-positive. Evidence (Round 13, skills zone): the same logical field gets two definitions — overlay.py::_package_digest writes sha256:<content_hash> (FULL text incl. frontmatter, disk/store.py::install_package L214); catalog/handlers.py::_materialize_global_skills writes sha256_digest(dest/'SKILL.md') (BODY file, frontmatter stripped); _copy_inherited_snapshot uses the body convention. They write into the same field: Home manifest skills index 'digest' + digests['skills/<id>']. relink_global_skills dodges the field today (compares manifest.json content_hash instead), and _receipt_from_disk reads the index digest into SkillInstallReceipt.digest claiming 'same source as manifest digests entry' — not true across write paths. The write-guard proposal already flagged: 'same field two conventions, must converge before landing any check.'",
    "id": "RA-056",
-   "notes": "Source: Round 13 friction walk (Strong; leaky seam). Prerequisite for RA-057.",
-   "passes": false,
+   "notes": "Source: Round 13 friction walk (Strong; leaky seam). Prerequisite for RA-057. | Implemented 2026-10-09: skill_index_digest() in lca/infrastructure/assistant/io.py; 3 write paths converged; skills_index_digest_version marker + one-time migration on load_manifest.",
+   "passes": true,
    "priority": 2,
    "title": "Converge the two digest conventions for the Home skills index 'digest' field"
   },

@@ -40,6 +40,7 @@ from lca.contracts.protocols.memory.operational_skills import (
     SkillPackage,
     SkillPackageStore,
 )
+from lca.infrastructure.assistant.io import skill_index_digest
 from lca.infrastructure.skills.disk.store import (
     DiskSkillPackageStore,
     safe_rel_path,
@@ -67,7 +68,6 @@ from lca.plugins.assistant.skill.overlay.gating import (
     _is_global_link,
     _link_global_package,
     _mark_local,
-    _package_digest,
     _place_package,
     _revision_of,
 )
@@ -153,7 +153,7 @@ class _AssistantSkillOverlayImpl(AssistantSkillOverlay):
             manifest_digest=str(manifest["manifest_digest"]),
             actor=actor,
             skill_id=package.skill_id,
-            skill_digest=_package_digest(package),
+            skill_digest=skill_index_digest(package.content_hash),
             artifact_state=artifact.state.value,
             source=source.reference,
             version=package.version,
@@ -164,7 +164,7 @@ class _AssistantSkillOverlayImpl(AssistantSkillOverlay):
             assistant_id=assistant_id,
             skill_id=package.skill_id,
             version=package.version,
-            digest=_package_digest(package),
+            digest=skill_index_digest(package.content_hash),
             artifact_state=artifact.state.value,
             installed_at=installed_at,
             revision_seq=_revision_of(manifest),
@@ -324,7 +324,7 @@ class _AssistantSkillOverlayImpl(AssistantSkillOverlay):
 
             manifest = load_manifest(home, assistant_id)
             new_revision_seq = _revision_of(manifest) + 1
-            package_digest = _package_digest(package)
+            package_digest = skill_index_digest(package.content_hash)
             extra: dict[str, str] = {}
             previous_digests = manifest.get("digests")
             if isinstance(previous_digests, dict):
@@ -448,12 +448,12 @@ class _AssistantSkillOverlayImpl(AssistantSkillOverlay):
                     skipped_missing_global.append(skill_id)
                     continue
                 try:
-                    current = _package_digest(home_store.get(skill_id))
+                    current = skill_index_digest(home_store.get(skill_id).content_hash)
                 except SkillNotFoundError:
                     # 落盘包缺失/不完整 = 未能证明与全局一致 ⇒ 重链把它补齐到
                     # 全局当前版本（重跑收敛到同一终态）。
                     current = ""
-                if current == _package_digest(package):
+                if current == skill_index_digest(package.content_hash):
                     already_current.append(skill_id)
                     continue
                 staged.append((skill_id, package, _gate_package(package)))
@@ -486,7 +486,7 @@ class _AssistantSkillOverlayImpl(AssistantSkillOverlay):
                     manifest_digest=manifest_digest,
                     actor=actor,
                     skill_id=skill_id,
-                    skill_digest=_package_digest(package),
+                    skill_digest=skill_index_digest(package.content_hash),
                     artifact_state=artifact.state.value,
                     source=_GLOBAL_LINK_SOURCE,
                     version=package.version,
@@ -572,7 +572,7 @@ class _AssistantSkillOverlayImpl(AssistantSkillOverlay):
                 for name, value in previous_digests.items()
                 if isinstance(value, str) and str(name).startswith(_SKILLS_DIGEST_PREFIX)
             }
-        package_digest = _package_digest(package)
+        package_digest = skill_index_digest(package.content_hash)
         extra[f"{_SKILLS_DIGEST_PREFIX}{package.skill_id}"] = package_digest
 
         new_manifest = build_manifest(
@@ -626,7 +626,7 @@ class _AssistantSkillOverlayImpl(AssistantSkillOverlay):
         skills_section = manifest.get("skills")
         section: dict[str, Any] = dict(skills_section) if isinstance(skills_section, dict) else {}
         for skill_id, package, artifact in relinked:
-            package_digest = _package_digest(package)
+            package_digest = skill_index_digest(package.content_hash)
             extra[f"{_SKILLS_DIGEST_PREFIX}{skill_id}"] = package_digest
             section[skill_id] = {
                 "digest": package_digest,
