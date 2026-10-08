@@ -1609,3 +1609,18 @@
   wrapper _rewrite_command/_project_host_to_guest，测试迁到 SandboxPaths seam）。
 - diversity quota 满足：RA-048/049 是 leaky-seam friction 发现，RA-050 是
   deletion-test 发现，无纯机械 duplication。
+
+
+## 2026-10-08 22:32 CST - RA-050 done
+
+- 删 `LocalSandboxAdapter._rewrite_command` / `_project_host_to_guest`
+  （38 行）：生产 `_exec_shell` 本就内联构造 SandboxPaths，wrapper 只有测试
+  在调，且丢 `mounted` 标志——纯净删除，零逻辑转移。
+- 测试 1:1 迁移：集成测试走 `run_terminal` 本就 pin 生产 seam（不动）；
+  直接 wrapper 单测改名后直调 `SandboxPaths.for_local(...).present_text(...)`
+  （旧 body，mounted=False 默认，语义一致）；`_rewrite_command` 的 seam 覆盖
+  本就在 test_sandbox_paths.py，无覆盖丢失。
+- learnings：deletion-test 类 story 的验收关键是"引用清零证明"
+  （`git grep` 私有名字零残留 + `hasattr` False），比跑测试更能定心。
+- 测试：tests/infrastructure/sandbox/ 76 passed；ruff clean。
+- 实现与评估一致，无差异。

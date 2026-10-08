@@ -178,44 +178,6 @@ class LocalSandboxAdapter(Sandbox):
     def _guest_to_host(self, guest_path: str, *, session_id: str = "") -> str:
         return str(self._paths_for(session_id).resolve(guest_path))
 
-    def _rewrite_command(self, command: str, root: str) -> str:
-        """Map guest ``/mnt/data`` references onto the host session root backing the agent's workspace.
-
-        Absolute guest paths resolve against the mount root — that is where
-        ``SandboxRuntime._stage_files`` writes run attachments, and what the
-        tool surface advertises to the model. Staging passes the session id,
-        so attachments live under the session root; guest scripts read
-        ``LCA_GUEST_ROOT`` (exported per spawn) as their ROOT. Shell commands
-        map onto the same session root so all three views agree.
-
-        Single seam (todo-81): delegates to :meth:`SandboxPaths.rewrite_command`.
-        """
-        return SandboxPaths.for_local(
-            root, guest_mount=self._layout.root.rstrip("/")
-        ).rewrite_command(command)
-
-    def _project_host_to_guest(self, text: str, root: str) -> str:
-        """Project host session-root paths in TEXT back to the guest view.
-
-        Inverse of :meth:`_rewrite_command`: the rewrite maps the guest
-        mount (``/mnt/data``) onto the host session root inside the command
-        text, so the shell's stdout/stderr come back containing host
-        absolute paths. The display projection deliberately never rewrites
-        free text (pinned by ``test_observation_surface_display_paths``),
-        so the adapter exit is the one place that converts them back —
-        the model only ever sees the guest view.
-
-        The match is boundary-aware: ``root`` is only replaced when NOT
-        followed by a path-continuation character, so sibling paths that
-        merely share the prefix (``<root>2/...``) are left alone. Uses the
-        same ``root``/``mount`` constants as the forward rewrite.
-
-        Single seam (todo-81): delegates to :meth:`SandboxPaths.present_text`.
-        """
-        return SandboxPaths.for_local(
-            root, guest_mount=self._layout.root.rstrip("/")
-        ).present_text(text)
-
     async def _exec_shell(
         self,
         command: str,

@@ -734,8 +734,8 @@
         "tests/infrastructure/sandbox/ all green; ruff check clean."
       ],
       "priority": 3,
-      "passes": false,
-      "notes": "Source: Round 12 friction walk (Worth exploring; deletion test). Constraints: boundary-aware rewrite coverage must not drop — migrate cases 1:1. Dependencies: only the one test file references the wrappers. Deletion test: deletes cleanly — the wrappers move no complexity. Test survival: test_sandbox_paths.py keeps pinning the seam. Strength: Worth exploring (narrative hygiene + mounted-mode drift removal)."
+      "passes": true,
+      "notes": "Source: Round 12 friction walk (Worth exploring; deletion test). DONE 2026-10-08: deleted LocalSandboxAdapter._rewrite_command and _project_host_to_guest (38 lines); kept _guest_to_host/_paths_for/_wrap_command. test_adapter_host_path_projection.py: the two async integration tests already drove the production seam via run_terminal (kept); the direct wrapper unit test was renamed and now drives SandboxPaths.for_local(root, guest_mount='/mnt/data').present_text(...) 1:1 (old wrapper body, mounted=False default — identical semantics); module docstring updated. _rewrite_command had no direct unit caller; seam-side test_rewrite_command_* already covered in test_sandbox_paths.py — zero coverage lost. Verified: hasattr(LocalSandboxAdapter, '_rewrite_command') is False; git grep shows no production/test references to the private names (only pre-existing test_rewrite_command_* names for the public SandboxPaths API). Implementation vs assessment: as assessed, no diffs. Tests: tests/infrastructure/sandbox/ 76 passed; ruff clean on touched files."
     }
   ]
 }
