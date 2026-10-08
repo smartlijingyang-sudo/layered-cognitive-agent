@@ -13,15 +13,21 @@ from lca.contracts.observability import exc_to_record
 from lca.contracts.observability.registry.status import RunLifecycleStatus
 from lca.contracts.protocols.runtime.infra.infra import MachineResolver
 from lca.infrastructure.observability.facade.run.ambit import bind_run_ambit
+from lca.infrastructure.observability.spine.exception.emit import (
+    emit_exception_caught,
+)
 from lca.infrastructure.runtime_plane.bindings.bindings import plane_bindings_scope
 from lca.infrastructure.runtime_plane.resolve.resolve import PlaneBindingError
+from lca.infrastructure.session.emit.runtime_emit import (
+    emit_exception_finally as emit_carrier_exception_finally,
+)
 from lca.infrastructure.workspace import run_workspace_scope
 from lca.plugins.events.publish_scope import (
     bind_event_bridge,
     unbind_event_bridge,
 )
 from lca.plugins.loop.driver.plugin import (
-    _UnknownExecutionTargetError as _UnknownExecutionTargetError,
+    UnknownExecutionTargetError,
 )
 from lca.plugins.transport.webserver.carrier.runs.binding import ensure_session_hub
 from lca.plugins.transport.webserver.carrier.runs.execute.execution_environment import (
@@ -86,12 +92,6 @@ class RunLifecycleCoordinator:
         success = False
         run_outcome: str = "failure"
         from lca.infrastructure.observability.spine.context.context import SpineContext
-        from lca.infrastructure.observability.spine.exception.emit import (
-            emit_exception_caught,
-        )
-        from lca.infrastructure.session.emit.runtime_emit import (
-            emit_exception_finally as emit_carrier_exception_finally,
-        )
         from lca.loop.transport import (
             emit_kernel_run_cancelled,
             emit_kernel_run_start,
@@ -156,25 +156,16 @@ class RunLifecycleCoordinator:
                             trace_id=session.trace_id,
                         ),
                     )
-        except (PlaneBindingError, _UnknownExecutionTargetError) as exc:
+        except (PlaneBindingError, UnknownExecutionTargetError) as exc:
+            # RA-048: failure observation converged in _observe_failure.
             user_message = str(exc)
-            self._record_failure(session, exc, hub, error=user_message)
-            emit_exception_caught(
-                exc_to_record(
-                    exc,
-                    boundary="lifecycle.execute",
-                    run_id=session.run_id,
-                    trace_id=session.trace_id,
-                )
-            )
-            emit_carrier_run_failed(
+            self._observe_failure(
                 session,
-                user_message=user_message,
-                exception_class=type(exc).__name__,
-            )
-            emit_carrier_exception_finally(
+                exc,
                 boundary="lifecycle.execute",
-                trace_id=session.trace_id,
+                hub=hub,
+                user_message=user_message,
+                emit_finally=True,
             )
         except asyncio.CancelledError:
             session.cancel_requested = True
@@ -189,24 +180,13 @@ class RunLifecycleCoordinator:
                 trace_id=session.trace_id,
                 error_type=type(exc).__name__,
             )
-            user_message = self._format_exception(exc, session)
-            self._record_failure(session, exc, hub, error=user_message)
-            emit_exception_caught(
-                exc_to_record(
-                    exc,
-                    boundary="lifecycle.execute",
-                    run_id=session.run_id,
-                    trace_id=session.trace_id,
-                )
-            )
-            emit_carrier_run_failed(
+            self._observe_failure(
                 session,
-                user_message=user_message,
-                exception_class=type(exc).__name__,
-            )
-            emit_carrier_exception_finally(
+                exc,
                 boundary="lifecycle.execute",
-                trace_id=session.trace_id,
+                hub=hub,
+                user_message=self._format_exception(exc, session),
+                emit_finally=True,
             )
         finally:
             unbind_event_bridge(publish_token)
@@ -315,30 +295,62 @@ class RunLifecycleCoordinator:
                 trace_id=session.trace_id,
                 error_type=type(exc).__name__,
             )
-            user_message = self._format_exception(exc, session)
-            self._record_failure(session, exc, session.hub, error=user_message)
-            from lca.infrastructure.observability.spine.exception.emit import (
-                emit_exception_caught,
-            )
-
-            emit_exception_caught(
-                exc_to_record(
-                    exc,
-                    boundary="lifecycle.resume",
-                    run_id=session.run_id,
-                    trace_id=session.trace_id,
-                )
-            )
-            emit_carrier_run_failed(
+            # RA-048: resume observes the same ritual minus the finally-emit.
+            self._observe_failure(
                 session,
-                user_message=user_message,
-                exception_class=type(exc).__name__,
+                exc,
+                boundary="lifecycle.resume",
+                hub=session.hub,
+                user_message=self._format_exception(exc, session),
+                emit_finally=False,
             )
         finally:
             if spine_hook_token is not None:
                 reset_bridge_spine_hook(spine_hook_token)
             unbind_event_bridge(publish_token)
             await self._finish_or_pause(session, workspace=None, success=success)
+
+    def _observe_failure(
+        self,
+        session: RunSession,
+        exc: Exception,
+        *,
+        boundary: str,
+        hub: Any,
+        user_message: str,
+        emit_finally: bool,
+    ) -> None:
+        """Converged run-failure observation ritual (RA-048).
+
+        ``execute()``'s two ``except`` blocks and ``resume()``'s ``except``
+        block all converge here: record the failure facts, emit the
+        exception-caught observation, publish the carrier ``run_failed``
+        event, and optionally emit the exception-finally observation.  The
+        per-path emit set is identical by construction — ``execute()`` passes
+        ``emit_finally=True``, ``resume()`` passes ``False``; boundary labels,
+        user-message formatting, and the hub stay at the call sites.
+
+        All four emits are synchronous calls, so this seam is sync.
+        """
+        self._record_failure(session, exc, hub, error=user_message)
+        emit_exception_caught(
+            exc_to_record(
+                exc,
+                boundary=boundary,
+                run_id=session.run_id,
+                trace_id=session.trace_id,
+            )
+        )
+        emit_carrier_run_failed(
+            session,
+            user_message=user_message,
+            exception_class=type(exc).__name__,
+        )
+        if emit_finally:
+            emit_carrier_exception_finally(
+                boundary=boundary,
+                trace_id=session.trace_id,
+            )
 
     @staticmethod
     def _record_failure(

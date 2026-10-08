@@ -18,7 +18,7 @@ from lca.infrastructure.runtime_plane.execution.target import parse_execution_ta
 from lca.infrastructure.runtime_plane.resolve.resolve import PlaneRequest
 from lca.plugins.loop.driver.plugin import (
     RunLoopDriverRegistry,
-    _UnknownExecutionTargetError,
+    UnknownExecutionTargetError,
 )
 
 
@@ -53,7 +53,7 @@ def resolve_run_intent(
         driver = registry.resolve("")
         plane_et = raw
     else:
-        raise _UnknownExecutionTargetError(raw)
+        raise UnknownExecutionTargetError(raw)
     return RunIntent(
         driver=driver,
         plane=PlaneRequest(

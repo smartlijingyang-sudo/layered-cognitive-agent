@@ -706,7 +706,7 @@
         "ruff check clean on touched files."
       ],
       "priority": 1,
-      "passes": false,
+      "passes": true,
       "notes": "Source: Round 12 friction walk (Strong; leaky seam, not mechanical duplication). Constraints: the emit set per path must stay bit-identical — parameterize, don't normalize. The helper is sync: all four emits are sync calls at the current call sites (verify no await is needed). Dependencies: RunLifecycleCoordinator only; exc_to_record / emit_exception_caught / emit_carrier_run_failed / emit_carrier_exception_finally stay where they are. Deletion test: concentrates — deleting the helper re-scatters the ritual. Test survival: run-lifecycle failure-path tests under tests/plugins/transport/webserver/. Strength: Strong."
     },
     {

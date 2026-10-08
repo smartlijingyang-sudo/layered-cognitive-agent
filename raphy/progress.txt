@@ -1624,3 +1624,15 @@
   （`git grep` 私有名字零残留 + `hasattr` False），比跑测试更能定心。
 - 测试：tests/infrastructure/sandbox/ 76 passed；ruff clean。
 - 实现与评估一致，无差异。
+
+## 2026-10-08 RA-048 done（recover：上一轮中断残留，本轮验证收尾）
+- 内容：RunLifecycleCoordinator 新增 `_observe_failure(session, exc, *, boundary, hub, user_message, emit_finally)` seam，
+  收敛 execute() 两个 except 块 + resume() 的 except 块的三段四步 ritual；
+  顺带把 `_UnknownExecutionTargetError` 的跨模块私有导入收敛为公开别名
+  `UnknownExecutionTargetError`（定义仍在 lca/plugins/loop/driver/plugin.py，RA-044 模式）。
+- learnings：中断残留的 diff 只要测试全绿 + ruff clean 就可直接收尾 commit，
+  不必重做；seam 的"bit-identical"验收用 monkeypatch 桩掉四个 emit
+  断言调用序列，比跑全量 lifecycle 更精准。
+- 测试：tests/transport/test_lifecycle_observe_failure.py 2 passed；
+  tests/plugins/assistant/ 42 passed；ruff clean。
+- 实现与评估一致，无差异（评估要求"helper 是 sync 的"，确认调用点全 sync，无 await）。
