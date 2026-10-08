@@ -14,7 +14,7 @@
 |---|---|---|
 | `sub_spec_ref.plan_ref` | 外层节点无独立 Executor；递归进子图 | `PlanInterpreter` → `SubgraphStrategy` |
 | `factory: foo.bar` | **业务语义名** = `semantic_name` | `rg 'semantic_name: str = "foo.bar"'` 或 `rg 'provides=.*::foo.bar'` |
-| Cordis 键 | `{region}::{factory}` | 例：`concept::act.validate`、`phase:think::think.shortcut` |
+| Cordis 键 | `{region}::{factory}` | 例：`act::act.validate`、`think::think.shortcut`（region 取 executor 声明的 `region`，与 factory 未必同名） |
 | `@plugin id=...` | Cordis 插件身份，**不是**解析键 | 别用它接线；审 diff 用它当接线 → Reject |
 | 节点 `id:` | 仅拓扑锚点（edges / journal） | **不是**契约键；测/审别钉节点 id |
 
@@ -60,28 +60,40 @@ perceive.main → think.main → act.main → reflect.main → remember.main →
 
 ---
 
-## 3. act 子图节点职责（`bundles/act.yaml`）
+## 3. act 子图节点职责（`bundles/act/act_subgraph.yaml`）
 
-拓扑（全部 `when: true`，顺序硬编码）：
+拓扑（主路径顺序硬编码；三条边为 `when:` 谓词路由，见下）：
 
 ```
-act.validate → act.authorize → act.envelope → act.dispatch → act.observe
+act.validate → act.authorize → act.approve.gate → act.envelope → act.fanout
+  → effect.pre_dispatch.envelope_check → act.dispatch → act.join
+  → act.observe.normalize → act.observe.commit_fact → act.observe.terminate_decide
 ```
+
+- `act.approve.gate`：仅当 `approval_routing.next_hint ∈ {approve_skipped, approve_approved}` 前进；interrupt / rejected 无内边（ADR-0237/ADR-0292）。
+- `act.fanout`：1:1 分发（`routing.next_hint == fanout_1to1`）时才进 `effect.pre_dispatch.envelope_check`（ADR-0234 5-gate 校验，产 `verdict_refs` typed port）。
+- `act.join`：收敛 `receipts` 列表；`routing.next_hint == join_1to1` 时进 observe 三件套。
 
 | 节点 id | factory | 类 | 端口 | 做什么 |
 |---|---|---|---|---|
 | `act.validate` | `act.validate` | `ActValidateExecutor` | in/out: `decision` | Decision shape：`action_type` 闭集；`USE_TOOL` 要求 `tool_calls` 非空且有 `tool_name`；`DELEGATE`/`HANDOFF` 要求 `delegations` |
 | `act.authorize` | `act.authorize` | `ActAuthorizeExecutor` | in: `decision`（state 可选） | 策略授权：budget（steps/tokens/cost）；USE_TOOL 的 call_id 唯一；危险 tool_name 本地拒 |
-| `act.envelope` | `act.envelope` | `ActEnvelopeExecutor` | in: `decision` → out: `envelope` | `mint_envelope(...)`：`operation=body.act`，`grant.capability=body.act`，`effect_class=tools`，metadata 塞入 `state`+`decision` |
-| `act.dispatch` | `act.dispatch.ref` | **无本层 Executor** | in: `envelope` → out: `receipt` | `sub_spec_ref` → `bundles/concept/effect_execute.yaml` entry `effect.execute` |
-| `act.observe` | `act.observe` | `ActObserveExecutor` | in/out: `receipt` | 校验 `EffectReceipt`；写 `RunFact`；emit `phase.tool.call.end` / `phase.act.fold.end` |
+| `act.approve.gate` | `act.approve.gate` | — | in: `approval_requirement` | 审批门（ADR-0237/ADR-0292）：`approve_skipped`/`approve_approved` 前进，其余 verdict 无内边 |
+| `act.envelope` | `act.envelope` | `ActEnvelopeExecutor` | in: `decision`, `state` → out: `envelope` + 透传 `decision`, `state` | `mint_envelope(...)`：`operation=body.act`，`grant.capability=body.act`，`effect_class=tools`；`metadata` 经 `ToolsEnvelopeMeta` 类型化构造，**活对象（`state`/`decision`）不再塞入**（RA-033 杀死了旧 metadata 偷渡） |
+| `act.fanout` | `act.fanout` | — | in: `envelope` → out: `envelope`, `envelopes`, `routing` | 1:1 envelope 分发边界节点（PR-3.8.4） |
+| `effect.pre_dispatch.envelope_check` | `effect.pre_dispatch.envelope_check` | — | in: `envelope` → out: `envelope`, `verdict_refs` | 5-gate 原子校验（ADR-0234）；`verdict_refs` typed port 供 `act.dispatch` / `effect.execute` |
+| `act.dispatch` | `act.dispatch.ref` | **无本层 Executor** | in: `envelope`, `verdict_refs`, `decision`, `state` → out: `receipt` | `sub_spec_ref` → `bundles/concept/effect/effect_execute.yaml` entry `effect.execute`（`state`/`decision` typed port 转发，ADR-0235） |
+| `act.join` | `act.join` | — | in: `receipts` → out: `receipt`, `routing` | 收敛 `receipts`（`effect.execute` 发 list-of-one）；`join_1to1` 路由进 observe |
+| `act.observe.normalize` | `act.observe.normalize` | `ActObserveExecutor` | in: `receipt` | 校验 `EffectReceipt` 并归一化；emit `phase.tool.call.end` / `phase.act.fold.end` |
+| `act.observe.commit_fact` | `act.observe.commit_fact` | — | — | observation-plane RunFact 落库 |
+| `act.observe.terminate_decide` | `act.observe.terminate_decide` | — | — | should_terminate 路由决策（PR-3 三件套分工：normalize / commit_fact / terminate_decide） |
 
 源码目录：
 
-- `lca/plugins/concept/act_subgraph/{validate,authorize,envelope,observe}.py`
-- `lca/plugins/concept/effect_execute/execute.py`（`EffectExecuteExecutor`，`semantic_name="effect.execute"`）
+- `lca/nodes/act/{validate,authorize,envelope,observe}/`（`Act*Executor`，`region="act"`，composite key 为 `act::<semantic_name>`）
+- `lca/nodes/concept/effect/execute.py`（`EffectExecuteExecutor`，`semantic_name="effect.execute"`）
 
-`act.dispatch` 的 journal 括号：`emit_on_enter: body.tool.execute.start` / `emit_on_exit: body.tool.execute.end`（图级 EP，与 Body 内 `UseToolOperation` 发的同名 EP 可按 `decision_id` join）。
+`act.dispatch` 当前 `emit_on_enter`/`emit_on_exit` 皆为空——`body.tool.execute.start` 的发射器已移到 session emit 面（`lca/infrastructure/session/emit/cognitive_emit/tool_events.py`），别再按旧 journal 括号查。
 
 ---
 
@@ -97,29 +109,30 @@ PlanInterpreter
        ├─ ActValidateExecutor.node_execute
        ├─ ActAuthorizeExecutor.node_execute
        ├─ ActEnvelopeExecutor.node_execute
-       │     mint_envelope(..., metadata.operation="body.act", decision, state)
+       │     mint_envelope(..., operation="body.act", via ToolsEnvelopeMeta)  # decision/state 走 typed port，不再进 metadata
        ├─ [act.dispatch.ref] → SubgraphStrategy(effect_execute.yaml)
        │     EffectExecuteExecutor.node_execute
-       │       └─ runtime.effect_gateway.execute(envelope, policy)
-       │            = RegistryEffectDispatcher.execute
-       └─ ActObserveExecutor.node_execute(EffectReceipt)
+       │       ├─ state = typed port ?? context.runtime.state（AgentState isinstance 守卫；真实 run 里 port 未接线，todo-80）
+       │       └─ runtime.effect_gateway.execute(envelope, policy, state=..., decision=active_decision)
+       │            = RegistryEffectDispatcher.execute  # active_decision = 显式决策 or 构造注入 self._decision
+       └─ act.join → act.observe.normalize / commit_fact / terminate_decide(EffectReceipt)
 ```
 
 关键文件：
 
 - `lca/harness/declarative/execute/dispatch.py` → `RegistryEffectDispatcher`
-- `lca/plugins/concept/effect_execute/execute.py` → 从 `context.runtime.effect_gateway` 取网关；缺失 → `RuntimeError`（fail-loud）
+- `lca/nodes/concept/effect/execute.py` → 从 `context.runtime.effect_gateway` 取网关；缺失 → `RuntimeError`（fail-loud）；state typed port 为 None 时回退 `context.runtime.state`（todo-80）
 
 ### 4.2 效果网关 → Body
 
 ```
-RegistryEffectDispatcher.execute(envelope, policy)
+RegistryEffectDispatcher.execute(envelope, policy, *, state=None, decision=None)   # ADR-0235
   ├─ 校验 effect_class / approval / idempotency cache
   ├─ operation = envelope.metadata["operation"]   # "body.act"
   ├─ handler = EffectHandlerRegistry.resolve("body.act")
-  └─ BodyActEffectHandler.handle(envelope, policy, capabilities)
-        state    = metadata["state"]
-        decision = metadata["decision"]
+  ├─ active_decision = decision if decision is not None else self._decision
+  └─ BodyActEffectHandler.handle(envelope, policy, capabilities, state=state, decision=active_decision)
+        # state / decision 走 typed kwargs；为 None → PG-003 fail-loud（RA-033）
         return await capabilities.body.act(decision, state)
 ```
 
