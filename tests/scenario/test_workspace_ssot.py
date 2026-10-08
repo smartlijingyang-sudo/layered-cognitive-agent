@@ -212,3 +212,37 @@ def test_wsot08_session_root_follows_run_assistant(monkeypatch, tmp_path):
     fallback = asyncio.run(adapter.create_session())
     assert fallback is not None
     assert (boot_default_ws / ".sessions" / fallback.session_id).is_dir()
+
+
+def test_wsot09_guest_scripts_honor_session_root(monkeypatch, tmp_path):
+    """Local 平面 guest 脚本的 ROOT 跟随会话根，不落宿主字面 /mnt/data。"""
+    import asyncio
+
+    from lca.contracts.models.core.execution.sandbox import SessionConfig
+    from lca.infrastructure.sandbox.local.adapter import LocalSandboxAdapter
+
+    _clean_env(monkeypatch)
+    adapter = LocalSandboxAdapter(root=str(tmp_path / "host_root"))
+    info = asyncio.run(
+        adapter.create_session(SessionConfig(workspace_root=str(tmp_path / "owner_ws")))
+    )
+    assert info is not None
+    session_root = tmp_path / "owner_ws" / ".sessions" / info.session_id
+    script = (
+        "import os\n"
+        "from pathlib import Path\n"
+        "root = os.environ['LCA_GUEST_ROOT']\n"
+        "Path(root).joinpath('probe.txt').write_text('x')\n"
+    )
+    result = asyncio.run(adapter.run_in_session(info.session_id, script, language="python"))
+    assert result.success, result.error
+    assert (session_root / "probe.txt").is_file()
+
+    # Composed guest scripts read ROOT from the same env knob.
+    from lca.infrastructure.computer.guest.json_script import compose_json_script
+    from lca.infrastructure.computer.guest.preamble import SCRIPT_PRELUDE
+
+    composed = compose_json_script(SCRIPT_PRELUDE + "def main(encoded):\n    emit(ROOT)\n", {})
+    rooted = asyncio.run(adapter.run_in_session(info.session_id, composed, language="python"))
+    assert rooted.success, rooted.error
+    assert rooted.stdout.strip().splitlines()[-1].strip('"') == str(session_root)
