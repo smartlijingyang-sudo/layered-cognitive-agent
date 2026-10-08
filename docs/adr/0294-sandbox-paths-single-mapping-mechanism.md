@@ -1,6 +1,6 @@
 # ADR-0294：沙箱路径单点映射机制（SandboxPaths）
 
-> **Status: Proposed**（2026-10-08 起草；源于李超 14:40/14:55 两问立案的 todo-81 第一性原理设计——沙箱环境路径统一、agent 只感知自己的目录、skill 不写死路径；验收标准来自李超 15:00「环境可换性」问。待李超拍板后实施）
+> **Status: Accepted**（2026-10-08 起草；源于李超 14:40/14:55 两问立案的 todo-81 第一性原理设计——沙箱环境路径统一、agent 只感知自己的目录、skill 不写死路径；验收标准来自李超 15:00「环境可换性」问。**李超 15:17 side chat "实施吧" 批准实施**；(b) `SandboxPaths` 合入 main（merge `7ace29bdb`，15:32），(c) per-exec mount namespace 合入 main（merge `386a438aa`，15:57），四步迁移全部完成，见 §11 实施记录）
 
 ## 1. Context（差距）
 
@@ -55,10 +55,10 @@ agent 可见根沿用 `/mnt/data` 作虚拟名（ADR-0046、`activate_skill`、R
 
 ## 7. 迁移（零行为变化）
 
-1. (b) 修复落地（todo-79 修法 (b)，staging 传 session id）→
-2. 引入 `SandboxPaths` 并逐个调用点 rewiring（每步全绿）→
-3. skill 审计 + 模板变量化 + lint 进 CI →
-4. 契约文档化（短 ADR 或契约节）
+1. (b) 修复落地（todo-79 修法 (b)，staging 传 session id）——✅ 2026-10-08，merge `6d8ba982e`
+2. 引入 `SandboxPaths` 并逐个调用点 rewiring（每步全绿）——✅ 2026-10-08 15:32，merge `7ace29bdb`（新模块 `lca/infrastructure/sandbox/paths/sandbox_paths.py`：`resolve`/`present`、path-token 感知的 `rewrite_command`/`present_text`、`for_local()`/`identity()` factory、fail-closed 错误；5 处调用点 rewiring；32 新测试全绿）
+3. skill 审计 + 模板变量化 + lint 进 CI ——✅ 2026-10-08 15:32，随 `7ace29bdb` 落地（`tests/infrastructure/sandbox/test_skill_path_hygiene.py`：lca/ 内 `/mnt/data` 字面量仅允许命名清单、skill 正文与 prompt 模板禁硬编码 host 路径，pytest 套件内常跑）
+4. 契约文档化（短 ADR 或契约节）——✅ 本 ADR 即契约文档；另追加 (c) per-exec mount namespace（Pattern A）：2026-10-08 15:57，merge `386a438aa`（`mount_namespace.py`：`mount_namespace_available()` cached 探针、`mount_namespace_enabled()`（`LCA_SANDBOX_MOUNT_NS` 显式 0/1 > 自动检测）、`wrap_in_mount_namespace()` 纯字符串构造器；`SandboxPaths` 加 `mounted` 模式：mounted 时 `rewrite_command`/`present_text` 恒等（内核做映射）、`resolve`/`present` 供 host 侧；13 新测试全绿；userns 不可用自动回退 (b)）
 
 lane 归属：lca/** 归 quality lane，tests/** 归 tests lane。
 
@@ -76,11 +76,17 @@ agent 可见契约、skills、prompts、rewrite/projection/staging 逻辑**零�
 ## 9. 与已有工作的关系
 
 - todo-79 修法 (b)（`_stage_files` 落 session root）：本机制的步骤 1，先行条件
-- RA-040（逆向投影）+ `8094cc234`（emit 内投影）：本机制 `present()` 侧的现有实现，将被收编
-- `b6608bb58`（contract-absolute guest 输入映射到有效根）：本机制 `resolve()` 侧的现有实现，将被收编
-- iter-quality 14:09 附带观察（正向裸 replace vs 逆向 boundary-aware 不对称）：本机制 round-trip 不变量消除
+- RA-040（逆向投影）+ `8094cc234`（emit 内投影）：本机制 `present()` 侧的现有实现，已被 `present()`/`present_text()` 收编（adapter 内已无调用者，仅留 virtual 路径 legacy 契约测试）
+- `b6608bb58`（contract-absolute guest 输入映射到有效根）：本机制 `resolve()` 侧的现有实现，已被 `resolve()` 收编
+- iter-quality 14:09 附带观察（正向裸 replace vs 逆向 boundary-aware 不对称）：已由 round-trip 不变量消除（`tests/infrastructure/sandbox/test_sandbox_paths.py` property 测试钉死）；旧 `command.replace(mount, root)` 的兄弟前缀暗坑（`/mnt/data2/x` → `<root>2/x`）在 (b) 落地时一并修复（双边边界检查）
 
 ## 10. 诚实边界
 
 - P2（无行为变化，纯结构）；不改 guest 可见契约（agent 视角仍是 `/mnt/data`）
-- 本 ADR 仅为提案：设计来自李超指令的 backlog todo-81，实施细节与命名归属待李超拍板
+- 本 ADR 已由李超 15:17 "实施吧" 批准并全部落地（§7/§11）；命名决策（`/mnt/data` 沿用，见 §6）与设计均按本 ADR 执行，未变更
+
+## 11. 实施记录（2026-10-08，全部落地）
+
+- **(b) `SandboxPaths` 单缝隙**（15:32，merge `7ace29bdb`）：guest 可见契约未变（ADR-0046 的 `/mnt/data` 输入 + `/mnt/data/outputs` 产出仍准）；`SandboxPaths` 三不变量（round-trip / containment / totality）由 `test_sandbox_paths.py` 的 property 测试钉死，非期望。
+- **(c) per-exec mount namespace**（15:57，merge `386a438aa`，Pattern A）：`unshare -Urm` per-exec 新建 namespace、`mount --make-rprivate /` 为必需步骤（`test_mount_namespace.py` 的 mountinfo 无泄漏回归测试钉死）；无 holder、无常驻进程、无残留（3 次 exec 实测）；guest 可见语义与 (b) 完全一致，只是实现从字符串重写换成内核真实挂载；`LCA_GUEST_ROOT` 在 mounted 模式取 guest_mount（host 路径对 guest 不可见，§2 公理 1 成立）；非 Linux / userns 被禁时自动回退 (b)。
+- **验证**（backlog todo-81 记录）：(b) 32 新测试 + 129 宽面绿；(c) 13 新测试 + sandbox 目录 76 绿 + `tests/infrastructure/` 1324 passed（7 failed 在 pristine main 同样红，pre-existing）；ruff（CI pin 0.16.10）净；0 push。
