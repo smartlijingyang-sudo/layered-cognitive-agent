@@ -653,8 +653,8 @@
         "Existing carrier lifecycle tests stay green; ruff clean."
       ],
       "priority": 3,
-      "passes": false,
-      "notes": "Source: Round 11 friction walk B (Worth exploring). Deletion test: concentrates — the ritual's pairing (bind/reset) is currently duplicated and easy to unpair. Constraints: resume()'s extra spine-hook binding is a separate ritual; keep it. The private modules stay private — the new seam is their public face."
+      "passes": true,
+      "notes": "Source: Round 11 friction walk B (Worth exploring). Deletion test: concentrates — the ritual's pairing (bind/reset) is currently duplicated and easy to unpair. Constraints: resume()'s extra spine-hook binding is a separate ritual; keep it. The private modules stay private — the new seam is their public face.\nDONE 2026-10-08 (optimize session): new public seam lca/plugins/events/publish_scope.py with bind_event_bridge() / unbind_event_bridge(); RunLifecycleCoordinator.execute/.resume now route the ritual through it — no private _session_observe / _session_publish imports remain in lifecycle.py. New tests: tests/plugins/events/test_publish_scope.py (3 passed). Existing carrier tests 16 passed; ruff clean. Implementation vs assessment: bind/unbind functions instead of a context manager — both call sites bind before a large try and reset inside its finally BEFORE emit_kernel_run_stop, so a context manager would invert that order; the pairing still lives once in the seam."
     },
     {
       "id": "RA-045",

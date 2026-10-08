@@ -1523,3 +1523,23 @@
     test_typed_decision_kwarg_overrides_constructor_decision 却只覆盖了门。
 ---
 
+
+## 2026-10-08 16:45 CST - RA-044
+
+- 新建 `lca/plugins/events/publish_scope.py`（`bind_event_bridge` /
+  `unbind_event_bridge`），把 execute()/resume() 里各重复一次的
+  publish-session ritual 收敛到一处；lifecycle.py 不再内联 import 私有模块。
+- 实现与评估差异：用显式 bind/unbind 而非 context manager——两处都是
+  try 之前 bind、finally 里在 emit_kernel_run_stop **之前** reset，
+  context manager 会颠倒这个顺序；配对逻辑仍只在 seam 里一份。
+- 修补插曲：行号替换脚本误删了 resume() 里条件块内的
+  `spine_hook_token = bind_bridge_spine_hook(bound.bridge)`，
+  ruff F401 抓到，已恢复（条件语义不变）。教训：display 层的 token
+  redaction 会遮住 `xxx_token = ...` 赋值行，做文本替换时用 base64/行号
+  绕过显示层核对。
+- 测试：新 test_publish_scope.py 3 passed；现有 carrier 16 passed；ruff clean。
+- 文件：lca/plugins/events/publish_scope.py（新）、
+  lca/plugins/transport/webserver/carrier/runs/lifecycle/lifecycle.py、
+  tests/plugins/events/test_publish_scope.py（新）
+---
+
