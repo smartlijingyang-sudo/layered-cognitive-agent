@@ -66,7 +66,7 @@ from lca.plugins.assistant.skill.overlay.gating import (
     _STAGING_DIR_NAME,
     _gate_package,
     _is_global_link,
-    _link_global_package,
+    _mark_global_link,
     _mark_local,
     _place_package,
     _revision_of,
@@ -425,12 +425,6 @@ class _AssistantSkillOverlayImpl(AssistantSkillOverlay):
             )
 
         global_store = self._global_store_factory()
-        raw_root = getattr(global_store, "root", None)
-        if raw_root is None:
-            raise TypeError(
-                f"全局技能库不支持硬链接 re-link（缺 root 属性）: {type(global_store).__name__}"
-            )
-        global_root = Path(raw_root)
         home_store = DiskSkillPackageStore(SkillSettings(cache_dir=skills_root))
 
         already_current: list[str] = []
@@ -458,7 +452,14 @@ class _AssistantSkillOverlayImpl(AssistantSkillOverlay):
                     already_current.append(skill_id)
                     continue
                 staged.append((skill_id, package, _gate_package(package)))
-                _link_global_package(global_root, staging_root, skill_id)
+                try:
+                    dest = global_store.materialize_link(skill_id, staging_root / skill_id)
+                except NotImplementedError as exc:
+                    raise TypeError(
+                        f"全局技能库不支持硬链接 re-link（缺 materialize_link 能力）: "
+                        f"{type(global_store).__name__}"
+                    ) from exc
+                _mark_global_link(dest)
 
             for skill_id, _, _ in staged:
                 _place_package(staging_root, skills_root, skill_id)

@@ -10,6 +10,7 @@ Operational Skill 回答「怎么做」（纯操作知识，与身份无关，�
 from __future__ import annotations
 
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Protocol
 
 # Guest mount prefix under SANDBOX_MOUNT_ROOT (_skills/<skill_id>/…).
@@ -96,6 +97,15 @@ class SkillPackageStore(Protocol):
     def resource_files(self, skill_id: str) -> dict[str, bytes]:
         """返回 skill 全部资源相对路径 → bytes，供沙箱挂载。"""
         ...
+
+    def materialize_link(self, skill_id: str, dest: Path) -> Path:
+        """把已安装包硬链接物化到 ``dest``（ADR-0243 D1 空间不膨胀），返回 ``dest``。
+
+        只有磁盘型 store 支持；只读视图（如合并 store）抛 NotImplementedError，
+        调用方按需降级（与 ``update_package_meta`` 同模式）。
+        包不存在/不完整抛 ``SkillNotFoundError``。
+        """
+        raise NotImplementedError
 
     def update_package_meta(
         self,

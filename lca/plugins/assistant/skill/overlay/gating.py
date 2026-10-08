@@ -6,15 +6,14 @@
   ``_ACTIVATABLE_STATES``(ADR-0187 §3 D6)/ ``_GLOBAL_LINK_SOURCE``(ADR-0243 D2);
 - ``_gate_package`` —— ADR-0067 三闸 + ``DRAFT → VERIFIED`` 迁移;
 - ``_place_package`` / ``_mark_local`` —— staging → Home skills 落盘;
-- ``_link_global_package`` / ``_mark_global_link`` / ``_is_global_link`` ——
-  全局库 → staging 硬链接物化(ADR-0243 D1 re-link);
+- ``_mark_global_link`` / ``_is_global_link`` —— 全局包 source 标记/识别
+  (ADR-0243 D2；硬链接物化已收归 ``SkillPackageStore.materialize_link``);
 - ``_package_digest`` / ``_revision_of`` —— manifest 摘要与修订读取。
 """
 
 from __future__ import annotations
 
 import json
-import os
 import shutil
 from collections.abc import Mapping
 from pathlib import Path
@@ -119,23 +118,6 @@ def _mark_local(skill_dir: Path) -> None:
 def _is_global_link(entry: Any) -> bool:
     """Home manifest ``skills`` 索引条目是否为全局库硬链接（ADR-0243 D2）。"""
     return isinstance(entry, dict) and entry.get("source") == _GLOBAL_LINK_SOURCE
-
-
-def _link_global_package(global_root: Path, staging_root: Path, skill_id: str) -> Path:
-    """把全局包硬链接进 staging（与 ``_copy_inherited_snapshot`` 同一物化惯用法）。
-
-    链接而非复制 = ADR-0243 D1 的空间不膨胀前提;落盘由 ``_place_package`` 完成，
-    使全局包在整个 re-link 过程中始终不被触碰。
-    """
-    dest = staging_root / skill_id
-    shutil.copytree(
-        global_root / skill_id,
-        dest,
-        dirs_exist_ok=True,
-        copy_function=os.link,
-    )
-    _mark_global_link(dest)
-    return dest
 
 
 def _mark_global_link(skill_dir: Path) -> None:

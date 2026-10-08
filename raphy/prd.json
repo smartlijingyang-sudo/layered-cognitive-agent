@@ -859,8 +859,8 @@
    "branchName": "raphy/arch-20261009-0107",
    "description": "As an LCA maintainer, I want the skill store Protocol to declare the materialization capability, so swapping the store impl fails at type-check time not runtime. Evidence (Round 13, skills zone): SkillPackageStore Protocol (contracts/protocols/memory/operational_skills.py) does NOT declare `root`, yet three call sites duck-type through it with getattr(store, 'root', None): overlay.py::relink_global_skills (~L470, raises TypeError when missing), catalog/handlers.py::_materialize_global_skills (L104-107), _list_materializable_global_skills (L152-162). Infrastructure detail leaking into plugin/domain layers; any new store impl explodes at runtime with TypeError instead of a construction-time error. The overlay Protocol docstring even celebrates this ('not a capability, so not in ownership.reads').",
    "id": "RA-059",
-   "notes": "Source: Round 13 friction walk (Strong; leaky seam).",
-   "passes": false,
+   "notes": "Source: Round 13 friction walk (Strong; leaky seam). Done 2026-10-09: Protocol declares materialize_link(skill_id, dest) -> Path with default raise NotImplementedError (update_package_meta pattern); DiskSkillPackageStore implements it (hardlink copytree, SkillNotFoundError on incomplete pack, dest replaced). Three call sites converted: relink_global_skills (NotImplementedError -> TypeError, _mark_global_link kept at call site), _materialize_global_skills (NotImplementedError/SkillNotFoundError -> _CatalogConfigError, manifest now read from dest), _list_materializable_global_skills (probes via declared get(), typed SkillPackageStore). Removed dead _link_tree (handlers) and _link_global_package (gating + overlay import + __init__ export). getattr(store,'root',None) zero remaining call sites. New tests/plugins/assistant/test_materialize_link_seam.py (6 passed). Related suites: 133 passed.",
+   "passes": true,
    "priority": 2,
    "title": "Give the hardlink materialization seam a first-class contract (stop getattr(store, 'root', None)穿透)"
   },

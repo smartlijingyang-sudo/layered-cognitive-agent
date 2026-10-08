@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import json
+import os
 import re
+import shutil
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -235,6 +237,24 @@ class DiskSkillPackageStore(SkillPackageInstaller, SkillPackageStore):
             version=resolved_version,
             references=tuple(declared_refs),
         )
+
+    def materialize_link(self, skill_id: str, dest: Path) -> Path:
+        """硬链接物化：``{root}/{skill_id}/`` → ``dest``（文件硬链接，目录新建）。
+
+        RA-059：Protocol 声明的一等物化接缝，替代调用方
+        ``getattr(store, "root", None)`` 穿透。
+        """
+        sid = sanitize_skill_id(skill_id)
+        src = self._root / sid
+        if not (src / _SKILL_MD).is_file() or not (src / _MANIFEST).is_file():
+            raise SkillNotFoundError(f"技能库中不存在 skill_id：{sid}")
+        if dest.exists():
+            if dest.is_dir() and not dest.is_symlink():
+                shutil.rmtree(dest)
+            else:
+                dest.unlink()
+        shutil.copytree(src, dest, copy_function=os.link)
+        return dest
 
     def update_package_meta(
         self,
