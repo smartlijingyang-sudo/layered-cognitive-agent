@@ -1248,3 +1248,18 @@
 - 验证结果: 无代码改动，无需验证门。扫描脚本全部 exit 0（ast0527.py/dead0527.py/dead0522b.py/sndb0527.py/shallow_scan.py 确定性重跑）；开工/收工工作区 on main（并发会话的未提交改动始终不动）。
 - commit: 无代码 commit；本台账单独 docs commit（沿用 0521–0538 `docs(lca-1000): 第NNNN轮台账` 模式）。
 - 备注: 只 commit docs/notes/lca-1000/ledger.md（`git add` + `git commit -- <path>` 显式路径；-m 须在 -- 之前，见 AGENTS.md 教训）。台账文本经 exec stdin 原样追加（UTF-8，未走 base64 管道；沿用 0536–0538）。扫描输出存 252 /tmp（ast0539_out.txt、dead0539_out.txt、dead0539b_out.txt、sndb0539_out.txt、shallow0539_out.txt）。新教训：for 循环里的裸 `$base` 也被 ssh252 包装吞掉（`case $base in` 直接变空致 syntax error；0538 的 `${}` 教训扩展版）；多文件 cmp 直接写多条裸命令，不要用循环变量。
+## 第0540轮 (2026-10-09 07:03-07:20 CST)
+- 改了什么: 无代码改动。**本轮未发现新的实质机会**（依据 body 规则 4：不硬凑 trivial commit）。
+- 依据 skill 哪一节: SKILL.md Deletion test + LANGUAGE.md（深度即杠杆/真实 seam/接口即测试面）+ DEEPENING.md Seam discipline + SKILL.md 的 ADR 不 re-litigate 规则 —— 见候选清单的驳回依据。
+- 关键设计决策（夜间跳过 grilling，记台账）: 自 0539（06:40）后无新落盘 —— HEAD 仍为 a6e2eb88c（`docs(lca-1000): 第0539轮台账`）。唯一未提交改动 .agent/skills/airtap-automation/SKILL.md 属并发会话，按 0.5/规则 5 绝不动、不细看（沿用 0522–0539 判例）。时间窗（07:03）与分支（main）两硬门槛均过；skill 四文件（SKILL.md/DEEPENING.md/LANGUAGE.md/INTERFACE-DESIGN.md）逐字完整重读（本地缓存经 md5 与 252 原件逐文件核验一致）；CONTEXT.md 领域词汇复核（Profile 启动产物/编译运行计划），与本轮深读领域无冲突。
+- 候选清单（本轮 explore：AST 同体 + dead a/b + 同名异体 + shallow-facade 最浅未裁决项深读 + deslop 清单 + 新鲜 diff 复查）:
+  1. AST —— /tmp/ast0540_out.txt 与 ast0539_out.txt 逐字节一致（functions=8430，243 组，零新组；0522/0523 已逐组人工裁决）。
+  2. dead a / dead b —— 与 dead0539_out.txt / dead0539b_out.txt 逐字节一致；真死 17 与 0522–0539 裁决集合一致。
+  3. sndb —— 与 sndb0539_out.txt 逐字节一致（295 组，含 0527 新裁决的 5 组）。
+  4. shallow-facade —— /tmp/shallow0540_out.txt 与 shallow0539_out.txt 逐字节一致（total 61）；最浅未裁决项 **lca/runtime/support/runtime_bindings.py**（15/20，RuntimePhaseCapabilities + DeclarativeRuntimeBindings，373 行）深读裁决：驳回。Deletion test：删去会把组合根闭包知识（fresh/resume 双路装配、factory 接线配方、with_writer/with_vocal_gate 的 per-run 分层 seam、new_state 新生状态的显式契约）散到 run loop 各入口 caller，复杂度不消失，是真实 seam。Module docstring 明示 interface 只暴露一个主要操作 new_driver() 并隐藏双路重复装配——这是真实 seam 而非 indirection；with_writer/with_vocal_gate 是刻意设计的不可变分层 seam（ADR-0248），RuntimeBindings 公开别名 ADR-0110 D5、PhaseCapabilityReader 退役 ADR-0221 P3：按 SKILL.md ADR 规则不 re-litigate。15 个 pass-through 方法是 seam 背后的类型化构造器，非无依据转发。`_ = interpreter` 的 explicit acknowledgement 有 ADR-0221 注释依据，非 slop；docstring 含真实设计知识（单一可导航事实源/不可变绑定），非叙事性注释。
+  5. deslop：TODO/FIXME/HACK/XXX lca/ --include='*.py' = 8（既往裁决项，无新增）；except Exception lca/ = 442（与基线一致）；noqa F401 lca/ = 1（cli.py side-effect registry 老项）；deprecated 无新增（0539 后生产代码零变更，git diff a6e2eb88c..HEAD -- lca/ 为空）。
+- 验证结果: 无代码改动，无需验证门。扫描脚本全部 exit 0（ast0527.py/dead0527.py/dead0522b.py/sndb0527.py/shallow_scan.py 确定性重跑）；开工/收工工作区 on main（并发会话的未提交改动始终不动）。
+- commit: 无代码 commit；本台账单独 docs commit（沿用 0521–0539 `docs(lca-1000): 第NNNN轮台账` 模式）。
+- 备注: 只 commit docs/notes/lca-1000/ledger.md（`git add` + `git commit -- <path>` 显式路径；-m 须在 -- 之前，见 AGENTS.md 教训）。台账文本经 exec stdin 原样追加（UTF-8，未走 base64 管道；沿用 0536–0539）。扫描输出存 252 /tmp（ast0540_out.txt、dead0540_out.txt、dead0540b_out.txt、sndb0540_out.txt、shallow0540_out.txt）。新教训两条：(1) shallow_scan.py 用相对 ROOTS（['lca','lca_kernel']），必须在 ~/layered-cognitive-agent 根目录下跑；在 /tmp 跑会得到 total: 0 的误报（0540 首轮差点误判为"零浅模块"）。(2) 往本地拷 skill 文件时 ssh252 登录 banner 会前插进 stdout；按 `^#` 定位剥离会误删 SKILL.md 开头的 YAML frontmatter，必须逐文件 md5 核验。
+
+--
