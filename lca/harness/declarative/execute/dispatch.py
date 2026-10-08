@@ -131,8 +131,12 @@ class RegistryEffectDispatcher(EffectDispatcher):
         if handler is None:
             raise DeclarativeValidationError("PG-003", f"undeclared effect operation: {operation}")
 
+        # Forward the resolved values, not the raw call args, so the handler
+        # sees exactly what the approval gate above evaluated. Previously the
+        # gate used ``active_decision`` while the handler got the raw arg.
         effect_output = await handler.handle(
-            envelope, policy, self._capabilities, state=state, decision=decision, **handler_kwargs
+            envelope, policy, self._capabilities, state=state, decision=active_decision,
+            **handler_kwargs
         )
         if not envelope.idempotency_key:
             return cast("object", effect_output)
