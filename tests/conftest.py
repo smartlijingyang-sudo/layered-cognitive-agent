@@ -55,8 +55,8 @@ def _isolate_skill_store(
     Same hazard as ``_isolate_runs_root``, different production tree. A test
     that builds an ``Agent`` without ``scope=`` boots the default kernel
     profile, which loads ``lca-skills-provider``, whose ``setup()`` calls
-    ``resolve_skill_store()``; that runs ``ensure_bundled_skills`` and writes
-    every repo ``skills/`` pack into ``~/.lca/skills``. Rewriting a global pack
+    ``materialize_bundled_skills()``; that install_packages every repo
+    ``skills/`` pack into ``~/.lca/skills``. Rewriting a global pack
     orphans the hard links 700+ assistant homes hold to it (ADR-0243 D1).
 
     Opt out module-wide with ``__keep_skill_store__ = True`` only for a test

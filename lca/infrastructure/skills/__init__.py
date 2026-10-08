@@ -17,7 +17,11 @@ from lca.infrastructure.skills.exec.bootstrap import (
     build_skill_exec_code,
     skill_mount_dir,
 )
-from lca.infrastructure.skills.factory.factory import resolve_skill_importer, resolve_skill_store
+from lca.infrastructure.skills.factory.factory import (
+    materialize_bundled_skills,
+    resolve_skill_importer,
+    resolve_skill_store,
+)
 from lca.infrastructure.skills.http.importer import HttpSkillImporter
 
 __all__ = [
@@ -32,6 +36,7 @@ __all__ = [
     "ensure_bundled_skills",
     "get_activated_skills",
     "get_newly_activated",
+    "materialize_bundled_skills",
     "register_activated",
     "resolve_skill_for_exec",
     "resolve_skill_importer",

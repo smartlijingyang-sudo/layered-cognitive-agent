@@ -845,8 +845,8 @@
    "branchName": "raphy/arch-20261009-0107",
    "description": "As an LCA maintainer, I want a function named 'resolve' to never write to production, so boot/test wiring can't silently rewrite ~/.lca/skills. Evidence (Round 13, skills zone): lca/infrastructure/skills/factory/factory.py (21 lines): resolve_skill_store() = construct store + ensure_bundled_skills(store) full install_package. Called from lca/plugins/memory/providers/skills_provider.py::setup at boot. Root cause of the 71515dace incident: a memory-wiring unit test booted a default kernel -> setup() -> resolve_skill_store() rewrote the production ~/.lca/skills, unlink-before-write orphaning 763 Homes' hardlinks. The fix was test isolation + effect declaration (f6c6a1e84), but the function still 'resolves by writing' — the real bug is in who-calls-when, invisible to any pure-function test. overlay.py::_default_global_store's comment even documents why it dares not call it ('would write the global store from the repo worktree...').",
    "id": "RA-058",
-   "notes": "Source: Round 13 friction walk (Strong; no-locality — the bug was in call timing, not function logic).",
-   "passes": false,
+   "notes": "Source: Round 13 friction walk (Strong; no-locality — the bug was in call timing, not function logic). | Implemented 2026-10-09: factory.resolve_skill_store() is now pure construction; new materialize_bundled_skills() is the explicit boot step, called once by lca-skills-provider setup (filesystem effect declared). overlay._default_global_store comment simplified; plugin_tree omit test now guards both entry points.",
+   "passes": true,
    "priority": 2,
    "title": "Split resolve_skill_store into pure resolve + explicit materialize step"
   },

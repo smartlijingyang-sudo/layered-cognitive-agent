@@ -83,10 +83,11 @@ log = structlog.get_logger(__package__)
 def _default_global_store() -> SkillPackageStore:
     """默认全局技能库读缝（ADR-0243 D1:全局库是只读内容源）。
 
-    直接构造 ``DiskSkillPackageStore(get_skill_settings())``,**不**经
-    ``resolve_skill_store()``:后者附带 ``ensure_bundled_skills``,会从 repo
-    工作树写全局库。re-link 只按全局库当前状态升级已链接 Home——把 bundled
-    技能刷进内容源是 boot 期职责,混进升级路径会让「重链」偷偷变成「先改源」。
+    直接构造 ``DiskSkillPackageStore``，不走 bundled 物化：把 bundled 技能
+    刷进内容源是 boot 期职责（skills-provider setup 经
+    ``materialize_bundled_skills`` 显式执行，RA-058 起 ``resolve_skill_store``
+    本身也不再写盘）。re-link 只按全局库当前状态升级已链接 Home——混进升级
+    路径会让「重链」偷偷变成「先改源」。
     """
     return DiskSkillPackageStore(get_skill_settings())
 

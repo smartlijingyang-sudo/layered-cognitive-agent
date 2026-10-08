@@ -1,5 +1,11 @@
 ## Codebase Patterns
 
+- **"resolve" 命名的函数绝不能写盘（RA-058）：** 工厂函数的"解析"语义是契约，
+  副作用必须拆成显式动词（`materialize_bundled_skills`）并只在 boot 期调一次。
+  71515dace 的教训：单测里一次无意的 boot 就把生产 `~/.lca/skills` 重写了，
+  而纯函数测试永远看不见"谁在何时调用"。effect 声明（filesystem）要挂在
+  真正写的那一步上，不是挂在构造上。
+
 - **写守卫挂"谓词+消息"二件套，别改 is_standing_write_path 本体（RA-057）：**
   新守卫（技能包）在 `standing_path.py` 里与 `is_standing_write_path` 并列加
   `is_<x>_write_path()` + `<x>_write_block_message()`，三个写调用点
@@ -1732,4 +1738,12 @@
 - **Learnings for future iterations:**
   - Predicate scope tests should use the same fake homes as the standing tests (/home/u/.lca/assistants/...) — the scope gate (is_under_lca_home or .lca/assistants segments) is shared logic, don't re-derive it per guard.
   - ssh252 sessions can wedge when the remote command's output never flushes (pytest -q with coverage prints only at the end); prefer nohup + log file + pgrep polling for long test runs (AGENTS.md remote-background pattern).
+---
+---
+## 2026-10-09 03:35 - RA-058
+- Implemented: split factory.resolve_skill_store() into pure resolve + explicit materialize step. resolve_skill_store() is now pure construction (no writes); new materialize_bundled_skills(store=None) -> tuple[str, ...] runs ensure_bundled_skills explicitly, called once at boot by lca-skills-provider setup (effects="filesystem" already declared, comment updated to name the new step). tool/set.py and resolve_skill_importer's default now get the pure store (they never needed the incidental bundled write; production boot already materialized via provider). overlay._default_global_store's defensive comment simplified (kept direct DiskSkillPackageStore construction — the architecture invariant test still bans overlay from importing the factory name). Exported materialize_bundled_skills from lca.infrastructure.skills. New tests/infrastructure/skills/test_factory_pure_resolve.py: resolve writes nothing, materialize writes packs + returns ids, idempotent on second call, default-store path. plugin_tree omit test now booms on both resolve_skill_store and materialize_bundled_skills. Pre-existing failure test_activate_skill_resolves_home_skill confirmed failing on HEAD (merged-store global resolution, unrelated).
+- Files changed: lca/infrastructure/skills/factory/factory.py, lca/plugins/memory/providers/skills_provider.py, lca/plugins/assistant/skill/overlay/overlay.py, lca/infrastructure/skills/__init__.py, tests/conftest.py, tests/scenario/plugin/test_plugin_tree_single_owner.py, tests/infrastructure/skills/test_factory_pure_resolve.py (new), raphy/prd.json, raphy/progress.txt
+- **Learnings for future iterations:**
+  - Two functions share the name resolve_skill_store (factory vs assistant/resolver with (scope, assistant_id) signature) — always disambiguate by module before editing; the story means the factory one.
+  - When splitting a writing resolve, audit every caller for whether it needed the side effect: tool/set.py only needed the store instance, so pure is correct there; only the boot provider needed the explicit materialize.
 ---
