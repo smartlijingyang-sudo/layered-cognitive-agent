@@ -109,3 +109,109 @@ class TestIFact3:
         from lca.runtime.loop.runtime_journal import RuntimeJournalCommitter
 
         assert issubclass(RuntimeJournalCommitter, SessionFactCommitter)
+
+
+class TestIFact3V2Seam:
+    """I-FACT-3 v2 (ADR-0221 切流后): catalog 事实的唯一汇入缝是
+    ``append_catalog_bound`` → ``DefaultFactGateway.append_catalog``。
+
+    arch 00:09 裁决 todo-87 (a): 意图存活, 归宿 seam 即此; 不钉
+    ``emit_context_manifested_for_state``(零生产调用, 纯 vestigial)。
+    """
+
+    _SEAM_FILE = "lca/loop/fact_gateway.py"
+
+    def test_append_catalog_bound_delegates_to_default_fact_gateway(self, monkeypatch) -> None:
+        import lca.loop.fact_gateway as fg
+
+        monkeypatch.setattr(fg, "_require_publish_writer", lambda session, *, fact, actor: object())
+        seen: dict = {}
+
+        def fake_init(self, writer):
+            seen["writer"] = writer
+
+        monkeypatch.setattr(fg.DefaultFactGateway, "__init__", fake_init)
+
+        def fake_append_catalog(self, event, *, actor):
+            seen["event"] = event
+            seen["actor"] = actor
+            return "RECEIPT"
+
+        monkeypatch.setattr(fg.DefaultFactGateway, "append_catalog", fake_append_catalog)
+
+        event = object()
+        assert fg.append_catalog_bound(event, session=object(), actor="unit-test") == "RECEIPT"
+        assert seen["event"] is event
+        assert seen["actor"] == "unit-test"
+        assert "writer" in seen
+
+    def test_append_catalog_bound_drops_loudly_when_unbound(self, monkeypatch) -> None:
+        import lca.loop.fact_gateway as fg
+
+        monkeypatch.setattr(fg, "active_publish_session", lambda: None)
+        warnings: list = []
+
+        class _Log:
+            def warning(self, event, **kwargs):
+                warnings.append(event)
+
+        monkeypatch.setattr(fg, "_log", _Log())
+
+        assert fg.append_catalog_bound(object(), actor="unit-test") is None
+        assert "fact_gateway.unbound_drop" in warnings
+
+    def test_no_direct_gateway_construction_or_catalog_append_outside_seam(self) -> None:
+        for pattern in ("DefaultFactGateway(", ".append_catalog("):
+            hits = [
+                h for h in _rg(pattern, _REPO_ROOT / "lca") if h.split(":", 1)[0].endswith(".py")
+            ]
+            offenders = [h for h in hits if not h.startswith(self._SEAM_FILE + ":")]
+            assert not offenders, (
+                "I-FACT-3 v2: catalog 必须经 append_catalog_bound 缝汇入, "
+                "禁止绕过 seam 直接构造/调用\n" + "\n".join(offenders)
+            )
+
+
+class TestIFact5V2ProducerClosedSet:
+    """I-FACT-5 v2: catalog/spine 事件生产者闭集 — 只能经 bound seam 发射。
+
+    白名单 = lca/ 内调用 ``append_catalog_bound``/``publish_ep_bound`` 的模块
+    (2026-10-09 iter-tests 实证枚举)。新增生产者必须先经 arch 裁决入白名单。
+    """
+
+    _PRODUCERS = frozenset(
+        {
+            "lca/loop/commit/tool_journal.py",
+            "lca/loop/commit/memory_journal.py",
+            "lca/loop/commit/delegation_journal.py",
+            "lca/loop/commit/act_journal.py",
+            "lca/loop/observation.py",
+            "lca/loop/emit/spine/ep.py",
+            "lca/infrastructure/session/emit/runtime_emit.py",
+            "lca/infrastructure/session/emit/lifecycle_emit.py",
+            "lca/infrastructure/session/emit/convergence_emit.py",
+            "lca/infrastructure/session/emit/cognitive_emit/tool_events.py",
+            "lca/infrastructure/session/emit/cognitive_emit/step_events.py",
+            "lca/infrastructure/session/emit/cognitive_emit/reflection_events.py",
+            "lca/infrastructure/session/emit/cognitive_emit/gate_events.py",
+            "lca/infrastructure/session/commit/spine_envelope.py",
+            "lca/infrastructure/session/commit/fact_committer.py",
+            "lca/infrastructure/observability/meta_event_emit.py",
+            "lca/infrastructure/observability/spine/exception/emit.py",
+        }
+    )
+
+    def test_producer_closed_set(self) -> None:
+        hits: list[str] = []
+        for pattern in ("append_catalog_bound(", "publish_ep_bound("):
+            hits.extend(_rg(pattern, _REPO_ROOT / "lca"))
+        offenders = []
+        for hit in hits:
+            rel = hit.split(":", 1)[0]
+            if not rel.endswith(".py"):
+                continue
+            if rel == "lca/loop/fact_gateway.py":
+                continue  # 缝定义本身
+            if rel not in self._PRODUCERS:
+                offenders.append(hit)
+        assert not offenders, "I-FACT-5 v2: 未在白名单的生产者模块\n" + "\n".join(offenders)
