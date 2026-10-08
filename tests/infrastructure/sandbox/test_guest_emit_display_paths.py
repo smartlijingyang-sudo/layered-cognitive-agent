@@ -13,6 +13,7 @@ from pathlib import Path
 
 import pytest
 
+from lca.contracts.models.core.execution.sandbox import SessionConfig
 from lca.infrastructure.computer.guest.json_script import compose_json_script
 from lca.infrastructure.computer.guest.preamble import SCRIPT_PRELUDE
 from lca.infrastructure.sandbox.local.adapter import LocalSandboxAdapter
@@ -65,3 +66,21 @@ def test_emit_keeps_paths_outside_root_absolute(session) -> None:
     adapter, sid = session
     shown = _shown(_emit(adapter, sid, "def main(encoded):\n    emit({'path': '/etc/hosts'})\n"))
     assert shown["path"] == "/etc/hosts"
+
+
+def test_resolve_maps_contract_absolute_into_session_root(tmp_path: Path) -> None:
+    adapter = LocalSandboxAdapter(root=str(tmp_path / "root"))
+    info = asyncio.run(
+        adapter.create_session(SessionConfig(workspace_root=str(tmp_path / "owner")))
+    )
+    assert info is not None
+    session_root = tmp_path / "owner" / ".sessions" / info.session_id
+    body = (
+        "def main(encoded):\n"
+        "    p = resolve('/mnt/data/hello5.txt')\n"
+        "    p.write_text('x')\n"
+        "    emit({'path': str(p)})\n"
+    )
+    shown = _shown(_emit(adapter, info.session_id, body))
+    assert shown["path"] == "hello5.txt"
+    assert (session_root / "hello5.txt").is_file()

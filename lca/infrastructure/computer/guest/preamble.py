@@ -36,7 +36,13 @@ def load_args(encoded):
 
 def resolve(path):
     p = Path(path or ROOT)
-    if not p.is_absolute():
+    s = str(p)
+    if p.is_absolute() and GUEST_ROOT != ROOT and (s == GUEST_ROOT or s.startswith(GUEST_ROOT + "/")):
+        # Contract-absolute input on a plane whose effective root differs
+        # (Local sessions): map into ROOT instead of touching the host path.
+        rel = s[len(GUEST_ROOT) + 1:]
+        p = Path(ROOT) / rel if rel else Path(ROOT)
+    elif not p.is_absolute():
         p = Path(ROOT) / p
     try:
         return p.resolve()
@@ -68,7 +74,8 @@ from pathlib import Path
 # The Local adapter exports LCA_GUEST_ROOT per session so host-side execution
 # honors the guest contract with a per-run root. Onlyboxes containers leave it
 # unset and keep the image contract root.
-ROOT = os.environ.get("LCA_GUEST_ROOT") or {ONLYBOXES.root!r}
+GUEST_ROOT = {ONLYBOXES.root!r}
+ROOT = os.environ.get("LCA_GUEST_ROOT") or GUEST_ROOT
 BG_DIR = str(Path(ROOT) / ".lca" / "background")
 """
     + _SCRIPT_HELPERS
