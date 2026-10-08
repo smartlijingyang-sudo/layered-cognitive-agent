@@ -9,6 +9,8 @@ from urllib.parse import urlparse
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from lca.contracts.models.core.execution.sandbox import SANDBOX_MOUNT_ROOT
+
 
 class ActivityStatus(StrEnum):
     RUNNING = "running"
@@ -298,7 +300,9 @@ class ActivityIntentNamer:
                 or ""
             )
             clean_target = (
-                target.replace("/mnt/data/", "") if target.startswith("/mnt/data/") else target
+                target.replace(SANDBOX_MOUNT_ROOT + "/", "")
+                if target.startswith(SANDBOX_MOUNT_ROOT + "/")
+                else target
             )
             start = args.get("start_line") or args.get("StartLine")
             end = args.get("end_line") or args.get("EndLine")
@@ -489,7 +493,7 @@ def parse_step_evidence(
             or ""
         )
         if target_path_str:
-            clean_p = target_path_str.replace("/mnt/data/", "").lstrip("/")
+            clean_p = target_path_str.replace(SANDBOX_MOUNT_ROOT + "/", "").lstrip("/")
             local_f = Path(clean_p)
             if not local_f.is_file() and "/" in clean_p:
                 parts = clean_p.split("/")

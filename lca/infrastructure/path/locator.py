@@ -115,7 +115,9 @@ def assistant_workspace_root(assistant_id: str | None = None) -> Path:
     if aid:
         return get_lca_home() / "assistants" / aid / "workspace"
     try:
-        path = Path("/mnt/data")
+        from lca.contracts.models.core.execution.sandbox import SANDBOX_MOUNT_ROOT
+
+        path = Path(SANDBOX_MOUNT_ROOT)
         path.mkdir(parents=True, exist_ok=True)
         probe = path / ".lca-write-probe"
         probe.write_text("ok", encoding="utf-8")
