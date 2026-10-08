@@ -112,6 +112,18 @@ class EffectExecuteExecutor:
         # state=...)`` instead of being smuggled via ``envelope.metadata``.
         decision = input.port_values.get(PortName("decision"))
         state = input.port_values.get(PortName("state"))
+        if state is None:
+            # RA-033 removed the envelope.metadata smuggle path, but the act
+            # subgraph never wired a ``state`` producer upstream of this node
+            # (the outer think.main->act.main edge carries only ``decision``),
+            # so the typed port arrives as None on real runs (todo-80).
+            # Fall back to the kernel-injected runtime port - the same source
+            # ``_append_tool_result_surface`` already reads for the step.
+            # Only a real AgentState is accepted; anything else keeps the
+            # previous None so legacy fixtures stay on the fail-loud path.
+            runtime_state = getattr(context.runtime, "state", None)
+            if isinstance(runtime_state, AgentState):
+                state = runtime_state
 
         receipt, observation, dispatch_error = await _dispatch(envelope, context, decision, state)
         _append_tool_result_surface(context, envelope, receipt, observation, dispatch_error)
