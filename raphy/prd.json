@@ -928,7 +928,7 @@
       "description": "As an LCA maintainer, I want one compile entry for boot products, so the 'single seam' claim is true. Evidence (Round 13, profile/boot zone): lca/harness/composition/boot_compile.py (27 lines) docstring says 'Compile logic lives in boot_compile', but production (run_resolved_kernel, boot_entries) constructs ProfileBootProducts(...) inline; boot_compile.compile_profile_boot_products has zero callers, and products.py L77-84's same-named wrapper also has zero callers (verified by repo-wide grep). Worse, it passes CompileOptions(require_executable_phase_graph=...) while production uses defaults — a compile-options fork waiting to diverge silently.",
       "id": "RA-064",
       "notes": "Source: Round 13 friction walk (Strong; deletion test).",
-      "passes": false,
+      "passes": true,
       "priority": 3,
       "title": "Delete boot_compile.py + the dead compile wrapper in products.py (dead second compile entry)"
     },

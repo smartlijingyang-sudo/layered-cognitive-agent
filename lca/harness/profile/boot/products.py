@@ -1,8 +1,8 @@
 """Profile boot product data seam (ADR-0195 P4-K03).
 
 ``ProfileBootProducts`` is the only boot-time attachment for resolved profile
-and compiled plan facts. Compile logic lives in
-:mod:`lca.harness.composition.boot_compile`.
+and compiled plan facts. Compilation itself happens in production boot
+(:mod:`lca_kernel.boot.boot` via :mod:`lca_kernel.plan.plan`).
 """
 
 from __future__ import annotations
@@ -74,18 +74,9 @@ def observability_plan_from_scope(scope: Context) -> CompiledObservabilityPlan:
     return products.compiled_observability_plan
 
 
-def compile_profile_boot_products(resolved: ResolvedProfile) -> ProfileBootProducts:
-    from lca.harness.composition.boot_compile import (
-        compile_profile_boot_products as _compile,
-    )
-
-    return _compile(resolved)
-
-
 __all__ = [
     "ProfileBootProducts",
     "attach_profile_boot_products",
-    "compile_profile_boot_products",
     "compiled_plan_from_scope",
     "observability_plan_from_scope",
     "profile_boot_products_from_scope",

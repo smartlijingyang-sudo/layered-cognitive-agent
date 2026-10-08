@@ -1819,3 +1819,12 @@
   - 删 filter 类模块先看 `__init__.py` 有无 re-export，再 grep 全仓；这次两者都干净。
   - commit body 按 AC 要求注明未来增长点：P5-03 若真需要 external-kind 过滤，从 plugin_origin.resolve_plugin_origin / is_untrusted_default_disabled 的统一分类长出来，不复活这个启发式。
 ---
+
+## 2026-10-09 05:35 CST - RA-064
+- 删死编译入口 `lca/harness/composition/boot_compile.py` + products.py 的死透传 wrapper：生产 boot（lca_kernel/boot/boot.py::run_resolved_kernel）直接用 `lca_kernel.plan.plan.compile_run_plan` + `lca_kernel.boot.observability.compile_observability_boot_plan` 组装 ProfileBootProducts，从不经过 boot_compile 的 forked CompileOptions（require_executable_phase_graph=not profile_allows_test_defaults）——它是"第二个编译入口"的本尊。
+- Files changed: deleted `lca/harness/composition/boot_compile.py`；`lca/harness/profile/boot/products.py`（删 wrapper + __all__ 条目 + docstring 改指 lca_kernel 为真入口）；`lca/harness/composition/__init__.py`（删 re-export + __all__ 条目，剩 4 符号）；`lca/harness/composition/README.md`（删表格行 + 门面符号数 5→4）。
+- **Learnings for future iterations:**
+  - 删"第二入口"前必须找到第一入口的生产调用链：boot_compile 看似"真实现"（调 lca_kernel compile_plan），但生产 boot 根本不走它——production callers grep 为空 + boot.py 直连 lca_kernel 两 compile 函数，两证据才算实锤。
+  - products.py 的 `scope.__dict__` 后门是 RA-069 的地盘，本轮零触碰。
+  - composition/__init__ 删 re-export 后，README 的门面符号数（两处）必须同步改，否则文档撒谎。
+---
