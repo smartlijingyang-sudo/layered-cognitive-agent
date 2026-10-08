@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterator
 from pathlib import Path
 
 import pytest
@@ -43,6 +44,36 @@ def _isolate_runs_root(
     if getattr(request.module, "__keep_runs_root__", False):
         return
     monkeypatch.setenv("LCA_RUNS_ROOT", str(tmp_path / "traces" / "runs"))
+
+
+@pytest.fixture(autouse=True)
+def _isolate_skill_store(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, request: pytest.FixtureRequest
+) -> Iterator[None]:
+    """Point the global operational skill store at a temporary directory.
+
+    Same hazard as ``_isolate_runs_root``, different production tree. A test
+    that builds an ``Agent`` without ``scope=`` boots the default kernel
+    profile, which loads ``lca-skills-provider``, whose ``setup()`` calls
+    ``resolve_skill_store()``; that runs ``ensure_bundled_skills`` and writes
+    every repo ``skills/`` pack into ``~/.lca/skills``. Rewriting a global pack
+    orphans the hard links 700+ assistant homes hold to it (ADR-0243 D1).
+
+    Opt out module-wide with ``__keep_skill_store__ = True`` only for a test
+    that must read the real store.
+    """
+    from lca.infrastructure.skills.settings.settings import get_skill_settings
+
+    if not getattr(request.module, "__keep_skill_store__", False):
+        monkeypatch.setenv("LCA_SKILL_CACHE_DIR", str(tmp_path / "skills"))
+    # ``get_skill_settings`` is ``@lru_cache(maxsize=1)``. Without the clear, a
+    # settings object built by an earlier test pins its root for the rest of the
+    # process and this test's env change never takes effect. Clearing on the
+    # opt-out path too, so such a test re-resolves the real root rather than
+    # inheriting some previous test's tmp dir.
+    get_skill_settings.cache_clear()
+    yield
+    get_skill_settings.cache_clear()
 
 
 @pytest.fixture
