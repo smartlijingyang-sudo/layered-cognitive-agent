@@ -498,4 +498,4 @@ def test_think_reason_render_keeps_sandbox_addressing_when_tools_are_native() ->
         "",
     )
     assert "/mnt/data" not in tools_text
-    assert "Workspace root: /mnt/data" in sandbox_text
+    assert "Your Workspace (your persistent working directory; guest path: /mnt/data)" in sandbox_text

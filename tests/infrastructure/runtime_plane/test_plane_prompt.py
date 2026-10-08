@@ -25,7 +25,7 @@ def test_unbound_renders_cloud_sandbox() -> None:
     text = render_plane_prompt(())
     assert "lobe-cloud-sandbox" in text
     assert "Cloud Sandbox" in text
-    assert "Workspace root" in text
+    assert "Your Workspace" in text
 
 
 def test_machine_tools_switch_to_local_system_role() -> None:

@@ -117,12 +117,12 @@ class HomeSection:
         ("plugins_dir", "plugins_dir: {home}/plugins/  (自主创造的插件独立执行目录)"),
         (
             "workspace_dir",
-            "workspace_dir: {home}/workspace/  (沙箱 /mnt/data 映射到此)",
+            "workspace_dir: {home}/workspace/  (你的 Workspace；guest 内路径 /mnt/data)",
         ),
         (
             "routing",
             "目录路由: 用户问「你的目录/配置/记忆/你自己」时，默认用 home_dir；"
-            "只有文件操作/代码执行/生成产物时才用 workspace_dir（沙箱 /mnt/data）。",
+            "只有文件操作/代码执行/生成产物时才用 workspace_dir（guest 内路径 /mnt/data）。",
         ),
         (
             "memory_note",

@@ -50,7 +50,10 @@ def test_home_section_renders_paths() -> None:
     # 目录路由规则：用户问「你的目录/配置/记忆」默认 home，文件操作才用沙箱。
     assert "目录路由" in text
     assert "默认用 home_dir" in text
-    assert "workspace_dir（沙箱 /mnt/data）" in text
+    assert "workspace_dir（guest 内路径 /mnt/data）" in text
+    # WSOT Task 3：概念名统一为「你的 Workspace」，/mnt/data 只作为路径值出现。
+    assert "你的 Workspace" in text
+    assert "沙箱 /mnt/data 映射到此" not in text
 
 
 def test_home_section_unbound_empty() -> None:

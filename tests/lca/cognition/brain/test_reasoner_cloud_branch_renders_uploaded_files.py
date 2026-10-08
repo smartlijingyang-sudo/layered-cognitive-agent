@@ -87,4 +87,4 @@ def test_empty_tool_catalog_still_lists_uploaded_guest_path(tmp_path: Path) -> N
     guest = "/mnt/data/可以合为一个表格吗 能兼容这些所有内容.xlsx"
     assert guest in built
     assert guest in rendered
-    assert "Workspace root: /mnt/data" in rendered
+    assert "Your Workspace (your persistent working directory; guest path: /mnt/data)" in rendered
