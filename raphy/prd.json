@@ -1136,8 +1136,8 @@
       "branchName": "raphy/arch-20261009-0107",
       "description": "As an LCA maintainer, I want the EP contract (assistant.skill.installed payload) pinned at unit level, so production emission isn't covered only by accident. Evidence (Round 13, skills zone): overlay.py::_emit_installed/_emit_activated/_emit_profile_revised call emit_assistant_ep_or_log(self._emit, ...) whose comment says 'no emitter -> log only (unit test path)'. The 37 overlay unit tests validate disk/manifest/receipts; the REAL production EP path (emit_fact_event -> event bus) never executes in unit tests — the seam's production behavior vs test behavior switches on a runtime branch. EP 'was it emitted, is the payload right' is only incidentally covered by e2e.",
       "id": "RA-079",
-      "notes": "Source: Round 13 friction walk (Worth exploring; testability gap — interface switches behavior by runtime branch).",
-      "passes": false,
+      "notes": "Source: Round 13 friction walk (Worth exploring; testability gap \u2014 interface switches behavior by runtime branch). | Implemented 2026-10-09: 评估证据部分过时 —— fake emitter 注入自 ADR-0187 PR-6 (9c4288d63) 即已存在，test_install_emits_installed_ep_with_required_fields 早已断言 EP descriptor + 四件套。本轮补上真实剩余缺口：installed EP 的 skill 契约字段（skill_digest/manifest_digest 的 sha256: 形状、source、installed_at 非空）+ EP descriptor 字面值断言。grep 确认无测试依赖 log-degradation 分支断言 EP。",
+      "passes": true,
       "priority": 3,
       "title": "Pin overlay EP emission in unit tests with an injected fake emitter"
     },

@@ -1981,3 +1981,23 @@
     唯一的显式写步骤）。
 - Tests: 新 pin 文件 + factory 6 passed；skills/overlay/global_link/
   materialize_link/invariants/isolation/merged_store 共 159 passed。ruff 全过。
+
+## 2026-10-09 06:07 CST - RA-079
+
+- Done: 核实评估证据 —— "单测只走 log-degradation 分支"已过时：
+  test_skill_overlay.py 的 overlay fixture 自 ADR-0187 PR-6 起即注入 fake
+  emitter，test_install_emits_installed_ep_with_required_fields 早已断言
+  EP descriptor + 四件套（assistant_id/revision_seq/manifest_digest/actor）。
+  本轮补真实剩余缺口：installed EP 的 skill 契约字段
+  （skill_digest/manifest_digest 形如 sha256:、source == 本地路径、
+  installed_at 非空）+ descriptor 字面值 "assistant.skill.installed" 断言
+  （常量改值测试要红）。
+- No test relies on the log-degradation branch for EP assertions:
+  全仓 grep `no_emitter`/caplog 无 EP 断言依赖该分支。
+- Learnings:
+  - 评估证据会过时：断言"没有/只有"前先 grep 穷尽（本轮差点把已存在三年的
+    pin 当成新活）。核实优先于动手。
+  - EP 契约 pin 的正确粒度：descriptor 字面值 + 四件套 + 各事件特有字段的
+    值形状；只跟常量走会漏掉"常量值被改"的回归。
+- Tests: test_skill_overlay.py 37 passed；overlay/global_link/tool_overlay/
+  ep_closure/invariants 共 101 passed。ruff 全过。

@@ -221,7 +221,9 @@ class TestInstallLocalSource:
         await overlay.install(handle.assistant_id, SkillSource(local_path=str(local_skill)))
         skill_events = [(ep, p) for ep, p in emitted if ep == ASSISTANT_SKILL_INSTALLED]
         assert len(skill_events) == 1
-        _, payload = skill_events[0]
+        ep, payload = skill_events[0]
+        # RA-079: EP descriptor 按字面值钉（不只跟常量走，常量改值测试要红）。
+        assert ep == "assistant.skill.installed"
         for field_name in ASSISTANT_REQUIRED_FIELDS:
             assert field_name in payload, f"EP payload 缺 {field_name}"
         assert payload["assistant_id"] == handle.assistant_id
@@ -229,6 +231,11 @@ class TestInstallLocalSource:
         assert payload["skill_id"] == "demo-skill"
         assert payload["artifact_state"] == "verified"
         assert payload["actor"] == "system"
+        # RA-079: 四件套之外的 skill 契约字段同样是 EP 契约 —— 值形状钉住。
+        assert payload["skill_digest"].startswith("sha256:")
+        assert payload["manifest_digest"].startswith("sha256:")
+        assert payload["source"] == str(local_skill)
+        assert payload["installed_at"]
 
     async def test_install_cleans_up_staging(
         self,
