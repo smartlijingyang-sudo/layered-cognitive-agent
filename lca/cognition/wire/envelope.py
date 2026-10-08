@@ -8,6 +8,7 @@ from lca.contracts.models.observability.plan.ref import get_current_plan_ref
 from lca.contracts.protocols.act.command.envelope import (
     CapabilityGrant,
     CommandEnvelope,
+    idempotency_key_for,
     mint_envelope,
 )
 from lca.infrastructure.transport.invocation import handoff_task_traced, send_and_wait
@@ -32,7 +33,11 @@ def mint_transport_envelope(
         decision={"decision_id": decision_ref},
         provider=f"transport:{protocol}",
         grant=CapabilityGrant(capability="transport", scope="turn", effect_class="transport"),
-        idempotency_key=f"{operation}:{decision_ref}:{target}",
+        idempotency_key=idempotency_key_for(
+            plan_ref=operation,
+            decision_id=decision_ref,
+            discriminator=target,
+        ),
         policy_verdict_refs=(),
         metadata={
             "operation": operation,

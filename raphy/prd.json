@@ -539,7 +539,7 @@
       "description": "As an LCA maintainer, I want the four envelope idempotency_key formulas converged into one seam, so the 'same decision + same params -> same key' invariant is enforced in one place instead of living in four docstrings.",
       "id": "RA-036",
       "notes": "Source: Round 10 friction walk C (Worth exploring). Deletion test (honest): inlining the formulas back keeps all green -> the seam is conventional, value is preventive not load-bearing today. Overlap: none.",
-      "passes": false,
+      "passes": true,
       "priority": 4,
       "title": "Converge the four envelope idempotency_key formulas into one seam"
     },

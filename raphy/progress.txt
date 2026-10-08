@@ -1280,3 +1280,31 @@
     时间胶囊；改它反而破坏可追溯性。live 文档（docstring/description）
     才跟代码走。
 ---
+
+## 2026-10-08 12:57 CST - RA-036
+- 在 `mint_envelope` 旁新增 `idempotency_key_for(*, plan_ref, scope_ref="",
+  decision_id="", discriminator="")`（contracts/protocols/act/command/envelope.py，
+  `__all__` 导出）：':' 连接非空成分，空成分跳过。
+- 5 处铸造点全部经它构造 key：act.envelope tools（plan,node,decision,call_index）、
+  act.envelope delegations（plan,node,decision,del_index）、remember/write
+  （plan,node,decision）、wire transport（operation,decision_ref,target）、
+  pipeline legacy（invocation_id,tool_name）。
+- case table 实证字节一致：6 行样本（tools idx0/idx3、delegations、remember、
+  wire、pipeline）新旧公式输出逐字相同。
+- 刻意排除：`delegate/compose.py` 的 `DelegationRequest.idempotency_key`
+ （另一 seam，非 envelope）和 `command_endpoints.py` 的 approval resume key
+  —— 收敛面只覆盖 envelope 铸造点，不扩大。
+- 测试 34 passed（envelope n_to_n、transport、tool_result_surface、
+  两个 memory integration、tool_pipeline）；ruff clean。
+- 文件：lca/contracts/protocols/act/command/envelope.py、
+  lca/nodes/act/envelope/envelope.py、lca/nodes/remember/write/write.py、
+  lca/cognition/wire/envelope.py、lca/cognition/body/executor/pipeline_safe_executor.py
+- **Learnings for future iterations:**
+  - "收敛 N 个公式"类 story 先穷举构造点再动手：本轮 grep 发现 5 处
+    envelope 公式 + 2 处非 envelope 同名 key（delegate/compose、
+    command_endpoints），后者刻意排除 —— 同名 key 不等于同 seam。
+  - keyword seam 对异形公式的映射要在 docstring 留 case table：wire 的
+    `(operation, decision_ref, target)` 映射到
+    `(plan_ref=operation, decision_id=decision_ref, discriminator=target)`，
+    不看 case table 的人会觉得参数名"驴唇不对马嘴"。
+---

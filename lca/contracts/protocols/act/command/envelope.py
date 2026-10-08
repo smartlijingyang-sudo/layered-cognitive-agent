@@ -325,6 +325,30 @@ def mint_envelope(
     )
 
 
+def idempotency_key_for(
+    *,
+    plan_ref: str,
+    scope_ref: str = "",
+    decision_id: str = "",
+    discriminator: str | int = "",
+) -> str:
+    """Build a ':'-joined envelope idempotency key (RA-036).
+
+    The single seam for the "same decision + same params -> same key"
+    invariant. Four hand-written f-string formulas used to live at the
+    mint sites; they are now all constructed here. Empty components are
+    skipped so producers with fewer parts keep their byte-identical keys.
+
+    Case table — every row byte-identical to its pre-seam formula:
+      act.envelope tools:       plan_ref, node_ref, decision_id, call_index
+      act.envelope delegations: plan_ref, node_ref, decision_id, del_index
+      remember.write:           plan_ref, node_id, decision_id
+      wire transport:           operation, decision_ref, target
+      legacy executor:          invocation_id, tool_name
+    """
+    return ":".join(str(part) for part in (plan_ref, scope_ref, decision_id, discriminator) if str(part))
+
+
 def command_envelope_to_dict(envelope: CommandEnvelope) -> dict[str, Any]:
     """JSON 友好字典（PR-7 V4 architecture test 输出）。"""
     return {
@@ -413,6 +437,7 @@ __all__ = [
     "command_envelope_to_dict",
     "envelope_aggregate_verdict",
     "envelope_is_authorized",
+    "idempotency_key_for",
     "mint_envelope",
     "tools_meta_of",
     "warn_deprecated_envelope_constructor",
