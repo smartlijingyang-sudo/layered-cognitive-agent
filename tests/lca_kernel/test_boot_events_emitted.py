@@ -1,28 +1,25 @@
-"""K3 + ADR-0116: verify three boot JournalEvents are emitted during ``_boot_context``.
+"""K3 + ADR-0116: verify boot diagnostics reach structlog during ``_boot_context``.
 
 Strategy
 --------
-Directly invoke the helpers exposed by ``lca_kernel.boot``:
-
-- :func:`lca_kernel.boot._emit_boot_events` with a captured journal backend
-  to verify the three typed events land in journal.
+Directly invoke :func:`lca_kernel.boot._emit_boot_events` with a captured
+structlog scope and a captured journal backend.
 
 We avoid going through the full cordis fiber boot path because
 ``PluginDefinition`` requires the ``@plugin`` decorator + plugin contract
-which is overkill for testing the kernel's emit behavior. We patch
-``_boot_context``'s entry iteration by passing a pre-built pending_events
-list and verifying the journal receives BootProfileResolved and
-BootObservabilityAssembled. We do NOT attempt to spawn real fibers in this
-file; fiber-spawning behavior is exercised by the integration tests in
-``tests/test_plugin_tree_single_owner.py`` and ``tests/lca_kernel/test_lifecycle.py``.
+which is overkill for testing the kernel's emit behavior. We do NOT attempt
+to spawn real fibers in this file; fiber-spawning behavior is exercised by
+the integration tests in ``tests/test_plugin_tree_single_owner.py`` and
+``tests/lca_kernel/test_lifecycle.py``.
 
 What is asserted
 ----------------
-- :func:`lca_kernel.boot._emit_boot_events` writes BootProfileResolved +
-  BootObservabilityAssembled + buffered BootPluginFiberSpawned events
-  in that order.
-- ``BootPluginFiberSpawned.stage`` is the :class:`Stage` IntEnum.
-- When journal backend is None, ``_emit_boot_events`` silently no-ops.
+- :func:`lca_kernel.boot._emit_boot_events` logs ``boot.profile_resolved``,
+  then ``boot.observability_assembled``, then one ``boot.pending_event`` per
+  buffered :class:`BootPluginFiberSpawned`.
+- K3 runs before Session bind, so ``Session.append`` is unreachable and boot
+  diagnostics have no journal path: a bound journal backend receives nothing.
+- A missing or raising ``observability`` seam never propagates out of boot.
 - ``JOURNAL_EVENT_CLASSES`` catalog exposes all three boot event types
   (regression guard against accidental removal).
 """
@@ -32,14 +29,11 @@ from __future__ import annotations
 import time
 from typing import Any
 
+import structlog
 from cordis import Context
 
 from lca.contracts.models.observability.journal.catalog import JOURNAL_EVENT_CLASSES
-from lca.contracts.models.observability.journal.journal import (
-    BootObservabilityAssembled,
-    BootPluginFiberSpawned,
-    BootProfileResolved,
-)
+from lca.contracts.models.observability.journal.journal import BootPluginFiberSpawned
 from lca.contracts.observability.journal.store import JournalStoreBackend
 from lca.infrastructure.observability import AttributePolicy
 from lca.infrastructure.observability.journal.backends.memory import InMemoryJournalStore
@@ -107,22 +101,27 @@ def test_journal_event_classes_catalog_registers_three_boot_events() -> None:
     } <= catalog_names
 
 
-def test_emit_boot_events_does_nothing_when_journal_missing() -> None:
-    """When BoundObservability.journal is None, _emit_boot_events silently skips."""
+def test_emit_boot_events_logs_without_a_journal_seam() -> None:
+    """A None journal seam narrows ``bound_seams``; boot diagnostics still log."""
     ctx = Context()
     ctx.provide("observability", make_minimal_bound(journal=None))
-    # Should not raise.
-    _emit_boot_events(
-        ctx,
-        pending_events=[],
-        products=_FakeProducts(),
-        topo_order=(),
-        boot_started=time.monotonic(),
-    )
+    with structlog.testing.capture_logs() as logs:
+        _emit_boot_events(
+            ctx,
+            pending_events=[],
+            products=_FakeProducts(),
+            topo_order=(),
+            boot_started=time.monotonic(),
+        )
+
+    events = {entry["event"] for entry in logs}
+    assert "boot.profile_resolved" in events
+    assembled = next(entry for entry in logs if entry["event"] == "boot.observability_assembled")
+    assert "journal" not in assembled["bound_seams"]
 
 
-def test_emit_boot_events_writes_three_event_kinds_in_order() -> None:
-    """End-to-end: _emit_boot_events writes BootPluginFiberSpawned + BootProfileResolved + BootObservabilityAssembled."""
+def test_emit_boot_events_logs_three_event_kinds_in_order() -> None:
+    """End-to-end: _emit_boot_events logs profile + observability + buffered fiber events."""
     capture = _CaptureStore()
     ctx = _ctx_with_journal(capture)
 
@@ -144,90 +143,76 @@ def test_emit_boot_events_writes_three_event_kinds_in_order() -> None:
             status="ok",
         ),
     ]
-    _emit_boot_events(
-        ctx,
-        pending_events=pending,
-        products=_FakeProducts(),
-        topo_order=("p-alpha", "p-beta"),
-        boot_started=time.monotonic(),
-    )
+    with structlog.testing.capture_logs() as logs:
+        _emit_boot_events(
+            ctx,
+            pending_events=pending,
+            products=_FakeProducts(),
+            topo_order=("p-alpha", "p-beta"),
+            boot_started=time.monotonic(),
+        )
 
-    kinds = [type(e.event).__name__ for e in capture.captured]
-    # BootPluginFiberSpawned first (buffered), then BootProfileResolved, then BootObservabilityAssembled.
-    assert kinds == [
-        "BootPluginFiberSpawned",
-        "BootPluginFiberSpawned",
-        "BootProfileResolved",
-        "BootObservabilityAssembled",
+    # ADR-0284's fail-soft ``boot.platform_file_missing`` warning lands between
+    # the observability line and the pending loop whenever the host LCA home is
+    # missing a tier-1 file, so it is filtered out of the order assertion.
+    names = [entry["event"] for entry in logs if entry["event"] != "boot.platform_file_missing"]
+    assert names == [
+        "boot.profile_resolved",
+        "boot.observability_assembled",
+        "boot.pending_event",
+        "boot.pending_event",
     ]
-    fiber_events = [
-        e.event for e in capture.captured if isinstance(e.event, BootPluginFiberSpawned)
-    ]
-    assert len(fiber_events) == 2
-    for ev in fiber_events:
-        assert ev.status == "ok"
-        assert ev.duration_ms >= 0.0
-        # Stage is the Stage IntEnum SSOT. After RunStore policy pass, the
-        # Enum may be normalized to its int value (1–6); we accept either.
-        assert ev.stage == Stage.BOOT or int(ev.stage) == int(Stage.BOOT)
 
-    profile_event = next(
-        e.event for e in capture.captured if isinstance(e.event, BootProfileResolved)
-    )
-    assert profile_event.plugin_count == 2
-    assert profile_event.topo_order == ("p-alpha", "p-beta")
+    profile_entry = next(entry for entry in logs if entry["event"] == "boot.profile_resolved")
+    assert profile_entry["plugin_count"] == 2
+    assert profile_entry["profile_path"] == "<test>"
 
-    obs_event = next(
-        e.event for e in capture.captured if isinstance(e.event, BootObservabilityAssembled)
-    )
-    assert obs_event.journal_enabled is True
-    assert "journal" in obs_event.bound_seams
+    obs_entry = next(entry for entry in logs if entry["event"] == "boot.observability_assembled")
+    assert "journal" in obs_entry["bound_seams"]
+
+    # K3 runs before Session bind, so boot diagnostics have no journal path:
+    # a bound backend must stay empty (single-track Session.append, no bypass).
+    assert capture.captured == []
 
 
-def test_emit_boot_events_swallows_journal_write_errors() -> None:
-    """When journal.write raises, _emit_boot_events must not crash the kernel."""
+def test_emit_boot_events_tolerates_a_raising_observability_seam() -> None:
+    """A seam lookup raising KeyError/TypeError must not crash boot (``_safe_inject``)."""
 
-    class _RaisingStore:
-        def write(self, _event: Any) -> Any:
-            raise RuntimeError("synthetic journal failure")
+    class _RaisingCtx:
+        def inject(self, _key: str, default: Any = None) -> Any:
+            raise TypeError("synthetic seam failure")
 
-        def flush(self) -> None:
-            return None
+    with structlog.testing.capture_logs() as logs:
+        _emit_boot_events(
+            _RaisingCtx(),  # type: ignore[arg-type]
+            pending_events=[],
+            products=_FakeProducts(),
+            topo_order=(),
+            boot_started=time.monotonic(),
+        )
 
-        def close(self) -> None:
-            return None
-
-    ctx = Context()
-    ctx.provide("observability", make_minimal_bound(journal=_RaisingStore()))  # type: ignore[arg-type]
-    # Should swallow the synthetic failure.
-    _emit_boot_events(
-        ctx,
-        pending_events=[],
-        products=_FakeProducts(),
-        topo_order=(),
-        boot_started=time.monotonic(),
-    )
+    assembled = next(entry for entry in logs if entry["event"] == "boot.observability_assembled")
+    assert assembled["bound_seams"] == ()
 
 
 def test_emit_boot_events_handles_empty_topo_order() -> None:
-    """Empty plugin list → BootProfileResolved with plugin_count=0."""
+    """Empty plugin list → ``boot.profile_resolved`` with plugin_count=0."""
     capture = _CaptureStore()
     ctx = _ctx_with_journal(capture)
-    _emit_boot_events(
-        ctx,
-        pending_events=[],
-        products=_FakeProducts(),
-        topo_order=(),
-        boot_started=time.monotonic(),
-    )
-    kinds = [type(e.event).__name__ for e in capture.captured]
-    assert "BootProfileResolved" in kinds
-    assert "BootObservabilityAssembled" in kinds
-    profile_event = next(
-        e.event for e in capture.captured if isinstance(e.event, BootProfileResolved)
-    )
-    assert profile_event.plugin_count == 0
-    assert profile_event.topo_order == ()
+    with structlog.testing.capture_logs() as logs:
+        _emit_boot_events(
+            ctx,
+            pending_events=[],
+            products=_FakeProducts(),
+            topo_order=(),
+            boot_started=time.monotonic(),
+        )
+
+    names = [entry["event"] for entry in logs if entry["event"] != "boot.platform_file_missing"]
+    assert names == ["boot.profile_resolved", "boot.observability_assembled"]
+    profile_entry = next(entry for entry in logs if entry["event"] == "boot.profile_resolved")
+    assert profile_entry["plugin_count"] == 0
+    assert capture.captured == []
 
 
 def test_emit_boot_events_structlog_records_plugin_id() -> None:
@@ -241,8 +226,6 @@ def test_emit_boot_events_structlog_records_plugin_id() -> None:
     ``resolve_profile`` in Python. This test asserts that all six
     identifying fields reach the log record.
     """
-    import structlog
-
     capture = _CaptureStore()
     ctx = _ctx_with_journal(capture)
 
