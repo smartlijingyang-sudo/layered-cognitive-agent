@@ -1201,3 +1201,18 @@
 - 验证结果: 无代码改动，无需验证门。扫描脚本全部 exit 0（ast0527.py/dead0527.py/dead0522b.py/sndb0527.py 确定性重跑）；0535 的 /tmp 基线输出文件已不在（/tmp 被清理），按"工作区 Python 逐字节未变（git diff --name-only 仅并发会话 .md）+ 确定性脚本"链复核：输出与既往裁决基线一致。开工/收工工作区 on main（并发会话的未提交改动始终不动）。
 - commit: 无代码 commit；本台账单独 docs commit（沿用 0521–0535 `docs(lca-1000): 第NNNN轮台账` 模式）。
 - 备注: 只 commit docs/notes/lca-1000/ledger.md（`git add` + `git commit -- <path>` 显式路径；-m 须在 -- 之前，见 AGENTS.md 教训）。台账文本经 exec stdin 原样追加（UTF-8，未走 base64 管道）。扫描输出存 252 /tmp（ast0536_out.txt、dead0536_out.txt、dead0536b_out.txt、sndb0536_out.txt）。
+--
+
+## 第0537轮 (2026-10-09 05:33-05:40 CST)
+- 改了什么: 无代码改动。**本轮未发现新的实质机会**（依据 body 规则 4：不硬凑 trivial commit）。
+- 依据 skill 哪一节: SKILL.md Deletion test + LANGUAGE.md（深度即杠杆/真实 seam/接口即测试面）+ DEEPENING.md Seam discipline + SKILL.md 的 ADR 不 re-litigate 规则 —— 见候选清单的驳回依据。
+- 关键设计决策（夜间跳过 grilling，记台账）: 自 0536（05:12）后新落盘两笔 —— 757a1717d（05:13，test(architecture): repair todo-89 session builder ownership pin）与 cc03d97b1（05:33，merge iter-tests-20261009-0509）：均为另一会话 iter-tests 的纯测试改动（ADR-0295 todo-88/89 仍在 Chao 待裁决队列），按 0533 判例不 re-litigate、不动。唯一未提交改动 .agent/skills/airtap-automation/SKILL.md 属并发会话，绝不动（沿用 0522–0536 判例）。时间窗（05:33）与分支（main）两硬门槛均过，skill 四文件（SKILL.md/DEEPENING.md/LANGUAGE.md/INTERFACE-DESIGN.md）完整重读。
+- 候选清单（本轮 explore：AST 同体 + dead a/b + 同名异体 + shallow-facade 未裁决项深读 + deslop 清单 + 新鲜 diff 复查）:
+  1. AST —— /tmp/ast0537_out.txt 与 ast0536_out.txt 逐字节一致（functions=8430，243 组，组 hash 与 0523 基线逐成员一致，零新组；0522/0523 已逐组人工裁决）。
+  2. dead a / dead b —— 与 dead0536_out.txt / dead0536b_out.txt 逐字节一致；真死 17 与 0522–0536 裁决集合一致（_RoleConfig 静态锚点；框架按名调用或保留；_validate_* ×12 pydantic validator classmethod 假阳性）。
+  3. sndb —— 与 sndb0536_out.txt 逐字节一致（295 组，含 0527 新裁决的 5 组）。
+  4. shallow-facade 未裁决最浅项 **lca/infrastructure/session/emit/runtime_emit.py**（9/10 委托，9 个 caller 文件）深读裁决：驳回。Deletion test：删去会把 spine fact 名 SSOT（"runtime.reducer.apply" 等 8 个 fact 名）+ payload 构造知识 + _coerce_run_id run_id 注入逻辑散到 9 个 caller 文件，复杂度不消失，是真实 seam（docstring 明示 "Single production seam for runtime envelope EPs"，ADR-0194 P2-10 立项）。每个 emit_* 都构造 payload dict，不是纯转发；_coerce_run_id/_active_run_id 全仓仅此一处，sibling（lifecycle_emit/convergence_emit）无副本，不存在跨模块重复可收敛。按 SKILL.md ADR 规则不 re-litigate；docstring 为单行 fact 描述，非叙事性注释，不属 deslop。
+  5. deslop：TODO/FIXME/HACK/XXX lca/ --include='*.py' = 8（既往裁决项，无新增）；except Exception lca/ = 442（与基线一致；本轮首计数误得 460 系把 lca_kernel/ 的 18 个纳入了范围，拆分目录核对后排除误报——lca_kernel/ 不属既往基线口径）；noqa F401 = 1（cli.py side-effect registry 老项）；"自承 dead"/叙事性注释/新 deprecated 无新增（0536 后生产代码零变更，git diff 771da0a9a..HEAD 仅 tests/ 一文件）。
+- 验证结果: 无代码改动，无需验证门。扫描脚本全部 exit 0（ast0527.py/dead0527.py/dead0522b.py/sndb0527.py/shallow_scan.py 确定性重跑）；开工/收工工作区 on main（并发会话的未提交改动始终不动）。
+- commit: 无代码 commit；本台账单独 docs commit（沿用 0521–0536 `docs(lca-1000): 第NNNN轮台账` 模式）。
+- 备注: 只 commit docs/notes/lca-1000/ledger.md（`git add` + `git commit -- <path>` 显式路径；-m 须在 -- 之前，见 AGENTS.md 教训）。台账文本经 exec stdin 原样追加（UTF-8，未走 base64 管道；沿用 0536）。扫描输出存 252 /tmp（ast0537_out.txt、dead0537_out.txt、dead0537b_out.txt、sndb0537_out.txt、shallow0537_out.txt）。教训：deslop 计数口径必须与基线目录对齐（lca/ vs lca_kernel/），跨目录裸 grep 会误报"新增"。
