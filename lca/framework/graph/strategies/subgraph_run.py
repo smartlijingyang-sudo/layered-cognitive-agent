@@ -195,9 +195,9 @@ def translate_outputs(
         inner_output_names = tuple(p.name for p in inner_schema.outputs)
         if len(outer_declared_outputs) == len(inner_output_names):
             translated = {
-                outer_declared_outputs[i]: merged_output.get(inner_output_names[i])
-                for i in range(len(outer_declared_outputs))
-                if inner_output_names[i] in merged_output
+                outer_name: merged_output.get(inner_name)
+                for outer_name, inner_name in zip(outer_declared_outputs, inner_output_names, strict=True)
+                if inner_name in merged_output
             }
             if translated:
                 outer_output = translated
