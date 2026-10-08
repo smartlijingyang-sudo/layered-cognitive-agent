@@ -803,8 +803,8 @@
    "branchName": "raphy/arch-20261009-0107",
    "description": "As an LCA operator, I want `activate_skill` to refuse unverified/retired packages, so the 'verified only enters context' guarantee holds on both activate paths. Evidence (Round 13, skills zone): 'activate' has two mutually-unaware semantics — AssistantSkillOverlay.activate (contracts/protocols/assistant/skill_overlay.py) emits EP without injecting content and requires artifact_state in _ACTIVATABLE_STATES (else SkillNotVerifiedError); SkillActivateTool.execute (lca/infrastructure/tools/skills/activate/tool.py) injects package.content into context but checks only findability/non-redundancy/budget — NOT retired, NOT artifact_state. retire_skill's exec path checks package.retired (exec/tool.py:121) but activate doesn't: a retired skill can't run scripts yet can be fully injected into context. The write-guard proposal's run_755719d1a9d5 exploit (writeFile tampering a verified package, activate_skill injects without re-hashing) works precisely because of this gap.",
    "id": "RA-055",
-   "notes": "Source: Round 13 friction walk (Strong; leaky seam / dual-semantics word). Does NOT touch lca/infrastructure/tools/assistant/ (ralph Round 2 territory).",
-   "passes": false,
+   "notes": "Source: Round 13 friction walk (Strong; leaky seam / dual-semantics word). Does NOT touch lca/infrastructure/tools/assistant/ (ralph Round 2 territory). | Implemented 2026-10-09: retired gate + manifest-state gate via shared predicate; 5 new pins.",
+   "passes": true,
    "priority": 1,
    "title": "Gate SkillActivateTool content injection on verified/retired state (close the ungated activate path)"
   },

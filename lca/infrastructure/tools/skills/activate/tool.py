@@ -1,4 +1,18 @@
-"""activate_skill — inject SKILL.md into agent context."""
+"""activate_skill — inject SKILL.md into agent context.
+
+Who gates content injection (RA-055 — this docstring is the single place
+documenting it):
+- ``package.retired`` → refuse (mirrors the ``run_skill_script``/exec path;
+  a retired skill may run nothing AND inject nothing).
+- Home manifest ``artifact_state`` → must satisfy ``is_activatable_state``
+  (the SAME predicate ``AssistantSkillOverlay.activate`` uses, ADR-0187 §3 D6).
+  The state is read duck-typed via ``store.package_artifact_state`` —
+  stores without a Home manifest concept (e.g. the global disk store)
+  don't expose it and the check is skipped there.
+
+"verified only enters context" 的保证在 overlay（发 EP、不注入正文）与本工具
+（注入 SKILL.md 正文）两条 activate 路径上一致。
+"""
 
 from __future__ import annotations
 
@@ -7,6 +21,7 @@ import time
 from pathlib import PurePosixPath
 from typing import Any, ClassVar
 
+from lca.contracts.atoms.artifact.state import is_activatable_state
 from lca.contracts.atoms.enums.enums import ContentType
 from lca.contracts.atoms.ids.ids import new_id
 from lca.contracts.atoms.semantic.keys import FAILURE_KIND, FAILURE_KIND_VALIDATION
@@ -160,6 +175,37 @@ class SkillActivateTool(Tool):
                 success=False,
                 payload=None,
                 error=f"未找到 skill: {raw!r}；请先 import_skill",
+                latency_ms=latency_ms,
+                extra={FAILURE_KIND: FAILURE_KIND_VALIDATION},
+            )
+        # RA-055: 退役门 —— 与 run_skill_script（exec/tool.py）同规则：
+        # 已退役的 skill 既不能跑脚本，也不能注入正文。
+        if package.retired:
+            latency_ms = int((time.monotonic() - start) * 1000)
+            return Observation(
+                observation_id=new_id("obs"),
+                success=False,
+                payload=None,
+                error=f"skill {package.skill_id} 已退役，拒绝注入；用 unretire_skill 恢复后再试",
+                latency_ms=latency_ms,
+                extra={FAILURE_KIND: FAILURE_KIND_VALIDATION},
+            )
+        # RA-055: manifest 状态门 —— 与 AssistantSkillOverlay.activate 用同一谓词
+        # （is_activatable_state，ADR-0187 §3 D6）。store 知道 Home manifest
+        # 状态才查（duck-typed；全局 disk store 无 manifest 概念则跳过）。
+        state_of = getattr(self._store, "package_artifact_state", None)
+        manifest_state = state_of(package.skill_id) if callable(state_of) else None
+        if manifest_state is not None and not is_activatable_state(manifest_state):
+            latency_ms = int((time.monotonic() - start) * 1000)
+            return Observation(
+                observation_id=new_id("obs"),
+                success=False,
+                payload=None,
+                error=(
+                    f"skill {package.skill_id} 未通过 0067 闸门"
+                    f"（manifest 状态={manifest_state!r}），拒绝注入；"
+                    "先 install/verify 后再激活"
+                ),
                 latency_ms=latency_ms,
                 extra={FAILURE_KIND: FAILURE_KIND_VALIDATION},
             )

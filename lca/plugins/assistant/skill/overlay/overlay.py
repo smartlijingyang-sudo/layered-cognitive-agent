@@ -16,6 +16,7 @@ from typing import Any
 
 import structlog
 
+from lca.contracts.atoms.artifact.state import is_activatable_state
 from lca.contracts.atoms.ids.ids import utc_now_iso
 from lca.contracts.harness.journal.artifact import CapabilityArtifact
 from lca.contracts.observability.closure.assistant_ep_closure import (
@@ -59,7 +60,6 @@ from lca.plugins.assistant.home._home_layout import (
     write_revision_snapshot,
 )
 from lca.plugins.assistant.skill.overlay.gating import (
-    _ACTIVATABLE_STATES,
     _GLOBAL_LINK_SOURCE,
     _SKILLS_DIGEST_PREFIX,
     _STAGING_DIR_NAME,
@@ -216,7 +216,7 @@ class _AssistantSkillOverlayImpl(AssistantSkillOverlay):
         section: Mapping[str, Any] = skills_section if isinstance(skills_section, dict) else {}
         entry = section.get(skill_id)
         state = str(entry.get("artifact_state") or "") if isinstance(entry, dict) else ""
-        if state not in _ACTIVATABLE_STATES:
+        if not is_activatable_state(state):  # RA-055: 与 activate_skill 共用同一谓词
             raise SkillNotVerifiedError(
                 f"skill 未过 0067 闸门,不可 activate: assistant={assistant_id!r} "
                 f"skill={skill_id!r} state={state or '(无索引记录)'}"

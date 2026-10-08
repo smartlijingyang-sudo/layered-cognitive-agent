@@ -20,7 +20,7 @@ from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
 
-from lca.contracts.atoms.artifact.state import ArtifactState
+from lca.contracts.atoms.artifact.state import ACTIVATABLE_STATES, ArtifactState
 from lca.contracts.atoms.scope.scope import Scope
 from lca.contracts.harness.journal.artifact import (
     CapabilityArtifact,
@@ -44,7 +44,7 @@ _SKILLS_DIGEST_PREFIX = "skills/"
 _GLOBAL_LINK_SOURCE = "global_link"
 """``source`` 标记值:包是全局库的硬链接视图(ADR-0243 D2)。"""
 
-_ACTIVATABLE_STATES = frozenset({ArtifactState.VERIFIED.value, ArtifactState.ACTIVE.value})
+_ACTIVATABLE_STATES = ACTIVATABLE_STATES  # RA-055: 共享谓词的别名（overlay/__init__ 重导出保持兼容）
 """``activate`` 接受的状态闭集(ADR-0187 §3 D6)。"""
 
 

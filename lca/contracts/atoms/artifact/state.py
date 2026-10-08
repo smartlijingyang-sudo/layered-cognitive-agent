@@ -44,6 +44,24 @@ class ArtifactState(StrEnum):
     RETIRED = "retired"
 
 
+ACTIVATABLE_STATES = frozenset({ArtifactState.VERIFIED.value, ArtifactState.ACTIVE.value})
+"""``activate`` 接受的状态闭集（ADR-0187 §3 D6，RA-055 抽为共享谓词）。
+
+``AssistantSkillOverlay.activate`` 与 ``SkillActivateTool.execute``（content
+injection）必须用**同一**谓词判定 —— "verified only enters context" 的保证
+在两条 activate 路径上一致。改闭集必经 ADR（C6）。
+"""
+
+
+def is_activatable_state(state: str) -> bool:
+    """manifest ``artifact_state`` 是否允许 activate。
+
+    与 overlay 共用的唯一判定入口；调用方不得各自复刻
+    ``{verified, active}`` 字面量。
+    """
+    return state in ACTIVATABLE_STATES
+
+
 # 合法迁移矩阵（PR-8 + ADR-0068 §一）：
 # - DRAFT → VERIFIED（校验通过）
 # - VERIFIED → ACTIVE（promote / mount）
