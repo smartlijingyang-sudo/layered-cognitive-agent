@@ -171,6 +171,7 @@ def _wrap_v2_plan(plan, *, resolved, overlay: PlanOverlay | None = None):
         # 因父类字段已存在而永不触发（0373 实证）。
         prompt_template_id=plan.prompt_template_id,
         prompt_section_overrides=plan.prompt_section_overrides,
+        action_authority=plan.action_authority,
         inner=plan,
         graph_spec=graph_spec,
     )
