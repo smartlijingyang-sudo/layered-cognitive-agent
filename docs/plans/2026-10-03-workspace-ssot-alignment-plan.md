@@ -113,8 +113,11 @@ agent 答"对话上下文 ✅ 有，`/mnt/data` 工作区 ❌ 没有，不会自
 > **状态（2026-10-08）：已落地。** commit `4ebae41ee` 改了两个 prompt section 的文案
 > （HomeSection 与 cloud_sandbox_system_role.md）：概念名统一为「你的 Workspace」，
 > `/mnt/data` 只作为 guest 路径值出现；回复面要求优先给 workspace 相对路径。
-> 模型可见工具 payload 的相对路径投影由 `3619ca1e5` 在单一投影 seam 完成；
-> per-run 沙箱根绑定由 `78034deea` 完成（SessionConfig.workspace_root）。
+> per-run 沙箱根绑定由 `78034deea` 完成（SessionConfig.workspace_root）；
+> guest 脚本 ROOT 跟随会话根由 `f03b2359a` 完成（LCA_GUEST_ROOT）；
+> 模型可见相对路径投影的单点在 guest `emit()`（`8094cc234`，取代宿主侧前缀投影），
+> 契约绝对入参映射由 `b6608bb58` 完成；carrier 对 agent-only run 的助理身份解析
+> 由 `66fafdcf0` 与 `01f205289` 完成（ownership store 反查 + 裸字符串 agent 解析）。
 
 ## Task 4：历史 traces/files 迁移 + 旧根废弃
 
