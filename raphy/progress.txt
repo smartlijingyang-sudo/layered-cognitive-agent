@@ -1590,3 +1590,22 @@
 ---
 
 **本轮 6 个 stories 全部完成（RA-042~047），无 open。**
+
+
+## 2026-10-08 22:20 CST - Round 12 assess（branch raphy/arch-20261008-2205）
+
+- 上下文：上一轮 raphy/arch-20261008-1505 已于 21:21 被正常合入 main
+  （merge 0ab9d67cd），分支已删，无残留；47 stories 全 done。
+- friction walk 3 区（sandbox 端到端 / effect dispatch / carrier run lifecycle
+  端到端），dispatch 区刚被 RA-033/042/043 深耕过、无新 friction。
+- 运行时验证复跑（worktree @0ab9d67cd，MockLLMAdapter）：basic completed；
+  one-shot tool call completed 且 marker 文件写出（RA-042 回归未复发）；
+  无限循环 mock（max_steps=3）返回 failed Result、无异常逃逸（RA-023 有效）；
+  同一 agent 双 run completed。无新 P0/P1。
+- 产出 3 stories：RA-048（Strong：收敛 RunLifecycleCoordinator 三处失败观测
+  仪式为一个 _observe_failure seam，附 _UnknownExecutionTargetError 公开化）、
+  RA-049（Worth exploring：resume 的 capability/tool/defer 手工 bind-reset
+  收进 contextmanager）、RA-050（Worth exploring：删 LocalSandboxAdapter 死
+  wrapper _rewrite_command/_project_host_to_guest，测试迁到 SandboxPaths seam）。
+- diversity quota 满足：RA-048/049 是 leaky-seam friction 发现，RA-050 是
+  deletion-test 发现，无纯机械 duplication。
