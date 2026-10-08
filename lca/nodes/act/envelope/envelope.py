@@ -149,10 +149,10 @@ class ActEnvelopeExecutor:
                         # reads this id to attribute the model-visible
                         # ``surface/tool_result`` row; reconstructing it downstream
                         # from ``decision`` only works for a single-call turn.
-                        "tool_call_id": decision.tool_calls[call_index].call_id,
+                        "tool_call_id": tool_call.call_id,
                     },
                 )
-                for call_index in range(len(decision.tool_calls))
+                for call_index, tool_call in enumerate(decision.tool_calls)
             )
 
         return NodeOutput(
