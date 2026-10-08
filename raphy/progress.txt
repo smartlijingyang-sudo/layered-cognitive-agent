@@ -2,6 +2,18 @@
 
 （raphy 轮共享的模式/禁区登记，供后续 assess/optimize 轮参考）
 
+- **pair-seam 收敛先列 case 表（RA-032）：** seam 只返回 pair 一半（如 store）
+  而消费者要 `(store, policy)` 元组时，先枚举全部状态组合
+  （unbound→(None,None)；bound+store None→(None,policy)；bound+store 有→
+  (store,policy)）证明新实现输出与旧实现逐字相同再动手。"无绑定 no-ref"
+  的直觉会误写成 `store is None → (None, None)`——RA-031 教训的实例化：
+  验收模糊或直觉与实现分歧时，以显式 case 表 + 零语义变更为准。
+- **observability 新 seam 三层导出清单（RA-032）：**
+  `facade/facade/facade.py` 定义 → `facade/__init__.py`（import + `__all__`）→
+  顶层 `__init__.py`（import + `__all__`）；deferred import 纪律是调用方的
+  （函数内 import，approve_gate 保留 try/except ImportError），seam 本体不替
+  调用方 import。
+
 - **禁区（ralph Round 2 领地 + 冻结区）：** DecisionGates、Ingest、ContextFiles shims、
   Read Runs micro-dirs（`plugins/transport/webserver/read/runs/`）、MemoryTools directory seam
   （`infrastructure/tools/assistant/`）、`lca/cognition/memory/`（Round 2 AP-01 冻结）。
@@ -1051,5 +1063,42 @@
     调用点再信。非本 story 范围，仅记录。
   - SSH 长 pytest（>10min）会断管：分文件跑 + `--no-cov -p no:cacheprovider`
     提速，单个文件几秒级。
+---
+
+
+## Round 9 — optimize RA-032 (2026-10-08 10:40, branch raphy/arch-20261008-0118)
+- What was implemented: `lca.infrastructure.observability` 新增
+  `resolve_evidence_store()` seam（`facade/facade/facade.py` 紧随 `current_bound`
+  定义；`facade/__init__.py` 与顶层 `__init__.py` 同步导出），收敛两处逐字相同
+  的 "current_bound → evidence_binding().store → 无绑定 no-ref" 仪式：
+  `safe_executor._resolve_evidence_pair` 的 store 解析改调 seam（policy 从同一
+  binding 另取，`(store, policy)` 元组形状不变），
+  `approve_gate._route_refusal_to_evidence` 删内联仪式改调 seam
+  （deferred import + try/except ImportError 纪律保留）；两处 docstring 里
+  "exactly like safe_executor._resolve_evidence_pair" 的 stale 引用改指新 seam。
+  `runs/tools.py` / `fact_gateway.py` 的 `current_bound()` 用法按验收 out of
+  scope 未动（fail-loud CLI / journal mirror，不同形状）。
+- Files changed: `lca/infrastructure/observability/facade/facade/facade.py`
+  （新 seam）, `lca/infrastructure/observability/__init__.py`,
+  `lca/infrastructure/observability/facade/__init__.py`（两层导出）,
+  `lca/cognition/body/executor/safe_executor/executor.py`,
+  `lca/nodes/intervene/approve_gate.py`,
+  `tests/unit/observability/test_resolve_evidence_store.py`（4 新测试）,
+  `raphy/prd.json`（RA-032 passes=true）
+- **Learnings for future iterations:**
+  - pair-seam 收敛必须先列 case 表：`_resolve_evidence_pair` 原实现在
+    bound 非空但 store 为 None 时返回 `(None, policy)` 而非 `(None, None)`——
+    "无绑定 no-ref" 的直觉会误写成 `store is None → (None, None)`。
+    动手前枚举全部状态组合（unbound→(None,None)；bound+store None→
+    (None,policy)；bound+store 有→(store,policy)）并证明新实现输出与旧实现
+    逐字相同。这是 RA-031 "验收模糊时以显式公式+零语义变更为准" 的实例化。
+  - observability 新 seam 三层导出清单：`facade/facade/facade.py` 定义 →
+    `facade/__init__.py`（import + `__all__`）→ 顶层 `__init__.py`
+    （import + `__all__`）；deferred import 纪律是调用方的（函数内 import，
+    approve_gate 保留 try/except ImportError），seam 本体不替调用方 import。
+  - 质量门结果：新 seam 4 测试（unbound→None；fake bound 有 store→store；
+    fake bound 无 store→None；pair 元组形状 pin）全过；ADR-0292 20 过；
+    safe_executor 7 文件 36 过；namespace + observability boundary 17 过；
+    6 个摸过的文件 `ruff check` clean。零行为变更由 case 表 + 全绿背书。
 ---
 

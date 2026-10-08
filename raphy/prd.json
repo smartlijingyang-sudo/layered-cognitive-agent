@@ -477,7 +477,7 @@
         "New tests pin: unbound -> None; fake bound with store -> store; fake bound without store -> None; existing safe_executor and ADR-0292 tests green; ruff check clean"
       ],
       "priority": 2,
-      "passes": false,
+      "passes": true,
       "branchName": "raphy/arch-20261008-0118",
       "notes": "Strength: Worth exploring. Two = real: safe_executor._resolve_evidence_pair and approve_gate._route_refusal_to_evidence share the verbatim 'current_bound -> evidence_binding().store -> no-ref when unbound' ritual (the approve_gate docstring even says 'exactly like safe_executor._resolve_evidence_pair'). Deletion test: concentrates ('how to reach the evidence store from the ambient seam' becomes the observability package's own knowledge)."
     }

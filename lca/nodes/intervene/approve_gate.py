@@ -112,7 +112,7 @@ def _route_refusal_to_evidence(
     """ADR-0292 C4 + section 10: route a grant-absence refusal to the evidence ledger.
 
     Mechanical wiring per the section-10 adjudication: resolve the ambient
-    evidence pair exactly like ``safe_executor._resolve_evidence_pair`` and
+    evidence store through the shared ``resolve_evidence_store`` seam and
     prepare the refusal payload (the blocked ungrantable action itself is the
     evidence). ``Decision.content_origin`` is recorded as audit metadata —
     "which external claim, if any, was present" — not as a trigger. The
@@ -122,13 +122,10 @@ def _route_refusal_to_evidence(
     evidence copy is skipped.
     """
     try:
-        from lca.infrastructure.observability import current_bound
+        from lca.infrastructure.observability import resolve_evidence_store
     except ImportError:  # pragma: no cover - packaged without observability
         return
-    bound = current_bound()
-    if bound is None:
-        return
-    store = bound.evidence_binding().store
+    store = resolve_evidence_store()
     if store is None:
         return
     origin = decision.content_origin
@@ -167,8 +164,8 @@ class ApproveGateExecutor:
     ``trust_envelope_scope``) — fail-closed allowlist, ``content_origin``
     as audit metadata only. On the refused path only, the gate additionally
     routes the refusal payload to the run-trace evidence ledger through the
-    ambient observability seam (same pattern as
-    ``safe_executor._resolve_evidence_pair``; no-ref path when unbound) —
+    ambient observability seam (shared ``resolve_evidence_store`` seam;
+    no-ref path when unbound) —
     ADR-0292 C4, "the blocked attack itself is security evidence".
     It never reads ``context.runtime`` and never mutates ``AgentState``.
     The four routing outcomes:
