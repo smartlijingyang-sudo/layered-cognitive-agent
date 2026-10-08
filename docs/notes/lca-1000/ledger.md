@@ -1216,3 +1216,20 @@
 - 验证结果: 无代码改动，无需验证门。扫描脚本全部 exit 0（ast0527.py/dead0527.py/dead0522b.py/sndb0527.py/shallow_scan.py 确定性重跑）；开工/收工工作区 on main（并发会话的未提交改动始终不动）。
 - commit: 无代码 commit；本台账单独 docs commit（沿用 0521–0536 `docs(lca-1000): 第NNNN轮台账` 模式）。
 - 备注: 只 commit docs/notes/lca-1000/ledger.md（`git add` + `git commit -- <path>` 显式路径；-m 须在 -- 之前，见 AGENTS.md 教训）。台账文本经 exec stdin 原样追加（UTF-8，未走 base64 管道；沿用 0536）。扫描输出存 252 /tmp（ast0537_out.txt、dead0537_out.txt、dead0537b_out.txt、sndb0537_out.txt、shallow0537_out.txt）。教训：deslop 计数口径必须与基线目录对齐（lca/ vs lca_kernel/），跨目录裸 grep 会误报"新增"。
+
+
+--
+
+## 第0538轮 (2026-10-09 06:03-06:09 CST)
+- 改了什么: 无代码改动。**本轮未发现新的实质机会**（依据 body 规则 4：不硬凑 trivial commit）。
+- 依据 skill 哪一节: SKILL.md Deletion test + LANGUAGE.md（深度即杠杆/真实 seam/接口即测试面）+ DEEPENING.md Seam discipline + SKILL.md 的 ADR 不 re-litigate 规则 —— 见候选清单的驳回依据。
+- 关键设计决策（夜间跳过 grilling，记台账）: 自 0537（05:40）后无新落盘 —— HEAD 仍为 ae2740ff7（`docs(lca-1000): 第0537轮台账`）。唯一未提交改动为 .agent/skills/airtap-automation/SKILL.md，属并发会话，按 0.5/规则 5 绝不动、不细看（沿用 0522/0528–0537 判例）。时间窗（06:03）与分支（main）两硬门槛均过，skill 四文件（SKILL.md/DEEPENING.md/LANGUAGE.md/INTERFACE-DESIGN.md）完整重读。
+- 候选清单（本轮 explore：AST 同体 + dead a/b + 同名异体 + shallow-facade 最浅未裁决项深读 + deslop 清单 + 新鲜 diff 复查）:
+  1. AST —— /tmp/ast0538_out.txt 与 ast0537_out.txt 逐字节一致（functions=8430，243 组，组 hash 与 0523 基线逐成员一致，零新组；0522/0523 已逐组人工裁决）。注意：首轮 for 循环 cmp 误报五组全 DIFFERS，系 ssh252 包装吞掉了远程命令里的 `${pair%%:*}` / `${pair##*:}` 花括号参数展开（裸 `$var` 正常；0533 教训的扩展版）；改用裸文件名逐对 cmp + diff + wc -c 核验后五组全部逐字节一致。
+  2. dead a / dead b —— 与 dead0537_out.txt / dead0537b_out.txt 逐字节一致；真死 17 与 0522–0537 裁决集合一致。
+  3. sndb —— 与 sndb0537_out.txt 逐字节一致（295 组，含 0527 新裁决的 5 组）。
+  4. shallow-facade（/tmp/shallow0538_out.txt 与 0537 基线逐字节一致，total 61）最浅未裁决项 **lca/runtime/loop/runtime_loop.py**（15/17，CognitiveRuntime，605 行）深读裁决：驳回。Deletion test：删去该 Module 会把 run 编排实质（trace_id 级联解析、SkillActivationReducerBridge install/dispose 生命周期、turn bracketing、session writer 分层 + capabilities.with_writer、ADR-0244 prior-turn seeding、ADR-0268 developer_seed handoff、ADR-0248 vocal/auto-review 接线、capability-bindings token 作用域、ADR-0169 异常归一化、resume envelope、lifecycle/finally 事件发射、initiative offer 派生）散到所有 run 入口 caller —— 复杂度不消失，是真实 seam。15 个 pass-through property 是刻意设计的窄只读 Interface（类 docstring 明示 "for existing Agents and tests"）：把 run 入口的 capability 读面稳定下来，binding 内部演进不波及 caller，是 loop 入口与 binding 之间的真实 seam，非无依据 indirection。`_publish_terminal_event` 有测试引用（tests/runtime/test_runtime_lifecycle_plugins.py:172），属 compatibility seam，非 dead，不动。附带：本机读取该文件时 `runtime_bindings_token = ...` 一行被输出管线脱敏为 `<redacted>`（变量名命中 *TOKEN* 启发式），系显示层行为，非仓库内容异常，不处理、不深究其值。
+  5. deslop：TODO/FIXME/HACK/XXX lca/ --include='*.py' = 8（既往裁决项，无新增）；except Exception lca/ = 442（与基线一致）；noqa F401 lca/ = 1（cli.py side-effect registry 老项）；"自承 dead"/叙事性注释/新 deprecated 无新增（0537 后生产代码零变更）。
+- 验证结果: 无代码改动，无需验证门。扫描脚本全部 exit 0（ast0527.py/dead0527.py/dead0522b.py/sndb0527.py/shallow_scan.py 确定性重跑）；开工/收工工作区 on main（并发会话的未提交改动始终不动）。
+- commit: 无代码 commit；本台账单独 docs commit（沿用 0521–0537 `docs(lca-1000): 第NNNN轮台账` 模式）。
+- 备注: 只 commit docs/notes/lca-1000/ledger.md（`git add` + `git commit -- <path>` 显式路径；-m 须在 -- 之前，见 AGENTS.md 教训）。扫描输出存 252 /tmp（ast0538_out.txt、dead0538_out.txt、dead0538b_out.txt、sndb0538_out.txt、shallow0538_out.txt）。新教训：ssh252 远程命令里避免 `${...}` 花括号参数展开（会被包装吞掉致误判），只用裸 `$var`（0533 教训扩展）。
