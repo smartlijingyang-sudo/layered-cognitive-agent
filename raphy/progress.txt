@@ -1887,3 +1887,16 @@
   - "收进契约"类 story 的检查单：contract 加常量+`__all__`；原模块删定义+修 `__all__`（F822 会抓漏）；所有引用方（生产+测试）改 import。ruff 的 RUF022（`__all__` 排序）+ F822 是天然验收。
   - 搬家时注意 import 排序：ruff isort 对 `from x import (CONST, Class)` 是大小写敏感排序（CONST 在前），按 ruff 为准。
 ---
+
+## 2026-10-09 09:30 CST - RA-074
+- ADR-0115 倒置迁移决议:选 (b)——诚实放弃迁移,承认 `lca.harness.profile.*` 为 SSOT,决议记入 `docs/adr/0115-kernel-transport-boundary.md`(RA-074 决议节)。理由:目标模块(`lca_kernel.resolve` 等)从未创建,真迁移(选项 a)是数百行搬迁,超出单轮且 harness 实现稳定。
+- 删 6 处 import 时 bogus DeprecationWarning(指向不存在的 `lca_kernel.*` 模块):`resolve/resolve.py`、`resolve/capability_plan_resolver.py`、`resolve/source.py`、`boot/runtime_closure.py`、`plan/declarations.py`、`validate/runtime_binding_validator.py`;5 个文件顺带删掉变未用的 `import warnings`(resolve.py 保留,206 行有合法 warn)。
+- 删 3 个零消费者影子:`lca_kernel/plan/resolve.py`、`lca_kernel/plan/declarations.py`、`lca_kernel/boot/closure.py`(`assert_runtime_closure` 零调用)。`lca_kernel/plan/source.py` 去 re-export 仅保留 `compose_entries`(唯一真实消费者是测试)。
+- K4 目录降级为 diagnostics/reference 表:在 `runtime_closure.py` docstring 注记——boot 真实门是 `lca_kernel/boot/plan_validation.validate_profile_plans`;需要闭包校验显式调 `validate_runtime_closure`。未做 boot 接线(那会是新硬门,需要另立 ADR)。
+- 新 pin 测试 `tests/architecture/test_adr0115_no_bogus_deprecations.py`(源码扫描:`lca/harness/profile` 下不许再出现 `deprecated, use lca_kernel`)。
+- 测试:新 pin + tests/harness/profile + compose_entries + boot_binding_completeness + runtime_binding_validator = 134 passed;tests/lca_kernel/boot + plan_compiler_validation = 178 passed。ruff 全绿。
+- **Learnings for future iterations:**
+  - import 时的 module-level `warnings.warn` 是最吵的不诚实:每个 import(每次 boot)都撒谎一次。评估"deprecated"声明时先 `ls` 目标模块是否存在。
+  - "需要架构决策"的 story:决议本身就是 deliverable,决议要落字(ADR 追加节),不能只落在 commit message。
+  - docstring 里插注记时,note 必须插在 closing `"""` 之前;脚本先 `compile()` 校验再继续。
+---

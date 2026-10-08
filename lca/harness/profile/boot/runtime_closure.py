@@ -8,11 +8,18 @@ capability 必须具备 provider、缺失时允许哪种 fixture 回退、以及
 本模块是 Profile 输入规范化、闭合验证、CapabilityPlan 投影及其诊断的唯一
 策略 seam。由目录派生的只读表仅为诊断和测试提供稳定读取面，不应在其他模块
 重新维护平行映射。
+
+
+RA-074 决议:本目录的运行时闭包目录(RUNTIME_CLOSURE_REQUIREMENTS 等)是
+diagnostics/reference 表,不是 boot 强制门。ADR-0115 K4 设想的
+``assert_runtime_closure`` boot 接线从未发生(``lca_kernel/boot/closure.py``
+零消费者,已随 RA-074 删除);boot 的真实门是
+``lca_kernel/boot/plan_validation`` 的 ``validate_profile_plans``。
+需要闭包校验时显式调用 :func:`validate_runtime_closure`。
 """
 
 from __future__ import annotations
 
-import warnings
 from collections.abc import Mapping
 from dataclasses import dataclass
 from enum import StrEnum
@@ -152,13 +159,6 @@ def closure_provider_hint(capability: str) -> str | None:
     requirement = runtime_closure_requirement(capability)
     return requirement.provider_hint if requirement is not None else None
 
-
-# === Deprecation (ADR-0115) ===
-warnings.warn(
-    "lca.harness.profile.runtime_closure is deprecated, use lca_kernel.runtime_closure (ADR-0115)",
-    DeprecationWarning,
-    stacklevel=2,
-)
 
 __all__ = [
     "RUNTIME_CLOSURE_FALLBACK_POLICIES",

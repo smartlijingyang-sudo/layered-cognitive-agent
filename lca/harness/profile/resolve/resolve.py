@@ -566,13 +566,6 @@ def _canonical_payload(
     ]
 
 
-# === Deprecation (ADR-0115) ===
-warnings.warn(
-    "lca.harness.profile.resolve is deprecated, use lca_kernel.resolve (ADR-0115)",
-    DeprecationWarning,
-    stacklevel=2,
-)
-
 __all__ = [
     "ProfileResolveError",
     "ResolvedPlugin",

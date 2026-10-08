@@ -1067,7 +1067,7 @@
       "description": "As an LCA maintainer, I want the ADR-0115 migration either finished or honestly abandoned, so boot stops emitting DeprecationWarnings pointing at modules that don't exist. Evidence (Round 13, profile/boot zone): the migration is inverted — deprecated lca.harness.profile.* modules are the production path (lca_kernel/boot/boot.py imports them directly), while lca_kernel/plan/resolve.py (25 lines), declarations.py (25 lines), source.py's re-export parts are thin re-exports whose DeprecationWarnings point at lca_kernel.resolve / lca_kernel.runtime_closure / lca_kernel.capability_plan_resolver — NONE of which exist in the repo. Every boot emits warnings naming nonexistent modules. Separately, lca_kernel/boot/closure.py (58 lines, K4 assert_runtime_closure) has zero callers (run_resolved_kernel actually calls validate_profile_plans); its policy catalog runtime_closure.py (240 lines, 15 RUNTIME_CLOSURE_CATALOG rules) + runtime_binding_validator.py (265 lines) form a 'single policy seam' that boot never executes — the worst middle state (looks enforced, isn't).",
       "id": "RA-074",
       "notes": "Source: Round 13 friction walk (Worth exploring; needs an architecture decision — ADR-0115. Combines closure chain + re-export shadows; deletion tests pass for all dead parts.)",
-      "passes": false,
+      "passes": true,
       "priority": 3,
       "title": "Resolve the ADR-0115 inverted migration: dead K4 closure chain + lca_kernel/plan re-export shadows"
     },
