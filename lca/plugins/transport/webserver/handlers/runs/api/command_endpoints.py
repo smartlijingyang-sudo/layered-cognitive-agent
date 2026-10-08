@@ -33,6 +33,7 @@ from starlette.responses import JSONResponse
 
 from lca.cognition.team.modes_catalog import resolve_profile_mode
 from lca.contracts.models.core.conversation.conversation import ConversationTurn
+from lca.contracts.protocols.assistant.ownership import AssistantOwnership
 from lca.infrastructure.file.store import LocalFileStore
 from lca.plugins.transport.webserver.handlers.cors.cors import cors_headers
 from lca.plugins.transport.webserver.handlers.runs.ingest import (
@@ -127,6 +128,7 @@ async def decode_create_run(
     file_store: LocalFileStore,
     resolve_mode: Any,
     user_id: str = "",
+    ownership: AssistantOwnership | None = None,
 ) -> CreateRunRequest | JSONResponse:
     """Decode + validate ``POST /runs`` body to a typed carrier request.
 
@@ -150,6 +152,12 @@ async def decode_create_run(
             status_code=400,
             code="invalid_assistant_id",
         )
+
+    agent = parse_agent_ref(body.get("agent"))
+    if not assistant_id and ownership is not None and agent.agent_id:
+        # Carrier-side resolution so agent-only callers (lca-ops runs create)
+        # get the same assistant identity the gateway bridge asserts.
+        assistant_id = ownership.assistant_id_for_agent(agent.agent_id) or ""
 
     mode = str(body.get("mode") or body.get("model") or "solo")
     resolved_mode = resolve_mode(ctx, mode)
@@ -181,7 +189,7 @@ async def decode_create_run(
         mode=resolved_mode,
         attachment_ids=run_input.attachment_ids,
         prior_turns=run_input.prior_turns,
-        agent=parse_agent_ref(body.get("agent")),
+        agent=agent,
         device_id=str(body.get("device_id") or ""),
         plane=str(body.get("plane") or ""),
         extra_plane=str(body.get("extra_plane") or ""),
@@ -519,6 +527,7 @@ async def create_run(request: Request) -> JSONResponse:
         file_store=_file_store_of(request),
         resolve_mode=resolve_profile_mode,
         user_id=user_id,
+        ownership=getattr(request.app.state, "assistant_ownership", None),
     )
     if isinstance(decoded, JSONResponse):
         return decoded
