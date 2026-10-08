@@ -509,7 +509,7 @@
       "description": "As an LCA maintainer, I want the observation_content docstring and journal-path narrative to match reality (tool_journal is a third consumer and the journal persists the projected text), so nobody trusts a journal 'absolute path' copy that does not exist.",
       "id": "RA-034",
       "notes": "Source: Round 10 friction walk A (Strong). Verified line-by-line: tool_journal.commit_body_tool_execute_end is the third caller; RunSessionWriter.append_tool_result persists the projected content; no absolute-path copy exists on the write path. Deletion test: deleting the 'journal keeps absolute paths' sentence changes zero complexity -> narrative debt. Overlap: none (RA-029 is the turn typed seam).",
-      "passes": false,
+      "passes": true,
       "priority": 2,
       "title": "Fix the observation_content dual-consumer narrative: journal stores the projected text, not absolute paths"
     },

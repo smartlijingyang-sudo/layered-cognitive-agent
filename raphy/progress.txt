@@ -1215,3 +1215,37 @@
     在干净树同样失败（引用的 `lca/runtime/runtime_bindings.py` 早已搬走），
     与本 story 无关，不纳入本轮修复范围。
 ---
+
+## 2026-10-08 12:51 CST - RA-034
+- 方向拍板：选 option (a) 纯文档修正，不做 (b)。理由：journal 存 display 投影
+  是正确行为 —— 持久记录与模型所见完全一致（可审计），且 host 绝对路径不进
+  durable store 正合 ADR-0121 的边界意图；(b) 的 process 视图无任何已验证
+  的消费者，属为不存在的需求改行为。叙事债务 → 叙事修复。
+- 修正 `lca/cognition/body/emit/observation_surface.py` 模块 docstring：
+  "both consumers" → 三个消费者（补上
+  `tool_journal.commit_body_tool_execute_end` 经 `RunSessionWriter` 的 journal
+  写路径），并写明 journal == display surface 立场；
+  `observation_content` 内联注释删掉"receipts and the journal keep absolute
+  process paths" false claim。
+- 修正 `tests/cognition/body/test_observation_surface_display_paths.py`
+  docstring 的同款 false claim。
+- 新增 pin 测试 `test_journal_persists_display_projection_not_absolute_paths`
+  （tests/loop/test_tool_surface_commit.py）：经真实 Session 跑
+  `commit_body_tool_execute_end`，断言 journal 事件的 content ==
+  `observation_content(obs)` 且不含绝对路径。实现细节：事件类型是
+  `SURFACE_TOOL_RESULT_TYPE`（='spine.body.tool.execute.end'），payload
+  即 data dict 本身（`payload["content"]`，不是 `payload["payload"]`）。
+- 验证过 receipts 侧：`EffectReceipt.output_ref=str(observation)` 的 repr
+  确实带绝对路径 —— 属 debug 副产品，非设计的 process 视图，docstring
+  未将其宣称为正式契约。
+- 文件：lca/cognition/body/emit/observation_surface.py、
+  tests/cognition/body/test_observation_surface_display_paths.py、
+  tests/loop/test_tool_surface_commit.py
+- **Learnings for future iterations:**
+  - "journal 存什么"类叙事先实证再定方向：本轮逐行验证了三个调用者与
+    journal 写路径，才敢选 (a)；若直接按字面修 docstring 会漏掉第 3 个
+    调用者。
+  - `Session.snapshot_events()` 的事件类型用 kernel 常量
+    `SURFACE_TOOL_RESULT_TYPE`（spine.body.tool.execute.end），不是字面的
+    "surface/tool_result"；payload 即 data 本体。
+---

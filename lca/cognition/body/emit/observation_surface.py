@@ -10,17 +10,24 @@ fence — the model-visible rendering of ``Observation.content_origin``.
 The fence is derived from the same mark (one source, two renderings);
 internal observations pass through unfenced.
 
-This lives beside the other body emit projections so both consumers share
+This lives beside the other body emit projections so all consumers share
 one definition:
 
   - ``SimpleBody.dispatch_tool_call`` — the explicit single-call seam;
   - ``effect.execute`` — the declarative graph side-effect boundary, the
-    path production actually runs.
+    path production actually runs;
+  - ``tool_journal.commit_body_tool_execute_end`` — the journal write path
+    (via ``RunSessionWriter.append_tool_result``).
 
-Both must stringify identically; a second copy drifted before (one used
+All three must stringify identically; a second copy drifted before (one used
 the nonexistent ``Observation.content``, which silently produced empty
 results). Structured payloads JSON-encode so the model sees coherent text
 rather than ``repr({...})``.
+
+Journal position (RA-034): the journal persists this projected text verbatim,
+so the durable record matches exactly what the model saw (journal ==
+display surface). There is no absolute-path copy anywhere on the write
+path — the old "journal keeps absolute process paths" narrative was false.
 """
 
 from __future__ import annotations
@@ -56,7 +63,9 @@ def observation_content(observation: Observation) -> str:
         text = payload
     elif isinstance(payload, (dict, list, tuple)):
         # Display projection (ADR-0121): the model sees workspace-relative
-        # guest paths; receipts and the journal keep absolute process paths.
+        # guest paths. The journal persists this same projected text
+        # (journal == display surface, RA-034) — no absolute-path copy exists
+        # on the write path.
         text = json.dumps(project_display_paths(payload), ensure_ascii=False)
     else:
         text = str(payload)
