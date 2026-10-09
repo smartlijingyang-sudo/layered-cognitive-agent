@@ -271,9 +271,7 @@ class CognitiveRuntime(Runtime):
                 content=task,
             )
 
-    def _resolve_vocal_context(
-        self, ctx: RunContext | None, trace_id: str
-    ) -> RuntimeVocalContext:
+    def _resolve_vocal_context(self, ctx: RunContext | None, trace_id: str) -> RuntimeVocalContext:
         """Resolve the runtime vocal context for this run.
 
         ADR-0248: 运行态声带与硬闸解析。复用 carrier 在组合期创建的共享
