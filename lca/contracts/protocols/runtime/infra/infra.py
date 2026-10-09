@@ -8,7 +8,6 @@ from __future__ import annotations
 from collections.abc import AsyncIterator, Sequence
 from typing import Any, ClassVar, Literal, Protocol, runtime_checkable
 
-from lca.contracts.atoms.enums.enums import LLMStreamEventType
 from lca.contracts.models.core.conversation.llm import LLMResponse, LLMStreamEvent
 from lca.contracts.models.core.execution.decision import AgentCard, Observation
 from lca.contracts.models.core.execution.local_exec import (
@@ -39,9 +38,14 @@ class LLMAdapter(Protocol):
 
     async def complete(self, prompt: str, **kwargs: Any) -> LLMResponse: ...
     async def stream(self, prompt: str, **kwargs: Any) -> AsyncIterator[LLMStreamEvent]:
-        """流式输出，逐事件返回结构化 ``LLMStreamEvent``。子类按需覆写。"""
+        """流式输出，逐事件返回结构化 ``LLMStreamEvent``。子类必须覆写。
+
+        RA-097：此处不再提供默认实现。曾经的 no-op 默认（只 yield 一个无
+        response 的 COMPLETED 事件）让只实现 ``complete`` 的 adapter 静默产出
+        空 ``LLMResponse``，run 在外层图以无证据的 "declarative run failed" 死亡。
+        未覆写 stream 的 adapter 会在 think.llm.invoke 处 fail-loud。
+        """
         ...
-        yield LLMStreamEvent(type=LLMStreamEventType.COMPLETED)  # pragma: no cover
 
 
 @runtime_checkable

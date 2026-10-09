@@ -95,7 +95,10 @@ class LlmInvokeExecutor:
 
         response: LLMResponse = LLMResponse(text="")
         aborted = False
-        async for event in adapter.stream(
+        # RA-097: fail loud when the adapter never overrode stream — the
+        # Protocol no longer ships a no-op default, so a complete-only adapter
+        # resolves stream to a coroutine here instead of an async iterator.
+        stream_result = adapter.stream(
             prompt,
             system=request.system,
             history=history,
@@ -105,7 +108,20 @@ class LlmInvokeExecutor:
             step=state.step,
             cursor=cursor,
             reasoner_prompt=reasoner_prompt,
-        ):
+        )
+        if not hasattr(stream_result, "__aiter__"):
+            # Never awaited below — close it so a complete-only adapter does
+            # not leak a "coroutine was never awaited" ResourceWarning.
+            close = getattr(stream_result, "close", None)
+            if callable(close):
+                close()
+            raise RuntimeError(
+                f"llm.invoke: adapter {type(adapter).__name__}.stream() did not "
+                "return an async iterator — LLMAdapter.stream must be overridden "
+                "to yield LLMStreamEvent (the COMPLETED event must carry the "
+                "LLMResponse)."
+            )
+        async for event in stream_result:
             if _wall_clock_exhausted(state):
                 aborted = True
                 break
@@ -118,6 +134,17 @@ class LlmInvokeExecutor:
                 finish_reason="length",
                 model=response.model,
                 usage=response.usage,
+            )
+
+        # RA-097: an event stream that carried no content is a broken adapter
+        # contract, not an empty model reply — fail here with the adapter named
+        # instead of letting an empty Decision die evidence-free at the outer
+        # graph ("declarative run failed").
+        if not (response.text or "").strip() and not response.tool_calls:
+            raise RuntimeError(
+                f"llm.invoke: adapter {type(adapter).__name__} produced an empty "
+                "LLMResponse (no text, no tool_calls). Its stream() must yield a "
+                "COMPLETED event carrying the LLMResponse."
             )
 
         return NodeOutput(

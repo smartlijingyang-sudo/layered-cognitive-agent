@@ -1,398 +1,229 @@
-# Raphy Assessment — Round 14 (2026-10-09 10:30, branch raphy/arch-20261009-1008)
+# Raphy Round 15 Assessment — raphy/arch-20261009-1643（基线 ba65436bb）
 
-Fresh session. Baseline `0127c7120` (main tip; merge: raphy RA-051..RA-080 sweep).
-Scope via YAGNI: last ~40 commits' hot spots are **skills package lifecycle**
-(RA-051..080 just landed: doctor chain, overlay/frontmatter/disk/catalog/factory),
-**CLI services** (`cli/commands` 12 commits), **kernel boot** (RA-054/070), and
-**trace-coherence/v3 scenario pins** (iter-tests). Read: CONTEXT.md,
-raphy/progress.txt `## Codebase Patterns` (top first), raphy/prd.json (RA-001..080
-themes — no duplicate filings), skills/improve-codebase-architecture/SKILL.md,
-relevant docs/adr/ (0119, 0175, 0185, 0232, 0248, 0251, 0268). 禁区 respected:
-preamble.py (user in-flight), gate_chain_strategy.py (other's work, not even read),
-ralph Round 2 territory (DecisionGates/Ingest/ContextFiles shims/Read Runs
-micro-dirs/lca/cognition/memory//infrastructure/tools/assistant/), lca-1000 active
-migration (contracts/event.py PILOT, webserver retired stubs), typed ports /
-delegation cache (iter lanes in flight).
+评估时间：2026-10-09 16:43–17:15 CST。新鲜会话，零记忆，全部状态来自仓库文件。
+上一轮 raphy/arch-20261009-1008 已合 main（merge 1cc01a1ac），RA-001~RA-096 全 done（无 dropped）。
+禁区遵守：未读未碰 `lca/infrastructure/computer/guest/preamble.py` 的 emit/resolve 路径映射。
 
-Three friction-walk zones delegated to fresh-session subagents (ASSESS ONLY, read-only,
-end-to-end reads, 5 questions mandatory each); runtime verification run directly
-with the R13 probe (adapted to this worktree). This file synthesizes their reports
-with self-grilling per candidate.
+## Phase 1 — Explore
 
-## Friction walk
+### 1.1 Scope via YAGNI
 
-### Area A — lca/agent/ + lca/runtime/loop/ + lca_kernel/boot/ + lca/nodes/ (zone: agent core runtime)
+`git log --oneline` 回溯 45 commits：热点区 = raphy/ 自身（mechanical）、docs/notes 账本、
+以及本次 assess 锁定的三区（最近两轮 raphy 改动最密集）：
 
-Read end-to-end: cognitive_agent.py (397), team_handle.py (166), member_invoke.py (96),
-orchestration_registry.py (39), runtime_loop.py (605), runtime_lifecycle_emitter.py (141),
-runtime_lifecycle.py (16), agent_runtime/phases.py (32), boot.py (559), lifespan.py (115),
-stages.py (40).
+- `lca/agent/cognitive_agent.py`（RA-082 包络收敛、RA-096 dataclasses.replace）
+- `lca/cognition/body/tools/tool_batch_executor.py`（RA-086 effects 收敛）
+- `lca/runtime/loop/runtime_loop.py`（近期 2 次改动，run() 方法 150+ 行）
+- `lca/contracts/protocols/runtime/infra/infra.py`（LLMAdapter Protocol —— 运行时验证炸出来的）
 
-1. *One concept, many modules?* YES — "start one fresh run" crosses ~8 modules
-   (CognitiveAgent.run → runtime_loop.run → vocal runtime_wiring → settle_guard →
-   capability_bindings → auto_review gate → BoxAccessor → skills activation bridge).
-2. *Shallow?* YES — `_publish_terminal_event` (3-line delegate); `_RunEventSessionBinder`
-   Protocol defined **verbatim twice** (cognitive_agent.py + team_handle.py);
-   `CognitiveAgent`'s 16 read-only `self._bindings.*` delegates are factual adapter
-   surface (nodes/composer read runtime.brain ×8) — honest, not filed.
-3. *Pure fns, bugs in callers?* YES — `_capture_resume_memory` wraps a pure fn in
-   try/except fail-soft: the swallow decision lives at the call site, not in the fn.
-4. *Leaky seams?* YES, strongest: `_run_driver` uses `getattr(vocal_ctx.gate,
-   "is_awaiting_widget", lambda: False)()` + `m.get("type")=="widget"` +
-   `latest_widget.get("message_id")` — vocal internals in the generic run driver;
-   same sniff repeated in result_projection.py:193 ("two adapters = real seam").
-   Second: lifespan.py docstring promises "no plugin/cli implementation details"
-   while `_lifespan` hard-imports `...webserver.handlers.runs.terminal.handoff_dispatch.LcaRunHandoffDispatcher`
-   and starts CronDaemonService — docstring-vs-code verbatim contradiction; plus
-   `getattr(ctx, "lock_dir", None)` duck-reads and a fail-soft `except Exception`
-   swallowing daemon-start failure in an otherwise fail-loud boot.
-5. *Testability?* YES — `CognitiveRuntime.run()`'s ~120-line composition corridor
-   (bridge install, session writer, vocal resolve, auto-review, capability bindings)
-   has no seam: only a full run reaches it; its top-level imports are empty with
-   10+ deferred imports inside `run()` — the static interface says nothing about
-   the 10 subsystems it touches. Also `transcript_features` fallback derivation
-   (~15 lines in `_run_driver.finally`) belongs to its only consumer
-   `evaluate_initiative` (no locality) and is untestable without a full run.
+### 1.2 Organic friction walk（5 问必答，精读非 grep）
 
-### Area B — lca/cognition/ (excl. memory/) + lca/contracts/ (excl. atoms/artifact/state.py, event.py)
+**Area A — `lca/agent/cognitive_agent.py`（426 行，已全读）**
 
-Read end-to-end: body/ dispatch chain (simple_body, tool_batch_executor,
-execution_policy, tool_wire_gate, guard×3, internal/_retry_classification,
-actions×3, contracts/cognition/body/tools/registry.py,
-protocols/act/tool/batch_execution.py); prompt assembly (sections/types,
-sections/assembler, brain/prompt/skill_router, models/cognition/prompt_assembly.py,
-perception.py, brain/pipeline/context_manifest.py); atoms/mechanisms (seam.py,
-plugin.py, registries.py, exhaustive.py — all honest leaf tools, **no filing**).
+1. 理解一个概念要跨多少小模块？`run()` → `_run_lifecycle` → `_run_lifecycle_body` →
+   `run_envelope`（`lca/agent/run_envelope.py`，RA-082）：四层嵌套但职责清晰（entry
+   → scope → envelope spec → cascade），不算 sprawl。真正刺痛的是 `run()` 与
+   `resume()` 各自末尾那段 `if self._plan_ref: with plan_ref_scope(...)` 的**逐字重复**
+   （各 12 行，唯一区别是 `_run_lifecycle` 的参数）。
+2. 浅模块？模块顶层的四个 `_agent_translate_*` 函数（RA-082 留下）：每个 8–10 行，
+   interface = 一种异常类型 + 上下文。deletion test：删掉它们并不能把复杂度"集中"
+   到一处——outcome 翻译规则（status/output/error/outcome/disposition 五元组）本来就
+   是四种异常各自的翻译表；但四函数之间有**机械对称性**（FAILED+`drain_run_partial()`+`steps=0`
+   出现 3 次）， Worth exploring：收敛成一张 outcome 翻译表而非四个函数。本轮不做
+   （RA-082 刚落地，收敛它等于重写上轮决策，先记观察）。
+3. 为 testability 抽出的纯函数？`_enrich_run_context`（RA-096 已收敛为 replace）。
+   `_task_as_text` 2 行分支——真 bug 藏在调用方（RA-046 已修 None 入口）。无 locality 问题。
+4. Leaky seam？**有**：`register_hook` 末尾 `if isinstance(runtime, HasHooks):` ——
+   Protocol 已声明 `HasHooks`（`lca.contracts.protocols.perceive.capabilities`），
+   调用方却用 isinstance 嗅探而不是让 interface 成为 test surface。else 分支是**静默
+   丢弃**（hook 注册无声失败）。→ 候选 RA-099。
+5. 未测试/只能穿透 interface 测试？四个 translator 有 RA-023 的 pin。`register_hook`
+   的静默丢弃分支无测试（穿透 `runtime` 具体类型才能触发）。同 RA-099。
 
-1. *One concept, many modules?* YES — "how is a tool batch scheduled" crosses
-   protocol → execution_policy → tool_batch_executor → registry.py (effects
-   taxonomy), two trees (contracts/cognition vs lca/cognition); "why this
-   template" crosses skill_router → prompt_assembly → assembler → reasoner → harness.
-2. *Shallow?* YES — `tools/tool_registry.py` (26-line NamedRegistry alias),
-   `actions/action_registry.py` (61-line alias dict): deletion test = just moves,
-   stable registration seams — not filed. `types.py` single-field wrapper
-   dataclasses (ManifestClock/Subtasks/Artifacts) — noted, folded into RA-093.
-3. *Pure fns, bugs in callers?* YES — `missing_arguments_block_observation(decision,
-   tool_registry: object)` hides the real contract in `object`; `_catalog_skill_count(catalog:
-   object | None)` — failure modes live in what callers pass, not the counting.
-4. *Leaky seams?* YES — `ToolBatchExecutor._resolve_tool_effects` getattr-chains
-   through `tool.manifest.api[0].effects` (manifest internals known to the
-   executor); `select_mode_with_audit` getattr-probes a capability the protocol
-   never declares; assembler's catalog seam is typed `object` while contracts
-   has `BrainPromptCatalog`; `_dispatch` switches on bare strings "pure"/"stateful".
-5. *Testability?* YES — PARALLEL-selection behavior only testable through
-   `select_mode_with_audit` (protocol `select_mode` can't express it); the audit
-   channel's contract is unwritable; wire-block observation shape asserted per-gate.
+**Area B — `lca/runtime/loop/runtime_loop.py`（595 行，`run()` 全读）**
 
-### Area C — lca/infrastructure/cli/ (excl. doctor) + computer/ (excl. preamble) + tools/ (excl. assistant) + env/ + assistant/ + path/
+1. 跨模块理解成本：`run()` 单方法 ~150 行，串起 8 组**函数内 import**
+   （`lca.infrastructure.session.bindings`、`...emit.lifecycle_emit`、
+   `lca.infrastructure.skills.activation.bridge`、`lca.runtime.session.run_session_writer`、
+   `lca.application.vocal.runtime_wiring`、`lca.contracts.models.vocal.models`、
+   `lca.infrastructure.runtime_plane.capability_bindings`、
+   `lca.infrastructure.vocal.settle_guard`、`lca.contracts.models.auto_review.models`、
+   `lca.infrastructure.auto_review.gate`、`lca.infrastructure.computer.box_accessor`）。
+   每个 import 注释都在解释"为什么不能放顶层"（循环 import / PR-E 桥接语义）。
+   理解"一次 run 做了什么"要在 6 个关注点之间跳：bridge 安装→turn 开始→session writer
+   播种→vocal 解析→auto-review 门→capability bindings token。**sprawl 的不是模块数，
+   是单个方法的阶段数**。
+2. 浅模块？`_publish_terminal_event`（3 行，docstring 承认是 "Compatibility seam"）
+   委托给 `self._lifecycle.publish_terminal` —— interface 与实现几乎同构。deletion test：
+   删掉它只是把一次调用搬到调用方，复杂度不集中。**它是 RA-083/084 时代的兼容垫片，
+   留给调用方迁移**——记观察，不入 story（删它需要先改全部调用方，属机械清理，
+   可作 hygiene，不占本轮名额）。
+3. 纯函数抽取？`_run_driver` 的 `outcome_holder` dict 是可变 holder 习语——
+   except 分支写、finally 分支读，真实 bug（outcome 丢失）只能藏在"哪个分支先跑"里，
+   纯函数抽不出来。这是 locality **正确**的例子（状态机就该待在一起）。
+4. Leaky seam？`cast("SessionProtocol", session_reader)` + 长注释论证
+   "resolve_raw_session isinstance-guaranteed"——seam 在用注释代替类型保证。
+   但 SPEC H 已声明这是 read face，属已声明契约，不算泄漏。
+5. 测试面？`_run_driver` 的 try/except/finally 包络只能通过整轮 run 集成测试覆盖；
+   细粒度行为（resume.end 只在 resume_envelope 时发）靠 scenario 测试。无穿透测试需求。
 
-Read: cli.py, commands/__init__.py, steps.py (293), service.py (~450),
-services/*, tools/_shared.py, tool/invocation_scope.py, seam/file_ref_args.py,
-box_accessor.py (62), box_sandbox_adapter.py (282), box_port.py (60),
-env/bootstrap.py, path/locator.py, path/policy.py.
+→ 候选 RA-100：把 `run()` 的 turn 准备阶段抽成命名私有 helper
+（`_install_skill_bridge` / `_seed_run_session` / `_resolve_vocal_ctx` / `_apply_runtime_overrides`），
+函数内 import 收敛到模块顶层或一个 `_late_imports` 块，并验证循环 import 的真实边界。
 
-1. *One concept, many modules?* YES — `lca-ops lobehub restart` crosses 4 layers,
-   two of them string-keyed (`step_map` dict → `register_step` global registry via
-   cli.py side-effect imports).
-2. *Shallow?* YES — 14 of 17 steps are 6–10-line verb→method translations;
-   ServiceRegistry is 7 dict one-liners; two `__init__.py` re-export barrels.
-   Deletion test: just moves — but the *capability gap* they paper over is real (RA-084).
-3. *Pure fns, bugs in callers?* YES — `daemon_ensure` (steps.py:113) calls
-   `CliShippingService`'s **private** `_cli_deployed()`/`_cli_source_changed()`
-   cross-module: the real coupling (this service ships a CLI) lives in the caller's
-   isinstance-narrowing + private calls, not on the interface.
-4. *Leaky seams?* YES, strongest: **box sandbox boundary has two owners and
-   diverged correctness** — `BoxAccessor.resolve_path` uses
-   `str(resolved).startswith(str(root_dir))` (line 37: `/home/box2/evil` escapes
-   `/home/box`), while `LocalBoxAdapter._resolve_safe_path` uses `relative_to`
-   (correct); production traffic (tools/box/tool.py:67/124/168 via
-   asyncio.to_thread) goes through the **vulnerable** one. Two byte-identical
-   atomic-write copies, two identical sudo/su hard-gate copies (117 vs 229 lines),
-   `self.adapter` written 3× never read (vestigial; BoxExecutionPort hypothetical
-   on the sync path), `get_box_adapter` zero production callers.
-   Second: `stack_heal` downcasts Service → KernelServeService for `.spawner()`
-   with a TypeError guard apologizing for the dishonest seam.
-   Third: file_ref_args seam claims "every path arg flows through resolve_path_arg"
-   but tools/ has zero callers; only read_file wires it, write/edit/list bypass.
-5. *Testability?* YES — stack_heal/daemon_ensure need fakes shaped like
-   KernelServeService, not the Service protocol ("interface is NOT the test
-   surface"); test_box_sandbox_adapter.py pins the **production-unused** path;
-   BoxAccessor.resolve_path prefix behavior has no pin.
+**Area C — `lca/cognition/body/tools/tool_batch_executor.py`（306 行，全读）+ `registry.py`（174 行，全读）**
 
-env/ (bootstrap constants, layered pure fns), path/locator.py (real multi-source
-priority complexity), assistant/io.py (RA-056 digest depth) — read, honest depth,
-**no filing**.
+1. 跨模块？`execute` → `_resolve_tools` → `_select_mode_with_optional_audit` →
+   `_select_segments` → `_execute_segment` → `_execute_one` → `_as_tool_result` /
+   `_combine_observations`：调用链深但每一步是 pipeline 阶段，顺序读即可，不刺痛。
+2. 浅模块？`_as_tool_result`（7 行）与 `_combine_observations`（40 行）——
+   前者是后者的单元素特例（OBS_RESULT_KIND 标记）。deletion test：
+   删掉 `_as_tool_result`，把单元素走 `_combine_observations`？
+   不行——`_combine_observations` 会重建 Observation 丢掉原 extra（注释明确写了
+   "passes the tool's own extra through untouched"）。**不对称是故意的**，不碰。
+3. 纯函数？`_canonicalise_tool_name` + `_CAMEL_BOUNDARY_RE` 在模块底——
+   位置对（私有 helper 沉底），locality 好。
+4. Leaky seam？`_select_mode_with_optional_audit` 的
+   `isinstance(self._policy, AuditAwareToolBatchPolicy)` + `getattr(tool, "grant", None)`：
+   前者是已声明协议的能力探测（docstring 明确 fallback 语义，RA-086/087 已审计），
+   后者是 Body 权威 grant 的防御性读取（注释写了 safe-by-default）。**已收敛，不碰**。
+5. 测试面？`_combine_observations` 的 failure_kind fold 有 pin（RA-086 相关测试）。
+   无缺口。
 
-## Runtime verification (real run, LLM_API_KEY=<redacted>
+结论：Area C 本轮无 story（RA-085/086/087 已收敛干净）。
 
-Probe `~/workspace/raphy-probe-r14.py` (R13 script, worktree path updated):
-- (a) basic run → COMPLETED
-- (b) one-shot tool-call run → COMPLETED, marker file written by tool (tool truly executed)
-- (c) two sequential runs on one agent → both COMPLETED
-- (d) infinite-loop mock, max_steps=3 → FAILED, no exception leak
-- (e) run(None) → TypeError at entry; NativeToolCall(arguments="str") → TypeError at construction
+### 1.3 Runtime verification（实跑，LLM_API_KEY=dummy，scripted LLM stub）
 
-**No crashes/hangs/silent failures. No P0 runtime candidates this round.**
+按 prompt 要求实跑三项核心流程（web-standard profile，`CognitiveAgent.run()`）：
 
-## Candidate table
+- (a) 基础 run → COMPLETED：**失败**
+- (b) 带 tool call 的 run → COMPLETED：**失败**
+- (c) 同一 agent 两次顺序 run：**失败**
 
-| ID | Files | Problem | Solution | Benefits (locality + leverage) | Strength |
-|---|---|---|---|---|---|
-| RA-081 | computer/box_accessor.py, box_sandbox_adapter.py, tools/box/tool.py, box_port.py | Sandbox boundary has two owners; containment correctness diverged — production path has a prefix-escape bug | Converge to one gate (relative_to semantics); one atomic-write; one hard-gate copy; resolve vestigial adapter | Security invariants in one place; new box ops inherit the gate; tests pin the production path | **Strong** |
-| RA-082 | agent/cognitive_agent.py, agent/team_handle.py | Run-lifecycle envelope hand-written twice, outcome-translation rules duplicated; binder Protocol defined verbatim twice | One envelope seam; carriers supply started/finished factories + outcome policy | Outcome matrix testable without driving agent AND team; 3rd carrier reuses the envelope | **Strong** |
-| RA-083 | cli/service/service.py | Protocol types and 7 subprocess probing primitives share "the core abstraction"; service/ vs services/ naming collision | service.py → pure protocol; primitives → honestly-named probing deep module | Gotcha set discoverable + fake-testable; protocol half becomes pure interface | Worth exploring |
-| RA-084 | cli/steps/steps.py, service.py, services/kernel/serve.py, services/daemon/daemon.py | Service protocol bypassed: isinstance downcast for .spawner(), cross-module private _cli_* calls; CliShippingService single-impl pseudo-protocol | Promote respawn + CLI-fingerprint to first-class protocol capabilities | Interface becomes the test surface again; future services hang capabilities on protocol bits | **Strong** |
-| RA-085 | contracts/cognition/body/tools/registry.py | audit_tool_manifest_effects: zero callers, body returns immediately; __all__ missing 2 names; whitelist literal ×2 | Delete dead fn; complete __all__; one _AUDITED_DEFAULT_TOOLS constant | Module shows its real enforcement face; 5th audited tool can't diverge the two sites | **Strong** |
-| RA-086 | cognition/body/tools/tool_batch_executor.py, contracts/.../registry.py | Executor re-implements select_effect inline (getattr through manifest.api[0], silent "external" fallback, duplicated closed-set check); registry's fail-loud select_effect has zero production callers | Converge on a registry-level tool-effects seam; executor deletes its helpers | Effects semantics (closed-set check + multi-API rule) in one place; taxonomy gains a 4th value in one edit | **Strong** |
-| RA-087 | protocols/act/tool/batch_execution.py, execution_policy.py, tool_batch_executor.py | PARALLEL-decision logic lives in select_mode_with_audit — never declared by the protocol; one getattr probe + one implementer = hypothetical seam; third-party policies silently degrade to SEQUENTIAL | Declare the audit channel (extension protocol or enriched entry); isinstance dispatch, no probing | Future batch policies implement a declared interface; "policy needs which facts" lives in the protocol | **Strong** |
-| RA-088 | lca_kernel/boot/lifespan.py, plugins/transport/webserver/server/server.py | make_lifespan docstring promises "no plugin/cli details" but imports the webserver dispatcher and starts the cron daemon; only production caller is server.py; fail-soft except in fail-loud boot | Cron start/stop → webserver plugin setup; make_lifespan → pure ASGI adapter | "Production needs cron" (ADR-0268) lives where its deps live; lifespan reusable without dragging cron along | **Strong** |
-| RA-089 | runtime/loop/runtime_loop.py, runtime/projection/result_projection.py, protocols/vocal/protocol.py, infrastructure/vocal/gate.py | _run_driver getattr-bypasses the declared is_awaiting_widget(); two sites sniff gate internals ("widget"/"message_id"/"content" strings); swap the gate → silent no-op | Typed vocal projection seam (pending_widget_approval(), visible texts); impl by gate classes | Message-shape knowledge back with its owner; driver loses vocal vocabulary; gate projection unit-testable | **Strong** |
-| RA-090 | runtime/loop/runtime_loop.py, application/initiative/hooks.py | transcript_features fallback derivation (~15 lines) lives in _run_driver.finally; sole consumer is evaluate_initiative; duck-reads prior_turns on a typed dataclass; untestable without a full run | Move derivation next to its consumer; driver = 3-line call | Role-counting rules get pure unit tests; initiative evolution never touches the run driver | **Strong** |
-| RA-091 | cognition/body/tools/tool_wire_gate.py | Two wire-block Observation constructors share identical shape + verbatim model-facing guidance text; trigger conditions differ | One private constructor seam; gates supply condition+status+reason | Guidance text single-sourced; 3rd gate reuses the shape; extra-contract asserted once | Worth exploring |
-| RA-092 | models/cognition/prompt_assembly.py, harness/memory/events.py, brain/prompt/skill_router.py, sections/assembler.py | "Why this template" has two vocabularies: closed SelectorDecisionPath (trace) vs bare str (SkillRouted); KeywordSkillRouter emits values outside the closed set | One vocabulary across channels; contract test: router-emitted values ∈ closed set | New routing strategies get consistent attribution for free; coerce fallback documented | Worth exploring |
-| RA-093 | cognition/brain/sections/types.py, models/core/perceive/perception.py | kind→payload-type knowledge split 3 ways (docstring, 4 helpers' isinstance checks, ItemKind Literal); ContextManifest.by_kind exists but is bypassed by _manifest_items | Typed kind→payload accessor on the manifest; helpers converge | New kinds get one pairing point; payload-type contracts testable per kind | Worth exploring |
-| RA-094 | cognition/brain/sections/assembler.py | Catalog seam typed `object` while BrainPromptCatalog exists; getattr duck-probing; _catalog_skill_count docstring promises 3 fallbacks, implements 1 | Type the seam; delete probing; fix doc (or add the fallback — explicit choice) | "What the assembler needs from catalog" moves from probe code into the type declaration | Worth exploring |
-| RA-095 | infrastructure/tools/seam/file_ref_args.py, computer/sandbox/computer.py | Seam claims "every path arg flows through resolve_path_arg"; tools/ has zero callers; only read_file wires it (write/edit/list bypass) | Explicit choice: universal choke point, or honest read-path-only scoping | Path-resolution policy decided in one place; wiring scope pinned by tests | Worth exploring |
-| RA-096 | agent/cognitive_agent.py | _enrich_run_context hand-rebuilds all 8 RunContext fields; the 9th field will be silently dropped | dataclasses.replace (keeping defensive copies of context_refs/extra) | "Fill default deadline" = one expression; future fields ride along | Worth exploring |
+根因链（逐层探针确认）：
 
-Diversity quota: duplication-class = RA-082, RA-085(whitelist part), RA-091 → 3/16, within limit.
-Friction-walk-sourced (shallow/leaky-seam/testability): RA-081, RA-083, RA-084, RA-086,
-RA-087, RA-088, RA-089, RA-090, RA-092, RA-093, RA-094, RA-095 — quota satisfied.
+1. `llm.invoke` 节点**只**消费 `adapter.stream(...)`（PR-B cf155018d 拆分后），
+   `LLMAdapter` Protocol 的 `stream` 带一个**默认实现**：`yield LLMStreamEvent(type=COMPLETED)`
+   （`lca/contracts/protocols/runtime/infra/infra.py:41-44`，`# pragma: no cover`）。
+2. 只实现 `complete` 的 adapter（包括仓库自带的 e2e 脚本桩
+   `tests/integration/test_run_with_tool_use.py::_ScriptedEcho`）继承了这个
+   no-op 默认：stream 只吐一个无 `response` 的 COMPLETED 事件。
+3. `invoke.py:113` 只有 `event.type is COMPLETED and event.response is not None` 才赋值
+   → response 保持 `LLMResponse(text="")` 空响应 → `decision.parse` 产出
+   `action_type='respond'` 空文本 → outer `phase_main` 三条出边全不匹配
+   （use_tool/delegate？no；respond+非空文本？no；should_terminate？no）
+   → `RuntimeError('declarative run failed')`，**零证据**（error_fact 无 detail）。
+4. 仓库自带的 e2e `test_run_with_tool_use_succeeds_on_web_standard` 在 main 上
+   **同样失败**（4.68s，同签名 step=0 failed）——PR-B 之后从未更新过脚本桩。
 
-## Self-grilling (per candidate)
+修好脚本桩的 `stream`（按 `LLMStreamEvent` 不变式：COMPLETED.response 与
+`complete()` 逐字段相等）后重跑：(a)(c) COMPLETED；(b) tool call 决策正确路由到
+`act.main`（gate 探针：`action_type='use_tool'`），但该轮 terminal fallback 报
+"未产生任何输出"——脚本桩只发一次 tool call 的人为限制，implementer 修 RA-097 时
+需用完整脚本复现确认（见 story AC）。
 
-### RA-081 box boundary
-- Constraints: ADR-0248 §3.2 (sandbox root, no sudo/su privilege); ADR-0251 decision 1
-  (atomic write tmp+fsync+os.replace) — semantics unchanged; tools/box sync-via-to_thread
-  shape kept; BoxExecutionPort contract + existing tests unbroken.
-- Dependencies: tools/box/tool.py (4 tool classes + build_box_tools) → BoxAccessor;
-  execution_environment.py lazily constructs BoxAccessor(); LocalBoxAdapter ←
-  BoxAccessor.__init__ (vestigial) + tests; OnlyboxesBoxAdapter/get_box_adapter ← tests only.
-- Shape: deep gate module — `contain(path) -> Path` (relative_to, escape → PermissionError),
-  `atomic_write(path, content)` (ADR-0251 full set); BoxAccessor + LocalBoxAdapter become
-  thin callers; `self.adapter` used or deleted.
-- Test survival: test_box_sandbox_adapter.py pins adapter behavior (keep); NEW pin:
-  BoxAccessor.resolve_path rejects sibling-prefix escapes — this is a behavior change,
-  record as bugfix not pure refactor; tools/box call-path tests verify delegation parity.
-- Deletion verdict: concentrates — security invariants converge in one gate.
+**这是 P0 级候选**：默认 `stream` 是教科书式的 "one adapter = hypothetical seam" 反例——
+为省一次 override 写出的默认实现，让所有不完整 adapter 在错误的地方静默失败，
+且失败点（`_runtime_failure_message` → "declarative run failed"）吞掉了全部证据。
 
-### RA-082 run-lifecycle envelope
-- Constraints: journal payloads (AgentRunStarted/Finished vs TeamRunStarted/Finished)
-  byte-identical — tests/scenario/journal_* pin them; ADR-0037 (team handle = narrative
-  edge); RA-046 (None-task fail-loud, agent-only); RA-023 (LoopObligationExceededError→failed,
-  agent-only); binder Protocol from ADR-0186; todo-38 hot-path comment — do NOT merge the
-  cheap active_publish_session() checks into one "optimization".
-- Dependencies: callers of .run() are transport/composer (external behavior unchanged);
-  internals call lca.loop.emit.cognitive.agent_spawn, observability, session.bindings.
-- Shape: new module under lca/agent/ exposing the envelope: inputs = started-event
-  factory + finished-event factory + execute callable + outcome-translation policy
-  (agent flavor has Cancelled/LoopObligation branches, team flavor doesn't); output = Result.
-- Test survival: team_1/test_team_modes_scripted.py, journal_0/*, carrier_terminal_observation —
-  must stay green; NEW: table-driven outcome-matrix tests (success/cancelled/failed/
-  loop-obligation × agent/team), currently unwritable.
-- Deletion verdict: concentrates — the outcome-translation rules (exit paths × carriers)
-  are the real complexity; converging them is not moving lines.
+### 1.4 Duplication scan（次要）
 
-### RA-083 service.py split
-- Constraints: 7 primitives' probing semantics (fallback order, timeouts, listening-only,
-  health-body rule) — production experience, NOT ONE WORD changes; Service protocol public
-  shape unchanged (registry/steps/services/* depend on it).
-- Dependencies: primitives ← services/{lobehub,kernel/*,daemon,infra,onlyboxes},
-  commands/runs/workflow.py, host_runtime/providers/user_cli.py, console.py, steps.py;
-  protocol types ← registry.py, services/*.
-- Shape: service.py shrinks to pure protocol (Service/ServiceStatus/HealthCheck/ServiceState
-  + RA-084's disposition of CliShippingService); new module = "host probing with production
-  gotchas", interface simple (pid_alive, http_ready), implementation deep — textbook deep module.
-- Test survival: primitives currently integration-only; pure move, update import paths;
-  NEW: fake-subprocess tests pin fallback semantics (lsof missing → ss).
-- Deletion verdict: concentrates — gotcha set centralized; protocol half becomes pure interface.
+- `cognitive_agent.py`：`run()` / `resume()` 末尾 `if self._plan_ref: with plan_ref_scope(...)`
+  12 行逐字重复 ×2（Area A Q1）。→ RA-098。
+- 其余重复均为已收敛（run_envelope、registry 白名单、Observation 构造器）。
 
-### RA-084 Service capabilities
-- Constraints: ADR-0119 decision 4 (lca-ops never manages LCA processes; kernel_serve does
-  state/heal, heal may self-respawn); Service idempotency semantics; all lca-ops command
-  behavior unchanged; do NOT invent a second CliShippingService impl for "generality".
-- Dependencies: 17 register_step fns → ctx.registry (ServiceRegistry, built by
-  services/__init__.py::build_registry) → protocol; commands/runs/services.py dispatches by
-  string step name; protocol ← registry.py; CliShippingService ← steps.py + daemon.py;
-  KernelServeService.spawner ← steps.py only.
-- Shape: Service protocol grows explicit capability faces (respawn, deployment-fingerprint);
-  steps.py zero downcast, zero private calls; mechanical wrappers may converge to single
-  verb→protocol-method dispatch.
-- Test survival: stack.heal/daemon.ensure behavior (spawn-failure actionable assembly,
-  fingerprint logic) must hold; NEW: pure-protocol fakes drive stack_heal (downcast dead)
-  and prove privates untouched.
-- Deletion verdict: concentrates — two real capability concepts surface at the protocol
-  layer instead of hiding in caller type-gymnastics.
+---
 
-### RA-085 registry cleanup
-- Constraints: ToolEffectsDeclarationError fail-loud semantics unchanged; EFFECTS_UNSET
-  sentinel purpose (distinguish "kwarg not passed" vs "explicit external") kept.
-- Dependencies: only test_registry_effects.py; zero production callers of the dead fn;
-  audit happens at bundle registration via register_manifest_with_audit.
-- Shape: registry.py keeps 4 live public functions + 1 constant; whitelist becomes
-  _AUDITED_DEFAULT_TOOLS.
-- Test survival: test_registry_effects.py fully green (deleted fn had no callers;
-  __all__ completion lets tests use normal imports).
-- Deletion verdict: concentrates — deleting the dead fn makes the module's real
-  enforcement face visible.
+## Phase 2 — Self-grilling
 
-### RA-086 select_effect convergence
-- Constraints: ToolEffects 3-value closed set is ADR-bound (new values need ADR — do not
-  expand); PR-3 conservative default (unaudited → sequential) kept.
-- Dependencies: _resolve_tool_effects only called by _select_mode_with_optional_audit;
-  select_effect currently test-only.
-- Shape: registry.py gains a tool-level effects-resolution function (Tool|manifest →
-  ToolEffects); executor deletes its two private helpers.
-- Test survival: test_registry_effects.py pins select_effect fail-loud;
-  test_tool_batch_executor_parallel.py pins read+concurrent→PARALLEL; NEW: illegal-effects
-  tool on the executor path raises (explicit, not silent sequential).
-- Deletion verdict: concentrates — manifest-structure knowledge moves into the taxonomy module.
+### RA-097（Strong / P0）
 
-### RA-087 audit protocol
-- Constraints: ToolBatchExecutionPolicy is a published extension point —
-  select_mode signature frozen; ADR-0232 PARALLEL semantics (read + grant.concurrent) frozen;
-  existing tests unbroken.
-- Dependencies: executor.execute → policy; policy ← default_tool_batch_policy(),
-  _resolve_tool_effects/_resolve_tool_grant; ReadOnlyToolBatchEntry flows executor↔policy.
-- Shape: protocol gains an explicit audit-aware extension (or entry type enriched);
-  executor branches on isinstance, not getattr.
-- Test survival: parallel tests pin current behavior; NEW: protocol-targeted tests —
-  a base-protocol-only policy gets explicit (non-silent) behavior.
-- Deletion verdict: concentrates — "the audit channel exists" moves from scattered
-  getattr/comments into the protocol definition.
+- **Constraints**：`LLMResponse` 不变式（COMPLETED.response ≡ complete() 返回值）不能破；
+  所有生产 adapter（openai/anthropic/…）都已实现 `stream`，删默认实现不能影响它们；
+  `complete` 仍是有效入口（非流式调用方在用）。
+- **Dependencies**：`stream` 的调用方只有 `lca/nodes/think/llm/invoke.py`（grep 确认）；
+  实现方 = 全部 LLM adapter。改动 seam = Protocol 默认方法 + invoke 的空响应检查。
+  `complete` 的调用方不受影响。
+- **Shape**：方案 A（推荐）：删掉 Protocol 上的默认 `stream` 实现（变抽象），
+  不完整 adapter 在**构造/类型检查**时 fail-loud；同时 `llm.invoke` 在组装出
+  空响应（无 text、无 tool_calls、无 delegations）时 raise `LLMAdapterError`
+  点名 adapter 类名——"the interface is the test surface"。
+  方案 B：保留默认但让默认委托 `complete()`（`response = await self.complete(...)` 后
+  yield COMPLETED(response=response)）。A 更深（interface 即契约），B 更兼容。
+  二选一由 implementer 定，AC 覆盖两种可接受终态。
+- **Test survival**：`test_run_with_tool_use_succeeds_on_web_standard` 现状是红的
+  （本轮实测），修好后是它最强的 pin；新增：只实现 `complete` 的桩 adapter 跑
+  `llm.invoke` 必须 fail-loud（A）或产出与 complete 一致的响应（B）。
+- **Deletion test**：删掉默认 `stream` → 所有 adapter 必须显式声明流式能力，
+  复杂度从"运行时静默空响应"集中到"声明时显式契约"。Concentrates。✅
 
-### RA-088 lifespan cron
-- Constraints: ADR-0119 decisions 3/4 (lifespan protocol shape; acyclic plugin/cli
-  direction — this change makes the code match the ADR text); ADR-0268 (cron is a
-  production-runtime need — behavior kept); ADR-0115 closure discipline (K3 untouched);
-  _FakeCtx test semantics preserved, relocated.
-- Dependencies: make_lifespan ← server.py:156 (production), test_cron_lifespan_integration.py,
-  tests/support/webserver_app.py (mimics the protocol shape, not cron behavior — confirm);
-  moved code needs MultiAssistantCronStore, CronDaemonService, get_lca_home, LcaRunHandoffDispatcher.
-- Shape: make_lifespan(ctx) keeps signature; body = app.state.ctx mount + yield + shutdown
-  cleanup (~15 lines, an honest protocol impl); cron start becomes a named step in
-  server.py setup (input ctx/app, output app.state.cron_daemon).
-- Test survival: cron integration test follows the behavior (plugin setup path);
-  tests/boot/ must not notice cron.
-- Deletion verdict: for lifespan = just moves (purer); for plugin = concentrates
-  (composition returns where its deps live).
+### RA-098（Worth exploring）
 
-### RA-089 widget seam
-- Constraints: ADR-0248 (vocal runtime + hard gate; INPUT_REQUIRED pause facts owned by
-  RuntimeResultFinalizer ONLY — driver sets state + extra["approval_request"], never emits
-  pause events, else double-append); approval_request {type,message_id,content,options} is a
-  frontend contract (loop_drivers.py:130 → session.approval_request → projection.py:49) —
-  byte-identical; VocalGateProtocol stays runtime_checkable-compatible.
-- Dependencies: _run_driver (sole production writer of approval_request[type/widget]);
-  result_projection final-text fallback; gate.py's two concrete classes; webserver session
-  lifecycle (reads approval_request).
-- Shape: 1–2 query methods on the vocal protocol (pending_widget_approval() →
-  WidgetApproval | None, delivered visible texts); driver/projection consume the protocol;
-  payload assembly stays in the driver (UI shape is a transport contract).
-- Test survival: vocal gate unit tests; carrier_terminal_observation (approval_request→session
-  chain); NEW: gate-projection shape tests + driver tests with stub-protocol gate.
-- Deletion verdict: concentrates — the leak (driver sniffing gate internals) is deleted;
-  shape knowledge concentrates with its owner.
+- **Constraints**：`plan_ref_scope` 的嵌套位置（bind_backends + run_scope 之内）不能变；
+  `run()` 传 objective=text、`resume()` 传 objective=f"resume:..." 的差异保留。
+- **Dependencies**：调用方只有 `run()` / `resume()` 本体。seam 移动影响为零。
+- **Shape**：私有 `_plan_scoped(self, **kwargs)` 上下文管理器（或一个
+  `_run_with_optional_plan_ref` helper），`run()`/`resume()` 各剩一行。
+- **Test survival**：现有 plan_ref 行为 pin（`tests/fixtures/plan_ref_golden.txt`
+  相关测试）在，改后必须 byte-identical。
+- **Deletion test**：删掉重复 → "plan ref 条件作用域"成为单一命名 seam。
+  Concentrates（小）。✅
 
-### RA-090 transcript_features
-- Constraints: RunContext is read-only input, not an output bus (per comments) — result
-  goes to Result.extra["initiative_offer"]; ADR-0248 slice 8 (successful runs feed
-  InitiativeHook transcript_features); extra["transcript_features"] caller-override semantics kept.
-- Dependencies: _run_driver → evaluate_initiative; RunContext.prior_turns (typed);
-  downstream readers of Result.extra["initiative_offer"] if any.
-- Shape: lca/application/initiative/ gains the derivation fn: (prior_turns, extra_override)
-  → features dict; driver = one call.
-- Test survival: existing initiative_offer pins; NEW: pure unit tests (empty/mixed/override).
-- Deletion verdict: concentrates — derivation rules move in with their only consumer.
+### RA-099（Worth exploring）
 
-### RA-091 wire-block seam
-- Constraints: ADR-0047 trigger semantics (ToolCall native fields first, extra fallback);
-  unexposed_tool_block_observation defer semantics untouched.
-- Dependencies: callers = UseToolOperation (body/actions side); required_arguments tolerant
-  schema reading kept.
-- Shape: private _wire_block_observation(status, reason, ...) in tool_wire_gate.py;
-  public signatures unchanged.
-- Test survival: existing trigger-condition tests; NEW: parameterized test asserting both
-  gates share the blocking-observation extra contract.
-- Deletion verdict: just moves (two public fns → one private seam) — acceptable convergence.
+- **Constraints**：`register_hook` 是 `AgentUnit` 的组合期 API；`runtime` 可能是
+  任意 `Runtime` 实现（测试替身常见）。不能把 hook 注册变成硬性要求。
+- **Dependencies**：调用方 = 组合根。`HasHooks` 已是声明式 Protocol。
+- **Shape**：方案 A：`Runtime` 协议侧声明可选 `hooks`（已有 `CognitiveRuntime.hooks`
+  property），`register_hook` 改为 `self.runtime.hooks.register(...)`，
+  无 hooks 的 runtime 在**组合期** fail-loud（`bind_agent_from_scope` 校验）。
+  方案 B（最小）：保留 isinstance 但 else 分支 raise 而非静默丢弃。
+  B 是 5 行改动，A 是 seam 迁移；AC 接受 B 为下限。
+- **Test survival**：无 hooks 的 runtime 调 `register_hook` 现状静默成功——
+  新测试 pin 其为显式失败。
+- **Deletion test**：静默丢弃分支的删除把"是否注册成功"变成可观测事实。Concentrates。✅
 
-### RA-092 decision vocabulary
-- Constraints: PromptTrace.selector_decision_path is str-typed; reflection_events.py depends
-  on _coerce_decision_path fallback; ADR-0175 D2 trace structure intact.
-- Dependencies: reasoner.py ← normalize_selector_result; skill_router.py → spine envelope +
-  SkillEventSink side channel; reasoner_prompt.py hook ← trace.
-- Shape: shared decision-reason vocabulary module (or SkillRouted.decision_path folded into
-  SelectorDecisionPath); router protocols document their reason-carrying.
-- Test survival: test_skill_router.py keyword behavior; NEW: router-emitted values ∈ closed set.
-- Deletion verdict: concentrates — "reason" gets one source of truth.
+### RA-100（Worth exploring）
 
-### RA-093 manifest accessor
-- Constraints: ContextManifest is a cross-layer contract (perceive→reasoner) — additive
-  only; ItemKind closed-set discipline kept; _manifest_items None-tolerance kept.
-- Dependencies: types.py's 4 helpers ← stateful section impls; by_kind ← perception itself.
-- Shape: typed accessor (payload_of(kind)) near perception.py; types.py helpers become thin
-  wrappers or are deleted.
-- Test survival: existing prompt-render tests; NEW: per-kind payload-type contract tests.
-- Deletion verdict: concentrates — query+assert logic of four lookalike helpers in one place.
+- **Constraints**：8 组函数内 import 各自注释了"为什么不能放顶层"（循环 import
+  为主）；`global_bridge.install/dispose` 的 try/finally 语义不能变；
+  `runtime_bindings_token` 的 token 作用域不能变。
+- **Dependencies**：`run()` 是 `CognitiveRuntime` 唯一大方法；helpers 全私有。
+- **Shape**：抽四个私有 helper：
+  `_install_skill_activation_bridge()`（PR-E 注释随它走）、
+  `_seed_run_session(...)`（writer 播种 + developer_seed/user 消息）、
+  `_resolve_vocal_context(...)`（vocal_mode/wake 解析 + gate 复用）、
+  `_apply_runtime_overrides(...)`（auto_review/box_accessor/origin + token）。
+  import 收敛：先实测哪些可回顶层（循环 import 的真实边界用 `python -c "import lca.runtime.loop.runtime_loop"` 验证），
+  剩下的收进一个 `_late` 块并注明原因。
+- **Test survival**：web-standard e2e（RA-097 修好后）+ 现有 runtime loop scenario
+  测试是行为 pin。
+- **Deletion test**：删掉 helpers 会把 6 个阶段重新揉回一个方法——
+  它们各自 earns existence（每个 helper 有独立注释/不变式）。✅
 
-### RA-094 catalog typing
-- Constraints: _catalog()'s INTENTIONAL swallow (not-ready → treated absent) is deliberate —
-  not fail-loud; ADR-0185 AvailableSkillsReason derivation unchanged.
-- Dependencies: catalog_provider injected by lca/plugins/prompts/assembler.py at composition;
-  available_skills_count → PromptTrace → narrative/viewer.
-- Shape: SectionManifestPromptAssembler.catalog_provider: BrainPromptCatalog | None;
-  _catalog_skill_count takes the Protocol type, no getattr.
-- Test survival: existing no-catalog→0 compat tests; NEW: bad-shape catalog behavior explicit.
-- Deletion verdict: concentrates — seam shape owned by the type declaration.
+---
 
-### RA-095 path-arg seam
-- Constraints: ADR-0121 PR-C /files/<aid> interception semantics; 3 input shapes +
-  allowed_refs scoping; UnresolvedFileRefError→passthrough fallback — all unchanged.
-- Dependencies: sole production caller _resolve_path_arg_or_passthrough (computer.py, lazy
-  import vs cycles); test_file_ref_args.py; docstring's universal claim (currently false).
-- Shape: (a) one path-entry fn shared by all guest ops; or (b) seam renamed/re-scoped to
-  read-path. Either way: one place decides.
-- Test survival: adapter tests kept; NEW: pin on the wiring scope (a or b).
-- Deletion verdict: (b) = just moves (honest docstring); (a) = concentrates.
+## Phase 3 — Present and record
 
-### RA-096 dataclasses.replace
-- Constraints: keep defensive copies — list(context_refs), dict(extra) — naive replace()
-  would alias originals and change downstream-mutation behavior; deadline short-circuit
-  semantics unchanged.
-- Dependencies: CognitiveAgent.run → _enrich_run_context; get_run_workspace() /
-  effective_agent_wall_clock.
-- Shape: 3–5 lines: replace(ctx, deadline=..., context_refs=list(...), extra=dict(...)).
-- Test survival: existing deadline-propagation tests; NEW: no-dropped-field regression
-  (assert against fields()).
-- Deletion verdict: concentrates — the default-deadline rule becomes one expression.
+| ID | Files | Problem | Solution | Benefits | Strength |
+|----|-------|---------|----------|----------|----------|
+| RA-097 | `lca/contracts/protocols/runtime/infra/infra.py`（LLMAdapter.stream 默认实现）, `lca/nodes/think/llm/invoke.py`, `tests/integration/test_run_with_tool_use.py` | `LLMAdapter.stream` 的 Protocol 默认实现只 yield 一个无 response 的 COMPLETED；`llm.invoke`（PR-B 后）只走 stream，导致任何只实现 `complete` 的 adapter 产出空 `LLMResponse`，run 在 outer 图以无证据的 "declarative run failed" 死亡。仓库自带 e2e 因此在 main 上是红的。 | 删掉默认 `stream`（变抽象，声明时 fail-loud）+ `llm.invoke` 对空响应 raise 点名 adapter；或退而让默认 `stream` 委托 `complete()`。二选一，AC 覆盖两种终态。修 e2e 脚本桩 override `stream`（按 COMPLETED.response ≡ complete() 不变式）。 | locality：stream 契约回到 Protocol 声明处，不再靠下游"恰好有内容"隐式保证；leverage：所有未来 adapter（测试桩/新 provider）不再踩同一个静默坑；测试面：空流从"不可测试的远端失败"变成 seam 处可断言的 fail-loud。 | Strong |
+| RA-098 | `lca/agent/cognitive_agent.py` | `run()` / `resume()` 末尾 `if self._plan_ref: with plan_ref_scope(...)` 12 行逐字重复 ×2。 | 抽私有 `_plan_scoped` 上下文管理器（或等价 helper），两处各剩一行。 | locality：plan-ref 条件作用域成为单一命名 seam；改嵌套位置时只改一处。 | Worth exploring |
+| RA-099 | `lca/agent/cognitive_agent.py` | `register_hook` 用 `isinstance(runtime, HasHooks)` 嗅探，else 分支**静默丢弃** hook 注册——"调用方不信任已声明的协议"。 | 方案 A：组合期校验 hooks 能力；方案 B（下限）：else 分支 raise 代替静默丢弃。 | interface 即 test surface：注册成功与否成为可观测事实；未来 debug "hook 没生效"不再需要穿透 runtime 具体类型。 | Worth exploring |
+| RA-100 | `lca/runtime/loop/runtime_loop.py` | `CognitiveRuntime.run()` ~150 行串 6 个阶段 + 8 组函数内 import；理解一次 run 要在 bridge/session/vocal/auto-review/bindings 间跳跃。 | 抽四个私有 helper（bridge 安装 / session 播种 / vocal 解析 / runtime overrides），import 收敛回顶层（实测循环边界）。 | locality：每个阶段有自己的命名 seam 和不变式注释；leverage：下一次改 vocal/auto-review 不用读完整方法。 | Worth exploring |
 
-## Top recommendation
+**Top recommendation：RA-097**。它是本轮唯一的运行时实证 P0：静默失败 + 证据吞没 +
+自带 e2e 在 main 上变红，三者叠加。修法已在树内验证（脚本桩补 `stream` 后
+(a)(c) COMPLETED、(b) tool-call 正确路由到 act.main）。Runner-up：RA-100
+（`run()` 是每次 debug 都要读的方法，阅读税最高）。
 
-**RA-081 first**: the box sandbox boundary is the only candidate where a *security*
-bug rides the production path today (prefix-escape in BoxAccessor.resolve_path while
-the correct relative_to implementation sits in the test-covered but
-production-unused adapter) — locality failure = security failure, and the fix shape
-is already proven in-tree. Runner-up: **RA-082** (run-lifecycle envelope) — the
-largest structural duplication, and outcome-translation rules are the most
-edit-fragile part of the agent core.
+依赖顺序：RA-097 先（它修好 e2e，后续 story 的行为 pin 才可信）；RA-098/099/100
+相互独立。RA-097 → RA-100（RA-100 的 AC 要求 e2e 绿）。
 
-Dependency order for the optimize loop: RA-083 before RA-084 (split the module
-before growing its protocol); RA-085 before RA-086 before RA-087 (registry cleanup
-→ executor convergence → protocol promotion); RA-082 before RA-096 (envelope move
-first, replace() after).
+**Diversity quota**：4 个 stories 中 duplication 类 1 个（RA-098），其余 3 个来自
+friction walk（RA-099 leaky seam、RA-100 shallow-method sprawl）与运行时验证
+（RA-097 testability gap）。满足"至少一个来自 friction walk"。
 
-## Learnings for future iterations
+---
 
-- `getattr(x, "method", lambda: default)()` on a protocol-declared method is a
-  review smell worth grepping for: it means the protocol exists but the caller
-  doesn't trust it (RA-089) or the capability was never declared (RA-087).
-- When two implementations of a safety invariant exist, check the *production*
-  call path first: the tested one may be the unused one (RA-081 — test coverage
-  on the wrong path is worse than no coverage because it looks safe).
-- Docstring-vs-code verbatim contradictions (lifespan.py "no plugin details" vs
-  hard import) are cheap to find and strong evidence — read the module docstring
-  first, then check every claim against the body (RA-088).
-- Assessment evidence goes stale within the same round: RA-083/086/087 share
-  registry.py + executor; implement in dependency order and re-grep before each.
-- `str(path).startswith(str(root))` is a containment bug until proven otherwise;
-  `relative_to` is the correct idiom — grep the tree for more startswith-containments.
+Assessment complete: 4 stories written, top is RA-097.

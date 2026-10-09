@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import contextlib
-from collections.abc import Awaitable, Callable
+from collections.abc import Awaitable, Callable, Iterator
 from dataclasses import replace
 
 from lca.agent.run_envelope import (
@@ -204,17 +204,7 @@ class CognitiveAgent(AgentUnit):
                 agent_role=role,
             )
 
-        with bind_backends(self._observability), run_scope(scope):
-            if self._plan_ref:
-                with plan_ref_scope(self._plan_ref):
-                    return await self._run_lifecycle(
-                        objective=text,
-                        ctx=bound_ctx,
-                        role=role,
-                        top_level=top_level,
-                        scope=scope,
-                        execute=execute,
-                    )
+        with bind_backends(self._observability), run_scope(scope), self._plan_scoped():
             return await self._run_lifecycle(
                 objective=text,
                 ctx=bound_ctx,
@@ -223,6 +213,23 @@ class CognitiveAgent(AgentUnit):
                 scope=scope,
                 execute=execute,
             )
+
+    @contextlib.contextmanager
+    def _plan_scoped(self) -> Iterator[None]:
+        """Conditionally bind the plan_ref scope for one lifecycle invocation.
+
+        The single home of the ``if self._plan_ref: with
+        plan_ref_scope(...)`` conditional shared by run() and resume():
+        the plan_ref scope must nest *inside* bind_backends + run_scope,
+        so both call sites spell it as one ``with ..., self._plan_scoped():``
+        line instead of duplicating the 12-line conditional. When no
+        plan_ref is bound the manager is a no-op passthrough.
+        """
+        if self._plan_ref:
+            with plan_ref_scope(self._plan_ref):
+                yield
+        else:
+            yield
 
     async def _run_lifecycle(
         self,
@@ -375,18 +382,7 @@ class CognitiveAgent(AgentUnit):
             return await self.runtime.resume(snapshot, input=msg, max_steps=self.max_steps)
 
         objective = f"resume:{snapshot.snapshot_id}"
-        with bind_backends(self._observability), run_scope(scope):
-            if self._plan_ref:
-                with plan_ref_scope(self._plan_ref):
-                    return await self._run_lifecycle(
-                        objective=objective,
-                        ctx=None,
-                        role=role,
-                        top_level=top_level,
-                        scope=scope,
-                        execute=execute,
-                        resumed_snapshot=snapshot,
-                    )
+        with bind_backends(self._observability), run_scope(scope), self._plan_scoped():
             return await self._run_lifecycle(
                 objective=objective,
                 ctx=None,
@@ -421,6 +417,20 @@ class CognitiveAgent(AgentUnit):
         )
 
     def register_hook(self, hook_name: str, hook_fn: Hook) -> None:
+        # RA-099: fail loud when the runtime cannot host hooks. The
+        # isinstance check against the declared HasHooks protocol stays —
+        # it is the capability gate — but the else branch must not silently
+        # drop the registration: a "my hook never fires" debug session
+        # should end here, naming the runtime type, not penetrate the
+        # concrete runtime looking for a silent no-op.
         runtime = self.runtime
         if isinstance(runtime, HasHooks):
             runtime.hooks.register(hook_name, hook_fn)
+        else:
+            raise TypeError(
+                "CognitiveAgent.register_hook: runtime "
+                f"{type(runtime).__name__!r} does not implement HasHooks — "
+                f"the hook {hook_name!r} would be silently dropped. Bind the "
+                "agent to a runtime exposing a HookRegistry, or do not "
+                "register hooks."
+            )

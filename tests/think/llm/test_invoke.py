@@ -29,6 +29,7 @@ from lca.contracts.models.core.conversation.llm import (
     TokenUsage,
 )
 from lca.contracts.models.core.state.state import AgentState, Budget
+from lca.contracts.protocols import LLMAdapter
 from lca.contracts.protocols.declarative.declarative_1.node_executor import (
     NodeContext,
     NodeInput,
@@ -329,3 +330,56 @@ async def test_invoke_is_idempotent() -> None:
 
     assert out_a.port_values["llm_response"] == out_b.port_values["llm_response"]
     assert out_a.port_values["usage"] == out_b.port_values["usage"]
+
+
+class _CompleteOnlyAdapter(LLMAdapter):
+    """Implements complete() but never overrides stream().
+
+    Reproduces the RA-097 failure shape: with the Protocol no longer shipping
+    a no-op default stream, this resolves stream to a coroutine, not an async
+    iterator.
+    """
+
+    async def complete(self, prompt: str, **kwargs: Any) -> LLMResponse:
+        del prompt, kwargs
+        return LLMResponse(text="hello", model="complete-only")
+
+
+class _ContentlessStreamAdapter:
+    """Overrides stream() but yields only a response-less COMPLETED event."""
+
+    async def complete(self, prompt: str, **kwargs: Any) -> LLMResponse:
+        del prompt, kwargs
+        return LLMResponse(text="hello", model="contentless")
+
+    async def stream(
+        self, prompt: str, **kwargs: Any
+    ) -> AsyncIterator[LLMStreamEvent]:
+        del prompt, kwargs
+        yield LLMStreamEvent(type=LLMStreamEventType.COMPLETED)
+
+
+@pytest.mark.asyncio
+async def test_invoke_fails_loud_when_adapter_never_overrode_stream() -> None:
+    """RA-097: complete-only adapter ⇒ RuntimeError naming the adapter.
+
+    Before RA-097 the Protocol's no-op default stream silently produced an
+    empty LLMResponse and the run died evidence-free at the outer graph.
+    """
+    executor = LlmInvokeExecutor()
+    with pytest.raises(RuntimeError, match=r"_CompleteOnlyAdapter.*did not return an async iterator"):
+        await executor.node_execute(
+            _ctx(_state(), adapter=_CompleteOnlyAdapter()),
+            NodeInput(port_values={"model_visible_request": _request("hi")}),
+        )
+
+
+@pytest.mark.asyncio
+async def test_invoke_fails_loud_on_contentless_stream() -> None:
+    """RA-097: stream with no content ⇒ RuntimeError naming the adapter."""
+    executor = LlmInvokeExecutor()
+    with pytest.raises(RuntimeError, match=r"_ContentlessStreamAdapter.*empty LLMResponse"):
+        await executor.node_execute(
+            _ctx(_state(), adapter=_ContentlessStreamAdapter()),
+            NodeInput(port_values={"model_visible_request": _request("hi")}),
+        )

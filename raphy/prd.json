@@ -1136,7 +1136,7 @@
       "branchName": "raphy/arch-20261009-0107",
       "description": "As an LCA maintainer, I want the EP contract (assistant.skill.installed payload) pinned at unit level, so production emission isn't covered only by accident. Evidence (Round 13, skills zone): overlay.py::_emit_installed/_emit_activated/_emit_profile_revised call emit_assistant_ep_or_log(self._emit, ...) whose comment says 'no emitter -> log only (unit test path)'. The 37 overlay unit tests validate disk/manifest/receipts; the REAL production EP path (emit_fact_event -> event bus) never executes in unit tests — the seam's production behavior vs test behavior switches on a runtime branch. EP 'was it emitted, is the payload right' is only incidentally covered by e2e.",
       "id": "RA-079",
-      "notes": "Source: Round 13 friction walk (Worth exploring; testability gap \u2014 interface switches behavior by runtime branch). | Implemented 2026-10-09: 评估证据部分过时 —— fake emitter 注入自 ADR-0187 PR-6 (9c4288d63) 即已存在，test_install_emits_installed_ep_with_required_fields 早已断言 EP descriptor + 四件套。本轮补上真实剩余缺口：installed EP 的 skill 契约字段（skill_digest/manifest_digest 的 sha256: 形状、source、installed_at 非空）+ EP descriptor 字面值断言。grep 确认无测试依赖 log-degradation 分支断言 EP。",
+      "notes": "Source: Round 13 friction walk (Worth exploring; testability gap — interface switches behavior by runtime branch). | Implemented 2026-10-09: 评估证据部分过时 —— fake emitter 注入自 ADR-0187 PR-6 (9c4288d63) 即已存在，test_install_emits_installed_ep_with_required_fields 早已断言 EP descriptor + 四件套。本轮补上真实剩余缺口：installed EP 的 skill 契约字段（skill_digest/manifest_digest 的 sha256: 形状、source、installed_at 非空）+ EP descriptor 字面值断言。grep 确认无测试依赖 log-degradation 分支断言 EP。",
       "passes": true,
       "priority": 3,
       "title": "Pin overlay EP emission in unit tests with an injected fake emitter"
@@ -1395,6 +1395,67 @@
       "implemented": "2026-10-09: replace(ctx, deadline=..., context_refs=list(...), extra=dict(...)); defensive copies kept; fields()-driven no-drop regression test + defensive-copy test added; 5 tests green.",
       "priority": 3,
       "title": "Rebuild _enrich_run_context with dataclasses.replace"
+    },
+    {
+      "acceptanceCriteria": [
+        "二选一终态：(A) LLMAdapter.stream 变为抽象（删默认实现），只实现 complete 的 adapter 在声明/装配时 fail-loud；且 llm.invoke 组装出空响应（无 text、无 tool_calls、无 delegations）时 raise 点名 adapter 类名；或 (B) 默认 stream 委托 complete()：yield COMPLETED(response=await self.complete(...))，满足 COMPLETED.response 与 complete() 逐字段相等的不变式。",
+        "无论选 A 还是 B：tests/integration/test_run_with_tool_use.py 的 _ScriptedEcho 按 LLMStreamEvent 不变式 override stream，test_run_with_tool_use_succeeds_on_web_standard 在 web-standard 上变绿（terminal outcome COMPLETED + wire shape [user, assistant{tool_calls}, tool, assistant]）。",
+        "新增回归测试：只实现 complete 的桩 adapter 跑 think.llm.invoke ——选 A 则断言 fail-loud（异常点名 adapter），选 B 则断言产出响应与 complete() 一致；绝不再出现静默空响应。",
+        "全部生产 adapter（openai/anthropic/…）显式实现 stream（grep 确认无一处依赖已删的默认实现）；现有 llm invoke 相关测试全绿；ruff clean。"
+      ],
+      "branchName": "raphy/arch-20261009-1643",
+      "description": "As an LCA maintainer, I want the LLMAdapter.stream contract to fail loud instead of silently producing an empty response, because today the Protocol ships a no-op default stream (yields one response-less COMPLETED) and think.llm.invoke only consumes stream since PR-B — so any adapter that implements only complete() (including the repo's own e2e scripted adapter) yields an empty LLMResponse, and the run dies at the outer graph with the evidence-free 'declarative run failed'. The repo's own e2e test_run_with_tool_use_succeeds_on_web_standard is red on main for exactly this reason.",
+      "id": "RA-097",
+      "notes": "Source: Round 15 runtime verification (real run, web-standard, scripted LLM). Repro: run tests/integration/test_run_with_tool_use.py::test_run_with_tool_use_succeeds_on_web_standard on main — fails at step=0, 4.68s. Root chain verified with probes: invoke only reads event.response on COMPLETED; protocol default yields COMPLETED with response=None; decision.parse then emits action_type=respond with empty text; phase_main has no matching edge. Fixing the scripted stub to override stream makes (a)/(c) COMPLETED and routes the tool-call decision to act.main. Strength: Strong (P0).\n\nImplemented 2026-10-09 (round 16): 1) Removed the no-op default stream() from LLMAdapter (now `...` + MUST-override docstring); all 7 production impls already define stream. 2) think.llm.invoke: two fail-loud guards — non-async-iterable stream() result -> RuntimeError naming the adapter class (closes the un-awaited coroutine); assembled empty response (no text/tool_calls, post-abort) -> RuntimeError naming the adapter. 3) _ScriptedEcho in test_run_with_tool_use.py now overrides stream() per the LLMStreamEvent invariant. 4) Two new regression tests in tests/think/llm/test_invoke.py (complete-only adapter -> RuntimeError; contentless stream -> RuntimeError). IMPL vs ASSESSMENT: the assessment's e2e clause expected COMPLETED; the approval era (ADR-0292 §10 grant gate + namespace_approval shell->require_approval) makes unattended bash execution impossible by design. The e2e now binds a TrustEnvelope granting 'bash' (production-faithful) and asserts TaskStatus.INPUT_REQUIRED — the designed approval pause — plus wire shape [user, assistant{tool_calls}] with no orphan tool rows. Note: tests/integration/test_think_llm_journal.py::test_think_llm_journal_populates_journal_json is red on main for the same approval-era reason (verified pre-existing via git stash); left untouched as out of scope — candidate for a future story.",
+      "passes": true,
+      "implemented": "",
+      "priority": 1,
+      "title": "Fail loud on empty LLM streams: remove the silent no-op default stream() on LLMAdapter"
+    },
+    {
+      "acceptanceCriteria": [
+        "cognitive_agent.py 中只剩一处 plan_ref 条件作用域逻辑（私有 _plan_scoped 上下文管理器或等价 helper），run()/resume() 各剩一行调用。",
+        "with plan_ref_scope 仍嵌在 bind_backends + run_scope 之内；run() 传 objective=text、resume() 传 objective=f'resume:{snapshot_id}' 的差异保留。",
+        "plan_ref 行为 pin（tests/fixtures/plan_ref_golden.txt 相关测试）byte-identical；ruff clean。"
+      ],
+      "branchName": "raphy/arch-20261009-1643",
+      "description": "As an LCA maintainer, I want the plan_ref conditional scope in CognitiveAgent to live in one named seam, because today run() and resume() each carry a verbatim 12-line 'if self._plan_ref: with plan_ref_scope(...)' block — the next person to move the nesting has to find and move both.",
+      "id": "RA-098",
+      "notes": "Source: Round 15 friction walk, Area A (cognitive_agent.py, Q1). Mechanical duplication (2 occurrences). Strength: Worth exploring.\n\nImplemented 2026-10-09 (round 16): added private _plan_scoped() contextmanager on CognitiveAgent — the single home of the `if self._plan_ref: with plan_ref_scope(...)` conditional. run() and resume() now spell `with bind_backends(...), run_scope(scope), self._plan_scoped():` and keep their respective objective/ctx differences (objective=text vs f'resume:{snapshot_id}'). Nesting order preserved: plan_ref_scope stays inside bind_backends + run_scope. New test tests/agent/test_cognitive_agent_plan_scoped.py pins both behaviors (binds when set, passthrough when unset, scope reset on exit). IMPL vs ASSESSMENT: as assessed.",
+      "passes": true,
+      "implemented": "",
+      "priority": 3,
+      "title": "Converge the duplicated plan_ref_scope conditional in CognitiveAgent.run/resume"
+    },
+    {
+      "acceptanceCriteria": [
+        "二选一：(A) 组合期校验——无 hooks 能力的 runtime 在 bind_agent_from_scope 即 fail-loud；register_hook 直接走 self.runtime.hooks.register，无 isinstance；或 (B) 最小改动：保留 isinstance 但 else 分支 raise（点名 runtime 类型）代替静默丢弃。",
+        "新增测试 pin：无 hooks 的 runtime 调 register_hook 不再静默成功（断言显式失败）。",
+        "现有 agent 组合/hook 相关测试全绿；ruff clean。"
+      ],
+      "branchName": "raphy/arch-20261009-1643",
+      "description": "As an LCA maintainer, I want CognitiveAgent.register_hook to fail loud when the runtime has no hooks, because today it sniffs isinstance(runtime, HasHooks) and silently drops the registration in the else branch — the caller does not trust the declared protocol, and a 'my hook never fires' debug session has to penetrate the concrete runtime type to find the silent drop.",
+      "id": "RA-099",
+      "notes": "Source: Round 15 friction walk, Area A (cognitive_agent.py, Q4/Q5). Leaky seam: declared HasHooks protocol exists, caller sniffs instead of using it; untested silent-drop branch. Strength: Worth exploring.\n\nImplemented 2026-10-09 (round 16), option B (minimal, AC-sanctioned): kept the isinstance(runtime, HasHooks) capability gate — it checks the declared runtime-checkable protocol — but the else branch now raises TypeError naming the runtime type instead of silently dropping the registration. New test tests/agent/test_cognitive_agent_register_hook.py pins all three behaviors: hooks-less runtime -> TypeError ('does not implement HasHooks' + runtime type name); runtime with hooks -> delegates to hooks.register. IMPL vs ASSESSMENT: chose option B over option A (composition-time validation) — no production caller of CognitiveAgent.register_hook exists in lca/, so the silent-drop branch was dead in prod paths; widening the composition contract was not justified for this P3.",
+      "passes": true,
+      "implemented": "",
+      "priority": 3,
+      "title": "Replace the isinstance(runtime, HasHooks) sniff in register_hook with a declared seam"
+    },
+    {
+      "acceptanceCriteria": [
+        "CognitiveRuntime.run() 拆成四个私有 helper：_install_skill_activation_bridge（PR-E 注释随它走）、_seed_run_session（writer 播种 + developer_seed/user 消息）、_resolve_vocal_context（vocal_mode/wake 解析 + gate 复用）、_apply_runtime_overrides（auto_review/box_accessor/origin + capability token）；run() 本体只剩编排，目标 <60 行。",
+        "8 组函数内 import 收敛：先用 python -c import 实测循环 import 真实边界，能回顶层的回顶层，剩下的收进注明原因的 _late 块。",
+        "global_bridge.install/dispose 的 try/finally 语义、runtime_bindings_token 作用域零变更；RA-097 修好后的 web-standard e2e + 现有 runtime loop scenario 测试全绿；ruff clean。"
+      ],
+      "branchName": "raphy/arch-20261009-1643",
+      "description": "As an LCA maintainer, I want CognitiveRuntime.run() decomposed into named turn-preparation phases, because today one ~150-line method interleaves 6 concerns (skill-bridge install, turn begin, session-writer seeding, vocal resolution, auto-review gating, capability-bindings token) plus 8 function-level import groups — reading one run means jumping between all of them, and the next vocal/auto-review change pays the full-method reading tax.",
+      "id": "RA-100",
+      "notes": "Source: Round 15 friction walk, Area B (runtime_loop.py, Q1). Shallow-method sprawl: the method is wide, not deep. Each helper earns its existence (own invariant comments). Strength: Worth exploring.\n\nImplemented 2026-10-09 (round 16): CognitiveRuntime.run() decomposed into 4 private helpers — _install_skill_activation_bridge (PR-E comments moved with it), _seed_run_session (writer bind + prior turns + developer_seed/user message), _resolve_vocal_context (vocal/wake parsing + shared-gate reuse), _apply_runtime_overrides (auto_review/box_accessor/origin + capability token, returns Token[BindingsViewBuilder | None]). run() body is now 55 lines, orchestration only. All 12 function-level import groups converged to top-level (run()'s 8 + resume()'s 2 duplicates removed); circular-import boundary verified empirically via python -c import in both orders (direct + reverse) — no cycle, no _late block needed. global_bridge.install/dispose try/finally and runtime_bindings_token scope unchanged (verified via full git diff review). IMPL vs ASSESSMENT: as assessed; trace-id/state-creation block kept inline in run() (it is the 'create fresh state' half of the docstring, 8 lines, not a phase).\n\nFollow-up fix (same story, amended into the RA-100 commit): the initial version hoisted lca.application.vocal.runtime_wiring to module top, which created a circular import for the lca.agent.cognitive_agent-first order (cognitive_agent -> lca.runtime -> runtime_loop -> lca.application.__init__ -> api -> spawn -> agent_assembly -> lca.agent.cognitive_agent, partially initialized). That import stays function-level inside _resolve_vocal_context with the reason documented — the AC's '_late block' case. Lesson: the empirical import test must cover more than one order; the direct `import lca.runtime.loop.runtime_loop` passed while the agent-first order did not. All three orders (agent/loop/assembly-first) verified green after the fix.",
+      "passes": true,
+      "implemented": "",
+      "priority": 2,
+      "title": "Deepen CognitiveRuntime.run(): extract the turn-preparation phases, converge the late imports"
     }
   ]
 }
