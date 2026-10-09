@@ -28,6 +28,8 @@ from lca.contracts.models.core.execution.result import ToolExecutionError
 from lca.contracts.models.team.role.team import CacheConfig, RetryPolicy
 from lca.contracts.protocols import SafeExecutor, Tool, ToolRegistry
 from lca.contracts.protocols.act.tool.batch_execution import (
+    AuditAwareToolBatchPolicy,
+    ReadOnlyToolBatchEntry,
     ToolBatchEntry,
     ToolBatchExecutionMode,
     ToolBatchExecutionPolicy,
@@ -99,19 +101,19 @@ class ToolBatchExecutor:
         entries: tuple[ToolBatchEntry, ...],
         resolved: Sequence[tuple[ToolCall, Tool]],
     ) -> ToolBatchExecutionMode | None:
-        """Resolve the batch mode, preferring the audit-aware overload when present.
+        """Resolve the batch mode, preferring the audit-aware overload when declared.
 
-        Returns ``None`` when the policy only exposes the protocol-level
-        ``select_mode`` (no audit channel); the caller then defers to
-        ``_select_segments`` which uses that legacy path.
+        Returns ``None`` when the policy implements only the base
+        ``ToolBatchExecutionPolicy`` (no audit channel declared).  The
+        caller then defers to ``_select_segments``, which uses the
+        protocol-level ``select_mode``.  This fallback is explicit and
+        documented — a base-only policy never sees enriched entries,
+        and its ``select_mode`` return value is the whole scheduling
+        decision (never a silent enrich-and-ignore).
         """
 
-        select_with_audit = getattr(self._policy, "select_mode_with_audit", None)
-        if select_with_audit is None:
+        if not isinstance(self._policy, AuditAwareToolBatchPolicy):
             return None
-        from lca.cognition.body.tools.execution_policy import (
-            ReadOnlyToolBatchEntry,
-        )
 
         audited_entries: list[ReadOnlyToolBatchEntry] = []
         for entry, (_call, tool) in zip(entries, resolved, strict=True):
@@ -128,7 +130,7 @@ class ToolBatchExecutor:
                     grant=grant if isinstance(grant, dict) else {},
                 )
             )
-        return select_with_audit(tuple(audited_entries))
+        return self._policy.select_mode_with_audit(tuple(audited_entries))
 
     def _resolve_tools(self, tool_calls: Sequence[ToolCall]) -> list[tuple[ToolCall, Tool]]:
         """Resolve every tool before dispatching any world effect.

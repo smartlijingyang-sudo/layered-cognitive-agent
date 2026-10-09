@@ -2100,3 +2100,13 @@
   - When converging on a seam, the "deleted helper" for a different concern (grant) doesn't have to move to the same module — inline it at the single call site with the semantics as a comment, keeping the concept in its owning layer.
   - A silent-fallback → fail-loud behavior change needs both a unit pin (seam level) and an executor-path pin (integration level); record it explicitly in commit + progress.
 ---
+
+## 2026-10-09 12:50 CST - RA-087
+- Implemented: declared the audit channel — new `AuditAwareToolBatchPolicy` runtime_checkable protocol in `lca/contracts/protocols/act/tool/batch_execution.py` with `select_mode_with_audit`; `ReadOnlyToolBatchEntry` moved from `execution_policy.py` to the contracts module (re-exported for compat; contracts must not import from cognition). `ParallelReadOnlyToolBatchPolicy` explicitly inherits both protocols. Executor dispatches via `isinstance(AuditAwareToolBatchPolicy)` — getattr probe and method-local import deleted; base-only policies get explicit documented behavior (no enrichment, protocol-level `select_mode` decides).
+- Files changed: lca/contracts/protocols/act/tool/batch_execution.py, lca/cognition/body/tools/execution_policy.py, lca/cognition/body/tools/tool_batch_executor.py, tests/cognition/body/tools/test_tool_batch_executor_parallel.py (+3 tests), raphy/prd.json, raphy/progress.txt
+- Tests: 24 passed (11 parallel incl. 3 new protocol tests + 13 registry); ruff clean.
+- **Learnings for future iterations:**
+  - When a "channel" is probed via getattr, the fix is a declared protocol in the contracts layer — and the channel's facts type must move with it (contracts can't import from cognition).
+  - Explicit multiple inheritance from two Protocols (`ToolBatchExecutionPolicy, AuditAwareToolBatchPolicy`) is the clearest "declares" signal; structural isinstance still works for third parties.
+  - A protocol-targeted test needs three shapes: implementer declares it, base-only gets explicit fallback, spy proves enrichment flows.
+---
