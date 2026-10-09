@@ -2249,3 +2249,17 @@
     a no-op copy; replace() keeps the same reference with identical behavior.
     RunContext is a non-frozen dataclass so replace() works directly.
 ---
+## 2026-10-09 17:15 CST - Round 15 assess（branch raphy/arch-20261009-1643，基线 ba65436bb）
+
+- 上下文：上一轮 raphy/arch-20261009-1008 已合 main（merge 1cc01a1ac），RA-001~RA-096 全 done，无残留。冷却已过（上次评估 10:33 CST，距今 >6h）。
+- 摩擦漫步三区（5 问必答、端到端精读）：Area A `lca/agent/cognitive_agent.py`（426 行全读）、Area B `lca/runtime/loop/runtime_loop.py`（595 行，run() 全读）、Area C `lca/cognition/body/tools/tool_batch_executor.py`（306 行全读）+ `contracts/.../registry.py`（174 行全读）。Area C 已收敛干净（RA-085/086/087），本轮无 story。禁区遵守（preamble.py 未碰）。
+- **运行时验证（实跑，LLM_API_KEY=dummy，web-standard + scripted LLM stub）**：(a) 基础 run、(b) 带 tool call 的 run、(c) 同 agent 两次顺序 run ——**三项全失败**。根因：`think.llm.invoke`（PR-B cf155018d 后）只消费 `adapter.stream()`，而 `LLMAdapter` Protocol 的 `stream` 带一个 no-op 默认实现（只 yield 无 response 的 COMPLETED）→ 只实现 `complete` 的 adapter 产出空 `LLMResponse` → `decision.parse` 给出空文本 respond → outer `phase_main` 三条出边全不匹配 → `RuntimeError('declarative run failed')` 零证据。仓库自带 e2e `test_run_with_tool_use_succeeds_on_web_standard` 在 main 上**同样红**（4.68s，同签名）。脚本桩补 `stream`（按 COMPLETED.response ≡ complete() 不变式）后：(a)(c) COMPLETED，(b) tool-call 正确路由到 act.main。
+- **4 个 stories 入 prd.json（RA-097~RA-100）**：Strong 1 个（RA-097 stream 静默空响应 P0：删 Protocol 默认实现变抽象 + invoke 空响应 fail-loud，二选一终态；修 e2e 脚本桩；只实现 complete 的桩 adapter 回归测试），Worth exploring 3 个（RA-098 run()/resume() 末尾 12 行 plan_ref_scope 重复收敛；RA-099 register_hook 的 isinstance(HasHooks) 嗅探 + 静默丢弃分支；RA-100 CognitiveRuntime.run() ~150 行 6 阶段 + 8 组函数内 import，抽 4 个私有 helper）。
+- Top 推荐 **RA-097**：唯一运行时实证 P0（静默失败 + 证据吞没 + 自带 e2e 在 main 变红）。Runner-up：RA-100（run() 阅读税最高）。
+- 依赖顺序：RA-097 先（修好 e2e，后续 story 的行为 pin 才可信）；RA-098/099/100 相互独立；RA-100 的 AC 要求 e2e 绿。
+- diversity quota 满足：duplication 类 1/4（RA-098）；friction walk 2 个（RA-099 leaky seam、RA-100 方法 sprawl）+ 运行时验证 1 个（RA-097 testability gap）。
+- **Learnings for future iterations:**
+  - Protocol 上的"方便默认实现"是审查气味：`# pragma: no cover` 的默认方法体等于承认没人走它——删掉它，让不完整实现者在声明时 fail-loud（"one adapter = hypothetical seam" 的反例）。
+  - e2e 的脚本桩必须跟被测 seam 的当前契约同步：PR-B 把 invoke 从 complete 切到 stream 后，`_ScriptedEcho` 只实现 complete 就成了"测了个寂寞"——assess 运行时验证必须先确认桩走的是真路径（本轮靠 gate 探针 action_type='respond' 才定位到）。
+  - `_runtime_failure_message` 的 "declarative run failed" 兜底吞证据：error_fact 无 detail 时等于零信息——排查时直接 monkeypatch 探针比读日志快。
+---
