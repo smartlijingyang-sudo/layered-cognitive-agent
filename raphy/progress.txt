@@ -2420,3 +2420,26 @@ Learnings:
   旧语义时，改测试不是"破坏 pin"，而是 story 的一部分——但要在 commit body
   里点名，否则后人以为测试被悄悄放水。
 ---
+
+## DESLOP-100 wave 1 — assess (2026-10-10 01:40, branch raphy/deslop-100)
+
+- 首轮 DESLOP-100：双焦点 = (1) deslop（current-state docs/comments 的
+  change-narration 残留、filler、与本地风格不一致的多余注释）+ (2) 真实架构深化
+  （deep modules / locality / deletion test / seams）。续号 RA-104 起，passes:false。
+- 运行时验证（实跑，LLM_API_KEY=dummy，PYTHONPATH=worktree）：
+  (a) basic run completed；(b) 自研 marker 工具 tool-call run completed 且
+  marker 真写出；(c) 同一 agent 双 run completed。无新 P0/P1。
+  注意：raphy-assess.md 的 Agent 调用片段已过时（Agent 现需 role/goal/backstory，
+  ensure_default_ctx 是 coroutine）——用当前公共 API 三场景全过。
+- 产出 6 个 stories（RA-104~RA-109）：RA-104 docs 散文 deslop（Strong）、
+  RA-105 代码注释 change-narration deslop（Strong）、RA-106 LLMAdapter 缺
+  model_name 接缝 + `_model` getattr 探针（Worth exploring）、RA-107
+  lca.application→lca.harness 未强制 forbidden dependency（Strong）、
+  RA-108 journal step 双命令重叠（Worth exploring，唯一 duplication 类）、
+  RA-109 phase_of 别名词表无测试覆盖（Worth exploring）。
+- deslop 分类：verify_doc_slop.py 123 hits 大部分是 docs/plans 时间胶囊
+  （keep，并扩展脚本排除）、port 分类表（keep）、glossary（keep，勿删）、
+  可解析 commit-hash 引用（keep，勿删）；真正 fix 的只有 observability
+  overview/platform-readme 的"已退役"表 + phase-graph guide 的"旧名已退役"。
+- 禁区全部遵守（memory / webserver / gate_chain_strategy.py / preamble.py）。
+- 提交：`chore: [raphy] assess - DESLOP-100 wave 1 candidates`（未 push）。
