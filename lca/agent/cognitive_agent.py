@@ -2,12 +2,15 @@
 
 from __future__ import annotations
 
-import asyncio
 import contextlib
 from collections.abc import Awaitable, Callable
-from contextlib import AbstractContextManager
-from typing import Protocol
 
+from lca.agent.run_envelope import (
+    EnvelopeSpec,
+    RunEventSessionBinder,
+    TranslatedOutcome,
+    run_envelope,
+)
 from lca.contracts.mechanisms import Hook
 from lca.contracts.models.core.conversation.message import (
     AgentMessage,
@@ -49,10 +52,6 @@ from lca.runtime.loop.runtime_lifecycle import record_run_resumed
 _STRATEGY_KEY_SOLO = "solo"
 
 
-class _RunEventSessionBinder(Protocol):
-    def bound(self, run_id: str) -> AbstractContextManager[object | None]: ...
-
-
 def _task_as_text(task: str | AgentMessage) -> str:
     if isinstance(task, AgentMessage):
         return agent_message_as_text(task)
@@ -85,6 +84,61 @@ def _loop_obligation_failed_result(
     return result
 
 
+def _agent_translate_success(result: Result) -> TranslatedOutcome:
+    """Agent flavor of execute() success: finish facts mirror the Result."""
+    return TranslatedOutcome(
+        status=result.status.value if isinstance(result.status, TaskStatus) else str(result.status),
+        output=result.output or "",
+        steps=result.total_steps,
+        error=result.error or "",
+        outcome="success",
+        disposition="return",
+        result=result,
+    )
+
+
+def _agent_translate_cancelled() -> TranslatedOutcome:
+    """Agent flavor of CancelledError: partial output drained, outcome 'cancelled'."""
+    return TranslatedOutcome(
+        status=TaskStatus.CANCELED.value,
+        output=drain_run_partial(),
+        steps=0,
+        error="canceled",
+        outcome="cancelled",
+        disposition="raise",
+    )
+
+
+def _agent_translate_loop_obligation(
+    err: LoopObligationExceededError, *, scope: RunScope
+) -> TranslatedOutcome:
+    """Agent flavor of non-convergence: fail-closed failed Result (RA-023)."""
+    partial_output = drain_run_partial()
+    return TranslatedOutcome(
+        status=TaskStatus.FAILED.value,
+        output=partial_output,
+        steps=0,
+        error=f"{type(err).__name__}: {err}",
+        outcome="failure",
+        disposition="return",
+        result=_loop_obligation_failed_result(
+            err, scope=scope, partial_output=partial_output
+        ),
+    )
+
+
+def _agent_translate_error(err: Exception) -> TranslatedOutcome:
+    """Agent flavor of unexpected error: fail-loud, partial output drained."""
+    return TranslatedOutcome(
+        status=TaskStatus.FAILED.value,
+        output=drain_run_partial(),
+        steps=0,
+        error=f"{type(err).__name__}: {err}",
+        outcome="failure",
+        disposition="raise",
+    )
+
+
 class CognitiveAgent(AgentUnit):
     """Runtime + RoleProfile as a schedulable unit with run / resume / cancel."""
 
@@ -96,7 +150,7 @@ class CognitiveAgent(AgentUnit):
         max_steps: int = DEFAULT_MAX_STEPS,
         max_wall_clock_seconds: int | None = None,
         plan_ref: str = "",
-        event_session_binder: _RunEventSessionBinder | None = None,
+        event_session_binder: RunEventSessionBinder | None = None,
     ) -> None:
         self.runtime = runtime
         self.role_profile = role_profile
@@ -118,7 +172,7 @@ class CognitiveAgent(AgentUnit):
         return self._plan_ref
 
     @property
-    def event_session_binder(self) -> _RunEventSessionBinder | None:
+    def event_session_binder(self) -> RunEventSessionBinder | None:
         """Optional run-boundary Session binder from composition root."""
         return self._event_session_binder
 
@@ -221,99 +275,73 @@ class CognitiveAgent(AgentUnit):
         top_level: bool,
         scope: RunScope,
         execute: Callable[[], Awaitable[Result]],
-        resumed_snapshot: StateSnapshot | None,
+        resumed_snapshot: StateSnapshot | None = None,
         iteration_kind: str,
         iteration_trace_id: str,
     ) -> Result:
-        """Emit + execute inside an already-bound (or intentionally unbound) Session."""
+        """Emit + execute inside an already-bound (or intentionally unbound) Session.
+
+        Iteration envelope converged with TeamHandle (RA-082): the agent only
+        supplies its Started/Finished factories, resume hook, partial-buffer
+        section and outcome translations; the try/except/finally cascade lives
+        in lca.agent.run_envelope.run_envelope.
+        """
         # PR-3.1: spine envelope for the agent_loop.iteration execution point.
-        from lca.loop.emit.cognitive.agent_spawn import (
-            emit_agent_loop_iteration_end,
-            emit_agent_loop_iteration_start,
-        )
-
-        emit_agent_loop_iteration_start(
-            trace_id=iteration_trace_id,
-            role=role,
-            iteration_kind=iteration_kind,
-        )
-
-        partial_token = begin_partial_buffer()
         from lca.infrastructure.session.bindings import active_publish_session
 
         # 热路径 cheap 检查(todo-38,2026-10-05 裁决):本函数 docstring 允许
         # “intentionally unbound”,无 Session 时跳过,不抛 RuntimeError。
         has_session = active_publish_session() is not None
-        if has_session:
-            record(
-                AgentRunStarted(
-                    agent_role=role,
-                    strategy_key=_STRATEGY_KEY_SOLO if top_level else "",
-                    objective=objective,
-                    objective_preview=objective_preview(objective),
-                    from_role=ctx.from_role if ctx else "",
+
+        def emit_started() -> None:
+            if has_session:
+                record(
+                    AgentRunStarted(
+                        agent_role=role,
+                        strategy_key=_STRATEGY_KEY_SOLO if top_level else "",
+                        objective=objective,
+                        objective_preview=objective_preview(objective),
+                        from_role=ctx.from_role if ctx else "",
+                    )
                 )
-            )
-        if resumed_snapshot is not None and has_session:
-            record_run_resumed(resumed_snapshot)
-        finish_status = TaskStatus.CANCELED.value
-        finish_output = ""
-        finish_steps = 0
-        finish_error = ""
-        iteration_outcome: str = "success"
-        try:
-            result = await execute()
-            self._stamp_resumable_snapshot(result, scope)
-            finish_status = (
-                result.status.value if isinstance(result.status, TaskStatus) else str(result.status)
-            )
-            finish_output = result.output or ""
-            finish_steps = result.total_steps
-            finish_error = result.error or ""
-            return result
-        except asyncio.CancelledError:
-            finish_status = TaskStatus.CANCELED.value
-            finish_output = drain_run_partial()
-            finish_error = "canceled"
-            iteration_outcome = "cancelled"
-            raise
-        except LoopObligationExceededError as err:
-            # RA-023: the interpreter reports non-convergence by raising;
-            # the agent layer translates it into a failed Result
-            # (fail-closed) instead of letting a graph-internal error type
-            # escape run(). asyncio.CancelledError above still propagates
-            # untouched; other exceptions keep the fail-loud behavior below.
-            finish_status = TaskStatus.FAILED.value
-            finish_output = drain_run_partial()
-            finish_error = f"{type(err).__name__}: {err}"
-            iteration_outcome = "failure"
-            return _loop_obligation_failed_result(
-                err, scope=scope, partial_output=finish_output
-            )
-        except Exception as err:
-            finish_status = TaskStatus.FAILED.value
-            finish_output = drain_run_partial()
-            finish_error = f"{type(err).__name__}: {err}"
-            iteration_outcome = "failure"
-            raise
-        finally:
+
+        def emit_resumed() -> None:
+            if resumed_snapshot is not None and has_session:
+                record_run_resumed(resumed_snapshot)
+
+        def emit_finished(status: str, output: str, steps: int, error: str) -> None:
             # 热路径 cheap 检查(todo-38,2026-10-05 裁决):ContextVar 按上下文隔离,每次现查。
             if active_publish_session() is not None:
                 record(
                     AgentRunFinished(
-                        status=finish_status,
-                        output_text=finish_output,
-                        steps=finish_steps,
-                        error=finish_error,
+                        status=status,
+                        output_text=output,
+                        steps=steps,
+                        error=error,
                     )
                 )
-            reset_partial_buffer(partial_token)
-            emit_agent_loop_iteration_end(
-                trace_id=iteration_trace_id,
-                role=role,
-                iteration_kind=iteration_kind,
-                outcome=iteration_outcome,
-            )
+
+        def translate_success(result: Result) -> TranslatedOutcome:
+            self._stamp_resumable_snapshot(result, scope)
+            return _agent_translate_success(result)
+
+        spec = EnvelopeSpec(
+            iteration_kind=iteration_kind,
+            trace_id=iteration_trace_id,
+            role=role,
+            begin_section=begin_partial_buffer,
+            emit_started=emit_started,
+            emit_resumed=emit_resumed,
+            translate_success=translate_success,
+            translate_cancelled=_agent_translate_cancelled,
+            translate_loop_obligation=lambda err: _agent_translate_loop_obligation(
+                err, scope=scope
+            ),
+            translate_error=_agent_translate_error,
+            emit_finished=emit_finished,
+            end_section=reset_partial_buffer,
+        )
+        return await run_envelope(spec=spec, execute=execute)
 
     @staticmethod
     def _stamp_resumable_snapshot(result: Result, scope: RunScope) -> None:

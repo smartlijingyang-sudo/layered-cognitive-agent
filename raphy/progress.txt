@@ -2050,3 +2050,13 @@
   - prd.json top-level keys are insertion-ordered (not sorted) while story objects are sort_keys — full json.dump rewrite would reorder top-level keys; use targeted block splice for status updates.
   - Deleting a constructor param is safe when grep proves zero callers pass it AND zero readers use the attribute; the story AC explicitly authorized "used or deleted".
 ---
+
+## 2026-10-09 11:20 CST - RA-082
+- Implemented: new `lca/agent/run_envelope.py` — one run-lifecycle envelope seam: `RunEventSessionBinder` Protocol defined once (deleted the verbatim duplicate in both files), `TranslatedOutcome` (status/output/steps/error/outcome/disposition), `EnvelopeSpec` (carrier-supplied started/finished factories, resume hook, partial-buffer section, 4 outcome translators), `run_envelope()` owning the try/except/finally cascade (success → return; CancelledError → translate+raise; LoopObligationExceededError → translate+return-or-raise; Exception → translate+raise; finally → emit finished + end section + emit iteration end). CognitiveAgent._run_lifecycle_body and TeamHandle._run_body now only build their spec and call run_envelope. Outcome translators are module-level `_agent_translate_*` / `_team_translate_*` (4×2).
+- Files changed: lca/agent/run_envelope.py (new), lca/agent/cognitive_agent.py, lca/agent/team_handle.py, tests/agent/test_run_envelope.py (new, 13 tests), raphy/prd.json, raphy/progress.txt
+- Tests: 21 passed (tests/agent/ incl. 13 new matrix+cascade tests and the pre-existing RA-023 translation tests, which drive the new _run_lifecycle_body unchanged); 72 passed (tests/scenario/team_1/, tests/scenario/journal_0/, tests/transport/test_carrier_terminal_observation.py — journal payloads byte-identical); ruff clean (fixed S101 assert→explicit raise, B904 raise-from).
+- **Learnings for future iterations:**
+  - Converging two envelopes with different nesting (team's emit-start was outside bind_backends, agent's inside) is safe when the emitted facts' payloads are fully explicit params and the sink resolves via active_publish_session() (bound before both positions in run()); verify the sink's ambient-state reads before assuming.
+  - Preserving an odd-but-current behavior (team's CANCELED+"success" on cancel) byte-identically is correct — encode it in the translator + a test asserting the oddity, with a comment saying it's preserved, not endorsed.
+  - Module-level translator functions make the previously-unwritable outcome matrix table-testable; the envelope cascade itself only needs return-vs-raise pinning.
+---
