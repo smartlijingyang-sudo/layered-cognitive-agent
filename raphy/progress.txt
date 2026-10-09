@@ -2090,3 +2090,13 @@
   - Deleting a dead function: grep for callers AND check `__all__` (star-import exposure) — both must be clean.
   - When a test does a function-level import of a same-module name, that's a smell pointing at an incomplete `__all__` or an unclear public surface; fix the module, then normalize the test import.
 ---
+
+## 2026-10-09 12:30 CST - RA-086
+- Implemented: `registry.py` gained `resolve_tool_effects(tool) -> ToolEffects` (tool-level seam: manifest's first `ToolApi.effects` via fail-loud `select_effect`; manifest-less tools conservatively `"external"` per PR-3). `ToolBatchExecutor` calls the seam; `_resolve_tool_effects`/`_resolve_tool_grant` deleted (grant resolved inline at the single call site, Body-owned semantics kept as a comment). No inline `("read","write","external")` check remains in the executor.
+- **Behavior change (explicit, per AC)**: illegal effects values on the executor path now raise `ToolEffectsDeclarationError` instead of silently degrading to sequential.
+- Files changed: lca/contracts/cognition/body/tools/registry.py, lca/cognition/body/tools/tool_batch_executor.py, tests/contracts/cognition/body/tools/test_registry_effects.py (+3 tests), tests/cognition/body/tools/test_tool_batch_executor_parallel.py (+1 test), raphy/prd.json, raphy/progress.txt
+- Tests: 21 passed (13 registry + 8 parallel incl. new illegal-effects pins; read+concurrent→PARALLEL preserved); ruff clean.
+- **Learnings for future iterations:**
+  - When converging on a seam, the "deleted helper" for a different concern (grant) doesn't have to move to the same module — inline it at the single call site with the semantics as a comment, keeping the concept in its owning layer.
+  - A silent-fallback → fail-loud behavior change needs both a unit pin (seam level) and an executor-path pin (integration level); record it explicitly in commit + progress.
+---

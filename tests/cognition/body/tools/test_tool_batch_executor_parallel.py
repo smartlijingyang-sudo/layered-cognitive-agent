@@ -23,6 +23,7 @@ from lca.cognition.body.tools.execution_policy import (
     ReadOnlyToolBatchEntry,
 )
 from lca.cognition.body.tools.tool_batch_executor import ToolBatchExecutor
+from lca.contracts.cognition.body.tools.registry import ToolEffectsDeclarationError
 from lca.contracts.models.core.execution.decision import Observation, ToolCall
 from lca.contracts.models.core.execution.tool import ToolApi, ToolManifest
 from lca.contracts.protocols import Tool
@@ -244,3 +245,16 @@ def test_select_mode_with_audit_falls_back_to_sequential_on_mixed() -> None:
     from lca.contracts.protocols.act.tool.batch_execution import ToolBatchExecutionMode
 
     assert policy.select_mode_with_audit(audited) == ToolBatchExecutionMode.SEQUENTIAL
+@pytest.mark.asyncio
+async def test_illegal_effects_tool_on_executor_path_raises() -> None:
+    """RA-086 behavior change, explicit: an illegal effects value on the
+    executor path fails loud instead of silently degrading to sequential."""
+    tools = {
+        "good": _make_tool("good", effects="read", grant_concurrent=True),
+        "bogus": _make_tool("bogus", effects="bogus", grant_concurrent=True),
+    }
+    registry = _Registry(tools)
+    executor = ToolBatchExecutor(registry, _SafeExecutor(per_call_latency_s=0))
+
+    with pytest.raises(ToolEffectsDeclarationError):
+        await executor.execute(_calls(list(tools)))

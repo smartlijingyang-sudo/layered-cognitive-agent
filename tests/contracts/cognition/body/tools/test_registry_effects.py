@@ -23,6 +23,7 @@ from lca.contracts.cognition.body.tools.registry import (
     ToolEffectsDeclarationError,
     assert_effects_declared,
     register_manifest_with_audit,
+    resolve_tool_effects,
     select_effect,
 )
 from lca.contracts.models.core.execution.tool import ToolApi, ToolManifest
@@ -202,3 +203,39 @@ def test_no_manifest_module_path_collides_with_contracts_path() -> None:
     # plugin code to leak into the contracts package.
     assert contracts_path.is_dir()
     assert plugins_path.is_dir()
+def _manifest_tool(*, effects: str | None, with_manifest: bool = True):
+    from lca.contracts.models.core.execution.tool import ToolApi, ToolManifest
+
+    manifest = None
+    if with_manifest:
+        manifest = ToolManifest(
+            identifier="probe.tool",
+            type="builtin",
+            api=(
+                ToolApi(
+                    name="probeTool",
+                    description="probe",
+                    parameters={"type": "object", "properties": {}},
+                    effects=effects,  # type: ignore[arg-type]
+                ),
+            ),
+        )
+    return type("ProbeTool", (), {"manifest": manifest})()
+
+
+def test_resolve_tool_effects_prefers_first_api_effect() -> None:
+    assert resolve_tool_effects(_manifest_tool(effects="read")) == "read"
+    assert resolve_tool_effects(_manifest_tool(effects="write")) == "write"
+
+
+def test_resolve_tool_effects_without_manifest_is_conservative_external() -> None:
+    # PR-3 conservative default: unaudited (manifest-less) tools stay sequential.
+    assert resolve_tool_effects(_manifest_tool(effects=None, with_manifest=False)) == "external"
+    assert resolve_tool_effects(object()) == "external"
+
+
+def test_resolve_tool_effects_illegal_value_fails_loud() -> None:
+    # RA-086 behavior change: illegal values raise instead of silently
+    # degrading to sequential.
+    with pytest.raises(ToolEffectsDeclarationError):
+        resolve_tool_effects(_manifest_tool(effects="bogus"))

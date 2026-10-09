@@ -142,11 +142,33 @@ def select_effect(api: ToolApi) -> ToolEffects:
     return api.effects  # type: ignore[return-value]
 
 
+def resolve_tool_effects(tool: object) -> ToolEffects:
+    """Resolve the batch-scheduling effect for one tool.
+
+    Prefers the manifest's first ``ToolApi.effects`` — most tools expose
+    exactly one API; for multi-API tools the first declared effect wins
+    (the audit opts the whole tool in at registration time).  Tools
+    without a manifest (legacy Protocol-only shape) are conservatively
+    ``"external"`` so the parallel default refuses to overlap an
+    unaudited tool (PR-3 conservative default).
+
+    Illegal values fail loud via ``select_effect`` instead of silently
+    degrading to sequential (RA-086 behavior change, explicit).
+    """
+
+    manifest = getattr(tool, "manifest", None)
+    api = getattr(manifest, "api", None) if manifest is not None else None
+    if not api:
+        return "external"
+    return select_effect(api[0])
+
+
 __all__ = [
     "EFFECTS_UNSET",
     "ToolEffects",
     "ToolEffectsDeclarationError",
     "assert_effects_declared",
     "register_manifest_with_audit",
+    "resolve_tool_effects",
     "select_effect",
 ]
