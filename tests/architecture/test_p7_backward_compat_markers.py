@@ -14,6 +14,7 @@ backward-compat, NOT SSOT) and point to the recommended P7 path
 
 import pathlib
 
+import pytest
 import yaml
 
 
@@ -53,6 +54,11 @@ class TestCognitivePhaseGraphPlanDeprecation:
 class TestPhaseBindingDeprecation:
     """PhaseBinding carries a .. deprecated:: marker on semantic_phase."""
 
+    @pytest.mark.skip(
+        reason=(
+            "archaeology: subject `class PhaseBinding` 已有意退役——删于 63a68a4da (ADR-0221 v2 PlanInterpreter cutover)；本 pin 审计对象不复存在，按 arch 08:09 裁决 (c) 考古 skip。"
+        )
+    )
     def test_docstring_has_deprecated_marker(self):
         f = (
             pathlib.Path(
@@ -79,6 +85,11 @@ class TestPhaseBindingDeprecation:
 class TestDeclarativePhaseGraphBundleHeader:
     """declarative-phase-graph.yaml header carries a .. note:: deprecation."""
 
+    @pytest.mark.skip(
+        reason=(
+            "archaeology: subject `bundles/declarative-phase-graph.yaml` 已有意退役——删于 d262aaf7e (ADR-0236 PR-7 retire dual lineage)；本 pin 审计对象不复存在，按 arch 08:09 裁决 (c) 考古 skip。"
+        )
+    )
     def test_yaml_has_deprecation_note(self):
         f = pathlib.Path("bundles/declarative-phase-graph.yaml")
         data = yaml.safe_load(f.read_text(encoding="utf-8"))
@@ -123,6 +134,11 @@ class TestP7PathDocumentedAsRecommended:
             "CognitivePhaseGraphPlan deprecation must reference P7 region-tag path"
         )
 
+    @pytest.mark.skip(
+        reason=(
+            "archaeology: subject `class PhaseBinding` 已有意退役——删于 63a68a4da (ADR-0221 v2 PlanInterpreter cutover)；本 pin 审计对象不复存在，按 arch 08:09 裁决 (c) 考古 skip。"
+        )
+    )
     def test_phase_binding_points_to_p7(self):
         f = (
             pathlib.Path(

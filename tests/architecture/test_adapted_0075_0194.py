@@ -31,6 +31,11 @@ class Test0075ShapePreserved:
             "0075 CognitivePhaseGraphPlan must remain importable"
         )
 
+    @pytest.mark.skip(
+        reason=(
+            "archaeology: subject `class PhaseBinding` 已有意退役——删于 63a68a4da (ADR-0221 v2 PlanInterpreter cutover)；本 pin 审计对象不复存在，按 arch 08:09 裁决 (c) 考古 skip。"
+        )
+    )
     def test_phase_binding_exists(self):
         mod = importlib.import_module(
             "lca.contracts.protocols.declarative.declarative_1.declarative_graph"
@@ -39,6 +44,11 @@ class Test0075ShapePreserved:
             "0075 PhaseBinding must remain importable"
         )
 
+    @pytest.mark.skip(
+        reason=(
+            "archaeology: subject `class PhaseBinding` 已有意退役——删于 63a68a4da (ADR-0221 v2 PlanInterpreter cutover)；本 pin 审计对象不复存在，按 arch 08:09 裁决 (c) 考古 skip。"
+        )
+    )
     def test_phase_executor_capability_closure_format(self):
         """0075 §三 — PhaseBinding.executor_capability is `phase.<name>.<executor>`.
 
