@@ -7,6 +7,14 @@
 3. 委派连续性：成员 run.agent 祖先链必含 delegation（ADR-0037 一等委派）；
 4. 身份完备：相位/资源 span 必带 agent_role；
 5. 内容完备：llm.chat 必带 model 与 prompt 预览。
+
+.. note:: archaeology (2026-10-09, todo-93 / arch 09:09 裁决 (c)) ——
+    本模块 premise 已被 ADR-0037 Stage 6（``4b9d4f135``）supersede：
+    ambient OTel span 拓扑（run.agent / llm.chat / delegation / 无父
+    transport.request-response）是刻意退役的机制平面调试细节；
+    单树 / 委派连续性归属 journal→OtelProjector 投影面，
+    不在 harness InMemory 采集路径内。5 个用例以 @unittest.skip
+    考古标记保留证据链；test_phase_spans_carry_actor_identity 为真绿保留。
 """
 
 from __future__ import annotations
@@ -69,6 +77,9 @@ class TestTraceCoherence(unittest.IsolatedAsyncioTestCase):
         )
         self.bundle = self.outcome.bundle
 
+    @unittest.skip(
+        "archaeology: premise 已被 ADR-0037 Stage 6 (4b9d4f135) supersede——transport.request/response 为刻意无父的机制平面 span（verbose 调试细节），单树/委派连续性归属 journal→OtelProjector 投影面；本 harness 采集的是 ambient 平面，pin 读错了平面。"
+    )
     def test_single_tree_no_orphans(self) -> None:
         roots = self.bundle.root_spans()
         self.assertEqual(len(roots), 1, f"应恰有一个根 span，实际 {[r.name for r in roots]}")
@@ -78,6 +89,9 @@ class TestTraceCoherence(unittest.IsolatedAsyncioTestCase):
         all_ids = {s.span_id for s in self.bundle.spans}
         self.assertEqual(root_reachable, all_ids, "存在孤儿 span（不可回溯到根）")
 
+    @unittest.skip(
+        "archaeology: `run.agent` 在 lca/ + lca_kernel/ 内零真实发射点（ADR-0037 Stage 6，4b9d4f135 刻意退役）；迭代空集合即过，断言空心，算没测。"
+    )
     def test_resource_spans_live_inside_agent_loops(self) -> None:
         """资源 span 必须归属于某个 run.agent 子树（认知循环上下文）。"""
         resource_names = (
@@ -93,6 +107,9 @@ class TestTraceCoherence(unittest.IsolatedAsyncioTestCase):
                     f"{name} 不在任何 run.agent 子树内：{s.span_id}",
                 )
 
+    @unittest.skip(
+        "archaeology: 迭代对象 run.agent 子树在 ADR-0037 Stage 6 (4b9d4f135) 后不存在，空集合即过，断言空心，算没测。"
+    )
     def test_all_four_phase_markers_present_per_agent(self) -> None:
         """每个 run.agent 子树必含四相边界标记（相位完整性）。"""
         phase_names = {
@@ -108,6 +125,9 @@ class TestTraceCoherence(unittest.IsolatedAsyncioTestCase):
                 missing, set(), f"run.agent 子树缺少相位标记：{missing}（{agent_root.span_id}）"
             )
 
+    @unittest.skip(
+        "archaeology: `run.agent`/`SpanName.DELEGATION` 在 lca/ + lca_kernel/ 内零真实发射点（4b9d4f135 退役；委派连续性由 journal 投影承载，不在 harness 采集路径）；成员工作经 transport send_and_wait。"
+    )
     def test_member_runs_chain_through_delegation(self) -> None:
         member_runs = [
             s
@@ -134,6 +154,9 @@ class TestTraceCoherence(unittest.IsolatedAsyncioTestCase):
                     f"{name} 缺少 agent_role（身份盖章失效）：{s.span_id}",
                 )
 
+    @unittest.skip(
+        "archaeology: `llm.chat` 在 lca/ + lca_kernel/ 内零真实发射点（ADR-0037 Stage 6，4b9d4f135 刻意退役）；pin 所钉的 span 拓扑已不存在。"
+    )
     def test_llm_chat_spans_carry_model_and_preview(self) -> None:
         chats = self.bundle.by_name(SpanName.LLM_CHAT.value)
         self.assertGreater(len(chats), 0)
