@@ -60,7 +60,6 @@ log:emit
 - `lca/contracts/capability_gate.py`
 - `lca/contracts/capability_plan.py`
 - `lca/contracts/casting.py`
-- `lca/contracts/cli_debug_command.py`
 - `lca/contracts/coding_agent_tools.py`
 - `lca/contracts/cognition.py`
 - `lca/contracts/cognitive_pipeline.py`

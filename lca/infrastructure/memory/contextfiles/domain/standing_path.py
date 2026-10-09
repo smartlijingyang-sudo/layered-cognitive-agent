@@ -65,4 +65,62 @@ def refuses_standing_path(path: str | Path) -> bool:
     return is_standing_write_path(path)
 
 
-__all__ = ["is_standing_write_path", "refuses_standing_path", "standing_write_block_message"]
+def is_skill_package_write_path(path: str | Path) -> bool:
+    """True when ``path`` targets a file inside an assistant Home's ``skills/`` package.
+
+    已安装技能包的唯一生产路径是 ``create_assistant_skill``（安装）/
+    ``edit_assistant_skill``（编辑）：staging → 内容闸 → 记录 digest →
+    revision 快照。通用 ``writeFile`` / ``editFile`` 直写会绕过其中每一步
+    （``run_755719d1a9d5`` 实测：5 次 writeFile 替换 SKILL.md，
+    ``artifact_state`` 仍为 ``verified``），因此这些路径必须拒绝。
+
+    作用域与 ``is_standing_write_path`` 一致：只看 ``get_lca_home()`` 之下
+    或 ``.lca/assistants/`` 树内的 ``assistants/<id>/skills/<skill_id>/...``。
+    工作区的同名文件（如 ``{home}/workspace/SKILL.md``）保持可写——
+    ``workspace`` 不是 home 的直接 ``skills`` 子目录，模式匹配不上。
+    读路径不受影响（守卫只挂在写调用点）。
+    """
+    raw_str = str(path).replace("\\", "/")
+    expanded = expand_user_path(path).resolve()
+    lca_home = get_lca_home().resolve()
+
+    try:
+        is_under_lca_home = expanded.is_relative_to(lca_home)
+    except (ValueError, AttributeError):
+        is_under_lca_home = False
+
+    segments = [s for s in raw_str.split("/") if s]
+    has_lca_assistants = any(
+        segments[i] == ".lca" and i + 1 < len(segments) and segments[i + 1] == "assistants"
+        for i in range(len(segments) - 1)
+    )
+
+    if not is_under_lca_home and not has_lca_assistants:
+        return False
+
+    # assistants/<assistant_id>/skills/<skill_id>[/...]
+    return any(
+        segments[i] == "assistants" and segments[i + 2] == "skills"
+        for i in range(len(segments) - 3)
+    )
+
+
+def skill_package_write_block_message() -> str:
+    """Reason returned to the model when it targets an installed skill package."""
+    return (
+        "writeFile 不能直接改写助理 Home 里已安装的技能包"
+        "（{home}/skills/<skill_id>/ 下的任何文件）。"
+        "技能内容的生产路径只有两条：create_assistant_skill（安装）与 "
+        "edit_assistant_skill（编辑）——它们走 staging → 内容闸 → 记录 digest → "
+        "revision 快照。要安装或修改技能请用这两个工具，不要用 writeFile / "
+        "editFile 直写。"
+    )
+
+
+__all__ = [
+    "is_skill_package_write_path",
+    "is_standing_write_path",
+    "refuses_standing_path",
+    "skill_package_write_block_message",
+    "standing_write_block_message",
+]

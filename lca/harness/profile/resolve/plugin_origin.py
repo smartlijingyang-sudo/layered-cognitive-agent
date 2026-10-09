@@ -9,10 +9,15 @@ filesystem conventions. The classification rules (per ADR §3.4):
 
 | source   | filesystem hint                       | default trust | enabled by default |
 |----------|---------------------------------------|---------------|--------------------|
-| bundled  | starts with ``lca/plugins/``          | core          | profile declares   |
+| bundled  | first-party namespaces (``lca`` /   | core          | profile declares   |
+|          | ``lca_kernel``, shipped w/ LCA)      |               |                    |
 | project  | starts with ``.lca/plugins/``         | untrusted     | false              |
 | user     | under user home, not project          | trusted       | profile declares   |
 | pip      | entry-point registered via setuptools | untrusted     | false              |
+
+Unclassifiable module paths fall back to ``pip`` / ``untrusted``
+(I-HPC-11 default-deny): "assume bundled" would silently trust
+third-party code as core (RA-066).
 
 Per I-HPC-11 (trust default denied): untrusted origins are filtered
 out by default; only profile-explicit enable admits them.
@@ -32,6 +37,9 @@ from lca.contracts.runtime.trust import (
 _BUNDLED_ROOT: Final[str] = "lca/plugins"
 _PROJECT_ROOT: Final[str] = ".lca/plugins"
 _USER_INDICATOR: Final[str] = ".local"  # user pip installs land here
+# First-party top-level namespaces: shipped with LCA itself, trusted as
+# core. ``lca_kernel`` is the vendored kernel package (in-repo).
+_FIRST_PARTY_ROOTS: Final[tuple[str, ...]] = ("lca", "lca_kernel")
 
 
 class PluginOriginResolutionError(ValueError):
@@ -63,10 +71,17 @@ def resolve_plugin_origin(
     if str(module_path).startswith(_PROJECT_ROOT + "/") or _PROJECT_ROOT + "/" in str(module_path):
         return _origin("project", "untrusted", "profile_required", str(module_path))
 
-    # 3. bundled plugin (under lca/plugins/)
+    # 3. bundled: first-party namespaces (shipped with LCA itself).
+    # Covers ``lca.plugins.*`` and sibling first-party trees such as
+    # ``lca.nodes.*`` / ``lca_kernel.*``: these top-level packages are
+    # product code, so they are trusted as core. Third-party pip
+    # distributions live under their own top-level names and still fall
+    # through to case 5 (RA-066).
     path_str = str(module_path)
-    dotted_prefix = _BUNDLED_ROOT.replace("/", ".") + "."
-    if path_str.startswith(dotted_prefix) or path_str.startswith(_BUNDLED_ROOT + "/"):
+    if any(
+        path_str == root or path_str.startswith(root + ".") or path_str.startswith(root + "/")
+        for root in _FIRST_PARTY_ROOTS
+    ):
         return _origin("bundled", "core", "bundled_default", path_str)
 
     # 4. user pip-installed (heuristic: under user home or .local)
@@ -74,8 +89,12 @@ def resolve_plugin_origin(
     if path_str.startswith(home) or _USER_INDICATOR in path_str:
         return _origin("user", "trusted", "profile_required", path_str)
 
-    # 5. fallback: assume bundled (the safe default; untrusted would fail-loud later)
-    return _origin("bundled", "core", "fallback", path_str)
+    # 5. fallback: unknown origin is UNTRUSTED (I-HPC-11 default-deny, RA-066).
+    # Never "assume bundled": a module path we cannot classify must not be
+    # silently trusted as core. Classified as pip/untrusted so the filter
+    # requires explicit profile admission; a profile that declares the
+    # plugin inline still admits it (source == profile_path).
+    return _origin("pip", "untrusted", "profile_required", path_str)
 
 
 def _origin(

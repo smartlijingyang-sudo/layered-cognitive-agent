@@ -18,47 +18,41 @@ from pathlib import Path
 from typing import Any
 
 from lca.contracts.diagnostics.doctor import (
+    PLUGIN_SHAPE_CODE_BY_KIND,
+    PLUGIN_SHAPE_SEVERITY_BY_KIND,
+    PLUGIN_SHAPE_UNKNOWN_KIND_CODE,
     DoctorFinding,
     DoctorReport,
-    DoctorSeverity,
 )
 
 _OWNER_ADR: str = "ADR-0199"
 
-# DOC-PS-* stable codes per scripts/check_plugin_shape.py dimension (kind).
-# Source of truth for kinds: scripts/check_plugin_shape.py ALL_KINDS.
-# Keep in sync with docs/specs/0199-implementation-plan.md §5 P2-04.
-_CODE_BY_KIND: dict[str, str] = {
-    "missing_effects": "DOC-PS-001",
-    "dual_form_residue": "DOC-PS-002",
-    "duplicate_id": "DOC-PS-003",
-    "plugin_location": "DOC-PS-004",
-    "orphan_plugin": "DOC-PS-005",
-    "dead_bundle_ref": "DOC-PS-006",
-    "plugin_in_init": "DOC-PS-007",
-}
-
-# Severity bands mirror check_plugin_shape.py semantics:
-#   * structural / contract violations = error (must fix)
-#   * convention / orphan references = warning (should fix)
-# Unknown kinds default to "info" (defensive; never fail-loud on a
-# kind the doctor doesn't yet understand).
-_SEVERITY_BY_KIND: dict[str, DoctorSeverity] = {
-    "missing_effects": "error",
-    "dual_form_residue": "error",
-    "duplicate_id": "error",
-    "plugin_location": "error",
-    "orphan_plugin": "warning",
-    "dead_bundle_ref": "warning",
-    "plugin_in_init": "error",
-}
-
 # Suffix used when the wrapped script is missing — distinct from the
 # dimension codes (DOC-PS-9xx reserved for doctor-internal failures).
 _MISSING_SCRIPT_CODE: str = "DOC-PS-901"
-_UNKNOWN_KIND_CODE: str = "DOC-PS-999"
 
 _DEFAULT_SCRIPT_REL: str = "scripts/check_plugin_shape.py"
+
+
+def _locate_repo_root(profile_path: str | Path) -> Path:
+    """Derive the audited repo root from a profile path (RA-060).
+
+    Walk up from the profile's location for a repo marker — a directory
+    containing ``scripts/check_plugin_shape.py`` (the script this pass
+    wraps, so the marker is definitionally the repo being audited).
+    When no marker is found on the ancestor chain, fall back to the
+    profile's own directory: still derived from the input (C8
+    determinism), and the missing-script finding then names an honest
+    location instead of the ambient cwd.
+    """
+    start = Path(profile_path).expanduser()
+    if not start.is_absolute():
+        start = Path.cwd() / start
+    node = start if start.is_dir() else start.parent
+    for ancestor in (node, *node.parents):
+        if (ancestor / _DEFAULT_SCRIPT_REL).is_file():
+            return ancestor
+    return node
 
 
 class PluginShapeDoctor:
@@ -68,10 +62,12 @@ class PluginShapeDoctor:
     It invokes the script as a subprocess and converts each violation
     into a ``DoctorFinding`` with a stable ``DOC-PS-*`` code.
 
-    Profile-independent: this pass audits the repository's plugin tree,
-    not a single profile. ``run(profile_path)`` accepts a profile_path
-    argument for facade-shape parity with ``ProfileCompileDryRun`` but
-    does not use it.
+    Repo-located, profile-independent: this pass audits the repository's
+    plugin tree, not the profile content — but the *repository* is located
+    via ``profile_path`` (walk up for a repo marker) unless ``repo_root``
+    was passed explicitly (RA-060). ``run(profile_path)`` therefore audits
+    the repo the diagnosed profile belongs to, regardless of the ambient
+    cwd (C8 determinism: same profile_path + same inputs -> same findings).
     """
 
     def __init__(
@@ -80,6 +76,8 @@ class PluginShapeDoctor:
         repo_root: str | Path | None = None,
         check_script: str | Path | None = None,
     ) -> None:
+        self._repo_root_explicit = repo_root is not None
+        self._script_explicit = check_script is not None
         self._repo_root = Path(repo_root) if repo_root else Path.cwd()
         if check_script is None:
             check_script = self._repo_root / _DEFAULT_SCRIPT_REL
@@ -91,27 +89,30 @@ class PluginShapeDoctor:
     ) -> DoctorReport:
         """Run plugin shape audit, convert findings to DoctorReport.
 
-        ``profile_path`` is accepted for facade-shape parity with
-        ``ProfileCompileDryRun.run(profile_path)`` but is NOT used by
-        this pass (plugin shape is profile-independent).
+        ``profile_path`` locates the audited repository: unless ``repo_root``
+        was passed explicitly, the repo root is derived by walking up from
+        the profile for a repo marker (RA-060). The ambient cwd is never
+        used as the audit target when a profile path is given.
 
         Returns a ``DoctorReport`` whose subject is ``"plugin_shape"``
         and whose findings carry ``DOC-PS-*`` codes.
         """
-        # Per I-HPC-7: profile_path is intentionally ignored. Doctor
-        # audits the repo plugin tree, not a single profile.
-        del profile_path
+        repo_root, script = self._repo_root, self._script
+        if profile_path is not None and not self._repo_root_explicit:
+            repo_root = _locate_repo_root(profile_path)
+            if not self._script_explicit:
+                script = repo_root / _DEFAULT_SCRIPT_REL
 
         subject = "plugin_shape"
         findings: list[DoctorFinding] = []
 
-        if not self._script.is_file():
+        if not script.is_file():
             findings.append(
                 DoctorFinding(
                     code=_MISSING_SCRIPT_CODE,
                     severity="error",
                     owner=_OWNER_ADR,
-                    message=f"check_plugin_shape.py not found at {self._script}",
+                    message=f"check_plugin_shape.py not found at {script}",
                     remediation=(
                         "Verify scripts/check_plugin_shape.py exists. The doctor "
                         "wraps it; the script is the source of truth for the audit."
@@ -123,7 +124,7 @@ class PluginShapeDoctor:
             return DoctorReport.from_findings(subject, findings)
 
         try:
-            raw = self._invoke_script()
+            raw = self._invoke_script(script=script, repo_root=repo_root)
         except FileNotFoundError as exc:
             findings.append(
                 DoctorFinding(
@@ -154,8 +155,8 @@ class PluginShapeDoctor:
         #   }
         for v in raw.get("violations", []):
             kind = v.get("kind", "")
-            code = _CODE_BY_KIND.get(kind, _UNKNOWN_KIND_CODE)
-            severity = _SEVERITY_BY_KIND.get(kind, "info")
+            code = PLUGIN_SHAPE_CODE_BY_KIND.get(kind, PLUGIN_SHAPE_UNKNOWN_KIND_CODE)
+            severity = PLUGIN_SHAPE_SEVERITY_BY_KIND.get(kind, "info")
             plugin_id_raw = v.get("id")
             plugin_id = plugin_id_raw if isinstance(plugin_id_raw, str) else None
             message = v.get("detail") or f"plugin shape violation: {kind}"
@@ -177,7 +178,7 @@ class PluginShapeDoctor:
 
         return DoctorReport.from_findings(subject, findings)
 
-    def _invoke_script(self) -> dict[str, Any]:
+    def _invoke_script(self, *, script: Path, repo_root: Path) -> dict[str, Any]:
         """Invoke check_plugin_shape.py as a subprocess; return parsed JSON.
 
         The script is invoked with ``--json --no-baseline-gate`` so:
@@ -187,10 +188,10 @@ class PluginShapeDoctor:
             transparent to the caller.
         """
         result = subprocess.run(  # noqa: S603 -- argv fully fixed (sys.executable + script + flags); doctor self-check
-            [sys.executable, str(self._script), "--json", "--no-baseline-gate"],
+            [sys.executable, str(script), "--json", "--no-baseline-gate"],
             capture_output=True,
             text=True,
-            cwd=self._repo_root,
+            cwd=repo_root,
             check=False,
         )
         # Exit codes from the script:
@@ -265,4 +266,4 @@ def _remediation_for(kind: str, location: str) -> str:
     )
 
 
-__all__ = ("_CODE_BY_KIND", "PluginShapeDoctor")
+__all__ = ("PluginShapeDoctor",)

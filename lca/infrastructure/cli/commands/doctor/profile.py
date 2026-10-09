@@ -1,8 +1,8 @@
-"""``lca-ops doctor profile`` — Doctor facade CLI entry (ADR-0199 §5.3 / P2-08).
+"""``lca-ops doctor profile`` / ``lca-ops doctor plugin`` — Doctor CLI entries (ADR-0199 §5.3 / P2-08, P2-09).
 
 Per ADR-0199 §5.3 this CLI is one of three canonical doctor consumers
 (CLI / CI / web). It runs the DoctorFacade (compile dry-run + plugin
-shape + capability cardinality + phase graph) against a profile path
+shape) against a profile path
 and prints the DoctorReport.
 
 Exit codes:
@@ -24,15 +24,17 @@ import typer
 
 from lca.contracts.diagnostics.doctor import DoctorReport
 from lca.harness.diagnostics.doctor.facade import DoctorFacade
+from lca.harness.diagnostics.doctor.single_plugin import SinglePluginDoctor
 
 
 def register(app: typer.Typer) -> None:
     """Register the ``doctor`` subcommand on the CLI app."""
     doctor_app = typer.Typer(
-        help="Read-only doctor (compile dry-run + plugin shape + capability + phase graph).",
+        help="Read-only doctor (compile dry-run + plugin shape).",
         no_args_is_help=True,
     )
     doctor_app.command(name="profile", help=_doctor_profile.__doc__ or "")(_doctor_profile)
+    doctor_app.command(name="plugin", help=_doctor_plugin.__doc__ or "")(_doctor_plugin)
     app.add_typer(doctor_app, name="doctor")
 
 
@@ -56,26 +58,6 @@ def _doctor_profile(
         "--skip-plugin-shape",
         help="Disable the DOC-PS-* pass (profile-independent, may be slow on large plugin trees).",
     ),
-    skip_capability: bool = typer.Option(
-        False,
-        "--skip-capability",
-        help="Disable the DOC-CAP-* pass.",
-    ),
-    skip_phase_graph: bool = typer.Option(
-        False,
-        "--skip-phase-graph",
-        help="Disable the DOC-PG-* pass.",
-    ),
-    skip_privilege: bool = typer.Option(
-        False,
-        "--skip-privilege",
-        help="Disable the DOC-PRIV-* pass.",
-    ),
-    skip_trust: bool = typer.Option(
-        False,
-        "--skip-trust",
-        help="Disable the DOC-TRUST-* pass.",
-    ),
 ) -> None:
     """Run the Doctor facade on a profile and print the report."""
     path = Path(profile_path)
@@ -87,10 +69,6 @@ def _doctor_profile(
     report = facade.doctor_profile(
         path,
         include_plugin_shape=not skip_plugin_shape,
-        include_capability_cardinality=not skip_capability,
-        include_phase_graph=not skip_phase_graph,
-        include_privilege=not skip_privilege,
-        include_trust=not skip_trust,
     )
 
     if json_output:
@@ -103,10 +81,44 @@ def _doctor_profile(
         raise SystemExit(1)
 
 
-def _print_human(report: DoctorReport) -> None:
+def _doctor_plugin(
+    plugin_path: str = typer.Argument(
+        ...,
+        help="Path to the plugin .py file to audit (pure AST, no import, no boot).",
+    ),
+    ci: bool = typer.Option(
+        False,
+        "--ci",
+        help="CI mode: exit 1 on any error finding (fail-closed).",
+    ),
+    json_output: bool = typer.Option(
+        False,
+        "--json",
+        help="Emit the DoctorReport as machine-readable JSON instead of human text.",
+    ),
+) -> None:
+    """Run the single-plugin doctor (P2-09) on one plugin file and print the report."""
+    path = Path(plugin_path)
+    if not path.exists():
+        typer.echo(f"plugin file not found: {path}", err=True)
+        raise SystemExit(2)
+
+    report = SinglePluginDoctor().run(path)
+
+    if json_output:
+        typer.echo(json.dumps(report.to_jsonable(), indent=2, ensure_ascii=False))
+    else:
+        _print_human(report, subject_label="plugin")
+
+    # Exit code: 1 if CI mode + any errors, else 0.
+    if ci and report.has_errors():
+        raise SystemExit(1)
+
+
+def _print_human(report: DoctorReport, *, subject_label: str = "profile") -> None:
     """Human-readable report rendering (default CLI output)."""
     lines: list[str] = []
-    lines.append(f"profile: {report.subject}")
+    lines.append(f"{subject_label}: {report.subject}")
     if report.activation_ref:
         lines.append(f"activation_ref: {report.activation_ref}")
     lines.append("")

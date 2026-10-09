@@ -19,10 +19,8 @@ from typing import Any
 
 import pytest
 
-from lca.harness.diagnostics.doctor.plugin_shape import (
-    _CODE_BY_KIND,
-    PluginShapeDoctor,
-)
+from lca.contracts.diagnostics.doctor import PLUGIN_SHAPE_CODE_BY_KIND
+from lca.harness.diagnostics.doctor.plugin_shape import PluginShapeDoctor
 
 # Stable machine-code regex copied verbatim from
 # lca.contracts.diagnostics.doctor (DOC-<DOMAIN>-<NNN>).
@@ -98,14 +96,81 @@ class TestSubjectAndDefaults:
         report = doctor.run()
         assert report.subject == "plugin_shape"
 
-    def test_run_profile_path_argument_is_ignored(self, tmp_path: Path) -> None:
-        """profile_path is accepted for facade parity but unused."""
+    def test_run_profile_path_does_not_relocate_explicit_repo_root(
+        self, tmp_path: Path
+    ) -> None:
+        """An explicitly passed repo_root wins over profile_path derivation."""
         script = _write_stub_script(tmp_path / "stub.py", payload={"violations": []})
         doctor = PluginShapeDoctor(repo_root=tmp_path, check_script=script)
         # Passing a profile_path must not change behavior or raise.
         report = doctor.run("/some/profile.yaml")
         assert report.subject == "plugin_shape"
         assert report.findings == ()
+
+
+class TestRepoRootDerivation:
+    """RA-060: the audited repo is derived from profile_path, not ambient cwd."""
+
+    @staticmethod
+    def _repo_with_stub(repo: Path, *, detail: str) -> Path:
+        scripts = repo / "scripts"
+        scripts.mkdir(parents=True)
+        _write_stub_script(
+            scripts / "check_plugin_shape.py",
+            payload={
+                "violations": [
+                    {
+                        "kind": "orphan_plugin",
+                        "id": "x",
+                        "file": "f.py",
+                        "line": 1,
+                        "detail": detail,
+                    }
+                ]
+            },
+        )
+        profile = repo / "profiles" / "x.yaml"
+        profile.parent.mkdir(parents=True, exist_ok=True)
+        profile.write_text("{}", encoding="utf-8")
+        return profile
+
+    def test_run_audits_profile_repo_not_cwd(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Pin: cwd != profile repo -> findings still reference the profile's repo."""
+        repo_a = tmp_path / "repo-a"
+        repo_b = tmp_path / "repo-b"
+        repo_b.mkdir()
+        profile_a = self._repo_with_stub(repo_a, detail="from-repo-a")
+        monkeypatch.chdir(repo_b)
+        report = PluginShapeDoctor().run(profile_a)
+        assert report.subject == "plugin_shape"
+        assert not [f for f in report.findings if f.code == "DOC-PS-901"]
+        assert any("from-repo-a" in f.message for f in report.findings)
+
+    def test_run_walks_up_for_repo_marker(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        repo = tmp_path / "repo"
+        self._repo_with_stub(repo, detail="from-repo")
+        deep = repo / "profiles" / "sub" / "deep" / "x.yaml"
+        deep.parent.mkdir(parents=True)
+        deep.write_text("{}", encoding="utf-8")
+        monkeypatch.chdir(tmp_path)
+        report = PluginShapeDoctor().run(deep)
+        assert any("from-repo" in f.message for f in report.findings)
+
+    def test_run_profile_outside_repo_names_profile_dir_in_901(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        lonely = tmp_path / "lonely" / "x.yaml"
+        lonely.parent.mkdir(parents=True)
+        lonely.write_text("{}", encoding="utf-8")
+        monkeypatch.chdir(tmp_path)
+        report = PluginShapeDoctor().run(lonely)
+        by901 = [f for f in report.findings if f.code == "DOC-PS-901"]
+        assert len(by901) == 1
+        assert str(lonely.parent) in by901[0].message
 
     def test_run_uses_invoked_script_path_when_set_explicitly(self, tmp_path: Path) -> None:
         script = _write_stub_script(
@@ -179,11 +244,11 @@ class TestCodeMapping:
         assert finding.remediation  # non-empty (DoctorFinding.__post_init__)
 
     def test_dimension_to_code_mapping_is_complete(self) -> None:
-        """Every key in _CODE_BY_KIND maps to a DOC-PS-NNN code."""
-        assert len(_CODE_BY_KIND) >= 7, (
+        """Every key in PLUGIN_SHAPE_CODE_BY_KIND maps to a DOC-PS-NNN code."""
+        assert len(PLUGIN_SHAPE_CODE_BY_KIND) >= 7, (
             "Expected at least 7 dimension codes (Phase A + PR-1 + AGENTS §5)."
         )
-        for kind, code in _CODE_BY_KIND.items():
+        for kind, code in PLUGIN_SHAPE_CODE_BY_KIND.items():
             assert _CODE_RE.match(code), f"{kind!r} → {code!r} not DOC-XX-NNN"
             # Each code starts with DOC-PS- (this doctor's domain).
             assert code.startswith("DOC-PS-"), (

@@ -263,6 +263,14 @@ async def test_omitting_skills_provider_does_not_call_resolve_skill_store(
 
     monkeypatch.setattr("lca.infrastructure.skills.factory.factory.resolve_skill_store", _boom)
 
+    def _boom_materialize(*_a: object, **_k: object) -> object:
+        raise AssertionError("materialize_bundled_skills must not run when skills-provider is omitted")
+
+    monkeypatch.setattr(
+        "lca.infrastructure.skills.factory.factory.materialize_bundled_skills",
+        _boom_materialize,
+    )
+
     from lca.cognition.memory.simple.memory import SimpleMemorySystem
 
     with pytest.raises(MissingCapabilityError, match="skills"):

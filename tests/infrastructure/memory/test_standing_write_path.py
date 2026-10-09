@@ -12,7 +12,9 @@ from pathlib import Path
 from typing import Any
 
 from lca.infrastructure.memory.contextfiles.domain.standing_path import (
+    is_skill_package_write_path,
     is_standing_write_path,
+    skill_package_write_block_message,
     standing_write_block_message,
 )
 
@@ -63,3 +65,47 @@ def test_custom_lca_home_override_is_honored(tmp_path: Path, monkeypatch: Any) -
     assert is_standing_write_path(custom_home / "assistants/asst_1/SOUL.md")
     assert is_standing_write_path(custom_home / "assistants/asst_1/memory/USER.md")
     assert is_standing_write_path(custom_home / "assistants/asst_1/memory/semantic.json")
+
+
+# ── RA-057:技能包写守卫 ────────────────────────────────────────────────
+
+
+def test_rejects_skill_package_files_under_home() -> None:
+    # run_755719d1a9d5 的真实故障路径：writeFile 直写 {home}/skills/<id>/SKILL.md
+    base = "/home/lichao/.lca/assistants/asst_c8b83acb1920/skills/psychological-counselor"
+    assert is_skill_package_write_path(f"{base}/SKILL.md")
+    assert is_skill_package_write_path(f"{base}/manifest.json")
+    assert is_skill_package_write_path(f"{base}/resources/helper.py")
+    # 包目录本身作为写入目标同样拒绝
+    assert is_skill_package_write_path(base)
+
+
+def test_skill_package_guard_ignores_workspace_and_out_of_scope() -> None:
+    # 工作区同名文件保持可写
+    assert not is_skill_package_write_path(
+        "/home/lichao/.lca/assistants/asst_x/workspace/SKILL.md"
+    )
+    assert not is_skill_package_write_path("/home/u/projects/skills/demo/SKILL.md")
+    assert not is_skill_package_write_path("skills/demo/SKILL.md")  # 相对路径无作用域
+    assert not is_skill_package_write_path("/tmp/report.md")  # noqa: S108
+    # skills/ 不是 home 的直接子目录（workspace 下的 skills 子目录）不误杀
+    assert not is_skill_package_write_path(
+        "/home/u/.lca/assistants/asst_x/workspace/skills/demo/SKILL.md"
+    )
+
+
+def test_skill_package_message_names_production_tools() -> None:
+    msg = skill_package_write_block_message()
+    assert "create_assistant_skill" in msg
+    assert "edit_assistant_skill" in msg
+
+
+def test_skill_package_guard_honors_lca_home_override(
+    tmp_path: Path, monkeypatch: Any
+) -> None:
+    custom_home = tmp_path / "custom_agent_data"
+    monkeypatch.setenv("LCA_HOME", str(custom_home))
+    assert is_skill_package_write_path(
+        custom_home / "assistants/asst_1/skills/demo/SKILL.md"
+    )
+    assert not is_skill_package_write_path(custom_home / "workspace/SKILL.md")

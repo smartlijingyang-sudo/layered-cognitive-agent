@@ -32,10 +32,10 @@ class Config(BaseModel):
     requires=["skills"],
     implements=[SkillPackageInstaller],
     layer="L0",
-    # resolve_skill_store() runs ensure_bundled_skills, which install_package's
-    # every repo skills/ pack into the global store root. Declaring "none" made
-    # that write invisible to the effects audit, which is how a unit test ended
-    # up rewriting the production ~/.lca/skills undetected.
+    # materialize_bundled_skills() install_packages every repo skills/ pack
+    # into the global store root. The filesystem effect is declared here so the
+    # write stays visible to the effects audit (71515dace: an undeclared write
+    # let a unit test rewrite the production ~/.lca/skills undetected).
     effects="filesystem",
     description="Register SkillPackageInstaller providers on the SkillsService Definition.",
     test_suite="tests/scenario/plugin/test_plugin_tree_single_owner.py",
@@ -59,7 +59,13 @@ class Config(BaseModel):
     ),
 )
 async def setup(ctx: PluginContext, config: Config) -> None:
-    from lca.infrastructure.skills.factory.factory import resolve_skill_store
+    from lca.infrastructure.skills.factory.factory import (
+        materialize_bundled_skills,
+        resolve_skill_store,
+    )
 
     if "disk" in config.providers:
-        ctx.require("skills").register("disk", resolve_skill_store())
+        store = resolve_skill_store()
+        # RA-058:显式 boot 步骤（纯 resolve 不再写盘）。
+        materialize_bundled_skills(store)
+        ctx.require("skills").register("disk", store)

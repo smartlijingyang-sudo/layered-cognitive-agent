@@ -6,21 +6,20 @@
   ``_ACTIVATABLE_STATES``(ADR-0187 §3 D6)/ ``_GLOBAL_LINK_SOURCE``(ADR-0243 D2);
 - ``_gate_package`` —— ADR-0067 三闸 + ``DRAFT → VERIFIED`` 迁移;
 - ``_place_package`` / ``_mark_local`` —— staging → Home skills 落盘;
-- ``_link_global_package`` / ``_mark_global_link`` / ``_is_global_link`` ——
-  全局库 → staging 硬链接物化(ADR-0243 D1 re-link);
+- ``_mark_global_link`` / ``_is_global_link`` —— 全局包 source 标记/识别
+  (ADR-0243 D2；硬链接物化已收归 ``SkillPackageStore.materialize_link``);
 - ``_package_digest`` / ``_revision_of`` —— manifest 摘要与修订读取。
 """
 
 from __future__ import annotations
 
 import json
-import os
 import shutil
 from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
 
-from lca.contracts.atoms.artifact.state import ArtifactState
+from lca.contracts.atoms.artifact.state import ACTIVATABLE_STATES, ArtifactState
 from lca.contracts.atoms.scope.scope import Scope
 from lca.contracts.harness.journal.artifact import (
     CapabilityArtifact,
@@ -33,7 +32,7 @@ from lca.contracts.protocols.memory.operational_skills import (
     SkillImportError,
     SkillPackage,
 )
-from lca.infrastructure.skills.disk.store import safe_rel_path, sanitize_skill_id
+from lca.infrastructure.skills.disk.store import is_canonical_rel_path, sanitize_skill_id
 
 _STAGING_DIR_NAME = ".staging"
 """Home 内 staging 子目录名(隐藏目录;``list_installed`` 跳过)。"""
@@ -44,7 +43,7 @@ _SKILLS_DIGEST_PREFIX = "skills/"
 _GLOBAL_LINK_SOURCE = "global_link"
 """``source`` 标记值:包是全局库的硬链接视图(ADR-0243 D2)。"""
 
-_ACTIVATABLE_STATES = frozenset({ArtifactState.VERIFIED.value, ArtifactState.ACTIVE.value})
+_ACTIVATABLE_STATES = ACTIVATABLE_STATES  # RA-055: 共享谓词的别名（overlay/__init__ 重导出保持兼容）
 """``activate`` 接受的状态闭集(ADR-0187 §3 D6)。"""
 
 
@@ -69,7 +68,9 @@ def _gate_package(package: SkillPackage) -> CapabilityArtifact:
     if len(package.resource_paths) > SKILL_MAX_RESOURCES:
         raise SkillImportError("invariant 闸失败: 资源数超过上限")
     for rel in package.resource_paths:
-        if not rel or safe_rel_path(rel) != rel:
+        # RA-076: 与 store 安装/读取用同一 traversal-safety 谓词；
+        # 策略结果（同输入同拒/同收）由 tests pin 住。
+        if not is_canonical_rel_path(rel):
             raise SkillImportError(f"invariant 闸失败: 资源路径非法 {rel!r}")
 
     artifact = make_capability_artifact(
@@ -96,12 +97,6 @@ def _place_package(staging_root: Path, skills_root: Path, skill_id: str) -> Path
     return dest
 
 
-def _package_digest(package: SkillPackage) -> str:
-    """``sha256:<hex>`` 形式的包内容摘要(manifest digests 条目同形)。"""
-    digest = package.content_hash
-    return digest if digest.startswith("sha256:") else f"sha256:{digest}"
-
-
 def _mark_local(skill_dir: Path) -> None:
     """把落盘包的 ``manifest.json`` 标记为 ``source: "local"``（ADR-0243 D2）。
 
@@ -125,23 +120,6 @@ def _mark_local(skill_dir: Path) -> None:
 def _is_global_link(entry: Any) -> bool:
     """Home manifest ``skills`` 索引条目是否为全局库硬链接（ADR-0243 D2）。"""
     return isinstance(entry, dict) and entry.get("source") == _GLOBAL_LINK_SOURCE
-
-
-def _link_global_package(global_root: Path, staging_root: Path, skill_id: str) -> Path:
-    """把全局包硬链接进 staging（与 ``_copy_inherited_snapshot`` 同一物化惯用法）。
-
-    链接而非复制 = ADR-0243 D1 的空间不膨胀前提;落盘由 ``_place_package`` 完成，
-    使全局包在整个 re-link 过程中始终不被触碰。
-    """
-    dest = staging_root / skill_id
-    shutil.copytree(
-        global_root / skill_id,
-        dest,
-        dirs_exist_ok=True,
-        copy_function=os.link,
-    )
-    _mark_global_link(dest)
-    return dest
 
 
 def _mark_global_link(skill_dir: Path) -> None:

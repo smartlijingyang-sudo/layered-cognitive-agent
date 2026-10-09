@@ -39,10 +39,15 @@ from lca.contracts.protocols.assistant.catalog import (
 )
 from lca.contracts.protocols.assistant.role_resolver import RoleCard, RoleNotFoundError
 from lca.contracts.protocols.journal.spec.spec import AgentSpec
+from lca.contracts.protocols.memory.operational_skills import (
+    SkillNotFoundError,
+    SkillPackageStore,
+)
 from lca.infrastructure.assistant.io import (
     load_grants,
     read_json,
     sha256_digest,
+    skill_index_digest,
     write_json,
 )
 from lca.plugins.assistant.events._events import (
@@ -88,19 +93,8 @@ log = structlog.get_logger(__name__)
 # ── 物化 helpers ────────────────────────────────────────────────────
 
 
-def _link_tree(src: Path, dst: Path) -> None:
-    """把 ``src`` 目录树硬链接镜像到 ``dst``（文件硬链接，目录新建）。"""
-    dst.mkdir(parents=True, exist_ok=True)
-    for child in src.iterdir():
-        target = dst / child.name
-        if child.is_dir():
-            _link_tree(child, target)
-        elif child.is_file():
-            os.link(child, target)
-
-
 def _materialize_global_skills(
-    global_store: Any,
+    global_store: SkillPackageStore,
     home: Path,
     skill_ids: tuple[str, ...],
     now: str,
@@ -110,23 +104,21 @@ def _materialize_global_skills(
     返回 ``(skills 索引, skills digest 前缀)`` 供 Home manifest 写入。每个
     落盘包的 ``manifest.json`` 标记 ``source: "global_link"``（ADR-0243 D2）。
     """
-    store_root = getattr(global_store, "root", None)
-    if store_root is None:
-        raise _CatalogConfigError("全局技能库不支持硬链接物化（缺 root 属性）")
     skills_root = home / "skills"
     skills_root.mkdir(parents=True, exist_ok=True)
     index: dict[str, Any] = {}
     digests: dict[str, str] = {}
     for skill_id in skill_ids:
-        src = Path(store_root) / skill_id
-        if not (src / "SKILL.md").is_file() or not (src / "manifest.json").is_file():
-            raise _CatalogConfigError(f"全局技能不存在: {skill_id}")
-        dest = skills_root / skill_id
-        if dest.exists():
-            shutil.rmtree(dest)
-        _link_tree(src, dest)
+        try:
+            dest = global_store.materialize_link(skill_id, skills_root / skill_id)
+        except NotImplementedError as exc:
+            raise _CatalogConfigError(
+                "全局技能库不支持硬链接物化（缺 materialize_link 能力）"
+            ) from exc
+        except SkillNotFoundError as exc:
+            raise _CatalogConfigError(f"全局技能不存在: {skill_id}") from exc
         # 标记来源：global_link（本地 manifest 多一个 source 字段）
-        meta = json.loads((src / "manifest.json").read_text(encoding="utf-8"))
+        meta = json.loads((dest / "manifest.json").read_text(encoding="utf-8"))
         meta["source"] = "global_link"
         # 先断链再写:此刻 dest/manifest.json 仍是全局包的硬链接,原地写会穿透到
         # 全局 inode,把标记写进内容源本身,并同时改写所有共享该 inode 的 Home。
@@ -136,7 +128,9 @@ def _materialize_global_skills(
             json.dumps(meta, ensure_ascii=False, indent=2, sort_keys=True),
             encoding="utf-8",
         )
-        digest = sha256_digest(dest / "SKILL.md")
+        # RA-056:全文约定——与 install_package 的 content_hash 同源，不再对
+        # 正文-only 的 SKILL.md 文件做 hash。
+        digest = skill_index_digest(str(meta.get("content_hash") or ""))
         index[skill_id] = {
             "digest": digest,
             "artifact_state": "verified",
@@ -149,17 +143,22 @@ def _materialize_global_skills(
     return index, digests
 
 
-def _list_materializable_global_skills(global_store: Any) -> tuple[str, ...]:
-    """返回全局库中可物化（含 SKILL.md + manifest.json）的 skill_id 列表。"""
-    store_root = getattr(global_store, "root", None)
-    if store_root is None:
-        return ()
-    return tuple(
-        entry.skill_id
-        for entry in global_store.list_installed()
-        if (Path(store_root) / entry.skill_id / "SKILL.md").is_file()
-        and (Path(store_root) / entry.skill_id / "manifest.json").is_file()
-    )
+def _list_materializable_global_skills(
+    global_store: SkillPackageStore,
+) -> tuple[str, ...]:
+    """返回全局库中可物化（含 SKILL.md + manifest.json）的 skill_id 列表。
+
+    用已声明的 ``get()`` 做可物化探测（缺任一文件即 ``SkillNotFoundError``），
+    不再穿透 ``root`` 属性。
+    """
+    materializable: list[str] = []
+    for entry in global_store.list_installed():
+        try:
+            global_store.get(entry.skill_id)
+        except SkillNotFoundError:
+            continue
+        materializable.append(entry.skill_id)
+    return tuple(materializable)
 
 
 def _materialize_default_tools(home: Path, names: tuple[str, ...]) -> None:
@@ -849,11 +848,14 @@ class _AssistantCatalogImpl(_AssistantCatalogEventsMixin, AssistantCatalog):
             for child in sorted(source_skills.iterdir()):
                 if child.is_dir() and (child / "SKILL.md").is_file():
                     is_global_link = False
+                    skill_meta: dict[str, Any] = {}
                     meta_path = child / "manifest.json"
                     if meta_path.is_file():
                         try:
-                            meta = json.loads(meta_path.read_text(encoding="utf-8"))
-                            is_global_link = meta.get("source") == "global_link"
+                            loaded_meta = json.loads(meta_path.read_text(encoding="utf-8"))
+                            if isinstance(loaded_meta, dict):
+                                skill_meta = loaded_meta
+                            is_global_link = skill_meta.get("source") == "global_link"
                         except (OSError, ValueError):
                             is_global_link = False
                     dest = dest_skills / child.name
@@ -866,11 +868,13 @@ class _AssistantCatalogImpl(_AssistantCatalogEventsMixin, AssistantCatalog):
                         )
                     else:
                         shutil.copytree(child, dest, dirs_exist_ok=True)
-                    digest = sha256_digest(dest / "SKILL.md")
+                    # RA-056:全文约定——来源 Home 技能 manifest 的 content_hash
+                    # 同源（缺失则 sha256:unknown，不回退正文-only）。
+                    digest = skill_index_digest(str(skill_meta.get("content_hash") or ""))
                     index[child.name] = {
                         "digest": digest,
                         "artifact_state": "verified",
-                        "version": str(meta.get("version") or "") if is_global_link else "",
+                        "version": str(skill_meta.get("version") or "") if is_global_link else "",
                         "source": "global_link" if is_global_link else "local",
                         "installed_at": _iso_now(),
                         "actor": "system",

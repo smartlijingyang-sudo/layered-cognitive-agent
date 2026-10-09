@@ -453,3 +453,31 @@ K6 + K7 单独成 ADR,见 [ADR-0117](./0117-process-lifecycle-env-whitelist.md)�
 | 包组织纪律 | [ADR-0105](./0105-package-organization-discipline.md) |
 | 命名宪法 | [ADR-0106](./0106-naming-constitution.md) |
 | Locked-surface | [ADR-0103](./0103-locked-surface-and-port-policy.md) |
+## RA-074 决议(2026-10-09):放弃倒置迁移,承认 harness 为 SSOT
+
+背景:决定 1 规划的 `lca-kernel/` 顶层包 K1–K8 迁移在 PR-2 阶段停滞为
+"薄 re-export + 废弃警告"中间态,且方向倒置——
+
+- `lca/harness/profile/*` 六个模块在 import 时打出 `DeprecationWarning`,
+  指向 `lca_kernel.resolve` / `lca_kernel.runtime_closure` /
+  `lca_kernel.capability_plan_resolver` 等**从未创建**的模块;
+- 而这些 harness 模块恰是生产路径(`lca_kernel/boot/boot.py` 直接 import 它们):
+  每次 boot 都在警告用户迁往不存在的目的地;
+- `lca_kernel/plan/resolve.py`、`declarations.py`、`lca_kernel/boot/closure.py`
+  是零消费者的 re-export 影子;K4 `assert_runtime_closure` 从未接入 boot。
+
+决议(选项 b):迁移**诚实放弃**,`lca.harness.profile.*` 为 SSOT。
+
+1. 删掉六处 bogus DeprecationWarning(本轮)。
+2. 删除零消费者影子:`lca_kernel/plan/resolve.py`、
+   `lca_kernel/plan/declarations.py`、`lca_kernel/boot/closure.py`(本轮)。
+3. `lca_kernel/plan/source.py` 去掉 re-export 部分,仅保留有真实消费者的
+   `compose_entries`(本轮)。
+4. K4 运行时闭包目录(`RUNTIME_CLOSURE_REQUIREMENTS` 等)降级为
+   diagnostics/reference 表:boot 的真实门是
+   `lca_kernel/boot/plan_validation` 的 `validate_profile_plans`;
+   需要闭包校验时显式调用 `validate_runtime_closure`(本轮在模块
+   docstring 注记;未来如需 boot 强制门,另立 ADR)。
+
+未做:真正的"迁往 lca_kernel 独立实现"(选项 a)——那是数百行代码的搬迁,
+超出单轮 story,且当前 harness 实现稳定,不值得为迁移而迁移。

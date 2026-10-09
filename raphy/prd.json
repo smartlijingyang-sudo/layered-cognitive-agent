@@ -736,6 +736,424 @@
       "priority": 3,
       "passes": true,
       "notes": "Source: Round 12 friction walk (Worth exploring; deletion test). DONE 2026-10-08: deleted LocalSandboxAdapter._rewrite_command and _project_host_to_guest (38 lines); kept _guest_to_host/_paths_for/_wrap_command. test_adapter_host_path_projection.py: the two async integration tests already drove the production seam via run_terminal (kept); the direct wrapper unit test was renamed and now drives SandboxPaths.for_local(root, guest_mount='/mnt/data').present_text(...) 1:1 (old wrapper body, mounted=False default — identical semantics); module docstring updated. _rewrite_command had no direct unit caller; seam-side test_rewrite_command_* already covered in test_sandbox_paths.py — zero coverage lost. Verified: hasattr(LocalSandboxAdapter, '_rewrite_command') is False; git grep shows no production/test references to the private names (only pre-existing test_rewrite_command_* names for the public SandboxPaths API). Implementation vs assessment: as assessed, no diffs. Tests: tests/infrastructure/sandbox/ 76 passed; ruff clean on touched files."
+    },
+    {
+      "acceptanceCriteria": [
+        "Either CompiledRunPlan/resolve result genuinely carries plugin_contracts + phase_graph_plan (4 passes run for real), or the dead orchestration + helpers are deleted and the '6 pass' docstring becomes an honest 2 pass.",
+        "getattr(..., None) silent-skip replaced with an explicit contract: fail-loud or explicitly-marked-unsupported; 'attribute structurally missing' must not be swallowed by the same except as 'resolve failed'.",
+        "tests/harness/diagnostics/doctor/ green incl. a new pin that exercises the REAL getattr seam (no patch of _optional_resolve_*) on a real CompiledRunPlan."
+      ],
+      "branchName": "raphy/arch-20261009-0107",
+      "description": "As an LCA maintainer, I want DoctorFacade's capability/phase_graph/privilege/trust passes to receive real inputs, so the documented '6-pass deterministic' doctor is true in production. Evidence (Round 13 friction walk, doctor zone): facade.py L165-195 `_optional_resolve_contracts`/`_optional_resolve_phase_graph` do `getattr(result.compiled_plan, 'plugin_contracts', None)` / `getattr(..., 'phase_graph_plan', None)`; `CompiledRunPlan` (lca/contracts/protocols/state/plan.py L43-102) is a frozen slots dataclass with neither field, and `V2ExecutablePlan` (lca_kernel/plan/plan_compile.py L47-77) delegates unknown attributes to `inner` which also lacks them. Both helpers therefore always return None and 4 passes silently skip per I-HPC-7. Production doctor = compile dry-run + plugin shape only. All tests patch the helpers, so the dead chain never surfaced.",
+      "id": "RA-051",
+      "notes": "Source: Round 13 friction walk (Strong; leaky seam / dead contract). Related: RA-065 (same facade resolve ritual). | Implemented 2026-10-09: deleted dead orchestration (deletion path), docstring honest 2-pass.",
+      "passes": true,
+      "priority": 1,
+      "title": "Fix DoctorFacade pass 3-6 dead inputs (always-None getattr on slots dataclass)"
+    },
+    {
+      "acceptanceCriteria": [
+        "Either ProfileCompileDryRun passes activation_ref=plan_ref into from_findings on success (one change, whole chain live), or the dead activation_ref plumbing in facade/CLI is deleted.",
+        "New end-to-end pin: run the real compile pass on a fixture profile and assert report.activation_ref equals the plan ref (no stub faking).",
+        "tests/harness/diagnostics/doctor/ + CLI doctor tests green."
+      ],
+      "branchName": "raphy/arch-20261009-0107",
+      "description": "As an LCA operator, I want `doctor profile --json`'s activation_ref to carry the real plan ref, so CI/downstream can rely on it for idempotency. Evidence (Round 13, doctor zone): the chain has 4 links — (1) compile_dry_run.py L150-161 puts plan_ref only on the DOC-COMPAT-000 finding, `DoctorReport.from_findings(subject, findings)` is never passed activation_ref; (2) facade.py L109-116 reads compile_report.activation_ref (always None) into the aggregate; (3) CLI --json emits activation_ref: null forever; `_print_human`'s `if report.activation_ref:` is dead. Each link is individually correct and testable — test_facade.py:270 fakes activation_ref='act-123' via stub and passes while the real producer never emits it. Classic no-locality: the bug lives in 'nobody moves finding.plan_ref into report.activation_ref'.",
+      "id": "RA-052",
+      "notes": "Source: Round 13 friction walk (Strong; no-locality / testability gap). | Implemented 2026-10-09: one-line producer fix (activation_ref=plan_ref), e2e pin on real fixture profile.",
+      "passes": true,
+      "priority": 1,
+      "title": "Wire activation_ref through compile_dry_run -> facade -> CLI (fix broken 4-link chain)"
+    },
+    {
+      "acceptanceCriteria": [
+        "Either doctor commands are registered in cli/cli.py (and `lca-ops doctor profile --help` works), or doctor is explicitly marked retired/unwired in docs + __init__.",
+        "New pin: test mounts the REAL root app and asserts the doctor command path is reachable.",
+        "Existing CLI doctor tests green; ruff clean."
+      ],
+      "branchName": "raphy/arch-20261009-0107",
+      "description": "As an LCA user, I want `lca-ops doctor` to exist (or be explicitly retired), so the well-tested doctor CLI is actually reachable. Evidence (Round 13, doctor zone): lca/infrastructure/cli/commands/doctor/profile.py defines register(), but lca/infrastructure/cli/cli/cli.py L30-100's command registry has no doctor entry; scripts/lca-ops -> `python3 -m lca.infrastructure.cli.cli` root app has NO `doctor` command. Tests (test_doctor_profile_cli.py, test_doctor_ci_integration.py) always build a fresh typer.Typer() + register(app) and never go through the real root app — which is why 'root app never mounted doctor' was never caught.",
+      "id": "RA-053",
+      "notes": "Source: Round 13 friction walk (Strong; untested assembly seam). Lesson: CLI register() tests must go through the real root app. | Implemented 2026-10-09: mounted on real root app, new root-app pin.",
+      "passes": true,
+      "priority": 1,
+      "title": "Mount `doctor` commands into the lca-ops root CLI (or declare them retired)"
+    },
+    {
+      "acceptanceCriteria": [
+        "Production reads .profile_path (keeping .path as legacy fallback only if justified).",
+        "Test fake replaced with the real ResolvedProfile type (or field names aligned) so the pin exercises the real shape.",
+        "tests/lca_kernel/test_boot_events_emitted.py green; ruff clean."
+      ],
+      "branchName": "raphy/arch-20261009-0107",
+      "description": "As an LCA operator, I want boot events to carry the real profile path, so boot logs are attributable. Evidence (Round 13, profile/boot zone): lca_kernel/boot/boot.py `_emit_boot_events` reads `getattr(products, 'path', '') or getattr(products.resolved_profile, 'path', '')`; neither ProfileBootProducts nor ResolvedProfile has `.path` — the real field is `profile_path`. Every production boot emits boot.profile_resolved with profile_path=''. The test (tests/lca_kernel/test_boot_events_emitted.py) builds a _FakeResolved(path='<test>') and asserts equality — a fake whose shape diverges from the real dataclass, green with confidence. The test imports the private function directly, bypassing the real interface — textbook no-locality.",
+      "id": "RA-054",
+      "notes": "Source: Round 13 friction walk (Strong; no-locality / fake-shape divergence). Pattern: test fakes must be built from real types. | Implemented 2026-10-09: direct .profile_path read; fake replaced with real types.",
+      "passes": true,
+      "priority": 1,
+      "title": "Fix _emit_boot_events reading .path instead of .profile_path (production boot logs lose profile attribution)"
+    },
+    {
+      "acceptanceCriteria": [
+        "SkillActivateTool reuses the same activatable predicate as the overlay (extract _ACTIVATABLE_STATES check into a shared function) or explicitly validates package.retired + manifest state before injection.",
+        "A retired package and an unverified package are both refused by activate_skill (new pins).",
+        "'Who gates content injection' documented in one place.",
+        "Existing skill tool tests green."
+      ],
+      "branchName": "raphy/arch-20261009-0107",
+      "description": "As an LCA operator, I want `activate_skill` to refuse unverified/retired packages, so the 'verified only enters context' guarantee holds on both activate paths. Evidence (Round 13, skills zone): 'activate' has two mutually-unaware semantics — AssistantSkillOverlay.activate (contracts/protocols/assistant/skill_overlay.py) emits EP without injecting content and requires artifact_state in _ACTIVATABLE_STATES (else SkillNotVerifiedError); SkillActivateTool.execute (lca/infrastructure/tools/skills/activate/tool.py) injects package.content into context but checks only findability/non-redundancy/budget — NOT retired, NOT artifact_state. retire_skill's exec path checks package.retired (exec/tool.py:121) but activate doesn't: a retired skill can't run scripts yet can be fully injected into context. The write-guard proposal's run_755719d1a9d5 exploit (writeFile tampering a verified package, activate_skill injects without re-hashing) works precisely because of this gap.",
+      "id": "RA-055",
+      "notes": "Source: Round 13 friction walk (Strong; leaky seam / dual-semantics word). Does NOT touch lca/infrastructure/tools/assistant/ (ralph Round 2 territory). | Implemented 2026-10-09: retired gate + manifest-state gate via shared predicate; 5 new pins.",
+      "passes": true,
+      "priority": 1,
+      "title": "Gate SkillActivateTool content injection on verified/retired state (close the ungated activate path)"
+    },
+    {
+      "acceptanceCriteria": [
+        "All three write paths converge on one skill_index_digest() function (recommend full-text hash, same source as content_hash).",
+        "Existing Homes carrying the other convention get a one-time migration or version marker.",
+        "Receipt digest claim becomes true; relevant skill/catalog tests green."
+      ],
+      "branchName": "raphy/arch-20261009-0107",
+      "description": "As an LCA maintainer, I want one digest convention for the skills index, so future integrity checks (write guard) don't false-positive. Evidence (Round 13, skills zone): the same logical field gets two definitions — overlay.py::_package_digest writes sha256:<content_hash> (FULL text incl. frontmatter, disk/store.py::install_package L214); catalog/handlers.py::_materialize_global_skills writes sha256_digest(dest/'SKILL.md') (BODY file, frontmatter stripped); _copy_inherited_snapshot uses the body convention. They write into the same field: Home manifest skills index 'digest' + digests['skills/<id>']. relink_global_skills dodges the field today (compares manifest.json content_hash instead), and _receipt_from_disk reads the index digest into SkillInstallReceipt.digest claiming 'same source as manifest digests entry' — not true across write paths. The write-guard proposal already flagged: 'same field two conventions, must converge before landing any check.'",
+      "id": "RA-056",
+      "notes": "Source: Round 13 friction walk (Strong; leaky seam). Prerequisite for RA-057. | Implemented 2026-10-09: skill_index_digest() in lca/infrastructure/assistant/io.py; 3 write paths converged; skills_index_digest_version marker + one-time migration on load_manifest.",
+      "passes": true,
+      "priority": 2,
+      "title": "Converge the two digest conventions for the Home skills index 'digest' field"
+    },
+    {
+      "acceptanceCriteria": [
+        "The proposal's guard lands: writeFile (and equivalent standing write paths) into {home}/skills/ is refused; reads unaffected.",
+        "A regression pin replays run_755719d1a9d5 (tamper SKILL.md via writeFile) and asserts refusal; legitimate install/edit paths still work.",
+        "Preferably after RA-056 (digest convergence); if landed first, guard must not depend on the ambiguous digest field."
+      ],
+      "branchName": "raphy/arch-20261009-0107",
+      "description": "As an LCA operator, I want generic writeFile to be refused inside {home}/skills/, so verified packages can't be silently tampered. Evidence (Round 13, skills zone): proposal docs/notes/proposed/seam/2026-10-09-skill-package-write-guard.md (landed this morning, df03d0cf1) records run_755719d1a9d5: 5x writeFile replacing {home}/skills/psychological-counselor/SKILL.md left the index digest (sha256:298a2c63...) disagreeing with reality (sha256:3be9e508...), revision_seq unchanged, artifact_state still 'verified' — NOTHING noticed. disk/store.py::get never re-hashes; _home_layout.py::compute_digests covers only 8 CONFIG_FACE_FILES; diff_digests skips ('skills/<id>' never in actual, so skipped not mismatched). Proposal already specifies: extend the is_standing_write_path guard to {home}/skills/, refuse writes not reads.",
+      "id": "RA-057",
+      "notes": "Source: Round 13 friction walk (Strong; testability gap — only bypassing the interface can detect drift). Proposal text exists; this story lands it. | Implemented 2026-10-09: is_skill_package_write_path() + skill_package_write_block_message() in standing_path.py; hooked into validate_writable_file (policy.py) and LcaComputerExecutor.write_file/edit_file (executor.py). Regression pin replays run_755719d1a9d5.",
+      "passes": true,
+      "priority": 2,
+      "title": "Land the skill-package write guard (is_standing_write_path extended to {home}/skills/)"
+    },
+    {
+      "acceptanceCriteria": [
+        "resolve_skill_store() becomes pure construction (no writes); materialize_bundled_skills(store) becomes an explicit boot step called by provider setup with a declared effect.",
+        "The defensive comment in overlay.py::_default_global_store is removable (or simplified).",
+        "Skills provider/boot tests green; no behavior change to production boot ordering."
+      ],
+      "branchName": "raphy/arch-20261009-0107",
+      "description": "As an LCA maintainer, I want a function named 'resolve' to never write to production, so boot/test wiring can't silently rewrite ~/.lca/skills. Evidence (Round 13, skills zone): lca/infrastructure/skills/factory/factory.py (21 lines): resolve_skill_store() = construct store + ensure_bundled_skills(store) full install_package. Called from lca/plugins/memory/providers/skills_provider.py::setup at boot. Root cause of the 71515dace incident: a memory-wiring unit test booted a default kernel -> setup() -> resolve_skill_store() rewrote the production ~/.lca/skills, unlink-before-write orphaning 763 Homes' hardlinks. The fix was test isolation + effect declaration (f6c6a1e84), but the function still 'resolves by writing' — the real bug is in who-calls-when, invisible to any pure-function test. overlay.py::_default_global_store's comment even documents why it dares not call it ('would write the global store from the repo worktree...').",
+      "id": "RA-058",
+      "notes": "Source: Round 13 friction walk (Strong; no-locality — the bug was in call timing, not function logic). | Implemented 2026-10-09: factory.resolve_skill_store() is now pure construction; new materialize_bundled_skills() is the explicit boot step, called once by lca-skills-provider setup (filesystem effect declared). overlay._default_global_store comment simplified; plugin_tree omit test now guards both entry points.",
+      "passes": true,
+      "priority": 2,
+      "title": "Split resolve_skill_store into pure resolve + explicit materialize step"
+    },
+    {
+      "acceptanceCriteria": [
+        "Protocol explicitly declares the capability (e.g. ContentAddressableStore.root: Path or a materialize_link(skill_id, dest) seam); hardlink materialization becomes a first-class seam, not a getattr backdoor.",
+        "All three call sites go through the declared seam; getattr(..., 'root', None) has zero remaining call sites.",
+        "Skill store/catalog/overlay tests green."
+      ],
+      "branchName": "raphy/arch-20261009-0107",
+      "description": "As an LCA maintainer, I want the skill store Protocol to declare the materialization capability, so swapping the store impl fails at type-check time not runtime. Evidence (Round 13, skills zone): SkillPackageStore Protocol (contracts/protocols/memory/operational_skills.py) does NOT declare `root`, yet three call sites duck-type through it with getattr(store, 'root', None): overlay.py::relink_global_skills (~L470, raises TypeError when missing), catalog/handlers.py::_materialize_global_skills (L104-107), _list_materializable_global_skills (L152-162). Infrastructure detail leaking into plugin/domain layers; any new store impl explodes at runtime with TypeError instead of a construction-time error. The overlay Protocol docstring even celebrates this ('not a capability, so not in ownership.reads').",
+      "id": "RA-059",
+      "notes": "Source: Round 13 friction walk (Strong; leaky seam). Done 2026-10-09: Protocol declares materialize_link(skill_id, dest) -> Path with default raise NotImplementedError (update_package_meta pattern); DiskSkillPackageStore implements it (hardlink copytree, SkillNotFoundError on incomplete pack, dest replaced). Three call sites converted: relink_global_skills (NotImplementedError -> TypeError, _mark_global_link kept at call site), _materialize_global_skills (NotImplementedError/SkillNotFoundError -> _CatalogConfigError, manifest now read from dest), _list_materializable_global_skills (probes via declared get(), typed SkillPackageStore). Removed dead _link_tree (handlers) and _link_global_package (gating + overlay import + __init__ export). getattr(store,'root',None) zero remaining call sites. New tests/plugins/assistant/test_materialize_link_seam.py (6 passed). Related suites: 133 passed.",
+      "passes": true,
+      "priority": 2,
+      "title": "Give the hardlink materialization seam a first-class contract (stop getattr(store, 'root', None)穿透)"
+    },
+    {
+      "acceptanceCriteria": [
+        "Repo root derived from profile_path (walk up for a repo marker) or passed explicitly as repo_root; run() no longer accepts-and-discards profile_path.",
+        "New pin: cwd != profile repo -> shape findings still reference the profile's repo.",
+        "doctor tests green."
+      ],
+      "branchName": "raphy/arch-20261009-0107",
+      "description": "As an LCA operator, I want `doctor profile /abs/repo-a/profiles/x.yaml` to audit repo-a's plugins regardless of my shell cwd, so doctor output is actually about the diagnosed profile. Evidence (Round 13, doctor zone): plugin_shape.py L77-103 — __init__ defaults to Path.cwd(); run(profile_path) accepts the path then `del`s it, auditing the cwd's plugin tree. Run from /repo-b while diagnosing repo-a's profile: compile pass diagnoses repo-a, shape pass audits repo-b, both mixed into one report. Same command in different directories yields different findings — violating the module's own C8 determinism claim ('same profile_path + same inputs -> same findings'; cwd is an implicit input). Interface pretends input matters, implementation substitutes environment state: framework/environment leakage into the 'pure diagnosis' domain.",
+      "id": "RA-060",
+      "notes": "Source: Round 13 friction walk (Strong; leaky seam — environment into domain). Done 2026-10-09: run(profile_path) now derives the audited repo root via _locate_repo_root() — walk up from the profile for a repo marker (dir containing scripts/check_plugin_shape.py); fallback to the profile's own directory when no marker found (still input-derived, C8). Explicit repo_root wins; explicit check_script is never relocated. Removed the accept-and-del `del profile_path`. Tests: replaced the ignore-behavior pin with TestRepoRootDerivation (cwd != profile repo pin, explicit-wins, walk-up, outside-repo 901 naming profile dir). doctor suites: 301 passed.",
+      "passes": true,
+      "priority": 2,
+      "title": "Stop PluginShapeDoctor from auditing ambient cwd (derive repo root from profile_path)"
+    },
+    {
+      "acceptanceCriteria": [
+        "Either lca-ops gains a real `debug` command consuming the registry (PR-9 closed), or the plugin seam is archived and `runs debug` (spine-direct) declared the one debug story.",
+        "No dangling registry wiring remains; observability CLI tests green."
+      ],
+      "branchName": "raphy/arch-20261009-0107",
+      "description": "As an LCA maintainer, I want one debuggable debug story, so newcomers aren't confused by two unreachable debug concepts. Evidence (Round 13, doctor zone): lca/plugins/observability/cli/debug_seam.py (63 lines, Tier-1 seam plugin) exists solely to ctx.provide('cli_debug_command', NamedRegistry()); its only consumer debug_trace_provider.py:139 requires it and registers handlers — but NO CLI command ever takes a handler from that registry (zero consumption points in lca/infrastructure). Meanwhile `runs debug` (cli/commands/runs/debug.py, 816 lines) reads the spine directly and is the reachable one. Two 'debug' concepts coexist; only one is reachable. The seam is shallow to the point of decorative.",
+      "id": "RA-061",
+      "notes": "Source: Round 13 friction walk (Strong; deletion test — seam with provide+register but no use).",
+      "passes": true,
+      "priority": 3,
+      "title": "Close or land the decorative debug plugin seam (debug_seam.py provide with zero CLI consumers)"
+    },
+    {
+      "acceptanceCriteria": [
+        "quarantine.py deleted; both test files no longer reference it (tests deleted or rehomed onto the real gate).",
+        "Repo-wide grep for SkillQuarantineGate/quarantine import shows zero production references.",
+        "Suite green; ruff clean."
+      ],
+      "branchName": "raphy/arch-20261009-0107",
+      "description": "As an LCA maintainer, I want the dead quarantine module gone, so the real isolation story (ADR-0067 triple-gate + artifact_state) isn't confused with a phantom one. Evidence (Round 13, skills zone): lca/infrastructure/skills/quarantine.py (109 lines, SkillQuarantineGate) has ZERO production importers repo-wide; only two test files import it. Its design intent (auto-crystallized skills quarantined pending review) was superseded by the ADR-0067 gates + artifact_state state machine, but the module and its green tests remain — tests vouching for dead code. Deletion test: removing module + test references changes nothing in production.",
+      "id": "RA-062",
+      "notes": "Source: Round 13 friction walk (Strong; deletion test).",
+      "passes": true,
+      "priority": 3,
+      "title": "Delete the dead SkillQuarantineGate module (quarantine.py, zero production callers)"
+    },
+    {
+      "acceptanceCriteria": [
+        "external_filter.py + its test deleted; repo-wide grep shows zero remaining references.",
+        "If P5-03 external-kind filtering is ever needed, it grows from plugin_origin's unified classification (noted in commit body).",
+        "Suite green; ruff clean."
+      ],
+      "branchName": "raphy/arch-20261009-0107",
+      "description": "As an LCA maintainer, I want the dead second trust filter gone, so nobody wires up the divergent heuristic by mistake. Evidence (Round 13, profile/boot zone): lca/harness/profile/resolve/external_filter.py (102 lines): filter_external_default_disabled is a second, parallel provenance filter (heuristic: plugin.id in profile_path_str) vs production's filter_untrusted_default_disabled + _profile_explicitly_admits — semantics already diverged. Zero production callers; only its own test file references it. Deletion test: removing module + test changes nothing repo-wide (verified by grep).",
+      "id": "RA-063",
+      "notes": "Source: Round 13 friction walk (Strong; deletion test).",
+      "passes": true,
+      "priority": 3,
+      "title": "Delete external_filter.py (dead second provenance filter with divergent heuristic)"
+    },
+    {
+      "acceptanceCriteria": [
+        "boot_compile.py and the products.py wrapper deleted (or production genuinely routed through it — pick one, not two).",
+        "Zero remaining references repo-wide; suite green; ruff clean."
+      ],
+      "branchName": "raphy/arch-20261009-0107",
+      "description": "As an LCA maintainer, I want one compile entry for boot products, so the 'single seam' claim is true. Evidence (Round 13, profile/boot zone): lca/harness/composition/boot_compile.py (27 lines) docstring says 'Compile logic lives in boot_compile', but production (run_resolved_kernel, boot_entries) constructs ProfileBootProducts(...) inline; boot_compile.compile_profile_boot_products has zero callers, and products.py L77-84's same-named wrapper also has zero callers (verified by repo-wide grep). Worse, it passes CompileOptions(require_executable_phase_graph=...) while production uses defaults — a compile-options fork waiting to diverge silently.",
+      "id": "RA-064",
+      "notes": "Source: Round 13 friction walk (Strong; deletion test).",
+      "passes": true,
+      "priority": 3,
+      "title": "Delete boot_compile.py + the dead compile wrapper in products.py (dead second compile entry)"
+    },
+    {
+      "acceptanceCriteria": [
+        "One doctor_profile call resolves at most once; _optional_resolve_contracts/_optional_resolve_phase_graph converge into one resolve + two projections.",
+        "_has_compile_errors deleted; its 4 call sites use compile_report.has_errors().",
+        "A pin asserts the resolve call count (currently 3+1 — the test that would expose the embarrassment).",
+        "doctor tests green."
+      ],
+      "branchName": "raphy/arch-20261009-0107",
+      "description": "As an LCA maintainer, I want one doctor_profile call to resolve at most once and share the result across passes, so 3/4 of K1+K2 work and the compile-vs-downstream plan fork disappear. Evidence (Round 13, doctor zone): facade.py L126-157 calls _optional_resolve_contracts 3x (capability/privilege/trust) + _optional_resolve_phase_graph 1x; each builds a new PlanResolutionService() and runs full resolve_refs (K1+K2), while the compile pass itself uses a lower-level direct path with different fallback semantics (service version falls back to profiles/<name>.yaml, direct version doesn't) — two compile paths that can fork. Additionally the two helpers are 10-of-11-lines identical (only the getattr field differs), and _has_compile_errors (facade.py L198-199) is a verbatim restatement of DoctorReport.has_errors() (contracts/diagnostics/doctor.py L155-156) with 4 call sites.",
+      "id": "RA-065",
+      "notes": "Source: Round 13 friction walk (Strong; sprawl + shallow-module twins). Verified 2026-10-09: already fully satisfied by RA-051 (commit 8048776cf 'Fix DoctorFacade pass 3-6 dead inputs'). _optional_resolve_contracts/_optional_resolve_phase_graph were DELETED outright (stronger than 'converge into one resolve': zero resolves now, not one); _has_compile_errors has zero references repo-wide. The pin exists as test_facade_has_no_dead_pass_seams asserting the helpers' absence. doctor_profile does a single compile dry-run + shape pass. No code change needed; doctor suites green (301 passed in the RA-060 verification run).",
+      "passes": true,
+      "priority": 2,
+      "title": "Resolve once in DoctorFacade: converge _optional_resolve_contracts/_optional_resolve_phase_graph + drop _has_compile_errors"
+    },
+    {
+      "acceptanceCriteria": [
+        "Either the P3-03 entry-point discovery result is actually threaded into _resolve_source, or absence of the map fails closed (unknown origin defaults to untrusted) instead of falling back to bundled.",
+        "New pin: production-shaped call (no map) on a pip-layout module path does not classify as trusted/bundled.",
+        "Profile resolve tests green."
+      ],
+      "branchName": "raphy/arch-20261009-0107",
+      "description": "As an LCA operator, I want the I-HPC-11 'default-deny trust' to hold in production, so a pip entry-point plugin isn't silently trusted when its origin can't be classified. Evidence (Round 13, profile/boot zone): filter_untrusted_default_disabled's docstring says pip plugins are only classifiable when the discovery phase supplies entry_point_group_by_module, falling back to 'bundled' when absent; its only production caller (resolve.py L91, _resolve_source) NEVER passes the map (repo-wide grep: entry_point_group_by_module exists only at definition + docstring). So on the real path, a pip entry-point plugin whose module path misses the project/user heuristics lands in plugin_origin.py case 5 'assume bundled' -> trusted. Unit tests all pass the map explicitly — they pin a safe fiction; the bug is at the call site.",
+      "id": "RA-066",
+      "notes": "Source: Round 13 friction walk (Strong bug, Worth exploring on exploitability — trust semantics, needs care). | Recover: 04:05 round found 4 uncommitted files from interrupted 03:05 round, tests green (90 passed), committed.",
+      "passes": true,
+      "priority": 2,
+      "title": "Fix pip plugin trust classification degrading to 'assume bundled' on the production path"
+    },
+    {
+      "acceptanceCriteria": [
+        "Either `doctor plugin <path>` lands (wired alongside doctor profile), or __init__ export + docs explicitly mark it retired/unwired.",
+        "No gray zone: a newcomer can tell from one read whether it's live.",
+        "doctor tests green."
+      ],
+      "branchName": "raphy/arch-20261009-0107",
+      "description": "As an LCA maintainer, I want SinglePluginDoctor either reachable or retired, so test coverage stops vouching for unreachable code. Evidence (Round 13, doctor zone): lca/harness/diagnostics/doctor/single_plugin.py (247 lines, P2-09 single-file AST audit) has a complete test file but ZERO consumers in lca/ — facade doesn't wire it, CLI doesn't expose it, unlike ResourceDoctor which at least has an explicit 'not wired' record in the facade docstring. It sits exported from doctor/__init__.py in a gray zone. Its three AST helpers (_kwarg_names/_extract_kwarg_value/_extract_plugin_id) could also merge.",
+      "id": "RA-067",
+      "notes": "Source: Round 13 friction walk (Worth exploring; orphan module).",
+      "passes": true,
+      "priority": 3,
+      "title": "Decide SinglePluginDoctor's fate: wire `doctor plugin <path>` or mark retired"
+    },
+    {
+      "acceptanceCriteria": [
+        "projection.py deleted; filter inlined into boot.py::_boot_context; behavior byte-identical.",
+        "Boot tests green; ruff clean."
+      ],
+      "branchName": "raphy/arch-20261009-0107",
+      "description": "As an LCA maintainer, I want the BootEntry projection folded into its single consumer, so 'projection' stops being a word with no projection semantics. Evidence (Round 13, profile/boot zone): lca/harness/profile/boot/projection.py (44 lines): 4-field dataclass + one classmethod 'filter disabled, keep topo order' consumed only by boot.py::_boot_context. Interface (BootEntry.from_resolved) is a verbatim restatement of the implementation; inlining the 5-line filter into _boot_context's loop changes nothing. Deletion test passes (docstring longer than logic).",
+      "id": "RA-068",
+      "notes": "Source: Round 13 friction walk (Worth exploring; shallow module).",
+      "passes": true,
+      "priority": 3,
+      "title": "Inline BootEntry into boot.py (shallow 44-line projection module)"
+    },
+    {
+      "acceptanceCriteria": [
+        "Either cordis gains the needed capability explicitly (e.g. atomic no-reinterpret attach) and the seam uses it, or the seam uniformly goes through ctx.provide; the __dict__ backdoor is gone.",
+        "Architecture seam tests updated to the public idiom; suite green."
+      ],
+      "branchName": "raphy/arch-20261009-0107",
+      "description": "As an LCA maintainer, I want the boot-products seam to mount through one idiom, so the seam contract stops depending on cordis Context's private __dict__ layout. Evidence (Round 13, profile/boot zone): products.py L48-60 does scope.__dict__[_BOOT_PRODUCTS_CONTEXT_KEY] = products while observability on the same ctx uses the legitimate ctx.provide('observability', bound) — one object, two mounting idioms. The architecture tests themselves enforce at __dict__ level (assert 'entries' not in ctx.__dict__) and forge dirty data via ctx.__dict__['entries'] = ... — the tests are evidence of the leak. Possibly ADR-0195 P4-K03 was deliberate (read it first).",
+      "id": "RA-069",
+      "notes": "Source: Round 13 friction walk (Worth exploring; framework leak into seam). Check ADR-0195 P4-K03 before touching.",
+      "passes": true,
+      "priority": 3,
+      "title": "Fix the seam's Context.__dict__ backdoor mount (or make the constraint explicit on cordis)"
+    },
+    {
+      "acceptanceCriteria": [
+        "Fail-loud fallback also goes through structlog (structlog.get_logger), or the dual-channel split is explicitly documented with rationale.",
+        "A pin asserts the fail-loud path emits via the structlog channel.",
+        "Boot/lifecycle tests green."
+      ],
+      "branchName": "raphy/arch-20261009-0107",
+      "description": "As an LCA on-call, I want all boot diagnostics on one channel, so fail-loud fallbacks aren't missed by structlog tailing. Evidence (Round 13, profile/boot zone): _emit_boot_events is structlog-only for a good reason (K3 pre-Session-bind, Session.append unreachable, no journal side-channel). But K6's fail-loud hooks — the highest-value diagnostics ('unhandled exception') — fall back to stdlib logging: lifecycle.py log = logging.getLogger(__name__) with two log.exception('lifecycle.fail_loud: ...') in _capture; lifespan.py cron daemon start failure via logging.getLogger(__name__).exception. Two diagnostic exits, contract governs one.",
+      "id": "RA-070",
+      "notes": "Source: Round 13 friction walk (Worth exploring; contract leak).",
+      "passes": true,
+      "priority": 3,
+      "title": "Bring fail-loud fallback under the structlog-only boot diagnostics contract"
+    },
+    {
+      "acceptanceCriteria": [
+        "Corrupt connections.json emits a structured warning and either fail-louds (per INV level) or returns an explicit degraded marker — never a silent [].",
+        "Unknown-service vs known-but-disconnected are distinguishable to callers.",
+        "New pins for both; connector tests green."
+      ],
+      "branchName": "raphy/arch-20261009-0107",
+      "description": "As an LCA operator, I want a corrupt connector store to surface loudly, so the agent never lies about connection state. Evidence (Round 13, profile/boot zone): lca/infrastructure/connectors/core/vault.py L44-49 _load_raw_connections suppress(Exception) -> returns []; the prompt section then tells the agent 'No external services are currently connected'. A half-written or disk-corrupted connections.json silently zeroes a security-relevant store. Also get_connection returns a NOT_CONNECTED stand-in for unknown services, so callers can't distinguish 'service unknown' from 'service known but disconnected' (composio.py CLI is another consumer — check it).",
+      "id": "RA-071",
+      "notes": "Source: Round 13 friction walk (Worth exploring; fail-silent in security-adjacent store).",
+      "passes": true,
+      "priority": 3,
+      "title": "Make ConnectorVault degradation honest (no silent [] on corrupt connections.json)"
+    },
+    {
+      "acceptanceCriteria": [
+        "Only known domain error types caught (ProfileResolveError, PlanCompilerError, FileNotFoundError); unexpected exceptions flow to the 'doctor itself failed' semantic (DoctorCompileError).",
+        "New pin: an injected TypeError inside compile surfaces as doctor-failure, not DOC-COMPAT-003.",
+        "doctor tests green."
+      ],
+      "branchName": "raphy/arch-20261009-0107",
+      "description": "As an LCA operator, I want doctor to say 'doctor is broken' when doctor is broken, not 'your profile is invalid'. Evidence (Round 13, doctor zone): compile_dry_run.py L126-144 except (ValueError, TypeError) — the comment justifies it because 'ProfileResolveError extends ValueError so this handler also catches resolve-phase failures'. But TypeError/ValueError are also the most common exception types for implementation bugs inside resolve/compile. A real code bug (wrong arg type) gets wrapped as DOC-COMPAT-003 'profile invalid' and the operator debugs YAML forever. The pure exception->finding translator is correct and testable; the bug is the call site converging 'domain error' and 'implementation error' into one except. DoctorCompileError exists as a classification but is never used here.",
+      "id": "RA-072",
+      "notes": "Source: Round 13 friction walk (Worth exploring; no-locality at the except site).",
+      "passes": true,
+      "priority": 3,
+      "title": "Narrow compile_dry_run's except to domain errors (stop misdiagnosing impl bugs as 'profile invalid')"
+    },
+    {
+      "acceptanceCriteria": [
+        "Either the script emits code/severity/remediation itself (machine contract moves forward, doctor passes through), or the mapping tables converge to one place shared by script and doctor.",
+        "A new kind added to the script is either understood or loudly flagged — never silently DOC-PS-999.",
+        "doctor + script tests green."
+      ],
+      "branchName": "raphy/arch-20261009-0107",
+      "description": "As an LCA maintainer, I want the plugin_shape doctor to stop second-guessing the script's semantics, so new kinds can't silently degrade. Evidence (Round 13, doctor zone): plugin_shape.py docstring claims 'Doctor must NOT be a third parallel rule engine... WRAPS scripts/check_plugin_shape.py', but _CODE_BY_KIND/_SEVERITY_BY_KIND (L31-58) + _remediation_for (L226-265) are a second modeling of the script's semantics, kept in sync by 'Keep in sync with...' comments — human sync. A new kind silently falls into _UNKNOWN_KIND_CODE/DOC-PS-999 info under the name of 'defensive'. The subprocess stdout is parsed by 'find the first line starting with {' (_invoke_script L205-214) — IO parsing details living in the diagnosis pass.",
+      "id": "RA-073",
+      "notes": "Source: Round 13 friction walk (Worth exploring; leaky seam — second rule engine contradicting its own docstring).",
+      "passes": true,
+      "priority": 3,
+      "title": "Move the plugin-shape kind->code/severity/remediation mapping into the machine contract"
+    },
+    {
+      "acceptanceCriteria": [
+        "One decision, documented: (a) truly migrate (warnings point at real modules, K4 wired into run_resolved_kernel), or (b) delete the re-export shadows + remove the bogus deprecation warnings (admit harness is the SSOT), and either wire assert_runtime_closure or downgrade the catalog to a diagnostics-only table.",
+        "Zero DeprecationWarnings naming nonexistent modules on a real boot.",
+        "Boot/profile tests green."
+      ],
+      "branchName": "raphy/arch-20261009-0107",
+      "description": "As an LCA maintainer, I want the ADR-0115 migration either finished or honestly abandoned, so boot stops emitting DeprecationWarnings pointing at modules that don't exist. Evidence (Round 13, profile/boot zone): the migration is inverted — deprecated lca.harness.profile.* modules are the production path (lca_kernel/boot/boot.py imports them directly), while lca_kernel/plan/resolve.py (25 lines), declarations.py (25 lines), source.py's re-export parts are thin re-exports whose DeprecationWarnings point at lca_kernel.resolve / lca_kernel.runtime_closure / lca_kernel.capability_plan_resolver — NONE of which exist in the repo. Every boot emits warnings naming nonexistent modules. Separately, lca_kernel/boot/closure.py (58 lines, K4 assert_runtime_closure) has zero callers (run_resolved_kernel actually calls validate_profile_plans); its policy catalog runtime_closure.py (240 lines, 15 RUNTIME_CLOSURE_CATALOG rules) + runtime_binding_validator.py (265 lines) form a 'single policy seam' that boot never executes — the worst middle state (looks enforced, isn't).",
+      "id": "RA-074",
+      "notes": "Source: Round 13 friction walk (Worth exploring; needs an architecture decision — ADR-0115. Combines closure chain + re-export shadows; deletion tests pass for all dead parts.)",
+      "passes": true,
+      "priority": 3,
+      "title": "Resolve the ADR-0115 inverted migration: dead K4 closure chain + lca_kernel/plan re-export shadows"
+    },
+    {
+      "acceptanceCriteria": [
+        "One parser yields the complete dict (incl. list values); install_package calls it once; the fail-loud on missing references stays.",
+        "Regression pin: block scalar containing a 'references:' line is not mis-parsed.",
+        "Skills/frontmatter tests green."
+      ],
+      "branchName": "raphy/arch-20261009-0107",
+      "description": "As an LCA maintainer, I want one frontmatter parser producing the full dict, so 'fix parser A, miss parser B' patches stop happening. Evidence (Round 13, skills zone): lca/infrastructure/skills/frontmatter/frontmatter.py has split_frontmatter (L59-89, skips list values) and parse_references_field (L96-141, second line-scan) — two syntax-INCONSISTENT parsers over the same text: split_frontmatter understands block scalars (just fixed by ed52b2ff0), parse_references_field is an independent line scan (stripped.startswith('references:')) that false-positives on same-named lines inside block scalars. disk/store.py::install_package (L196-205) calls both in sequence, with a comment admitting the 'second check'. One concept (frontmatter schema), no single deep parser — two shallow scans stacked.",
+      "id": "RA-075",
+      "notes": "Source: Round 13 friction walk (Worth exploring; sprawl + no-locality).",
+      "passes": true,
+      "priority": 3,
+      "title": "Unify the frontmatter parsing into one parser (kill the two-pass scan)"
+    },
+    {
+      "acceptanceCriteria": [
+        "Policy converges to one place: either full-link fail-loud (delete the normalizing calls) or an explicit 'normalize-and-record' API; _gate_package and install_package use the same predicate.",
+        "New pins assert identical inputs get identical policy outcomes across both paths.",
+        "Skills tests green."
+      ],
+      "branchName": "raphy/arch-20261009-0107",
+      "description": "As an LCA maintainer, I want one traversal-safety policy for skill packages, so the real decision isn't split across call sites. Evidence (Round 13, skills zone): disk/store.py::safe_rel_path silently normalizes ('..'/empty/backslash stripped); store's read_resource/install_package USE it to normalize, but overlay/gating.py::_gate_package REJECTS anything where safe_rel_path(rel) != rel (SkillImportError). Same input 'resources/../SKILL.md': store silently rewrites, gate refuses. The pure function is well-tested (test_skill_reference_containment.py), but the actual security decision (normalize vs reject) lives at the call sites — and the two call sites disagree. Traversal bugs will hide in 'which call was chosen', not in the implementation.",
+      "id": "RA-076",
+      "notes": "Source: Round 13 friction walk (Worth exploring; no-locality — security decision at call sites). | Implemented 2026-10-09: converged on full-link fail-loud via is_canonical_rel_path/require_canonical_rel_path in disk/store.py; _gate_package uses the same predicate (keeps its SkillImportError type/message). Pins in tests/infrastructure/skills/test_skill_path_policy_convergence.py.",
+      "passes": true,
+      "priority": 3,
+      "title": "Converge the safe_rel_path security policy (normalize vs reject) to one predicate"
+    },
+    {
+      "acceptanceCriteria": [
+        "Either the importer also fail-louds (surfacing the missing field to the caller/model to fix per the guide), or the 'fill default empty declaration' becomes an explicit, recorded install_package parameter — not byte surgery.",
+        "Both install paths share documented semantics; new pin covers the URL-import missing-references case.",
+        "Importer/skills tests green."
+      ],
+      "branchName": "raphy/arch-20261009-0107",
+      "description": "As an LCA maintainer, I want both install paths to honor the same 'missing references fails' semantic, so pulled content isn't silently rewritten to pass the contract. Evidence (Round 13, skills zone): ADR-0214 §7 requires frontmatter `references`; missing -> install_package fail-loud. But lca/infrastructure/skills/http/importer.py::_ensure_references_field (L33-48) silently splices 'references: []' into pulled bytes ('avoid URL installs being rejected by the contract'). 0c32cc411 just made `references` a hard requirement in the skill-creator guide (because run_cf67920f2e39 burned two installs guessing) — 'missing field should fail explicitly' is the established semantic, yet the importer papers over it on the network path. Content-integrity decisions hide in string surgery; split_frontmatter's pure tests can't cover it.",
+      "id": "RA-077",
+      "notes": "Source: Round 13 friction walk (Worth exploring; call-site semantic split). | Implemented 2026-10-09: chose explicit-recorded-parameter direction — install_package gains assume_empty_references kwarg (protocol + manifest references_assumed_empty + SkillPackage field, get() round-trips); _import_single_markdown passes the flag instead of byte surgery (_ensure_references_field deleted); local path still fail-loud. Pins in tests/infrastructure/skills/test_http_importer_references.py.",
+      "passes": true,
+      "priority": 3,
+      "title": "Make the skill importer fail loud on missing references instead of byte-surgery"
+    },
+    {
+      "acceptanceCriteria": [
+        "Construction and first-write separate (mkdir moves to first write); get_skill_settings loses its import-time global memo (explicit injection or a lifecycle-scoped container).",
+        "The global_store_factory defensive layering can be simplified (documented in commit body).",
+        "Skills tests green; no boot behavior change."
+      ],
+      "branchName": "raphy/arch-20261009-0107",
+      "description": "As an LCA maintainer, I want constructing a store handle to never touch the filesystem, so construction timing stops being an implicit correctness precondition. Evidence (Round 13, skills zone): disk/store.py::__init__ does self._root.mkdir(parents=True, exist_ok=True) — constructing a 'store handle' touches the FS, which is why overlay needs a factory-of-factories (global_store_factory; overlay.py L99-101 comment documents the motivation). settings/settings.py::get_skill_settings has @lru_cache(maxsize=1) making settings process-global mutable state; the 71515dace fix called cache_clear 'load bearing' — test isolation correctness depends on remembering to clear a memoization cache. The real hazards ('when was the store constructed / which settings got cached') all live in call timing, not in any function logic.",
+      "id": "RA-078",
+      "notes": "Source: Round 13 friction walk (Worth exploring; no-locality — hazard in call timing). | Implemented 2026-10-09: DiskSkillPackageStore __init__ no longer mkdirs (RA-058 resolve stays pure; _ensure_root() runs at the top of install_package); get_skill_settings() de-memoized (lru_cache removed, fresh parse per call); overlay global_store_factory comment updated (factory kept for lazy settings + injection, no longer for mkdir-avoidance); conftest load-bearing cache_clear ritual deleted. Pins: strengthened test_factory_pure_resolve (root not even created) + new test_skill_settings_no_global_memo.",
+      "passes": true,
+      "priority": 3,
+      "title": "Separate DiskSkillPackageStore construction from mkdir; contain the settings lru_cache"
+    },
+    {
+      "acceptanceCriteria": [
+        "_AssistantSkillOverlayImpl gets an injectable fake emitter (constructor already supports event_emitter) in unit tests asserting EP descriptors + the four-field payload set.",
+        "No test relies on the log-degradation branch for EP assertions.",
+        "Overlay tests green."
+      ],
+      "branchName": "raphy/arch-20261009-0107",
+      "description": "As an LCA maintainer, I want the EP contract (assistant.skill.installed payload) pinned at unit level, so production emission isn't covered only by accident. Evidence (Round 13, skills zone): overlay.py::_emit_installed/_emit_activated/_emit_profile_revised call emit_assistant_ep_or_log(self._emit, ...) whose comment says 'no emitter -> log only (unit test path)'. The 37 overlay unit tests validate disk/manifest/receipts; the REAL production EP path (emit_fact_event -> event bus) never executes in unit tests — the seam's production behavior vs test behavior switches on a runtime branch. EP 'was it emitted, is the payload right' is only incidentally covered by e2e.",
+      "id": "RA-079",
+      "notes": "Source: Round 13 friction walk (Worth exploring; testability gap \u2014 interface switches behavior by runtime branch). | Implemented 2026-10-09: 评估证据部分过时 —— fake emitter 注入自 ADR-0187 PR-6 (9c4288d63) 即已存在，test_install_emits_installed_ep_with_required_fields 早已断言 EP descriptor + 四件套。本轮补上真实剩余缺口：installed EP 的 skill 契约字段（skill_digest/manifest_digest 的 sha256: 形状、source、installed_at 非空）+ EP descriptor 字面值断言。grep 确认无测试依赖 log-degradation 分支断言 EP。",
+      "passes": true,
+      "priority": 3,
+      "title": "Pin overlay EP emission in unit tests with an injected fake emitter"
+    },
+    {
+      "acceptanceCriteria": [
+        "One walk seam; three call sites use it; safe_rel_path vs as_posix discrepancy resolved in one place.",
+        "Traversal-safety pins (incl. RA-076's policy) cover the converged seam.",
+        "Skills tests green."
+      ],
+      "branchName": "raphy/arch-20261009-0107",
+      "description": "As an LCA maintainer, I want one 'walk a skill source dir -> {rel: bytes}' seam, so traversal-safety details stop drifting across copies. Evidence (Round 13, skills zone): three implementations of the same operation — importing.py::_import_local_path (rglob + safe_rel_path), overlay.py::_stage_edited_package (another rglob + safe_rel_path, plus extra skip logic), bundled/bundled.py::_load_resources (third rglob, as_posix() instead of safe_rel_path). Details differ (skip SKILL.md or not; normalize path or not). Deletion test: extract one function (disk/store.py is the natural home), three call sites.",
+      "id": "RA-080",
+      "notes": "Source: Round 13 friction walk (Worth exploring; mechanical duplication x3 with drifting details). | Implemented 2026-10-09: one walk seam walk_skill_source_files() in disk/store.py (walk_root + rel_root + skip_paths params cover all three shapes); _import_local_path, _stage_edited_package and bundled._load_resources (deleted, inlined) call it; safe_rel_path vs as_posix unified via RA-076 require_canonical_rel_path (fail-loud). Pins in tests/infrastructure/skills/test_skill_source_walk_seam.py.",
+      "passes": true,
+      "priority": 3,
+      "title": "Converge the three skill-source directory walks (importing/overlay/bundled rglob trio)"
     }
   ]
 }

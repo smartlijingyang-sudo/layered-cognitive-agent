@@ -144,7 +144,9 @@ def filter_untrusted_default_disabled(
     the entry-point group; pass ``entry_point_group_by_module`` to feed
     that information in (P3-03 emits it; this filter is a downstream
     consumer). When absent, ``resolve_plugin_origin`` falls back to
-    ``bundled`` for module paths it cannot classify.
+    ``pip`` / ``untrusted`` for module paths it cannot classify
+    (I-HPC-11 default-deny, RA-066): unknown origin is never trusted
+    as ``bundled``.
 
     Per I-HPC-11, dropped plugins are reported via :func:`warnings.warn`
     (not raised) so an operator can still resolve a profile with the
@@ -563,13 +565,6 @@ def _canonical_payload(
         for item in plugins
     ]
 
-
-# === Deprecation (ADR-0115) ===
-warnings.warn(
-    "lca.harness.profile.resolve is deprecated, use lca_kernel.resolve (ADR-0115)",
-    DeprecationWarning,
-    stacklevel=2,
-)
 
 __all__ = [
     "ProfileResolveError",

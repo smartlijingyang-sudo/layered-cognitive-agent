@@ -35,6 +35,8 @@ from cordis import Context
 from lca.contracts.models.observability.journal.catalog import JOURNAL_EVENT_CLASSES
 from lca.contracts.models.observability.journal.journal import BootPluginFiberSpawned
 from lca.contracts.observability.journal.store import JournalStoreBackend
+from lca.harness.profile.boot.products import ProfileBootProducts
+from lca.harness.profile.resolve.resolve import ResolvedProfile
 from lca.infrastructure.observability import AttributePolicy
 from lca.infrastructure.observability.journal.backends.memory import InMemoryJournalStore
 from lca.infrastructure.observability.journal.engine.engine import RunStore
@@ -80,15 +82,23 @@ def _ctx_with_journal(events_capture: _CaptureStore) -> Context:
     return ctx
 
 
-class _FakeResolved:
-    path = "<test>"
-    manifest_hash = "deadbeef"
-    bundles = ()
-    plugins = ()
-
-
-class _FakeProducts:
-    resolved_profile = _FakeResolved()
+# RA-054: the products fake must be built from the REAL types. The old
+# _FakeResolved carried a ``path`` class attribute that neither
+# ProfileBootProducts nor ResolvedProfile has — the fake's divergent shape
+# masked the production bug (boot.profile_resolved always had an empty
+# profile_path). Using the real dataclasses keeps fake and production
+# shapes identical by construction.
+def _real_products(profile_path: str = "<test>") -> ProfileBootProducts:
+    return ProfileBootProducts(
+        resolved_profile=ResolvedProfile(
+            profile_path=profile_path,
+            bundles=(),
+            plugins=(),
+            dag_edges=(),
+            manifest_hash="deadbeef",
+            env_refs=(),
+        )
+    )
 
 
 def test_journal_event_classes_catalog_registers_three_boot_events() -> None:
@@ -109,7 +119,7 @@ def test_emit_boot_events_logs_without_a_journal_seam() -> None:
         _emit_boot_events(
             ctx,
             pending_events=[],
-            products=_FakeProducts(),
+            products=_real_products(),
             topo_order=(),
             boot_started=time.monotonic(),
         )
@@ -147,7 +157,7 @@ def test_emit_boot_events_logs_three_event_kinds_in_order() -> None:
         _emit_boot_events(
             ctx,
             pending_events=pending,
-            products=_FakeProducts(),
+            products=_real_products(),
             topo_order=("p-alpha", "p-beta"),
             boot_started=time.monotonic(),
         )
@@ -186,7 +196,7 @@ def test_emit_boot_events_tolerates_a_raising_observability_seam() -> None:
         _emit_boot_events(
             _RaisingCtx(),  # type: ignore[arg-type]
             pending_events=[],
-            products=_FakeProducts(),
+            products=_real_products(),
             topo_order=(),
             boot_started=time.monotonic(),
         )
@@ -203,7 +213,7 @@ def test_emit_boot_events_handles_empty_topo_order() -> None:
         _emit_boot_events(
             ctx,
             pending_events=[],
-            products=_FakeProducts(),
+            products=_real_products(),
             topo_order=(),
             boot_started=time.monotonic(),
         )
@@ -243,7 +253,7 @@ def test_emit_boot_events_structlog_records_plugin_id() -> None:
         _emit_boot_events(
             ctx,
             pending_events=pending,
-            products=_FakeProducts(),
+            products=_real_products(),
             topo_order=("p-alpha",),
             boot_started=time.monotonic(),
         )

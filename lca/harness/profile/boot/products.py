@@ -1,8 +1,17 @@
 """Profile boot product data seam (ADR-0195 P4-K03).
 
 ``ProfileBootProducts`` is the only boot-time attachment for resolved profile
-and compiled plan facts. Compile logic lives in
-:mod:`lca.harness.composition.boot_compile`.
+and compiled plan facts. Compilation itself happens in production boot
+(:mod:`lca_kernel.boot.boot` via :mod:`lca_kernel.plan.plan`).
+
+Mount idiom (RA-069): the products attach through the public cordis
+``Context.provide`` / ``Context.inject`` bindings — the same idiom the
+observability seam uses (``ctx.provide("observability", ...)`` read back via
+``ctx.inject(...)``). ``Context.get``/``ctx[...]`` route through Reflect's
+service store and do *not* see ``provide``d bindings, so the read side must be
+``inject``. The old ``scope.__dict__`` backdoor is gone; the no-reinterpret
+guard (attach rejects a *different* products object) lives in
+:func:`attach_profile_boot_products`, not in framework private layout.
 """
 
 from __future__ import annotations
@@ -42,12 +51,12 @@ def attach_profile_boot_products(
         if existing != products:
             raise RuntimeError("Profile boot products are already attached to this scope")
         return existing
-    scope.__dict__[_BOOT_PRODUCTS_CONTEXT_KEY] = products
+    scope.provide(_BOOT_PRODUCTS_CONTEXT_KEY, products)
     return products
 
 
 def profile_boot_products_from_scope(scope: Context) -> ProfileBootProducts | None:
-    products = scope.__dict__.get(_BOOT_PRODUCTS_CONTEXT_KEY)
+    products = scope.inject(_BOOT_PRODUCTS_CONTEXT_KEY, default=None)
     if products is None:
         return None
     if not isinstance(products, ProfileBootProducts):
@@ -74,18 +83,9 @@ def observability_plan_from_scope(scope: Context) -> CompiledObservabilityPlan:
     return products.compiled_observability_plan
 
 
-def compile_profile_boot_products(resolved: ResolvedProfile) -> ProfileBootProducts:
-    from lca.harness.composition.boot_compile import (
-        compile_profile_boot_products as _compile,
-    )
-
-    return _compile(resolved)
-
-
 __all__ = [
     "ProfileBootProducts",
     "attach_profile_boot_products",
-    "compile_profile_boot_products",
     "compiled_plan_from_scope",
     "observability_plan_from_scope",
     "profile_boot_products_from_scope",

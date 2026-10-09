@@ -69,6 +69,18 @@ class AssistantMergedSkillStore(SkillPackageStore):
     def get(self, skill_id: str) -> SkillPackage:
         return self._lookup(lambda store: store.get(skill_id))
 
+    def package_artifact_state(self, skill_id: str) -> str | None:
+        """Home manifest 中该 skill 的 ``artifact_state``；无记录回 None。
+
+        RA-055: ``SkillActivateTool`` 经此缝隙拿到与 overlay 同源的 manifest
+        状态，用同一谓词（``is_activatable_state``）判定 content injection
+        资格。duck-typed 调用 —— ``SkillPackageStore`` Protocol 本体不声明。
+        """
+        for receipt in self._overlay.list_installed(self._assistant_id):
+            if receipt.skill_id == skill_id:
+                return receipt.artifact_state
+        return None
+
     def read_resource(self, skill_id: str, rel_path: str) -> str:
         return self._lookup(lambda store: store.read_resource(skill_id, rel_path))
 

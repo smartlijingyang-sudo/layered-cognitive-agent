@@ -9,7 +9,7 @@ K1–K2(纯函数,产出 ``ResolvedProfile`` + ``CompiledRunPlan``)
 K3 run_kernel(本模块主入口)
                       │
                       ├─ 1) install_observability(基线,backend 全 no-op)
-                      ├─ 2) for entry in BootEntry.from_resolved:
+                      ├─ 2) for entry in resolved.plugins (未禁用):
                       │       spawn_fiber + await_fiber
                       ├─ 3) attach_profile_boot_products(把 K2 产物挂到 ctx)
                       ├─ 4) install_observability(二次,registry 已填充,真 backend)
@@ -72,7 +72,6 @@ from lca.harness.profile.boot.products import (
     profile_boot_products_from_scope,
     resolved_profile_from_scope,
 )
-from lca.harness.profile.boot.projection import BootEntry
 from lca.harness.profile.resolve.resolve import ResolvedProfile, resolve_entries
 from lca.harness.profile.validate.errors import ProfileResolveError
 from lca.infrastructure.file.store import FileStore
@@ -332,7 +331,7 @@ async def _boot_context(
     Boot ordering (ADR-0116 §决定 2 + ADR-0115 K5):
 
     1. ``install_observability(ctx)`` —— baseline,所有 backend None。
-    2. 遍历 BootEntry,对每个 plugin ``spawn_fiber + await_fiber``,记录
+    2. 遍历未禁用的 resolved plugin,对每个 ``spawn_fiber + await_fiber``,记录
        ``BootPluginFiberSpawned`` 到 ``pending_events``(journal 仍为 None,
        write() 安全 no-op)。
     3. ``install_observability(ctx)`` —— 第二次 install,registry 已被 plugin
@@ -357,9 +356,9 @@ async def _boot_context(
         install_observability(ctx)  # ↓ K5:第 1 次,所有 backend None,plugin 还没灌入 registry
         # Step 2: spawn fibers, buffer BootPluginFiberSpawned.
         topo_order: list[str] = []  # ↑ K3:记录实际启动顺序(emit 给 BootProfileResolved)
-        for entry in BootEntry.from_resolved(
-            resolved
-        ):  # ↓ K1b → K3:BootEntry 包装,顺序就是 K1b 拓扑序
+        for entry in resolved.plugins:
+            if entry.disabled:
+                continue  # ↓ K1b → K3:只启动未禁用的插件,顺序就是 K1b 拓扑序
             plugin_started_at[entry.definition.spec.id] = (
                 time.monotonic()
             )  # ↑ K3:记这个 plugin 起始时间
@@ -454,9 +453,12 @@ def _emit_boot_events(
     收口。
     """
     duration_ms = (time.monotonic() - boot_started) * 1000
-    profile_path = str(
-        getattr(products, "path", "") or getattr(products.resolved_profile, "path", "")
-    )
+    # RA-054: neither ProfileBootProducts nor ResolvedProfile has a ``path``
+    # attribute — the real field is ``profile_path``. The getattr-None chain
+    # above always resolved to "" in production, so every boot emitted
+    # boot.profile_resolved with an empty profile_path.
+    resolved = products.resolved_profile
+    profile_path = str(resolved.profile_path) if resolved is not None else ""
     bound = _safe_inject(ctx, "observability")
     bound_seams = tuple(
         name
@@ -541,7 +543,6 @@ async def _dispose_context(ctx: Context) -> None:
 
 
 __all__ = [
-    "BootEntry",
     "ProfileBootProducts",
     "attach_profile_boot_products",
     "boot_entries",

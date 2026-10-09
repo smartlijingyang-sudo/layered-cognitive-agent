@@ -38,6 +38,10 @@ from collections.abc import AsyncIterator, Callable, Generator
 from contextlib import asynccontextmanager
 from typing import Any, cast
 
+import structlog
+
+_log = structlog.get_logger(__name__)
+
 
 def make_lifespan(
     ctx: Any,
@@ -95,9 +99,7 @@ def make_lifespan(
             await cron_daemon.start()
             app.state.cron_daemon = cron_daemon
         except Exception:
-            import logging
-
-            logging.getLogger(__name__).exception("lifespan: failed to start CronDaemonService")
+            _log.exception("lifespan: failed to start CronDaemonService")
 
         try:
             yield {"ctx": ctx}

@@ -1,22 +1,30 @@
 """Doctor facade orchestrator (ADR-0199 §5.1 / §5.3 / P2-07).
 
 Per ADR-0199 §5.1 Doctor is a compile-pipeline dry-run projection. This
-facade composes the six wired doctor passes into a single
-``doctor_profile(path) -> DoctorReport`` call. The CLI (P2-08) and the
+facade composes the doctor passes that have real production inputs into a
+single ``doctor_profile(path) -> DoctorReport`` call. The CLI (P2-08) and the
 web UI (P2-11) consume this facade; per §5.3 the facade is the SINGLE
 doctor entry point.
 
 Per I-HPC-7 the facade is read-only on the profile path and plugin
 tree: no K3 boot, no journal writes, no network. Resolution failures
-are converted to findings or skipped silently.
+are converted to findings.
 
-Pass order (deterministic per C8):
+Passes wired (RA-051): only these two have real production inputs —
   1. ProfileCompileDryRun   — profile-level compile errors
   2. PluginShapeDoctor      — plugin tree shape violations
-  3. CapabilityCardinality  — capability duplicates
-  4. PhaseGraphDoctor       — closed-set violations
-  5. PrivilegeDoctor        — privilege/effect consistency (DOC-PRIV-*)
-  6. TrustDoctor            — external_kind vs privilege consistency (DOC-TRUST-*)
+
+NOT wired (RA-051): CapabilityCardinality, PhaseGraphDoctor,
+PrivilegeDoctor, TrustDoctor. Their required inputs (``plugin_contracts``
+/ ``phase_graph_plan`` projections) do not exist on the compiled plan
+seam: ``CompiledRunPlan`` is a slots dataclass with neither attribute,
+and ``V2ExecutablePlan`` delegates unknown attributes to ``inner`` which
+lacks them too, so any ``getattr`` lookup always returned None and the
+passes silently skipped in production per I-HPC-7. The read-only rule
+forbids the facade from materializing those inputs itself, so the wiring
+was dead orchestration and was deleted rather than left to silently
+skip. The four modules remain importable as library passes for callers
+that can supply their inputs directly; they keep their own test modules.
 
 Not wired (RA-039): ResourceDoctor. It needs a live ResourceRegistry plus
 the harness provider names to audit orphans against, and neither exists
@@ -29,25 +37,17 @@ exists, wire it here with an include_resource switch in the same style.
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any
 
 from lca.contracts.diagnostics.doctor import (
     DoctorFinding,
     DoctorReport,
 )
-from lca.contracts.runtime.external_plugin import ExternalPluginKind
-from lca.harness.diagnostics.doctor.capability_cardinality import (
-    CapabilityCardinalityDoctor,
-)
 from lca.harness.diagnostics.doctor.compile_dry_run import ProfileCompileDryRun
-from lca.harness.diagnostics.doctor.phase_graph import PhaseGraphDoctor
 from lca.harness.diagnostics.doctor.plugin_shape import PluginShapeDoctor
-from lca.harness.diagnostics.doctor.privilege import PrivilegeDoctor
-from lca.harness.diagnostics.doctor.trust import TrustDoctor
 
 
 class DoctorFacade:
-    """Orchestrator that composes the six wired doctor passes (ADR-0199 P2-07, RA-039).
+    """Orchestrator that composes the two wired doctor passes (ADR-0199 P2-07, RA-039, RA-051).
 
     The facade is constructed with optional pass instances; when None,
     default ones are created. This enables:
@@ -66,31 +66,15 @@ class DoctorFacade:
         *,
         compile_dry_run: ProfileCompileDryRun | None = None,
         plugin_shape: PluginShapeDoctor | None = None,
-        capability_cardinality: CapabilityCardinalityDoctor | None = None,
-        phase_graph: PhaseGraphDoctor | None = None,
-        privilege: PrivilegeDoctor | None = None,
-        trust: TrustDoctor | None = None,
-        external_kind_by_plugin: dict[str, ExternalPluginKind] | None = None,
     ) -> None:
         self._compile_dry_run = compile_dry_run or ProfileCompileDryRun()
         self._plugin_shape = plugin_shape or PluginShapeDoctor()
-        self._capability_cardinality = capability_cardinality or CapabilityCardinalityDoctor()
-        self._phase_graph = phase_graph or PhaseGraphDoctor()
-        self._privilege = privilege or PrivilegeDoctor()
-        self._trust = trust or TrustDoctor()
-        # Operator override map for the trust pass (plugin_id -> kind);
-        # absent plugins default to "inprocess" per the TrustDoctor contract.
-        self._external_kind_by_plugin = dict(external_kind_by_plugin or {})
 
     def doctor_profile(
         self,
         profile_path: str | Path,
         *,
         include_plugin_shape: bool = True,
-        include_capability_cardinality: bool = True,
-        include_phase_graph: bool = True,
-        include_privilege: bool = True,
-        include_trust: bool = True,
     ) -> DoctorReport:
         """Run all configured doctor passes and aggregate their findings.
 
@@ -100,9 +84,7 @@ class DoctorFacade:
         re-summarized by DoctorReport.from_findings.
 
         Per I-HPC-7 the facade never raises for profile-level issues;
-        the compile pass converts them to findings and the downstream
-        passes are silently skipped when the compile step failed or
-        when their required inputs are unavailable.
+        the compile pass converts them to findings.
         """
         profile_path = Path(profile_path)
         findings: list[DoctorFinding] = []
@@ -120,83 +102,11 @@ class DoctorFacade:
             shape_report = self._plugin_shape.run(profile_path)
             findings.extend(shape_report.findings)
 
-        # 3. Capability cardinality — requires the resolved plugin
-        #    contracts. If the compile step failed, skip this pass.
-        #    If contracts are unavailable, skip silently (I-HPC-7).
-        if include_capability_cardinality and not _has_compile_errors(compile_report):
-            contracts = self._optional_resolve_contracts(profile_path)
-            if contracts is not None:
-                cap_report = self._capability_cardinality.run(contracts)
-                findings.extend(cap_report.findings)
-
-        # 4. Phase graph — requires the compiled phase graph plan.
-        #    If the compile step failed, skip this pass.
-        if include_phase_graph and not _has_compile_errors(compile_report):
-            phase_plan = self._optional_resolve_phase_graph(profile_path)
-            if phase_plan is not None:
-                pg_report = self._phase_graph.run(phase_plan)
-                findings.extend(pg_report.findings)
-
-        # 5. Privilege — requires the resolved plugin contracts (same input
-        #    as capability cardinality). Skipped under the same conditions.
-        if include_privilege and not _has_compile_errors(compile_report):
-            contracts = self._optional_resolve_contracts(profile_path)
-            if contracts is not None:
-                priv_report = self._privilege.run(contracts)
-                findings.extend(priv_report.findings)
-
-        # 6. Trust — same input; external kinds default to "inprocess"
-        #    unless the operator injected a map at construction.
-        if include_trust and not _has_compile_errors(compile_report):
-            contracts = self._optional_resolve_contracts(profile_path)
-            if contracts is not None:
-                trust_report = self._trust.run(
-                    contracts,
-                    external_kind_by_plugin=self._external_kind_by_plugin,
-                )
-                findings.extend(trust_report.findings)
-
         return DoctorReport.from_findings(
             subject=str(profile_path),
             findings=findings,
             activation_ref=activation_ref,
         )
-
-    def _optional_resolve_contracts(self, profile_path: Path) -> list[Any] | None:
-        """Resolve plugin contracts if available; return None on failure.
-
-        Per I-HPC-7 failure is silent (None) so the doctor remains
-        read-only and does not crash mid-orchestration. The dynamic
-        import keeps the facade free of a hard dependency on
-        PlanResolutionService at module import time.
-        """
-        try:
-            from lca.application.runtime.plan_resolution import (
-                PlanResolutionService,
-            )
-
-            service = PlanResolutionService()
-            result = service.resolve_refs(profile_path, session_id=None)
-            return getattr(result.compiled_plan, "plugin_contracts", None)
-        except Exception:
-            return None
-
-    def _optional_resolve_phase_graph(self, profile_path: Path) -> Any:
-        """Resolve phase graph plan if available; return None on failure."""
-        try:
-            from lca.application.runtime.plan_resolution import (
-                PlanResolutionService,
-            )
-
-            service = PlanResolutionService()
-            result = service.resolve_refs(profile_path, session_id=None)
-            return getattr(result.compiled_plan, "phase_graph_plan", None)
-        except Exception:
-            return None
-
-
-def _has_compile_errors(report: DoctorReport) -> bool:
-    return report.summary.errors > 0
 
 
 __all__ = ("DoctorFacade",)

@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from functools import lru_cache
 from pathlib import Path
 
 from pydantic import Field
@@ -70,6 +69,10 @@ class SkillSettings(BaseSettings):
     )
 
 
-@lru_cache(maxsize=1)
 def get_skill_settings() -> SkillSettings:
+    """RA-078: 每次调用按当前 env 重新解析，不再有进程级全局 memo。
+
+    调用方需要复用时显式注入 ``SkillSettings``（各 __init__ 均已支持）；
+    测试隔离不再依赖"记得 cache_clear"。
+    """
     return SkillSettings()

@@ -55,25 +55,18 @@ def _isolate_skill_store(
     Same hazard as ``_isolate_runs_root``, different production tree. A test
     that builds an ``Agent`` without ``scope=`` boots the default kernel
     profile, which loads ``lca-skills-provider``, whose ``setup()`` calls
-    ``resolve_skill_store()``; that runs ``ensure_bundled_skills`` and writes
-    every repo ``skills/`` pack into ``~/.lca/skills``. Rewriting a global pack
+    ``materialize_bundled_skills()``; that install_packages every repo
+    ``skills/`` pack into ``~/.lca/skills``. Rewriting a global pack
     orphans the hard links 700+ assistant homes hold to it (ADR-0243 D1).
 
     Opt out module-wide with ``__keep_skill_store__ = True`` only for a test
     that must read the real store.
     """
-    from lca.infrastructure.skills.settings.settings import get_skill_settings
-
     if not getattr(request.module, "__keep_skill_store__", False):
         monkeypatch.setenv("LCA_SKILL_CACHE_DIR", str(tmp_path / "skills"))
-    # ``get_skill_settings`` is ``@lru_cache(maxsize=1)``. Without the clear, a
-    # settings object built by an earlier test pins its root for the rest of the
-    # process and this test's env change never takes effect. Clearing on the
-    # opt-out path too, so such a test re-resolves the real root rather than
-    # inheriting some previous test's tmp dir.
-    get_skill_settings.cache_clear()
+    # RA-078: ``get_skill_settings`` 不再有进程级 memo（去掉了 @lru_cache），
+    # 每次调用按当前 env 重新解析 —— env 隔离即生效，不需要 cache_clear 仪式。
     yield
-    get_skill_settings.cache_clear()
 
 
 @pytest.fixture

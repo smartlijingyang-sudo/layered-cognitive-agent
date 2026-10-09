@@ -16,8 +16,8 @@ from lca.contracts.protocols.memory.operational_skills import (
 )
 from lca.infrastructure.skills.disk.store import (
     DiskSkillPackageStore,
-    safe_rel_path,
     sanitize_skill_id,
+    walk_skill_source_files,
 )
 from lca.infrastructure.skills.frontmatter.frontmatter import skill_title, split_frontmatter
 from lca.infrastructure.skills.http.importer import HttpSkillImporter
@@ -49,13 +49,8 @@ def _import_local_path(staging_root: Path, local_path: str) -> SkillPackage:
     if skill_md is None:
         raise SkillImportError(f"local_path 缺 SKILL.md: {local_path}")
     text = skill_md.read_text(encoding="utf-8")
-    resources: dict[str, bytes] = {}
-    for path in sorted(src.rglob("*")):
-        if not path.is_file() or path == skill_md:
-            continue
-        rel = safe_rel_path(str(path.relative_to(src)))
-        if rel:
-            resources[rel] = path.read_bytes()
+    # RA-080: 经 disk/store.py 的 walk 接缝；SKILL.md 本体跳过。
+    resources = walk_skill_source_files(src, skip_paths=(skill_md,))
     meta, _ = split_frontmatter(text)
     skill_id = sanitize_skill_id(skill_title(meta, src.name))
     store = DiskSkillPackageStore(SkillSettings(cache_dir=staging_root))

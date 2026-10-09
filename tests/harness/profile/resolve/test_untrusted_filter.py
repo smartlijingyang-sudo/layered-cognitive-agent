@@ -178,8 +178,32 @@ def test_pip_plugins_kept_when_profile_path_matches_discovery() -> None:
     assert not [w for w in captured if "untrusted-default" in str(w.message)]
 
 
+def test_production_shaped_call_without_map_filters_unclassified_pip_layout() -> None:
+    """RA-066 pin: production-shaped call (no map) on a pip-layout module.
+
+    ``_resolve_source`` never passes ``entry_point_group_by_module``; an
+    unclassifiable module path must NOT classify as trusted/bundled.
+    Without profile admission the plugin is filtered with a warning.
+    """
+    plugin = _make_plugin(
+        plugin_id="my.pip_plugin",
+        module="some_pip_plugin",
+        source="bundles/core.yaml",
+    )
+    with pytest.warns(UserWarning, match="untrusted-default plugins filtered"):
+        kept = filter_untrusted_default_disabled(
+            (plugin,), profile_path="profiles/x.yaml"
+        )
+    assert kept == ()
+
+
 def test_pip_plugins_kept_when_profile_path_is_substring_of_source() -> None:
-    """Profile path that is a substring of plugin source → kept (bundled case)."""
+    """Profile path that is a substring of plugin source → kept (explicit admission).
+
+    Without the entry-point map the module is unclassifiable → pip /
+    untrusted (RA-066 fail-closed); the profile still admits it because
+    the profile path appears in the plugin's declared source.
+    """
     plugin = _make_plugin(
         plugin_id="my.pip_plugin",
         module="some_pip_plugin",

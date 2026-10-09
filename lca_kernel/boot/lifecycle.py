@@ -37,7 +37,6 @@ Public surface
 from __future__ import annotations
 
 import asyncio
-import logging
 import signal
 import sys
 import threading
@@ -50,11 +49,13 @@ from typing import Any, Protocol, runtime_checkable
 # 而非直接构造 dict payload。任何逃出 try/except 的异常必须在 traceback
 # 丢失之前归一化成 ExceptionRecord,再 emit_exception_caught → spine。
 # 公开名直接 import(供测试 monkeypatch + lint-imports whitelist)。
+import structlog
+
 from lca.contracts.observability.trace.exception_capture import exc_to_record
 from lca.infrastructure.observability.spine.exception.emit import emit_exception_caught
 from lca_kernel.cli.errors import KernelError
 
-log = logging.getLogger(__name__)
+log = structlog.get_logger(__name__)
 
 FAIL_LOUD_RELEASE_TIMEOUT_MS: int = 2000
 
@@ -202,16 +203,16 @@ def install_fail_loud(coordinator: ShutdownCoordinator) -> None:
                 )
             except Exception:
                 log.exception(
-                    "lifecycle.fail_loud: exc_to_record failed boundary=%s",
-                    boundary,
+                    "lifecycle.fail_loud: exc_to_record failed",
+                    boundary=boundary,
                 )
                 return
             try:
                 emit_exception_caught(record)
             except Exception:
                 log.exception(
-                    "lifecycle.fail_loud: emit_exception_caught failed boundary=%s",
-                    boundary,
+                    "lifecycle.fail_loud: emit_exception_caught failed",
+                    boundary=boundary,
                 )
         finally:
             _capturing = False

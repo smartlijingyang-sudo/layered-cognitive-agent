@@ -10,6 +10,7 @@ Operational Skill 回答「怎么做」（纯操作知识，与身份无关，�
 from __future__ import annotations
 
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Protocol
 
 # Guest mount prefix under SANDBOX_MOUNT_ROOT (_skills/<skill_id>/…).
@@ -64,6 +65,7 @@ class SkillPackage:
     content_hash: str
     version: str = ""
     references: tuple[str, ...] = ()  # ADR-0214 §7: SKILL.md frontmatter 声明的引用路径索引
+    references_assumed_empty: bool = False  # RA-077: 空 references 由安装方代声明（URL 裸 SKILL.md 导入），manifest 记录
     retired: bool = False  # 退役后 search 默认不可见、exec 拒绝
     usage_count: int = 0  # activate 成功累计次数，供退役评审参考
 
@@ -97,6 +99,15 @@ class SkillPackageStore(Protocol):
         """返回 skill 全部资源相对路径 → bytes，供沙箱挂载。"""
         ...
 
+    def materialize_link(self, skill_id: str, dest: Path) -> Path:
+        """把已安装包硬链接物化到 ``dest``（ADR-0243 D1 空间不膨胀），返回 ``dest``。
+
+        只有磁盘型 store 支持；只读视图（如合并 store）抛 NotImplementedError，
+        调用方按需降级（与 ``update_package_meta`` 同模式）。
+        包不存在/不完整抛 ``SkillNotFoundError``。
+        """
+        raise NotImplementedError
+
     def update_package_meta(
         self,
         skill_id: str,
@@ -122,8 +133,14 @@ class SkillPackageInstaller(SkillPackageStore, Protocol):
         resource_files: dict[str, bytes],
         source_url: str,
         version: str = "",
+        assume_empty_references: bool = False,
     ) -> SkillPackage:
-        """校验并持久化一个技能包，返回其可读取表示。"""
+        """校验并持久化一个技能包，返回其可读取表示。
+
+        RA-077: ``assume_empty_references=True`` 时，frontmatter 缺 ``references``
+        字段不再 fail-loud —— 安装方显式声明空列表并记录在 manifest
+        （``references_assumed_empty``）；缺省仍 fail-loud。
+        """
         ...
 
 

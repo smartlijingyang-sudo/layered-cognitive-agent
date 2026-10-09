@@ -1,23 +1,16 @@
 """Profile YAML / Bundle / Patch 输入适配(K1a)。
 
-ADR-0115 决定 1 K1a:本模块在 PR-2 阶段是 :mod:`lca.harness.profile.source` 的
-薄 re-export(为 6 个月 compat 窗口保留);新增 deepseek 借鉴的
-:func:`compose_entries` 多层 patch 合并函数。完整迁移到独立 kernel 实现
-留给后续阶段(避免与 compat 形成 cycle)。
+:func:`compose_entries` 多层 patch 合并函数(借鉴 deepseek)。
+
+RA-074 决议:ADR-0115 的"lca_kernel.* 薄 re-export"迁移已放弃,
+``lca.harness.profile.*`` 是 SSOT。本模块不再 re-export
+:mod:`lca.harness.profile.resolve.source`(零消费者)。
 """
 
 from __future__ import annotations
 
 from collections.abc import Iterable, Mapping, Sequence
 from typing import Any
-
-# 重导出旧路径实现 —— source 是纯 IO adapter,无业务逻辑,直接 import 比复制代码更稳。
-from lca.harness.profile.resolve.source import (
-    ProfileSource,
-    load_profile_entries,
-    load_profile_source,
-    programmatic_profile_source,
-)
 
 
 def compose_entries(
@@ -100,11 +93,7 @@ def _deep_merge_entry(base: dict[str, Any], overlay: Mapping[str, Any]) -> None:
 
 
 __all__ = [
-    "ProfileSource",
     "compose_entries",
-    "load_profile_entries",
-    "load_profile_source",
-    "programmatic_profile_source",
 ]
 
 

@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import contextlib
 import json
 import os
 import time
@@ -11,6 +10,15 @@ from typing import Any
 
 from lca.infrastructure.connectors.core.state import ConnectionMetadata, ConnectionState
 from lca.infrastructure.path.locator import get_lca_home
+
+
+class ConnectorVaultError(RuntimeError):
+    """Raised when the connector vault cannot be read or written honestly.
+
+    A corrupt or unreadable ``connections.json`` must never degrade silently
+    to "no connections" (RA-071): callers would act on a lie (e.g. re-prompt
+    OAuth for a service the user already connected).
+    """
 
 
 def atomic_write_json(file_path: Path, data: dict[str, Any]) -> None:
@@ -42,11 +50,26 @@ class ConnectorVault:
 
     def _load_raw_connections(self) -> list[dict[str, Any]]:
         user_file = self._get_user_connections_file()
-        if user_file.is_file():
-            with contextlib.suppress(Exception):
-                data = json.loads(user_file.read_text(encoding="utf-8"))
-                return data.get("connections", [])
-        return []
+        if not user_file.is_file():
+            return []
+        try:
+            data = json.loads(user_file.read_text(encoding="utf-8"))
+        except (OSError, ValueError) as exc:
+            # RA-071: a present-but-unreadable vault file is a secret-access
+            # failure. Degrading to [] would lie to every caller downstream.
+            raise ConnectorVaultError(
+                f"connector vault file is unreadable or corrupt: {user_file}"
+            ) from exc
+        if not isinstance(data, dict):
+            raise ConnectorVaultError(
+                f"connector vault file has an unexpected shape: {user_file}"
+            )
+        connections = data.get("connections", [])
+        if not isinstance(connections, list):
+            raise ConnectorVaultError(
+                f"connector vault file has an unexpected shape: {user_file}"
+            )
+        return connections
 
     def list_connections(self) -> list[ConnectionMetadata]:
         raw_list = self._load_raw_connections()

@@ -21,7 +21,12 @@ from pathlib import Path
 
 from lca.contracts.atoms.ids.ids import utc_now_iso
 from lca.contracts.observability.canonical_digest import canonical_digest
-from lca.infrastructure.assistant.io import read_json, sha256_digest
+from lca.infrastructure.assistant.io import (
+    read_json,
+    read_json_soft,
+    sha256_digest,
+    skill_index_digest,
+)
 from lca.infrastructure.memory.contextfiles.domain.layout import packaged_layout
 
 __all__ = [
@@ -194,6 +199,48 @@ class HomePaths:
         return self.root / _BOOTSTRAP_FILE
 
 
+# ── skills 索引 digest 约定版本（RA-056）─────────────────────────────────
+
+
+SKILLS_INDEX_DIGEST_VERSION = 1
+"""skills 索引 ``digest`` 字段的约定版本。
+
+- ``1``：全文约定（``skill_index_digest`` → ``sha256:<content_hash>``，
+  与 skills store ``manifest.json`` 的 ``content_hash`` 同源）；
+- 缺失：旧约定（正文-only 的 ``sha256_digest(SKILL.md)``），读时一次性迁移。
+"""
+
+
+def migrate_legacy_skills_digest(home: Path, manifest: dict) -> bool:
+    """一次性迁移：旧 Home 的 skills 索引 digest（正文-only 约定）→ 全文约定。
+
+    已标记 ``skills_index_digest_version == 1`` 的直接返回 ``False``。
+    否则逐技能从 ``{home}/skills/<id>/manifest.json`` 读 ``content_hash``
+    重算 digest，同时更新索引条目 ``digest`` 与
+    ``digests["skills/<id>"]``，重算 ``manifest_digest``，打标记。
+    ``content_hash`` 不可恢复的技能落 ``sha256:unknown``（不回退旧约定）。
+    返回是否发生了改写（调用方据此决定是否写盘）。
+    """
+    if manifest.get("skills_index_digest_version") == SKILLS_INDEX_DIGEST_VERSION:
+        return False
+    skills = manifest.get("skills")
+    if isinstance(skills, dict) and skills:
+        digests = manifest.get("digests")
+        if not isinstance(digests, dict):
+            digests = {}
+            manifest["digests"] = digests
+        for skill_id, entry in skills.items():
+            if not isinstance(entry, dict):
+                continue
+            skill_manifest = read_json_soft(home / "skills" / str(skill_id) / "manifest.json")
+            new_digest = skill_index_digest(str(skill_manifest.get("content_hash") or ""))
+            entry["digest"] = new_digest
+            digests[f"skills/{skill_id}"] = new_digest
+        manifest["manifest_digest"] = canonical_digest(digests, length=64, prefix="sha256:")
+    manifest["skills_index_digest_version"] = SKILLS_INDEX_DIGEST_VERSION
+    return True
+
+
 # ── digest 与 manifest ───────────────────────────────────────────────
 
 
@@ -233,6 +280,7 @@ def build_manifest(
         "digests": digests,
         "manifest_digest": manifest_digest,
         "created_at": created_at or utc_now_iso(),
+        "skills_index_digest_version": SKILLS_INDEX_DIGEST_VERSION,
     }
 
 
@@ -291,6 +339,9 @@ def load_manifest(home: Path, assistant_id: str) -> dict[str, object]:
     digests = manifest.get("digests")
     if not isinstance(digests, dict):
         raise AssistantCatalogError(f"manifest.digests 缺失或非 dict: {home}")
+    # RA-056:旧 Home 一次性迁移（正文-only → 全文约定）；已标记的直接跳过。
+    if migrate_legacy_skills_digest(home, manifest):
+        write_manifest(home, manifest)
     return manifest
 
 

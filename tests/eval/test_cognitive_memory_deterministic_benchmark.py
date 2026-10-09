@@ -13,7 +13,6 @@ from lca.cognition.memory.guards.salience import SalienceGate
 from lca.cognition.memory.recall import SystemTwoRecallEngine
 from lca.cognition.memory.types import SemanticClaim
 from lca.infrastructure.memory.entities.store import EntityGraphStore
-from lca.infrastructure.skills.quarantine import SkillQuarantineGate
 from lca.infrastructure.tools.shield.tool_shield import ToolPitfallShield
 
 
@@ -214,25 +213,6 @@ def test_track_a_tool_pitfall_shield_sub_millisecond_redline():
     # 未配置工具无红线
     assert shield.get_pre_execution_guard("pytest") == ""
 
-
-def test_track_a_skill_quarantine_gate_prevents_wild_growth(tmp_path: Path):
-    """[技能结晶] 隔离待审门阻止新生成技能野蛮生长进 active skills/。"""
-    gate = SkillQuarantineGate(base_dir=tmp_path)
-
-    slug = "auto-generated-sql-bot"
-    content = "---\nname: auto-generated-sql-bot\n---\n# SQL Bot"
-
-    # 结晶写入隔离区
-    q_path = gate.quarantine_skill(slug, content)
-    assert q_path.exists()
-    assert (tmp_path / "skills" / "quarantine" / slug).exists()
-    # active 目录不受污染
-    assert not (tmp_path / "skills" / slug).exists()
-
-    # 晋级后移入 active 目录
-    active_path = gate.promote_quarantined_skill(slug)
-    assert active_path.exists()
-    assert not (tmp_path / "skills" / "quarantine" / slug).exists()
 
 
 def test_track_a_system_two_multi_hop_and_anti_hallucination(tmp_path: Path):

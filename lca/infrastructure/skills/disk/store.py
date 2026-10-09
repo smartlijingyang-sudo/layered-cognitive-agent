@@ -3,7 +3,10 @@
 from __future__ import annotations
 
 import json
+import os
 import re
+import shutil
+from collections.abc import Collection
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -20,7 +23,6 @@ from lca.contracts.protocols.memory.operational_skills import (
 )
 from lca.infrastructure.path import expand_user_path
 from lca.infrastructure.skills.frontmatter.frontmatter import (
-    parse_references_field,
     skill_title,
     split_frontmatter,
 )
@@ -49,11 +51,15 @@ class DiskSkillPackageStore(SkillPackageInstaller, SkillPackageStore):
     def __init__(self, settings: SkillSettings | None = None) -> None:
         self._settings = settings if settings is not None else get_skill_settings()
         self._root: Path = expand_user_path(self._settings.cache_dir)
-        self._root.mkdir(parents=True, exist_ok=True)
+        # RA-078: 构造不再触碰文件系统；mkdir 推迟到首次写盘（_ensure_root）。
 
     @property
     def root(self) -> Path:
         return self._root
+
+    def _ensure_root(self) -> None:
+        """RA-078: 首次写盘时建根目录（幂等）；读路径永不建目录。"""
+        self._root.mkdir(parents=True, exist_ok=True)
 
     def list_installed(self) -> tuple[SkillIndexEntry, ...]:
         entries: list[SkillIndexEntry] = []
@@ -105,6 +111,7 @@ class DiskSkillPackageStore(SkillPackageInstaller, SkillPackageStore):
             content_hash=str(meta.get("content_hash") or ""),
             version=str(meta.get("version") or ""),
             references=references,
+            references_assumed_empty=bool(meta.get("references_assumed_empty", False)),
             retired=bool(meta.get("retired", False)),
             usage_count=int(meta.get("usage_count", 0) or 0),
         )
@@ -112,8 +119,10 @@ class DiskSkillPackageStore(SkillPackageInstaller, SkillPackageStore):
     def read_resource(self, skill_id: str, rel_path: str) -> str:
         package = self.get(skill_id)
         # resource_paths 存 ``resources/`` 前缀的 skill 根相对路径；
-        # 调用方可能传扁平名或带前缀名，统一归一化后检查。
-        normalized = _to_resource_rel(safe_rel_path(rel_path))
+        # 调用方可能传扁平名或带前缀名（双形式是 canonical 子集，保留）。
+        # RA-076: traversal 策略收敛 — 非 canonical 输入 fail-loud，
+        # 与 overlay/_gate_package 用同一谓词，不再静默归一化。
+        normalized = _to_resource_rel(require_canonical_rel_path(rel_path))
         if normalized not in package.resource_paths:
             raise SkillNotFoundError(
                 f"技能 {skill_id!r} 中不存在资源路径 {rel_path!r}（不在白名单内）"
@@ -132,7 +141,8 @@ class DiskSkillPackageStore(SkillPackageInstaller, SkillPackageStore):
 
     def _read_resource_bytes(self, skill_id: str, rel_path: str) -> bytes:
         # 物理布局: resources/<flat>；resource_paths 的 ``resources/`` 前缀在此剥离。
-        storage_rel = _strip_resources_prefix(safe_rel_path(rel_path))
+        # RA-076: traversal 策略收敛 — 非 canonical 输入 fail-loud。
+        storage_rel = _strip_resources_prefix(require_canonical_rel_path(rel_path))
         path = self._root / sanitize_skill_id(skill_id) / _RESOURCES / storage_rel
         if not path.is_file():
             raise SkillNotFoundError(f"资源文件不存在: {rel_path}")
@@ -149,6 +159,7 @@ class DiskSkillPackageStore(SkillPackageInstaller, SkillPackageStore):
         resource_files: dict[str, bytes],
         source_url: str,
         version: str = "",
+        assume_empty_references: bool = False,
     ) -> SkillPackage:
         sid = sanitize_skill_id(skill_id)
         if len(skill_md_text) > SKILL_MAX_CONTENT_CHARS:
@@ -156,20 +167,32 @@ class DiskSkillPackageStore(SkillPackageInstaller, SkillPackageStore):
 
         meta_front, body = split_frontmatter(skill_md_text)
         # ADR-0214 §7: SKILL.md frontmatter 必须声明 references(可空)。
-        # split_frontmatter 跳过列表值,二次检查 parse_references_field;
-        # 两份都缺失才 fail-loud。
-        if "references" not in meta_front and not parse_references_field(skill_md_text):
-            raise SkillContractError(
-                f"SKILL.md frontmatter 缺 'references' 字段: {sid!r}"
-                " — 在 frontmatter 里加 'references: []' 声明打包清单。"
-            )
+        # 单次解析:references 进 dict 即为 list;缺失或非 list 才 fail-loud。
+        # RA-077: 缺字段默认 fail-loud；只有调用方显式 assume_empty_references
+        #（如 URL 裸 SKILL.md 导入）才由安装方声明空列表，并记录在 manifest
+        # 的 references_assumed_empty —— 不再允许调用方做字节手术瞒过合约。
+        raw_refs = meta_front.get("references")
+        declared_refs = raw_refs if isinstance(raw_refs, list) else []
+        references_assumed_empty = False
+        if "references" not in meta_front and not declared_refs:
+            if not assume_empty_references:
+                raise SkillContractError(
+                    f"SKILL.md frontmatter 缺 'references' 字段: {sid!r}"
+                    " — 在 frontmatter 里加 'references: []' 声明打包清单。"
+                )
+            references_assumed_empty = True
         name = skill_title(meta_front, sid)
-        summary = meta_front.get("description", "").strip()
+        _description = meta_front.get("description", "")
+        summary = _description.strip() if isinstance(_description, str) else ""
         # 调用方只在继承既有包时才带 version；其余路径由 frontmatter 提供，
         # 否则 render_skill_discovery 会渲染出空的 "(v)"。
-        resolved_version = version.strip() or str(meta_front.get("version") or "").strip()
+        _fm_version = meta_front.get("version") or ""
+        resolved_version = version.strip() or (
+            _fm_version.strip() if isinstance(_fm_version, str) else ""
+        )
         digest = content_hash(skill_md_text.encode("utf-8"))
 
+        self._ensure_root()  # RA-078: 首次写盘点
         dest = self._root / sid
         resources_dir = dest / _RESOURCES
         if dest.exists():
@@ -182,21 +205,21 @@ class DiskSkillPackageStore(SkillPackageInstaller, SkillPackageStore):
 
         normalized_resources: list[str] = []
         for rel, data in sorted(resource_files.items()):
-            clean = safe_rel_path(rel)
-            if not clean:
-                continue
+            # RA-076: traversal 策略收敛 — 非 canonical key fail-loud，
+            # 与 overlay/_gate_package 用同一谓词；不再静默归一化/跳过。
+            require_canonical_rel_path(rel)
             if len(data) > SKILL_MAX_RESOURCE_BYTES:
-                raise ValueError(f"资源 {clean} 超过单文件上限")
+                raise ValueError(f"资源 {rel} 超过单文件上限")
             # 落盘用扁平相对路径；manifest 记录 ``resources/`` 前缀的声明路径。
-            storage_rel = _strip_resources_prefix(clean)
+            storage_rel = _strip_resources_prefix(rel)
             out_path = resources_dir / storage_rel
             out_path.parent.mkdir(parents=True, exist_ok=True)
             out_path.write_bytes(data)
-            normalized_resources.append(_to_resource_rel(clean))
+            normalized_resources.append(_to_resource_rel(rel))
 
         # ADR-0214 §7: 校验 references 列表里的所有路径必须落到 _root/<sid>/_RESOURCES
         # 或 _root/<sid>/(SKILL.md 同级) — 不存在就 fail-loud。
-        declared_refs = parse_references_field(skill_md_text)
+        # declared_refs 来自本函数开头的单次解析,不再二次扫描。
         for ref in declared_refs:
             candidate = (dest / ref).resolve()
             if not candidate.is_relative_to(dest.resolve()):
@@ -216,6 +239,7 @@ class DiskSkillPackageStore(SkillPackageInstaller, SkillPackageStore):
             "version": resolved_version,
             "resource_paths": normalized_resources,
             "references": list(declared_refs),
+            "references_assumed_empty": references_assumed_empty,
             "imported_at": datetime.now(tz=UTC).isoformat(),
             "retired": False,
             "usage_count": 0,
@@ -234,7 +258,26 @@ class DiskSkillPackageStore(SkillPackageInstaller, SkillPackageStore):
             content_hash=digest,
             version=resolved_version,
             references=tuple(declared_refs),
+            references_assumed_empty=references_assumed_empty,
         )
+
+    def materialize_link(self, skill_id: str, dest: Path) -> Path:
+        """硬链接物化：``{root}/{skill_id}/`` → ``dest``（文件硬链接，目录新建）。
+
+        RA-059：Protocol 声明的一等物化接缝，替代调用方
+        ``getattr(store, "root", None)`` 穿透。
+        """
+        sid = sanitize_skill_id(skill_id)
+        src = self._root / sid
+        if not (src / _SKILL_MD).is_file() or not (src / _MANIFEST).is_file():
+            raise SkillNotFoundError(f"技能库中不存在 skill_id：{sid}")
+        if dest.exists():
+            if dest.is_dir() and not dest.is_symlink():
+                shutil.rmtree(dest)
+            else:
+                dest.unlink()
+        shutil.copytree(src, dest, copy_function=os.link)
+        return dest
 
     def update_package_meta(
         self,
@@ -275,6 +318,57 @@ def safe_rel_path(name: str) -> str:
     cleaned = name.replace("\\", "/").strip().lstrip("/")
     parts = [p for p in cleaned.split("/") if p and p not in {".", ".."}]
     return "/".join(parts)
+
+
+def is_canonical_rel_path(name: str) -> bool:
+    """RA-076: 技能包相对路径的唯一 traversal-safety 谓词。
+
+    canonical ⟺ 非空且已是 ``safe_rel_path`` 的输出形状（无前导斜杠、
+    无反斜杠、无 ``.``/``..`` 段、无空段）。store 的安装/读取与
+    overlay ``_gate_package`` 收敛到同一谓词：非 canonical 输入一律
+    fail-loud，永不静默重写。
+    """
+    return bool(name) and safe_rel_path(name) == name
+
+
+def require_canonical_rel_path(name: str) -> str:
+    """RA-076: ``is_canonical_rel_path`` 的 fail-loud 版；违例抛 SkillContractError。"""
+    if not is_canonical_rel_path(name):
+        raise SkillContractError(
+            f"资源路径不是 canonical 形式（拒绝静默归一化）: {name!r} — "
+            "调用方先自行归一化，或显式用 safe_rel_path 转换。"
+        )
+    return name
+
+
+def walk_skill_source_files(
+    walk_root: Path,
+    *,
+    rel_root: Path | None = None,
+    skip_paths: Collection[Path] = (),
+) -> dict[str, bytes]:
+    """RA-080: 技能源目录 walk 的唯一接缝。
+
+    rglob ``walk_root`` 下所有文件，返回 ``{rel: bytes}``；``rel`` 是相对
+    ``rel_root``（缺省 ``walk_root``）的 canonical 相对路径；``skip_paths``
+    命中的文件跳过（如 ``_import_local_path`` 的 SKILL.md 本体）。
+
+    收敛三处实现（overlay/importing 的 ``_import_local_path``、
+    overlay 的 ``_stage_edited_package``、bundled 的 ``_load_resources``）：
+    ``safe_rel_path`` vs ``as_posix()`` 的差异在此统一 —— 直接用 RA-076 的
+    ``require_canonical_rel_path``，非 canonical 的 rel fail-loud，不再静默
+    归一化（rglob 产出的 rel 本来就是 canonical，正常路径行为不变）。
+    不存在的 walk_root 返回空 dict（rglob 语义）。
+    """
+    base = walk_root if rel_root is None else rel_root
+    skipped = set(skip_paths)
+    out: dict[str, bytes] = {}
+    for path in sorted(walk_root.rglob("*")):
+        if not path.is_file() or path in skipped:
+            continue
+        rel = require_canonical_rel_path(path.relative_to(base).as_posix())
+        out[rel] = path.read_bytes()
+    return out
 
 
 def _strip_resources_prefix(path: str) -> str:

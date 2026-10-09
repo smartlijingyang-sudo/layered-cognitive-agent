@@ -8,7 +8,6 @@ Profile / Bundle → `ResolvedProfile` → `CompiledRunPlan` 的**编译时**管
 
 | 组件 | 公共入口 | 依赖的编译实现 |
 |---|---|---|
-| Profile boot 编译 | `boot_compile.compile_profile_boot_products` | `lca_kernel.plan.plan_compile.compile_plan` |
 | Observability 编译 | `observability_compile.compile_observability_boot_plan` | `lca_kernel.events.compile.compiler.ObservabilityCompiler` |
 | Resource 投影 | `resource_registry.project_resources` · `ResourceRegistry` | ADR-0199 §3.1 第四维度（只读、可分发内容） |
 
@@ -26,7 +25,7 @@ Profile / Bundle → `ResolvedProfile` → `CompiledRunPlan` 的**编译时**管
 
 ## 4. 输出
 
-包门面 `__all__` 共 5 个符号：`compile_profile_boot_products`、
+包门面 `__all__` 共 4 个符号：
 `compile_plan`、`explain_compile_plan`、`CompileOptions`、`PlanCompilerError`。
 产物是 `ProfileBootProducts`、`CompiledRunPlan` / `V2ExecutablePlan`、
 `CompiledObservabilityPlan` 与 `ResourceRegistry` 条目——全是值，不触发运行。
@@ -72,5 +71,5 @@ Wave P4：profile/compile 文件收拢至本目录；kernel 只保留薄 re-expo
 
 ## 9. 公共入口
 
-包门面导出五个名字：`CompileOptions`, `PlanCompilerError`, `compile_plan`,
-`compile_profile_boot_products`, `explain_compile_plan`。
+包门面导出四个名字：`CompileOptions`, `PlanCompilerError`, `compile_plan`,
+`explain_compile_plan`。

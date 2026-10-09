@@ -10,10 +10,29 @@ from lca.infrastructure.skills.settings.settings import get_skill_settings
 
 
 def resolve_skill_store() -> DiskSkillPackageStore:
-    """Return the disk skill store after materializing first-party bundled skills."""
-    store = DiskSkillPackageStore(get_skill_settings())
-    ensure_bundled_skills(store)
-    return store
+    """Pure construction: return the disk skill store without writing anything.
+
+    RA-058: a function named "resolve" must never write to production.
+    Bundled-skill materialization is an explicit boot step — see
+    ``materialize_bundled_skills`` (called once by the skills provider,
+    whose filesystem effect is declared on the plugin).
+    """
+    return DiskSkillPackageStore(get_skill_settings())
+
+
+def materialize_bundled_skills(
+    store: DiskSkillPackageStore | None = None,
+) -> tuple[str, ...]:
+    """Explicit boot step: install first-party bundled skills into ``store``.
+
+    Returns the skill_ids that were (re)written; ``ensure_bundled_skills``
+    is idempotent. The only production caller is ``lca-skills-provider``
+    setup — every other call site uses the pure ``resolve_skill_store()``,
+    so a mis-call can no longer silently rewrite the production
+    ``~/.lca/skills`` (71515dace).
+    """
+    resolved = store if store is not None else resolve_skill_store()
+    return ensure_bundled_skills(resolved)
 
 
 def resolve_skill_importer(store: SkillPackageInstaller | None = None) -> HttpSkillImporter:

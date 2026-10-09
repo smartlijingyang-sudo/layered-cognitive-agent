@@ -16,6 +16,7 @@ from typing import Any
 
 import structlog
 
+from lca.contracts.atoms.artifact.state import is_activatable_state
 from lca.contracts.atoms.ids.ids import utc_now_iso
 from lca.contracts.harness.journal.artifact import CapabilityArtifact
 from lca.contracts.observability.closure.assistant_ep_closure import (
@@ -39,10 +40,11 @@ from lca.contracts.protocols.memory.operational_skills import (
     SkillPackage,
     SkillPackageStore,
 )
+from lca.infrastructure.assistant.io import skill_index_digest
 from lca.infrastructure.skills.disk.store import (
     DiskSkillPackageStore,
-    safe_rel_path,
     sanitize_skill_id,
+    walk_skill_source_files,
 )
 from lca.infrastructure.skills.settings.settings import SkillSettings, get_skill_settings
 from lca.plugins.assistant.events._events import (
@@ -59,15 +61,13 @@ from lca.plugins.assistant.home._home_layout import (
     write_revision_snapshot,
 )
 from lca.plugins.assistant.skill.overlay.gating import (
-    _ACTIVATABLE_STATES,
     _GLOBAL_LINK_SOURCE,
     _SKILLS_DIGEST_PREFIX,
     _STAGING_DIR_NAME,
     _gate_package,
     _is_global_link,
-    _link_global_package,
+    _mark_global_link,
     _mark_local,
-    _package_digest,
     _place_package,
     _revision_of,
 )
@@ -83,10 +83,11 @@ log = structlog.get_logger(__package__)
 def _default_global_store() -> SkillPackageStore:
     """默认全局技能库读缝（ADR-0243 D1:全局库是只读内容源）。
 
-    直接构造 ``DiskSkillPackageStore(get_skill_settings())``,**不**经
-    ``resolve_skill_store()``:后者附带 ``ensure_bundled_skills``,会从 repo
-    工作树写全局库。re-link 只按全局库当前状态升级已链接 Home——把 bundled
-    技能刷进内容源是 boot 期职责,混进升级路径会让「重链」偷偷变成「先改源」。
+    直接构造 ``DiskSkillPackageStore``，不走 bundled 物化：把 bundled 技能
+    刷进内容源是 boot 期职责（skills-provider setup 经
+    ``materialize_bundled_skills`` 显式执行，RA-058 起 ``resolve_skill_store``
+    本身也不再写盘）。re-link 只按全局库当前状态升级已链接 Home——混进升级
+    路径会让「重链」偷偷变成「先改源」。
     """
     return DiskSkillPackageStore(get_skill_settings())
 
@@ -110,8 +111,9 @@ class _AssistantSkillOverlayImpl(AssistantSkillOverlay):
         self._catalog = catalog
         self._emit = event_emitter
         self._url_importer_factory = url_importer_factory or _default_url_importer
-        # 注入的是工厂而非实例:构造 DiskSkillPackageStore 会 mkdir 全局根,
-        # 没有 global_link 条目的 Home 不该因此触碰全局库。
+        # RA-078: 构造 DiskSkillPackageStore 已不再触碰文件系统（mkdir 推迟到
+        # 首次写盘），工厂缝保留的理由只剩：settings 延迟到首次使用时解析、
+        # 测试可整体替换。re-link 是唯一读全局库的动作。
         self._global_store_factory = global_store_factory or _default_global_store
 
     # ── 公开面 ────────────────────────────────────────────────────────
@@ -153,7 +155,7 @@ class _AssistantSkillOverlayImpl(AssistantSkillOverlay):
             manifest_digest=str(manifest["manifest_digest"]),
             actor=actor,
             skill_id=package.skill_id,
-            skill_digest=_package_digest(package),
+            skill_digest=skill_index_digest(package.content_hash),
             artifact_state=artifact.state.value,
             source=source.reference,
             version=package.version,
@@ -164,7 +166,7 @@ class _AssistantSkillOverlayImpl(AssistantSkillOverlay):
             assistant_id=assistant_id,
             skill_id=package.skill_id,
             version=package.version,
-            digest=_package_digest(package),
+            digest=skill_index_digest(package.content_hash),
             artifact_state=artifact.state.value,
             installed_at=installed_at,
             revision_seq=_revision_of(manifest),
@@ -216,7 +218,7 @@ class _AssistantSkillOverlayImpl(AssistantSkillOverlay):
         section: Mapping[str, Any] = skills_section if isinstance(skills_section, dict) else {}
         entry = section.get(skill_id)
         state = str(entry.get("artifact_state") or "") if isinstance(entry, dict) else ""
-        if state not in _ACTIVATABLE_STATES:
+        if not is_activatable_state(state):  # RA-055: 与 activate_skill 共用同一谓词
             raise SkillNotVerifiedError(
                 f"skill 未过 0067 闸门,不可 activate: assistant={assistant_id!r} "
                 f"skill={skill_id!r} state={state or '(无索引记录)'}"
@@ -324,7 +326,7 @@ class _AssistantSkillOverlayImpl(AssistantSkillOverlay):
 
             manifest = load_manifest(home, assistant_id)
             new_revision_seq = _revision_of(manifest) + 1
-            package_digest = _package_digest(package)
+            package_digest = skill_index_digest(package.content_hash)
             extra: dict[str, str] = {}
             previous_digests = manifest.get("digests")
             if isinstance(previous_digests, dict):
@@ -424,12 +426,6 @@ class _AssistantSkillOverlayImpl(AssistantSkillOverlay):
             )
 
         global_store = self._global_store_factory()
-        raw_root = getattr(global_store, "root", None)
-        if raw_root is None:
-            raise TypeError(
-                f"全局技能库不支持硬链接 re-link（缺 root 属性）: {type(global_store).__name__}"
-            )
-        global_root = Path(raw_root)
         home_store = DiskSkillPackageStore(SkillSettings(cache_dir=skills_root))
 
         already_current: list[str] = []
@@ -448,16 +444,23 @@ class _AssistantSkillOverlayImpl(AssistantSkillOverlay):
                     skipped_missing_global.append(skill_id)
                     continue
                 try:
-                    current = _package_digest(home_store.get(skill_id))
+                    current = skill_index_digest(home_store.get(skill_id).content_hash)
                 except SkillNotFoundError:
                     # 落盘包缺失/不完整 = 未能证明与全局一致 ⇒ 重链把它补齐到
                     # 全局当前版本（重跑收敛到同一终态）。
                     current = ""
-                if current == _package_digest(package):
+                if current == skill_index_digest(package.content_hash):
                     already_current.append(skill_id)
                     continue
                 staged.append((skill_id, package, _gate_package(package)))
-                _link_global_package(global_root, staging_root, skill_id)
+                try:
+                    dest = global_store.materialize_link(skill_id, staging_root / skill_id)
+                except NotImplementedError as exc:
+                    raise TypeError(
+                        f"全局技能库不支持硬链接 re-link（缺 materialize_link 能力）: "
+                        f"{type(global_store).__name__}"
+                    ) from exc
+                _mark_global_link(dest)
 
             for skill_id, _, _ in staged:
                 _place_package(staging_root, skills_root, skill_id)
@@ -486,7 +489,7 @@ class _AssistantSkillOverlayImpl(AssistantSkillOverlay):
                     manifest_digest=manifest_digest,
                     actor=actor,
                     skill_id=skill_id,
-                    skill_digest=_package_digest(package),
+                    skill_digest=skill_index_digest(package.content_hash),
                     artifact_state=artifact.state.value,
                     source=_GLOBAL_LINK_SOURCE,
                     version=package.version,
@@ -518,14 +521,11 @@ class _AssistantSkillOverlayImpl(AssistantSkillOverlay):
             shutil.copytree(src_resources, staging_dir / "resources", dirs_exist_ok=True)
         (staging_dir / "SKILL.md").write_text(skill_md, encoding="utf-8")
 
-        resource_files: dict[str, bytes] = {}
-        res_dir = staging_dir / "resources"
-        if res_dir.is_dir():
-            for path in sorted(res_dir.rglob("*")):
-                if path.is_file():
-                    rel = safe_rel_path(str(path.relative_to(staging_dir)))
-                    if rel:
-                        resource_files[rel] = path.read_bytes()
+        # RA-080: 经 disk/store.py 的 walk 接缝；rel 相对 staging_dir（含
+        # resources/ 前缀）。res_dir 不存在时接缝返回空 dict（rglob 语义）。
+        resource_files = walk_skill_source_files(
+            staging_dir / "resources", rel_root=staging_dir
+        )
 
         meta: dict[str, Any] = {}
         old_manifest = skill_dir / "manifest.json"
@@ -572,7 +572,7 @@ class _AssistantSkillOverlayImpl(AssistantSkillOverlay):
                 for name, value in previous_digests.items()
                 if isinstance(value, str) and str(name).startswith(_SKILLS_DIGEST_PREFIX)
             }
-        package_digest = _package_digest(package)
+        package_digest = skill_index_digest(package.content_hash)
         extra[f"{_SKILLS_DIGEST_PREFIX}{package.skill_id}"] = package_digest
 
         new_manifest = build_manifest(
@@ -626,7 +626,7 @@ class _AssistantSkillOverlayImpl(AssistantSkillOverlay):
         skills_section = manifest.get("skills")
         section: dict[str, Any] = dict(skills_section) if isinstance(skills_section, dict) else {}
         for skill_id, package, artifact in relinked:
-            package_digest = _package_digest(package)
+            package_digest = skill_index_digest(package.content_hash)
             extra[f"{_SKILLS_DIGEST_PREFIX}{skill_id}"] = package_digest
             section[skill_id] = {
                 "digest": package_digest,
