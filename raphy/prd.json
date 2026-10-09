@@ -1,6 +1,6 @@
 {
   "project": "LCA Raphy Architecture Optimization",
-  "branchName": "raphy/arch-20261008-2205",
+  "branchName": "raphy/arch-20261009-2045",
   "description": "Continuous architecture deepening for the LCA cognitive-agent codebase via the raphy fresh-session loop. Round 1 (2026-10-06, old prompt): RA-001/RA-002 converged, RA-003 dropped with evidence. Round 2 (2026-10-06, hardened prompt): RA-004..RA-009 all done (merged to main 2026-10-07, merge 1b1526a94). Round 3 (2026-10-07, hardened prompt): friction walk over session plugins, loop_cursor, delegation/body executor; RA-010..RA-013 below. Out of scope: ralph Round 2 areas (DecisionGates, Ingest, ContextFiles shims, Read Runs micro-dirs, MemoryTools directory seam), lca/cognition/memory/ (frozen per Round 2 AP-01), CLI surface must not import contracts (deliberate rule), gate_chain_strategy.py (hands-off: another party's uncommitted work + pre-existing red test). Round 10 (2026-10-08 12:06, branch raphy/arch-20261008-1206): RA-033..RA-041 below (3 Strong + 5 Worth exploring + 1 Speculative; all from friction walk, none duplication-class). Round 11 (2026-10-08 15:05, branch raphy/arch-20261008-1505): RA-042..RA-047 all done (merged to main 2026-10-08, merge 0ab9d67cd). Round 12 (2026-10-08 22:05, branch raphy/arch-20261008-2205): RA-048..RA-050 below (1 Strong + 2 Worth exploring; all from friction walk, none duplication-class).",
   "userStories": [
     {
@@ -1456,6 +1456,52 @@
       "implemented": "",
       "priority": 2,
       "title": "Deepen CognitiveRuntime.run(): extract the turn-preparation phases, converge the late imports"
+    },
+    {
+      "acceptanceCriteria": [
+        "`PortReader.port_has_value(name: str)` 本体委托给 `self.registry.has_port(PortName(name))`，不再调用 `snapshot()`；签名与返回值语义不变。",
+        "`PortRegistry.snapshot()` 语义零变更（interpreter 的观测面仍需 copy）。",
+        "三态行为一致：从未写入 / 已写入 / 被清空（None 值）三种情况下 `port_has_value` 与 `has_port` 返回相同；新增测试 pin 此三态。",
+        "`predicate_evaluator` 的 PortSet/PortNotSet 相关测试、`tests/cognition/wire/test_close_out_adapter.py` 全绿；ruff clean。"
+      ],
+      "branchName": "raphy/arch-20261009-2045",
+      "description": "As an LCA maintainer, I want `PortReader.port_has_value` to delegate to the declared `PortRegistry.has_port` seam, because today it bypasses that seam with `name in self.registry.snapshot()` — a full copy of the port store on every call — while `predicate_evaluator` invokes it up to 3 times per edge predicate evaluation, so loop-heavy graphs (e.g. the act→think re-ask loop) pay a full-dict copy per edge per iteration for a mere membership test.",
+      "id": "RA-101",
+      "implemented": false,
+      "notes": "Source: Round 16 friction walk, Area C (port_reader.py, Q2/Q4). Leaky seam: the registry already declares port-existence as a seam (has_port, used by close_out_adapter with an explicit test pin), but the reader goes around it. Strength: Strong.",
+      "passes": false,
+      "priority": "P1",
+      "title": "Make PortReader.port_has_value delegate to the declared PortRegistry.has_port seam"
+    },
+    {
+      "acceptanceCriteria": [
+        "`PlanInterpreter.run` 内的三处 visit-end 仪式块（routing-terminate break / terminal_predicate break / 循环末尾）收敛为一个私有 `_record_visit_end(...)` helper，覆盖 observe → latency.record → VisitRecord → recorder.record → visits.append → facts.extend 六步，返回 VisitRecord。",
+        "terminal_predicate 路径的 `traversal.terminal = True` + `terminal_reason` 赋值保留在 helper 调用之前；`terminal_node = node.id` 留在调用方；`_classify` 的 dispatch 判定不变。",
+        "interpreter scenario 测试（visit records / GraphObservation 序列）全绿，行为零变更；ruff clean。"
+      ],
+      "branchName": "raphy/arch-20261009-2045",
+      "description": "As an LCA maintainer, I want the three near-identical visit-end ceremony blocks in `PlanInterpreter.run()` converged into one private helper, because today the routing-terminate break, the terminal_predicate break, and the normal loop-end path each repeat the same ~20-line ritual (observe visit-end, record latency, build VisitRecord, record it, append, extend facts) differing only in dispatch kind — the next person adding a visit-end concern must touch all three.",
+      "id": "RA-102",
+      "implemented": false,
+      "notes": "Source: Round 16 friction walk, Area A (interpreter.py, Q1). Mechanical duplication class: 3x ~20-line blocks, diff is dispatch kind + terminal_reason. Strength: Worth exploring.",
+      "passes": false,
+      "priority": "P2",
+      "title": "Converge the three visit-end ceremony blocks in PlanInterpreter.run()"
+    },
+    {
+      "acceptanceCriteria": [
+        "删掉 `AnomalyDetector._recent_points` deque、`CYCLE_WINDOW` 类属性、以及 `_check_cycle` 返回值中的 `and point in self._recent_points` 恒真条件；`deque` import 无他用则一并删除。",
+        "`_check_cycle` docstring 与 `__init__` 注释改写为 consecutive-count 语义，不再提 window。",
+        "8 个 `_check_*` 方法、`CYCLE_BASELINES`、`CYCLE_BASELINE_DEFAULT` 原样保留（I16 build 检查通过）；`tests/lca_plugins/observability/spine/test_anomaly_detector.py` + `test_cycle_detector_fingerprint.py` 全绿，trip 行为零变更；ruff clean。"
+      ],
+      "branchName": "raphy/arch-20261009-2045",
+      "description": "As an LCA maintainer, I want the vestigial `_recent_points` rolling-window state removed from `AnomalyDetector`, because RA-030 rewrote cycle detection as consecutive-count with per-EP baselines but left the deque behind: it is appended on every event and consumed only by `point in self._recent_points`, which is always True since the point was just appended — the class attribute, comments, and docstring still narrate a window semantics the implementation no longer has.",
+      "id": "RA-103",
+      "implemented": false,
+      "notes": "Source: Round 16 friction walk, Area B (anomaly.py, Q2). Vestigial state: deletion concentrates the detector's state on the one real semantics (consecutive-count). Strength: Worth exploring.",
+      "passes": false,
+      "priority": "P2",
+      "title": "Delete the vestigial CYCLE_WINDOW rolling-window state in AnomalyDetector"
     }
   ]
 }
