@@ -192,13 +192,22 @@ _PHASE_ALIAS_OF: dict[str, str] = {
     # alias 集中归到 top phase,顶层 phase 才是 LCA 六语义之一。
     "phase": "perceive",  # phase.perceive.observe / phase.think.fold / 等
     # think subgraph 节点命名缺 ``think.`` 前缀 —— 全部归到 think。
-    "tool": "think",       # tool.fork.dispatch  ── think.tool.fork_dispatch(计划中改名)
-    "memory": "think",    # memory.derive       ── think.history.assemble subgraph
-    "llm": "think",        # llm.call            ── think.llm.dispatch subgraph
-    "decision": "think",   # decision.parse / decision.repair ── think.decision.*
-    "gate": "think",       # gate.chain.run / gate.chain.reject ── think.gate subgraph
+    "tool": "think",  # tool.fork.dispatch  ── think.tool.fork_dispatch(计划中改名)
+    "memory": "think",  # memory.derive       ── think.history.assemble subgraph
+    "llm": "think",  # llm.call            ── think.llm.dispatch subgraph
+    "decision": "think",  # decision.parse / decision.repair ── think.decision.*
+    "gate": "think",  # gate.chain.run / gate.chain.reject ── think.gate subgraph
     # act subgraph 节点命名缺 ``act.`` 前缀。
-    "effect": "act",       # effect.execute      ── act.effect.execute
+    "effect": "act",  # effect.execute      ── act.effect.execute
+    # business turn(``bundles/agent/reasoning_turn.yaml``)用 ``reason.*`` 作为
+    # 认知流业务域(ADR §0.4 N9)—— 该图就是 think 阶段的业务图。
+    "reason": "think",  # reason.prepare.* / reason.llm.call / reason.gate.enforce
+    # think.reason 内层概念图经 sub_spec_ref 挂在 ``reason.*`` 之下,却缺 ``think.`` 前缀。
+    "context": "think",  # context.lines.collect / context.skills.merge ── reason.prepare.context
+    "prompt": "think",  # prompt.candidate.* / prompt.sections.* ── reason.prepare.template / reason.render.prompt
+    "shortcut": "think",  # shortcut.try ── 无 LLM 快速路径(think 短路)
+    "capability": "think",  # capability.role.* ── reason.prepare.role 内层
+    # (capability.fork.dispatch 是 boot-time 原语,未挂 phase 图;若将来落入 act 再拆)
 }
 
 

@@ -1593,7 +1593,7 @@
         "Existing graph observation tests green; ruff clean."
       ],
       "priority": 3,
-      "passes": false,
+      "passes": true,
       "branchName": "raphy/deslop-100",
       "notes": "Source: DESLOP-100 friction walk, Area D (graph framework). Strength: Worth exploring. Testability gap: 'the interface is the test surface' — phase_of is the interface downstream consumers (NodeEnter/NodeExit facts, graph_timeline) rely on, yet its vocabulary is untested against real inputs. Constraint: do not change phase_of semantics without evidence; the test may reveal legitimate unknowns (e.g. 'stop'/'terminal' handling) — record them in the keep-list."
     }

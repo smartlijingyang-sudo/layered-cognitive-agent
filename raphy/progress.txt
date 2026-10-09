@@ -1,5 +1,14 @@
 ## Codebase Patterns
 
+- **Phase-alias 词汇用真实 bundle 语料钉住，跨 phase region 进 keep-list（RA-109）：**
+  收集节点语料只认 ``nodes:`` list 里的 ``id``（裸 grep ``id:`` 会混入
+  plugin/provider 注册 id）。无 phase 前缀分两类：think 内层节点
+  （``reason/context/prompt/shortcut/capability``，经 sub_spec_ref 挂在
+  ``bundles/agent/reasoning_turn.yaml`` 下）→ 用真实 YAML 证据扩展
+  ``_PHASE_ALIAS_OF``；ADR-0228 的跨 phase region（``plan/intervene/
+  delegate``）与 Layer 1 原语（``primitive``）→ 进测试 keep-list，
+  ``phase_of`` 返回 "" 是文档化正确语义，不伪造 phase。
+
 - **重叠 CLI 命令先按输出格式分类再决定 merge vs cross-reference（RA-108）：**
   ``journal step --step N``（单步原始事实纯文本）与 ``journal steps --step N``
   （StepNarrativeWriter narrative markdown）输出本质不同且都被 docs/ADR 引用 →
@@ -2609,4 +2618,42 @@ Learnings:
   - `read_step_document` 要求完整 JournalDocument 形状（schema/metadata 等）：
     `_load_journal` 旧测试的 `{"steps": [...]}` 极简 fixture 不再是合法输入，
     测试 fixture 要跟着 seam 升级。
+---
+## 2026-10-10 03:05 - RA-109
+
+- 实现：`lca/framework/graph/observation.py::_PHASE_ALIAS_OF` 依据真实 bundle
+  证据扩展 5 个 alias：`reason` / `context` / `prompt` / `shortcut` /
+  `capability` → think。它们全是 think 阶段业务图
+  （`bundles/agent/reasoning_turn.yaml`，ADR §0.4 N9 的 `reason.*` 认知流）经
+  sub_spec_ref 挂载的内层概念图/原语节点，缺 `think.` 前缀。
+- 新增 `tests/framework/graph/test_phase_of_vocabulary.py`：走查
+  `bundles/**/*.yaml` 全部 90 个 `nodes:` 节点 id，断言每个非空 node id 映射到
+  顶层 phase / alias，或头段落入文档化 keep-list。
+- Keep-list（合法无 phase，`phase_of` 返回 "" 是正确语义）：`plan` /
+  `intervene` / `delegate`（ADR-0228 明确 "not added to the six-phase closed
+  set… cross-phase subgraphs"）+ `primitive`（Layer 1 phase 无关原语）。
+  未强塞 alias —— 遵守评估约束 "do not change phase_of semantics without
+  evidence"。
+- 混合头段证据：`capability.role.*` 在 think turn（reason.prepare.role 内层），
+  `capability.fork.dispatch` 是 boot-time 原语未挂 phase 图 —— 按 phase 图内
+  实际用法归 think，注释记录 caveat（若将来落入 act 再拆）。
+- Files changed:
+  - `lca/framework/graph/observation.py`（alias 表 +5，注释带 bundle 证据）
+  - `tests/framework/graph/test_phase_of_vocabulary.py`（新增，6 测试）
+  - `raphy/prd.json`（RA-109 passes=true）、`raphy/progress.txt`
+- 测试：新测试 6 passed；观察面回归（test_graph_observer +
+  test_runtime_graph_observer_wiring + test_spine_graph_events_e2e）16 passed；
+  ruff check + ruff format clean。`test_gate_chain_annotations_resolve` 红为
+  RA-023 已记录的干净树基线（NameError: PortRegistry forward-ref，与本轮
+  无关，未动）。
+- **Learnings for future iterations:**
+  - 收集 bundle 节点语料必须走 `nodes:` list 语义，不能裸 grep `id:` ——
+    `id:` 还出现在 plugin/provider 注册（base.yaml 的 `lca-*` 服务 id 等），
+    会把非节点 id 混进语料。
+  - 跨 phase region（plan/intervene/delegate）不是 alias 候选：ADR-0228 已
+    明确它们不属于六 phase 闭集，`phase_of` 返回 "" 是文档化语义；强塞 alias
+    等于伪造 phase。
+  - 混合头段（capability：role 在 think、fork 是 boot-time）按 phase 图内的
+    实际用法定 alias，并把 caveat 写进注释；若另一用法将来落入其它 phase，
+    需要拆分命名而非继续共享头段。
 ---
