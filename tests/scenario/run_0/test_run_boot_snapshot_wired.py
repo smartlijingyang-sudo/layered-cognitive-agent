@@ -12,6 +12,10 @@ def test_snapshot_recorder_writes_file(monkeypatch) -> None:
     )
 
     ctx = MagicMock()
+    # RA-069 (202d00468): boot products are read via scope.inject; a bare
+    # MagicMock auto-creates inject -> a non-ProfileBootProducts value ->
+    # the fail-loud type guard raises. Model "no boot products attached".
+    ctx.inject.return_value = None
     session = MagicMock()
     session.run_id = "test-run-123"
     session.plan_ref = "plan-hash"
@@ -40,6 +44,10 @@ def test_snapshot_recorder_swallows_write_errors(monkeypatch) -> None:
     )
 
     ctx = MagicMock()
+    # RA-069 (202d00468): boot products are read via scope.inject; a bare
+    # MagicMock auto-creates inject -> a non-ProfileBootProducts value ->
+    # the fail-loud type guard raises. Model "no boot products attached".
+    ctx.inject.return_value = None
     session = MagicMock()
     session.run_id = "fail-run"
     session.plan_ref = ""
