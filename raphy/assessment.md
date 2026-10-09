@@ -1,310 +1,398 @@
-# Raphy Assessment — Round 13 (2026-10-09 01:07, branch raphy/arch-20261009-0107)
+# Raphy Assessment — Round 14 (2026-10-09 10:30, branch raphy/arch-20261009-1008)
 
-Fresh session. Scope via YAGNI: last ~40 commits' hot spots are **skills package
-lifecycle** (f6c6a1e84 filesystem-effect declare, 71515dace global-store isolation,
-997705416 global_link re-link, ed52b2ff0 YAML block scalar, 0c32cc411 skill-creator
-guide, df03d0cf1 write-guard proposal), **CLI doctor chain** (RA-039 landed Round 10;
-doctor CLI + stack_heal + debug-trace), and **profile resolve-boot + kernel boot
-diagnostics** (911a6ac73/6e6e90d3c resolve-boot pins, 62d776740 list_connections seam,
-54ad5f2d9 structlog-only boot diagnostics). Read: runtime-findings-20261007.md
-(outranks static findings), CONTEXT.md, raphy/progress.txt `## Codebase Patterns`,
-skills/improve-codebase-architecture/SKILL.md. 禁区 respected: preamble.py
-(user in-flight), gate_chain_strategy.py, ralph Round 2 territory (incl.
-infrastructure/tools/assistant/, lca/cognition/memory/), sandbox (Round 12 RA-048/049/050),
-effect dispatch (RA-033/042/043), act subgraph typed ports (RA-041).
+Fresh session. Baseline `0127c7120` (main tip; merge: raphy RA-051..RA-080 sweep).
+Scope via YAGNI: last ~40 commits' hot spots are **skills package lifecycle**
+(RA-051..080 just landed: doctor chain, overlay/frontmatter/disk/catalog/factory),
+**CLI services** (`cli/commands` 12 commits), **kernel boot** (RA-054/070), and
+**trace-coherence/v3 scenario pins** (iter-tests). Read: CONTEXT.md,
+raphy/progress.txt `## Codebase Patterns` (top first), raphy/prd.json (RA-001..080
+themes — no duplicate filings), skills/improve-codebase-architecture/SKILL.md,
+relevant docs/adr/ (0119, 0175, 0185, 0232, 0248, 0251, 0268). 禁区 respected:
+preamble.py (user in-flight), gate_chain_strategy.py (other's work, not even read),
+ralph Round 2 territory (DecisionGates/Ingest/ContextFiles shims/Read Runs
+micro-dirs/lca/cognition/memory//infrastructure/tools/assistant/), lca-1000 active
+migration (contracts/event.py PILOT, webserver retired stubs), typed ports /
+delegation cache (iter lanes in flight).
 
-Three friction-walk zones were delegated to fresh-session subagents (full end-to-end
-reads, 5 questions mandatory each); runtime verification to a fourth. This file
-synthesizes their reports with self-grilling per candidate.
+Three friction-walk zones delegated to fresh-session subagents (ASSESS ONLY, read-only,
+end-to-end reads, 5 questions mandatory each); runtime verification run directly
+with the R13 probe (adapted to this worktree). This file synthesizes their reports
+with self-grilling per candidate.
 
 ## Friction walk
 
-### Area A — CLI doctor / DoctorFacade / stack_heal / debug-trace (32 files read)
+### Area A — lca/agent/ + lca/runtime/loop/ + lca_kernel/boot/ + lca/nodes/ (zone: agent core runtime)
 
-1. *Bouncing between modules for one concept?* YES — "diagnose a profile" crosses
-   ~12 modules + 1 process boundary (profile.py CLI -> facade.py -> 6 pass files ->
-   contracts/diagnostics/doctor.py -> PluginContract -> PlanResolutionService ->
-   resolve.py + plan_compile.py -> subprocess scripts/check_plugin_shape.py, whose
-   kinds plugin_shape.py re-models with 3 tables). Doctor-layer depth is thin;
-   depth concentrates in resolve/compile. Plus 4 mutually-unaware "diagnosis"
-   surfaces: `doctor profile` (facade), `runs debug` (spine-direct), `debug trace`
-   (journal via TraceInspector), `stack_heal` (service bring-up in steps.py).
-2. *Shallow modules?* `_has_compile_errors` = verbatim restatement of
-   `DoctorReport.has_errors()` (RA-065 folds it); `_optional_resolve_contracts` /
-   `_optional_resolve_phase_graph` 10-of-11 lines identical (twins); `debug_seam.py`
-   63 lines provide with zero CLI consumers (RA-061); `SinglePluginDoctor`
-   247 lines, tested, zero consumers (RA-067).
-3. *Pure functions hiding call-site bugs?* YES — activation_ref 4-link chain
-   (RA-052: each link correct, nobody moves finding.plan_ref into
-   report.activation_ref; stub test masked it); `except (ValueError, TypeError)`
-   in compile_dry_run (RA-072: impl bug misdiagnosed as "profile invalid").
-4. *Leaky seams?* YES — PluginShapeDoctor audits ambient cwd while pretending
-   run(profile_path) is input-relevant (RA-060); plugin_shape.py second-models
-   script kinds against its own docstring's "not a third rule engine" (RA-073);
-   facade's `except Exception: return None` conflates "no data" with "chain
-   structurally dead" (folded into RA-051).
-5. *Untested / untestable?* pass 3-6 production path zero-tested (helpers always
-   patched — RA-051); activation_ref e2e zero (RA-052); `lca-ops doctor` mounting
-   zero — tests build fresh typer apps, never the real root app (RA-053); trust
-   pass real-kind flow zero (map default {}); debug registry seam zero consumers.
+Read end-to-end: cognitive_agent.py (397), team_handle.py (166), member_invoke.py (96),
+orchestration_registry.py (39), runtime_loop.py (605), runtime_lifecycle_emitter.py (141),
+runtime_lifecycle.py (16), agent_runtime/phases.py (32), boot.py (559), lifespan.py (115),
+stages.py (40).
 
-### Area B — skills lifecycle (32 files read end-to-end + commits f6c6a1e84/71515dace/997705416/0c32cc411/df03d0cf1)
+1. *One concept, many modules?* YES — "start one fresh run" crosses ~8 modules
+   (CognitiveAgent.run → runtime_loop.run → vocal runtime_wiring → settle_guard →
+   capability_bindings → auto_review gate → BoxAccessor → skills activation bridge).
+2. *Shallow?* YES — `_publish_terminal_event` (3-line delegate); `_RunEventSessionBinder`
+   Protocol defined **verbatim twice** (cognitive_agent.py + team_handle.py);
+   `CognitiveAgent`'s 16 read-only `self._bindings.*` delegates are factual adapter
+   surface (nodes/composer read runtime.brain ×8) — honest, not filed.
+3. *Pure fns, bugs in callers?* YES — `_capture_resume_memory` wraps a pure fn in
+   try/except fail-soft: the swallow decision lives at the call site, not in the fn.
+4. *Leaky seams?* YES, strongest: `_run_driver` uses `getattr(vocal_ctx.gate,
+   "is_awaiting_widget", lambda: False)()` + `m.get("type")=="widget"` +
+   `latest_widget.get("message_id")` — vocal internals in the generic run driver;
+   same sniff repeated in result_projection.py:193 ("two adapters = real seam").
+   Second: lifespan.py docstring promises "no plugin/cli implementation details"
+   while `_lifespan` hard-imports `...webserver.handlers.runs.terminal.handoff_dispatch.LcaRunHandoffDispatcher`
+   and starts CronDaemonService — docstring-vs-code verbatim contradiction; plus
+   `getattr(ctx, "lock_dir", None)` duck-reads and a fail-soft `except Exception`
+   swallowing daemon-start failure in an otherwise fail-loud boot.
+5. *Testability?* YES — `CognitiveRuntime.run()`'s ~120-line composition corridor
+   (bridge install, session writer, vocal resolve, auto-review, capability bindings)
+   has no seam: only a full run reaches it; its top-level imports are empty with
+   10+ deferred imports inside `run()` — the static interface says nothing about
+   the 10 subsystems it touches. Also `transcript_features` fallback derivation
+   (~15 lines in `_run_driver.finally`) belongs to its only consumer
+   `evaluate_initiative` (no locality) and is untestable without a full run.
 
-1. *Bouncing?* YES — "install/activate a skill" holds ~15 modules: create_skill_tool ->
-   skill_overlay Protocol -> overlay.py (669) -> importing/gating/receipts ->
-   disk/store.py -> frontmatter (TWO parsers) -> _home_layout -> catalog handlers
-   (884) -> operational_skills Protocol -> factory/bundled/settings/activation.
-   Plus 14 `__init__.py` "Auto-created by split_oversized_directories" shells whose
-   own README still lists pre-split flat filenames (doc rot as sprawl evidence).
-2. *Shallow?* `quarantine.py` 109 lines, zero production callers, only tests
-   import it (RA-062); frontmatter double scan (RA-075); rglob trio
-   importing/overlay/bundled (RA-080); exec/bootstrap + format/routing thin —
-   dropped as weakest (benefit ~2 jump points, speculative gain).
-3. *Call-site bugs?* YES, three textbook cases incl. one past incident:
-   resolve_skill_store() "resolves by writing" (71515dace incident: a unit test
-   rewrote production ~/.lca/skills — RA-058); safe_rel_path normalize-vs-reject
-   split across store/gate call sites (RA-076); importer byte-surgery inserting
-   `references: []` to dodge the contract's fail-loud (RA-077);
-   DiskSkillPackageStore.__init__ mkdir + settings lru_cache making construction
-   timing the hazard (RA-078).
-4. *Leaky seams?* YES — three call sites `getattr(store, "root", None)` punching
-   through the SkillPackageStore Protocol (RA-059); "activate" as two unaware
-   semantics — overlay gates on _ACTIVATABLE_STATES but never injects content,
-   SkillActivateTool injects content but checks neither retired nor
-   artifact_state — the write-guard proposal's run_755719d1a9d5 exploit lands
-   exactly here (RA-055).
-5. *Untested?* writeFile drift undetectable by any interface (RA-057; proposal
-   exists since this morning df03d0cf1); digest field two conventions
-   (full-text vs body hash) across three writers (RA-056); overlay EP emission
-   only ever walks the log-degradation branch in unit tests (RA-079).
+### Area B — lca/cognition/ (excl. memory/) + lca/contracts/ (excl. atoms/artifact/state.py, event.py)
 
-### Area C — profile resolve-boot / connected_services / kernel boot diagnostics (28 files)
+Read end-to-end: body/ dispatch chain (simple_body, tool_batch_executor,
+execution_policy, tool_wire_gate, guard×3, internal/_retry_classification,
+actions×3, contracts/cognition/body/tools/registry.py,
+protocols/act/tool/batch_execution.py); prompt assembly (sections/types,
+sections/assembler, brain/prompt/skill_router, models/cognition/prompt_assembly.py,
+perception.py, brain/pipeline/context_manifest.py); atoms/mechanisms (seam.py,
+plugin.py, registries.py, exhaustive.py — all honest leaf tools, **no filing**).
 
-1. *Bouncing?* YES — "parse profile -> boot kernel" spans ~30 modules / 3
-   packages (lca.harness.profile.* / lca_kernel.boot.* / lca_kernel.plan.*),
-   with ≥7 pure re-export / zero-caller shadow modules from the half-done
-   ADR-0115 migration (RA-074). Real depth concentrates in resolve.py,
-   plan_compile.py, boot.py's _boot_context four-step.
-2. *Shallow?* external_filter.py (dead second filter, divergent heuristic —
-   RA-063); boot_compile.py + products wrapper (dead second compile entry,
-   options fork — RA-064); lca_kernel/boot/closure.py (K4, zero callers —
-   RA-074); BootEntry 44-line module (RA-068).
-3. *Call-site bugs?* YES — _emit_boot_events reads `.path` while real
-   dataclasses expose `.profile_path`: production boot always emits
-   profile_path='' and the test's _FakeResolved(path='<test>') masks it
-   (RA-054, textbook fake-shape divergence); pip trust classification: the only
-   production caller never passes entry_point_group_by_module, so case-5
-   "assume bundled" silently grants trust (RA-066, safety-relevant).
-4. *Leaky seams?* YES — products.py writes scope.__dict__ directly while
-   observability uses ctx.provide on the same object (RA-069; ADR-0195 P4-K03
-   may be deliberate — check first); K6 fail-loud falls back to stdlib logging
-   breaking the structlog-only contract (RA-070); ConnectorVault
-   suppress(Exception) -> [] makes the agent lie about connection state
-   (RA-071).
-5. *Untested?* _emit_boot_events never ran against real shapes (RA-054);
-   attach_profile_boot_products' re-interpret-rejection branch unpinned; K4
-   catalog zero integration coverage (never executed); ConnectorVault corrupt
-   file path untested (RA-071). Good counterexample: test_profile_boot_inspection_seam.py
-   is a real full boot — read-side coverage is solid; the rot is write-side.
+1. *One concept, many modules?* YES — "how is a tool batch scheduled" crosses
+   protocol → execution_policy → tool_batch_executor → registry.py (effects
+   taxonomy), two trees (contracts/cognition vs lca/cognition); "why this
+   template" crosses skill_router → prompt_assembly → assembler → reasoner → harness.
+2. *Shallow?* YES — `tools/tool_registry.py` (26-line NamedRegistry alias),
+   `actions/action_registry.py` (61-line alias dict): deletion test = just moves,
+   stable registration seams — not filed. `types.py` single-field wrapper
+   dataclasses (ManifestClock/Subtasks/Artifacts) — noted, folded into RA-093.
+3. *Pure fns, bugs in callers?* YES — `missing_arguments_block_observation(decision,
+   tool_registry: object)` hides the real contract in `object`; `_catalog_skill_count(catalog:
+   object | None)` — failure modes live in what callers pass, not the counting.
+4. *Leaky seams?* YES — `ToolBatchExecutor._resolve_tool_effects` getattr-chains
+   through `tool.manifest.api[0].effects` (manifest internals known to the
+   executor); `select_mode_with_audit` getattr-probes a capability the protocol
+   never declares; assembler's catalog seam is typed `object` while contracts
+   has `BrainPromptCatalog`; `_dispatch` switches on bare strings "pure"/"stateful".
+5. *Testability?* YES — PARALLEL-selection behavior only testable through
+   `select_mode_with_audit` (protocol `select_mode` can't express it); the audit
+   channel's contract is unwritable; wire-block observation shape asserted per-gate.
 
-## Runtime verification (mandatory, actually run; baseline ed3f496aa, LLM_API_KEY=dummy)
+### Area C — lca/infrastructure/cli/ (excl. doctor) + computer/ (excl. preamble) + tools/ (excl. assistant) + env/ + assistant/ + path/
 
-All six probes PASS, no new P0/P1:
-(a) basic run COMPLETED; (b) one-shot tool call COMPLETED **with marker file
-really written by the tool** (llm_calls=2); (c) two sequential runs on one agent
-COMPLETED x2; (d) RA-023 infinite mock (max_steps=3) -> failed Result, no leak
-(tool executed 4x then terminated — fix healthy); (e1) RA-046 run(None) ->
-TypeError at entry; (e2) RA-047 NativeToolCall(arguments=str) -> TypeError at
-construction, dict still accepted. Related suites green (5 + 9 passed).
-Two false positives eliminated by bisection: scripted adapters must implement
-stream() (think.llm.invoke walks adapter.stream, Protocol default yields empty
-COMPLETED without calling complete()); probe tools must be non-privileged —
-bash is in _STANDARD_SHELL_TOOLS privilege list so ADR-0292 §10 grant-absence
-fail-closed fires with the EXACT RA-033 regression message ("Agent 运行结束但未
-产生任何输出") — a trap for the next verifier; probe now uses a self-built
-non-privileged tool through the RA-042 path. Probe script kept at
-~/workspace/raphy-probe-r13.py for reuse. Round 12 baseline 0ab9d67cd showed
-identical probe behavior.
+Read: cli.py, commands/__init__.py, steps.py (293), service.py (~450),
+services/*, tools/_shared.py, tool/invocation_scope.py, seam/file_ref_args.py,
+box_accessor.py (62), box_sandbox_adapter.py (282), box_port.py (60),
+env/bootstrap.py, path/locator.py, path/policy.py.
 
-## Duplication scan (secondary, after friction walk)
+1. *One concept, many modules?* YES — `lca-ops lobehub restart` crosses 4 layers,
+   two of them string-keyed (`step_map` dict → `register_step` global registry via
+   cli.py side-effect imports).
+2. *Shallow?* YES — 14 of 17 steps are 6–10-line verb→method translations;
+   ServiceRegistry is 7 dict one-liners; two `__init__.py` re-export barrels.
+   Deletion test: just moves — but the *capability gap* they paper over is real (RA-084).
+3. *Pure fns, bugs in callers?* YES — `daemon_ensure` (steps.py:113) calls
+   `CliShippingService`'s **private** `_cli_deployed()`/`_cli_source_changed()`
+   cross-module: the real coupling (this service ships a CLI) lives in the caller's
+   isinstance-narrowing + private calls, not on the interface.
+4. *Leaky seams?* YES, strongest: **box sandbox boundary has two owners and
+   diverged correctness** — `BoxAccessor.resolve_path` uses
+   `str(resolved).startswith(str(root_dir))` (line 37: `/home/box2/evil` escapes
+   `/home/box`), while `LocalBoxAdapter._resolve_safe_path` uses `relative_to`
+   (correct); production traffic (tools/box/tool.py:67/124/168 via
+   asyncio.to_thread) goes through the **vulnerable** one. Two byte-identical
+   atomic-write copies, two identical sudo/su hard-gate copies (117 vs 229 lines),
+   `self.adapter` written 3× never read (vestigial; BoxExecutionPort hypothetical
+   on the sync path), `get_box_adapter` zero production callers.
+   Second: `stack_heal` downcasts Service → KernelServeService for `.spawner()`
+   with a TypeError guard apologizing for the dishonest seam.
+   Third: file_ref_args seam claims "every path arg flows through resolve_path_arg"
+   but tools/ has zero callers; only read_file wires it, write/edit/list bypass.
+5. *Testability?* YES — stack_heal/daemon_ensure need fakes shaped like
+   KernelServeService, not the Service protocol ("interface is NOT the test
+   surface"); test_box_sandbox_adapter.py pins the **production-unused** path;
+   BoxAccessor.resolve_path prefix behavior has no pin.
 
-Mechanical duplication found: the rglob trio (RA-080) and facade helper twins
-(RA-065). Not storied on duplication alone — RA-080's drift (safe_rel_path vs
-as_posix) and RA-065's resolve-fork are the friction; both are friction-walk
-findings. Quota satisfied trivially: zero pure-duplication stories in the final
-list.
+env/ (bootstrap constants, layered pure fns), path/locator.py (real multi-source
+priority complexity), assistant/io.py (RA-056 digest depth) — read, honest depth,
+**no filing**.
 
-## Self-grilling (per candidate)
+## Runtime verification (real run, LLM_API_KEY=<redacted>
 
-- **RA-051 (dead pass 3-6 inputs)**. Constraints: I-HPC-7 read-only rule —
-  changing getattr-None to explicit contract must not add live fallback writes;
-  ADR-0199 §5.1 shapes pass inputs. Dependencies: facade.py + 4 pass modules +
-  doctor/profile.py CLI + tests patching helpers. Shape: either plan producers
-  grow plugin_contracts/phase_graph_plan projections (deepens plan seam) or
-  facade drops dead orchestration and docstring tells the truth (deletes
-  illusion). Test survival: all current tests patch the helpers — they'd keep
-  passing either way; the new pin on the REAL seam is the only honest one.
-  Deletion test verdict: **concentrates** — the getattr-None swallows "contract
-  missing" into "no data"; explicitizing forces one true story.
-- **RA-052 (activation_ref chain)**. Constraints: DoctorReport frozen contract;
-  --json schema stability. Dependencies: compile_dry_run -> facade -> CLI
-  --json/_print_human. Shape: single producer fix in run() success branch
-  passing activation_ref into from_findings; or delete the dead pipe.
-  Test survival: stub test at test_facade.py:270 pins facade behavior only;
-  new e2e pin with the real pass. Deletion test: **concentrates** — the
-  move (finding.plan_ref -> report.activation_ref) belongs in exactly one place.
-- **RA-053 (doctor CLI unmounted)**. Constraints: lca-ops entry semantics.
-  Dependencies: cli/cli.py registry, commands/doctor/profile.py register().
-  Shape: one register() call in the root app; or explicit retired marking.
-  Test survival: existing tests keep passing; the NEW real-root-app pin is the
-  finding. Deletion test: **concentrates** — "reachable" is one registration.
-- **RA-054 (boot profile_path)**. Constraints: boot event schema. Dependencies:
-  _emit_boot_events, both dataclasses, the fake-based test. Shape: read
-  .profile_path; test fake rebuilt from the real type. Test survival: the fake
-  test is the bug's accomplice — replace, don't preserve. Deletion test: **moves
-  nothing** (pure fix), earns existence by restoring attribution.
-- **RA-055 (activate gate)**. Constraints: ADR-0214 gate semantics; tool vs
-  overlay wording must agree. Dependencies: SkillActivateTool,
-  skill_overlay Protocol, _ACTIVATABLE_STATES in overlay. Shape: shared
-  predicate extracted once; tool calls it before injection. Test survival:
-  existing tool tests don't pin the gap — add retired/unverified pins.
-  Deletion test: **concentrates** — one predicate, two callers.
-- **RA-056 (digest conventions)**. Constraints: existing Homes carry both
-  values — migration needed. Dependencies: three writers, _receipt_from_disk,
-  future guard (RA-057). Shape: single skill_index_digest() seam. Test survival:
-  receipt tests asserting 'same source' are currently fiction — rewrite.
-  Deletion test: **concentrates** — one function, one truth.
-- **RA-057 (write guard)**. Constraints: proposal df03d0cf1 already specifies
-  refuse-writes-not-reads; legit install/edit paths must keep working.
-  Dependencies: is_standing_write_path seam, disk store, RA-056 ideally first.
-  Shape: extend guard to {home}/skills/. Test survival: run_755719d1a9d5 replay
-  as the pin. Deletion test: n/a (lands a designed guard).
-- **RA-058 (resolve/write split)**. Constraints: boot ordering must not change.
-  Dependencies: factory, skills_provider setup, overlay's defensive comment.
-  Shape: pure resolve + explicit materialize step. Test survival: boot tests pin
-  ordering. Deletion test: **concentrates** — "read" and "write" become
-  auditable call sites.
-- **RA-059 (getattr root)**. Constraints: Protocol honesty; three materialize
-  paths must share semantics. Dependencies: operational_skills Protocol, three
-  call sites, DiskSkillPackageStore. Shape: declared capability or
-  materialize_link seam. Test survival: TypeError-based tests become
-  construction-time errors. Deletion test: **concentrates**.
-- **RA-060 (cwd leak)**. Constraints: C8 determinism claim; single profile_path
-  input. Dependencies: plugin_shape doctor, CLI. Shape: derive repo root from
-  profile_path (or explicit repo_root param). Test survival: shape tests use
-  stubbed scripts — add the cwd!=repo pin. Deletion test: **concentrates**.
-- **RA-061 (debug_seam)**. Constraints: PR-9 may want it; check before
-  archiving. Dependencies: debug_seam plugin, debug_trace_provider, lca-ops.
-  Shape: land (real debug command) or archive + declare `runs debug` canonical.
-  Deletion test: **concentrates** — a seam with no consumers is decoration.
-- **RA-062 (quarantine)**. Constraints: ADR-0067 gates remain the real story.
-  Shape: delete module + test references. Test survival: the two importing test
-  files must be rehomed/deleted — they vouch for dead code. Deletion test:
-  trivially **concentrates** (zero production callers).
-- **RA-063/RA-064 (dead filters/compile entry)**. Same shape as RA-062: delete;
-  note the future growth point (plugin_origin / boot.py single entry) in the
-  commit body. Deletion test: **concentrates**.
-- **RA-065 (facade resolve x4)**. Constraints: K1+K2 idempotent — sharing one
-  result is safe. Dependencies: facade, PlanResolutionService, 4 passes.
-  Shape: one resolve + two projections; twins merged; _has_compile_errors
-  dropped for report.has_errors(). Test survival: add the call-count pin —
-  the test that exposes the embarrassment. Deletion test: **concentrates**.
-- **RA-066 (pip trust)**. Constraints: I-HPC-11 default-deny; ADR-0199 §3.4.
-  Dependencies: resolve.py call site, discovery phase, plugin_origin case 5.
-  Shape: thread discovery map in, or fail-closed on absence. Test survival:
-  existing tests pin the fiction — add production-shaped (no-map) pin.
-  Deletion test: n/a (safety fix; exploitability speculative, the bug is real).
-- **RA-067 (SinglePluginDoctor)**. Constraints: needs product call (wire or
-  retire). Deletion test: **concentrates** either way (wired = earns existence;
-  retired = removes the gray zone).
-- **RA-068 (BootEntry)**. Constraints: none. Shape: inline into _boot_context.
-  Deletion test: **concentrates** (interface == implementation verbatim).
-- **RA-069 (__dict__ mount)**. Constraints: ADR-0195 P4-K03 may be deliberate —
-  READ IT FIRST. Shape: explicit cordis capability or uniform ctx.provide.
-  Deletion test: verdict pending ADR read; leak is factual either way.
-- **RA-070 (stdlib logging)**. Constraints: structlog availability at K6.
-  Shape: structlog.get_logger in fail-loud fallback, or documented dual-channel.
-  Deletion test: **concentrates** — one diagnostic channel.
-- **RA-071 (vault suppress)**. Constraints: INV classification of corruption.
-  Shape: structured warning + fail-loud or degraded marker. Deletion test:
-  **concentrates** — honesty about connection state is the module's job.
-- **RA-072 (broad except)**. Constraints: ProfileResolveError extends
-  ValueError — narrow by explicit tuple, not by base class. Shape: catch the
-  named domain types; unexpected -> DoctorCompileError. Deletion test:
-  **concentrates** — the except is the module's error model.
-- **RA-073 (kind tables)**. Constraints: script stays the single rule source.
-  Shape: script emits machine contract; doctor passes through (or shared
-  import). Deletion test: **concentrates** — one modeling of kinds.
-- **RA-074 (ADR-0115 shadows)**. Constraints: NEEDS an architecture decision
-  first — either finish or abandon honestly. Deletion test: all dead parts
-  pass individually; the decision is the deliverable.
-- **RA-075 (frontmatter)**. Constraints: fail-loud on missing references stays.
-  Shape: one parser -> full dict. Deletion test: **concentrates** — one schema,
-  one parser.
-- **RA-076 (safe_rel_path)**. Constraints: traversal safety must not weaken in
-  either direction. Shape: one predicate used by both paths. Deletion test:
-  **concentrates** — the policy becomes auditable in one place.
-- **RA-077 (importer)**. Constraints: both install paths must share documented
-  semantics. Shape: fail-loud or explicit recorded parameter. Deletion test:
-  **concentrates** — byte surgery is not a policy.
-- **RA-078 (store mkdir/lru)**. Constraints: boot ordering unchanged.
-  Shape: lazy mkdir; lifecycle-scoped settings. Deletion test: **concentrates**
-  — construction timing stops being load-bearing.
-- **RA-079 (EP fake)**. Constraints: event_emitter already injectable.
-  Shape: fake emitter + assertions in unit tests. Deletion test: **concentrates**
-  — the production branch finally gets pinned.
-- **RA-080 (rglob trio)**. Constraints: RA-076's policy covers the seam after
-  convergence. Shape: one walk seam in disk/store.py. Deletion test:
-  **concentrates** — traversal detail in one place.
+Probe `~/workspace/raphy-probe-r14.py` (R13 script, worktree path updated):
+- (a) basic run → COMPLETED
+- (b) one-shot tool-call run → COMPLETED, marker file written by tool (tool truly executed)
+- (c) two sequential runs on one agent → both COMPLETED
+- (d) infinite-loop mock, max_steps=3 → FAILED, no exception leak
+- (e) run(None) → TypeError at entry; NativeToolCall(arguments="str") → TypeError at construction
+
+**No crashes/hangs/silent failures. No P0 runtime candidates this round.**
 
 ## Candidate table
 
-| ID | Files | Problem | Solution | Benefits (locality/leverage) | Strength |
+| ID | Files | Problem | Solution | Benefits (locality + leverage) | Strength |
 |---|---|---|---|---|---|
-| RA-051 | harness/diagnostics/doctor/facade.py, contracts/protocols/state/plan.py, lca_kernel/plan/plan_compile.py | 4 passes' inputs always None (slots dataclass lacks the attrs); getattr-None swallows "contract missing" as "no data" | Real projections on the plan, or delete dead orchestration + honest docstring | Ends tested-green/production-half-dead; `--ci` stops being false safety | Strong |
-| RA-052 | doctor/compile_dry_run.py, facade.py, cli/commands/doctor/profile.py | activation_ref 4-link chain: producer never emits, consumers assume; stub test masked it | Move finding.plan_ref into report.activation_ref at the source | --json activation_ref becomes real; tests match production | Strong |
-| RA-053 | cli/cli/cli.py, cli/commands/doctor/profile.py | register() never mounted in root app; `lca-ops doctor` doesn't exist | Mount, or declare retired | The tested CLI becomes reachable; assembly seam gets a real pin | Strong |
-| RA-054 | lca_kernel/boot/boot.py, tests/lca_kernel/test_boot_events_emitted.py | _emit_boot_events reads .path; real field is .profile_path; fake masked it | Read .profile_path; rebuild fake from real type | Boot logs attributable; closes the fake-shape class of tests | Strong |
-| RA-055 | infrastructure/tools/skills/activate/tool.py, contracts/protocols/assistant/skill_overlay.py | activate has two unaware semantics; tool injects content with no retired/verified check | Shared activatable predicate, tool calls it | The tamper exploit's injection surface closes | Strong |
-| RA-056 | plugins/assistant/skill/overlay/overlay.py, plugins/domain/assistant/catalog/handlers.py | Same digest field, two conventions (full-text vs body hash), three writers | One skill_index_digest() seam | Prerequisite for the write guard; receipts tell the truth | Strong |
-| RA-057 | disk/store.py, _home_layout.py, is_standing_write_path seam | writeFile tampering of verified packages undetectable (run_755719d1a9d5) | Land the proposed guard on {home}/skills/ | `verified` becomes true again | Strong |
-| RA-058 | infrastructure/skills/factory/factory.py, plugins/memory/providers/skills_provider.py | resolve_skill_store() "resolves by writing" (71515dace root cause) | Pure resolve + explicit materialize step | Read/write call sites auditable; next mis-call can't silently rewrite prod | Strong |
-| RA-059 | operational_skills.py Protocol, overlay.py, catalog/handlers.py | getattr(store,"root",None) x3 punches through the Protocol | First-class capability / materialize_link seam | Impl swap fails at type-check, not runtime TypeError | Strong |
-| RA-060 | harness/diagnostics/doctor/plugin_shape.py | Audits ambient cwd, discards profile_path; breaks C8 | Derive repo root from profile_path | Doctor output actually about the diagnosed profile | Strong |
-| RA-061 | plugins/observability/cli/debug_seam.py, debug_trace_provider.py | 63-line provide with zero CLI consumers; two debug concepts | Land a real debug command or archive | One debug story; no decorative seam | Strong |
-| RA-062 | infrastructure/skills/quarantine.py | Zero production callers; tests vouch for dead code | Delete | Removes the phantom isolation story | Strong |
-| RA-063 | harness/profile/resolve/external_filter.py | Dead second filter, divergent heuristic | Delete | Removes the misuse lure | Strong |
-| RA-064 | harness/composition/boot_compile.py, profile/boot/products.py wrapper | Dead second compile entry with forked options | Delete (or route production through it) | One true compile entry | Strong |
-| RA-065 | harness/diagnostics/doctor/facade.py, contracts/diagnostics/doctor.py | 4 full resolves per doctor call; twin helpers; _has_compile_errors restates has_errors() | Resolve once + merge twins + drop the restatement | -3/4 K1+K2 cost; no compile fork; call-count pin | Strong |
-| RA-066 | harness/profile/resolve/resolve.py, plugin_origin.py | Pip trust falls back to "assume bundled" on the production path (map never passed) | Thread discovery in, or fail-closed | ADR-0199 trust model holds in production | Strong bug / Worth exploring exploitability |
-| RA-067 | doctor/single_plugin.py, doctor/__init__.py | 247 lines, tested, zero consumers, no "unwired" record | Wire `doctor plugin <path>` or mark retired | Coverage stops vouching for unreachable code | Worth exploring |
-| RA-068 | harness/profile/boot/projection.py, lca_kernel/boot/boot.py | 44-line module, interface == implementation | Inline into _boot_context | One fewer concept | Worth exploring |
-| RA-069 | harness/profile/boot/products.py | Seam mounts via Context.__dict__ backdoor | Explicit cordis capability or uniform ctx.provide | Seam stops depending on framework private layout | Worth exploring |
-| RA-070 | lca_kernel/boot/lifecycle.py, lifespan.py | Fail-loud uses stdlib logging, breaking structlog-only | structlog in fallback or documented dual-channel | One diagnostic channel for on-call | Worth exploring |
-| RA-071 | infrastructure/connectors/core/vault.py | suppress(Exception) -> [] lies about connection state | Structured warning + fail-loud/degraded marker | Corruption surfaces early | Worth exploring |
-| RA-072 | doctor/compile_dry_run.py | except (ValueError, TypeError) misdiagnoses impl bugs as "profile invalid" | Narrow to named domain errors; unexpected -> DoctorCompileError | Doctor stops blaming the user's YAML for its own bugs | Worth exploring |
-| RA-073 | doctor/plugin_shape.py, scripts/check_plugin_shape.py | Three kind tables second-model script semantics vs own docstring | Machine contract from the script; doctor passes through | No human sync point; new kinds can't silently degrade | Worth exploring |
-| RA-074 | lca_kernel/boot/closure.py, profile/boot/runtime_closure.py, lca_kernel/plan/{resolve,declarations,source}.py | ADR-0115 inverted migration: deprecation warnings name nonexistent modules; K4 chain never executes | Architecture decision: finish or abandon honestly | Policy either enforced or gone — no middle state | Worth exploring |
-| RA-075 | infrastructure/skills/frontmatter/frontmatter.py, disk/store.py | Two syntax-inconsistent parsers scan the same text | One parser -> full dict | `references` fix-class patches stop recurring | Worth exploring |
-| RA-076 | disk/store.py, plugins/assistant/skill/overlay/gating.py | safe_rel_path: store normalizes, gate rejects — same input, opposite policies | One predicate for both paths | Traversal policy auditable in one place | Worth exploring |
-| RA-077 | infrastructure/skills/http/importer.py | Byte-surgery inserts `references: []` to dodge fail-loud | Fail loud, or explicit recorded parameter | Both install paths share semantics; pulled bytes stay intact | Worth exploring |
-| RA-078 | disk/store.py, infrastructure/skills/settings/settings.py | __init__ mkdir + lru_cache make timing load-bearing | Lazy mkdir; lifecycle-scoped settings | Construction stops being an implicit correctness precondition | Worth exploring |
-| RA-079 | plugins/assistant/skill/overlay/overlay.py | Unit tests only ever walk the log-degradation EP branch | Inject fake emitter, assert EP descriptors | Production EP branch finally pinned | Worth exploring |
-| RA-080 | overlay/importing.py, overlay.py, bundled/bundled.py | Three rglob implementations with drifting traversal details | One walk seam in disk/store.py | Traversal safety converges | Worth exploring |
+| RA-081 | computer/box_accessor.py, box_sandbox_adapter.py, tools/box/tool.py, box_port.py | Sandbox boundary has two owners; containment correctness diverged — production path has a prefix-escape bug | Converge to one gate (relative_to semantics); one atomic-write; one hard-gate copy; resolve vestigial adapter | Security invariants in one place; new box ops inherit the gate; tests pin the production path | **Strong** |
+| RA-082 | agent/cognitive_agent.py, agent/team_handle.py | Run-lifecycle envelope hand-written twice, outcome-translation rules duplicated; binder Protocol defined verbatim twice | One envelope seam; carriers supply started/finished factories + outcome policy | Outcome matrix testable without driving agent AND team; 3rd carrier reuses the envelope | **Strong** |
+| RA-083 | cli/service/service.py | Protocol types and 7 subprocess probing primitives share "the core abstraction"; service/ vs services/ naming collision | service.py → pure protocol; primitives → honestly-named probing deep module | Gotcha set discoverable + fake-testable; protocol half becomes pure interface | Worth exploring |
+| RA-084 | cli/steps/steps.py, service.py, services/kernel/serve.py, services/daemon/daemon.py | Service protocol bypassed: isinstance downcast for .spawner(), cross-module private _cli_* calls; CliShippingService single-impl pseudo-protocol | Promote respawn + CLI-fingerprint to first-class protocol capabilities | Interface becomes the test surface again; future services hang capabilities on protocol bits | **Strong** |
+| RA-085 | contracts/cognition/body/tools/registry.py | audit_tool_manifest_effects: zero callers, body returns immediately; __all__ missing 2 names; whitelist literal ×2 | Delete dead fn; complete __all__; one _AUDITED_DEFAULT_TOOLS constant | Module shows its real enforcement face; 5th audited tool can't diverge the two sites | **Strong** |
+| RA-086 | cognition/body/tools/tool_batch_executor.py, contracts/.../registry.py | Executor re-implements select_effect inline (getattr through manifest.api[0], silent "external" fallback, duplicated closed-set check); registry's fail-loud select_effect has zero production callers | Converge on a registry-level tool-effects seam; executor deletes its helpers | Effects semantics (closed-set check + multi-API rule) in one place; taxonomy gains a 4th value in one edit | **Strong** |
+| RA-087 | protocols/act/tool/batch_execution.py, execution_policy.py, tool_batch_executor.py | PARALLEL-decision logic lives in select_mode_with_audit — never declared by the protocol; one getattr probe + one implementer = hypothetical seam; third-party policies silently degrade to SEQUENTIAL | Declare the audit channel (extension protocol or enriched entry); isinstance dispatch, no probing | Future batch policies implement a declared interface; "policy needs which facts" lives in the protocol | **Strong** |
+| RA-088 | lca_kernel/boot/lifespan.py, plugins/transport/webserver/server/server.py | make_lifespan docstring promises "no plugin/cli details" but imports the webserver dispatcher and starts the cron daemon; only production caller is server.py; fail-soft except in fail-loud boot | Cron start/stop → webserver plugin setup; make_lifespan → pure ASGI adapter | "Production needs cron" (ADR-0268) lives where its deps live; lifespan reusable without dragging cron along | **Strong** |
+| RA-089 | runtime/loop/runtime_loop.py, runtime/projection/result_projection.py, protocols/vocal/protocol.py, infrastructure/vocal/gate.py | _run_driver getattr-bypasses the declared is_awaiting_widget(); two sites sniff gate internals ("widget"/"message_id"/"content" strings); swap the gate → silent no-op | Typed vocal projection seam (pending_widget_approval(), visible texts); impl by gate classes | Message-shape knowledge back with its owner; driver loses vocal vocabulary; gate projection unit-testable | **Strong** |
+| RA-090 | runtime/loop/runtime_loop.py, application/initiative/hooks.py | transcript_features fallback derivation (~15 lines) lives in _run_driver.finally; sole consumer is evaluate_initiative; duck-reads prior_turns on a typed dataclass; untestable without a full run | Move derivation next to its consumer; driver = 3-line call | Role-counting rules get pure unit tests; initiative evolution never touches the run driver | **Strong** |
+| RA-091 | cognition/body/tools/tool_wire_gate.py | Two wire-block Observation constructors share identical shape + verbatim model-facing guidance text; trigger conditions differ | One private constructor seam; gates supply condition+status+reason | Guidance text single-sourced; 3rd gate reuses the shape; extra-contract asserted once | Worth exploring |
+| RA-092 | models/cognition/prompt_assembly.py, harness/memory/events.py, brain/prompt/skill_router.py, sections/assembler.py | "Why this template" has two vocabularies: closed SelectorDecisionPath (trace) vs bare str (SkillRouted); KeywordSkillRouter emits values outside the closed set | One vocabulary across channels; contract test: router-emitted values ∈ closed set | New routing strategies get consistent attribution for free; coerce fallback documented | Worth exploring |
+| RA-093 | cognition/brain/sections/types.py, models/core/perceive/perception.py | kind→payload-type knowledge split 3 ways (docstring, 4 helpers' isinstance checks, ItemKind Literal); ContextManifest.by_kind exists but is bypassed by _manifest_items | Typed kind→payload accessor on the manifest; helpers converge | New kinds get one pairing point; payload-type contracts testable per kind | Worth exploring |
+| RA-094 | cognition/brain/sections/assembler.py | Catalog seam typed `object` while BrainPromptCatalog exists; getattr duck-probing; _catalog_skill_count docstring promises 3 fallbacks, implements 1 | Type the seam; delete probing; fix doc (or add the fallback — explicit choice) | "What the assembler needs from catalog" moves from probe code into the type declaration | Worth exploring |
+| RA-095 | infrastructure/tools/seam/file_ref_args.py, computer/sandbox/computer.py | Seam claims "every path arg flows through resolve_path_arg"; tools/ has zero callers; only read_file wires it (write/edit/list bypass) | Explicit choice: universal choke point, or honest read-path-only scoping | Path-resolution policy decided in one place; wiring scope pinned by tests | Worth exploring |
+| RA-096 | agent/cognitive_agent.py | _enrich_run_context hand-rebuilds all 8 RunContext fields; the 9th field will be silently dropped | dataclasses.replace (keeping defensive copies of context_refs/extra) | "Fill default deadline" = one expression; future fields ride along | Worth exploring |
+
+Diversity quota: duplication-class = RA-082, RA-085(whitelist part), RA-091 → 3/16, within limit.
+Friction-walk-sourced (shallow/leaky-seam/testability): RA-081, RA-083, RA-084, RA-086,
+RA-087, RA-088, RA-089, RA-090, RA-092, RA-093, RA-094, RA-095 — quota satisfied.
+
+## Self-grilling (per candidate)
+
+### RA-081 box boundary
+- Constraints: ADR-0248 §3.2 (sandbox root, no sudo/su privilege); ADR-0251 decision 1
+  (atomic write tmp+fsync+os.replace) — semantics unchanged; tools/box sync-via-to_thread
+  shape kept; BoxExecutionPort contract + existing tests unbroken.
+- Dependencies: tools/box/tool.py (4 tool classes + build_box_tools) → BoxAccessor;
+  execution_environment.py lazily constructs BoxAccessor(); LocalBoxAdapter ←
+  BoxAccessor.__init__ (vestigial) + tests; OnlyboxesBoxAdapter/get_box_adapter ← tests only.
+- Shape: deep gate module — `contain(path) -> Path` (relative_to, escape → PermissionError),
+  `atomic_write(path, content)` (ADR-0251 full set); BoxAccessor + LocalBoxAdapter become
+  thin callers; `self.adapter` used or deleted.
+- Test survival: test_box_sandbox_adapter.py pins adapter behavior (keep); NEW pin:
+  BoxAccessor.resolve_path rejects sibling-prefix escapes — this is a behavior change,
+  record as bugfix not pure refactor; tools/box call-path tests verify delegation parity.
+- Deletion verdict: concentrates — security invariants converge in one gate.
+
+### RA-082 run-lifecycle envelope
+- Constraints: journal payloads (AgentRunStarted/Finished vs TeamRunStarted/Finished)
+  byte-identical — tests/scenario/journal_* pin them; ADR-0037 (team handle = narrative
+  edge); RA-046 (None-task fail-loud, agent-only); RA-023 (LoopObligationExceededError→failed,
+  agent-only); binder Protocol from ADR-0186; todo-38 hot-path comment — do NOT merge the
+  cheap active_publish_session() checks into one "optimization".
+- Dependencies: callers of .run() are transport/composer (external behavior unchanged);
+  internals call lca.loop.emit.cognitive.agent_spawn, observability, session.bindings.
+- Shape: new module under lca/agent/ exposing the envelope: inputs = started-event
+  factory + finished-event factory + execute callable + outcome-translation policy
+  (agent flavor has Cancelled/LoopObligation branches, team flavor doesn't); output = Result.
+- Test survival: team_1/test_team_modes_scripted.py, journal_0/*, carrier_terminal_observation —
+  must stay green; NEW: table-driven outcome-matrix tests (success/cancelled/failed/
+  loop-obligation × agent/team), currently unwritable.
+- Deletion verdict: concentrates — the outcome-translation rules (exit paths × carriers)
+  are the real complexity; converging them is not moving lines.
+
+### RA-083 service.py split
+- Constraints: 7 primitives' probing semantics (fallback order, timeouts, listening-only,
+  health-body rule) — production experience, NOT ONE WORD changes; Service protocol public
+  shape unchanged (registry/steps/services/* depend on it).
+- Dependencies: primitives ← services/{lobehub,kernel/*,daemon,infra,onlyboxes},
+  commands/runs/workflow.py, host_runtime/providers/user_cli.py, console.py, steps.py;
+  protocol types ← registry.py, services/*.
+- Shape: service.py shrinks to pure protocol (Service/ServiceStatus/HealthCheck/ServiceState
+  + RA-084's disposition of CliShippingService); new module = "host probing with production
+  gotchas", interface simple (pid_alive, http_ready), implementation deep — textbook deep module.
+- Test survival: primitives currently integration-only; pure move, update import paths;
+  NEW: fake-subprocess tests pin fallback semantics (lsof missing → ss).
+- Deletion verdict: concentrates — gotcha set centralized; protocol half becomes pure interface.
+
+### RA-084 Service capabilities
+- Constraints: ADR-0119 decision 4 (lca-ops never manages LCA processes; kernel_serve does
+  state/heal, heal may self-respawn); Service idempotency semantics; all lca-ops command
+  behavior unchanged; do NOT invent a second CliShippingService impl for "generality".
+- Dependencies: 17 register_step fns → ctx.registry (ServiceRegistry, built by
+  services/__init__.py::build_registry) → protocol; commands/runs/services.py dispatches by
+  string step name; protocol ← registry.py; CliShippingService ← steps.py + daemon.py;
+  KernelServeService.spawner ← steps.py only.
+- Shape: Service protocol grows explicit capability faces (respawn, deployment-fingerprint);
+  steps.py zero downcast, zero private calls; mechanical wrappers may converge to single
+  verb→protocol-method dispatch.
+- Test survival: stack.heal/daemon.ensure behavior (spawn-failure actionable assembly,
+  fingerprint logic) must hold; NEW: pure-protocol fakes drive stack_heal (downcast dead)
+  and prove privates untouched.
+- Deletion verdict: concentrates — two real capability concepts surface at the protocol
+  layer instead of hiding in caller type-gymnastics.
+
+### RA-085 registry cleanup
+- Constraints: ToolEffectsDeclarationError fail-loud semantics unchanged; EFFECTS_UNSET
+  sentinel purpose (distinguish "kwarg not passed" vs "explicit external") kept.
+- Dependencies: only test_registry_effects.py; zero production callers of the dead fn;
+  audit happens at bundle registration via register_manifest_with_audit.
+- Shape: registry.py keeps 4 live public functions + 1 constant; whitelist becomes
+  _AUDITED_DEFAULT_TOOLS.
+- Test survival: test_registry_effects.py fully green (deleted fn had no callers;
+  __all__ completion lets tests use normal imports).
+- Deletion verdict: concentrates — deleting the dead fn makes the module's real
+  enforcement face visible.
+
+### RA-086 select_effect convergence
+- Constraints: ToolEffects 3-value closed set is ADR-bound (new values need ADR — do not
+  expand); PR-3 conservative default (unaudited → sequential) kept.
+- Dependencies: _resolve_tool_effects only called by _select_mode_with_optional_audit;
+  select_effect currently test-only.
+- Shape: registry.py gains a tool-level effects-resolution function (Tool|manifest →
+  ToolEffects); executor deletes its two private helpers.
+- Test survival: test_registry_effects.py pins select_effect fail-loud;
+  test_tool_batch_executor_parallel.py pins read+concurrent→PARALLEL; NEW: illegal-effects
+  tool on the executor path raises (explicit, not silent sequential).
+- Deletion verdict: concentrates — manifest-structure knowledge moves into the taxonomy module.
+
+### RA-087 audit protocol
+- Constraints: ToolBatchExecutionPolicy is a published extension point —
+  select_mode signature frozen; ADR-0232 PARALLEL semantics (read + grant.concurrent) frozen;
+  existing tests unbroken.
+- Dependencies: executor.execute → policy; policy ← default_tool_batch_policy(),
+  _resolve_tool_effects/_resolve_tool_grant; ReadOnlyToolBatchEntry flows executor↔policy.
+- Shape: protocol gains an explicit audit-aware extension (or entry type enriched);
+  executor branches on isinstance, not getattr.
+- Test survival: parallel tests pin current behavior; NEW: protocol-targeted tests —
+  a base-protocol-only policy gets explicit (non-silent) behavior.
+- Deletion verdict: concentrates — "the audit channel exists" moves from scattered
+  getattr/comments into the protocol definition.
+
+### RA-088 lifespan cron
+- Constraints: ADR-0119 decisions 3/4 (lifespan protocol shape; acyclic plugin/cli
+  direction — this change makes the code match the ADR text); ADR-0268 (cron is a
+  production-runtime need — behavior kept); ADR-0115 closure discipline (K3 untouched);
+  _FakeCtx test semantics preserved, relocated.
+- Dependencies: make_lifespan ← server.py:156 (production), test_cron_lifespan_integration.py,
+  tests/support/webserver_app.py (mimics the protocol shape, not cron behavior — confirm);
+  moved code needs MultiAssistantCronStore, CronDaemonService, get_lca_home, LcaRunHandoffDispatcher.
+- Shape: make_lifespan(ctx) keeps signature; body = app.state.ctx mount + yield + shutdown
+  cleanup (~15 lines, an honest protocol impl); cron start becomes a named step in
+  server.py setup (input ctx/app, output app.state.cron_daemon).
+- Test survival: cron integration test follows the behavior (plugin setup path);
+  tests/boot/ must not notice cron.
+- Deletion verdict: for lifespan = just moves (purer); for plugin = concentrates
+  (composition returns where its deps live).
+
+### RA-089 widget seam
+- Constraints: ADR-0248 (vocal runtime + hard gate; INPUT_REQUIRED pause facts owned by
+  RuntimeResultFinalizer ONLY — driver sets state + extra["approval_request"], never emits
+  pause events, else double-append); approval_request {type,message_id,content,options} is a
+  frontend contract (loop_drivers.py:130 → session.approval_request → projection.py:49) —
+  byte-identical; VocalGateProtocol stays runtime_checkable-compatible.
+- Dependencies: _run_driver (sole production writer of approval_request[type/widget]);
+  result_projection final-text fallback; gate.py's two concrete classes; webserver session
+  lifecycle (reads approval_request).
+- Shape: 1–2 query methods on the vocal protocol (pending_widget_approval() →
+  WidgetApproval | None, delivered visible texts); driver/projection consume the protocol;
+  payload assembly stays in the driver (UI shape is a transport contract).
+- Test survival: vocal gate unit tests; carrier_terminal_observation (approval_request→session
+  chain); NEW: gate-projection shape tests + driver tests with stub-protocol gate.
+- Deletion verdict: concentrates — the leak (driver sniffing gate internals) is deleted;
+  shape knowledge concentrates with its owner.
+
+### RA-090 transcript_features
+- Constraints: RunContext is read-only input, not an output bus (per comments) — result
+  goes to Result.extra["initiative_offer"]; ADR-0248 slice 8 (successful runs feed
+  InitiativeHook transcript_features); extra["transcript_features"] caller-override semantics kept.
+- Dependencies: _run_driver → evaluate_initiative; RunContext.prior_turns (typed);
+  downstream readers of Result.extra["initiative_offer"] if any.
+- Shape: lca/application/initiative/ gains the derivation fn: (prior_turns, extra_override)
+  → features dict; driver = one call.
+- Test survival: existing initiative_offer pins; NEW: pure unit tests (empty/mixed/override).
+- Deletion verdict: concentrates — derivation rules move in with their only consumer.
+
+### RA-091 wire-block seam
+- Constraints: ADR-0047 trigger semantics (ToolCall native fields first, extra fallback);
+  unexposed_tool_block_observation defer semantics untouched.
+- Dependencies: callers = UseToolOperation (body/actions side); required_arguments tolerant
+  schema reading kept.
+- Shape: private _wire_block_observation(status, reason, ...) in tool_wire_gate.py;
+  public signatures unchanged.
+- Test survival: existing trigger-condition tests; NEW: parameterized test asserting both
+  gates share the blocking-observation extra contract.
+- Deletion verdict: just moves (two public fns → one private seam) — acceptable convergence.
+
+### RA-092 decision vocabulary
+- Constraints: PromptTrace.selector_decision_path is str-typed; reflection_events.py depends
+  on _coerce_decision_path fallback; ADR-0175 D2 trace structure intact.
+- Dependencies: reasoner.py ← normalize_selector_result; skill_router.py → spine envelope +
+  SkillEventSink side channel; reasoner_prompt.py hook ← trace.
+- Shape: shared decision-reason vocabulary module (or SkillRouted.decision_path folded into
+  SelectorDecisionPath); router protocols document their reason-carrying.
+- Test survival: test_skill_router.py keyword behavior; NEW: router-emitted values ∈ closed set.
+- Deletion verdict: concentrates — "reason" gets one source of truth.
+
+### RA-093 manifest accessor
+- Constraints: ContextManifest is a cross-layer contract (perceive→reasoner) — additive
+  only; ItemKind closed-set discipline kept; _manifest_items None-tolerance kept.
+- Dependencies: types.py's 4 helpers ← stateful section impls; by_kind ← perception itself.
+- Shape: typed accessor (payload_of(kind)) near perception.py; types.py helpers become thin
+  wrappers or are deleted.
+- Test survival: existing prompt-render tests; NEW: per-kind payload-type contract tests.
+- Deletion verdict: concentrates — query+assert logic of four lookalike helpers in one place.
+
+### RA-094 catalog typing
+- Constraints: _catalog()'s INTENTIONAL swallow (not-ready → treated absent) is deliberate —
+  not fail-loud; ADR-0185 AvailableSkillsReason derivation unchanged.
+- Dependencies: catalog_provider injected by lca/plugins/prompts/assembler.py at composition;
+  available_skills_count → PromptTrace → narrative/viewer.
+- Shape: SectionManifestPromptAssembler.catalog_provider: BrainPromptCatalog | None;
+  _catalog_skill_count takes the Protocol type, no getattr.
+- Test survival: existing no-catalog→0 compat tests; NEW: bad-shape catalog behavior explicit.
+- Deletion verdict: concentrates — seam shape owned by the type declaration.
+
+### RA-095 path-arg seam
+- Constraints: ADR-0121 PR-C /files/<aid> interception semantics; 3 input shapes +
+  allowed_refs scoping; UnresolvedFileRefError→passthrough fallback — all unchanged.
+- Dependencies: sole production caller _resolve_path_arg_or_passthrough (computer.py, lazy
+  import vs cycles); test_file_ref_args.py; docstring's universal claim (currently false).
+- Shape: (a) one path-entry fn shared by all guest ops; or (b) seam renamed/re-scoped to
+  read-path. Either way: one place decides.
+- Test survival: adapter tests kept; NEW: pin on the wiring scope (a or b).
+- Deletion verdict: (b) = just moves (honest docstring); (a) = concentrates.
+
+### RA-096 dataclasses.replace
+- Constraints: keep defensive copies — list(context_refs), dict(extra) — naive replace()
+  would alias originals and change downstream-mutation behavior; deadline short-circuit
+  semantics unchanged.
+- Dependencies: CognitiveAgent.run → _enrich_run_context; get_run_workspace() /
+  effective_agent_wall_clock.
+- Shape: 3–5 lines: replace(ctx, deadline=..., context_refs=list(...), extra=dict(...)).
+- Test survival: existing deadline-propagation tests; NEW: no-dropped-field regression
+  (assert against fields()).
+- Deletion verdict: concentrates — the default-deadline rule becomes one expression.
 
 ## Top recommendation
 
-**Start with RA-051.** The doctor is the codebase's flagship "trust me, I'll check
-your profile" tool, and in production it runs 2 of its 6 documented passes — the
-other four are structurally dead behind a getattr that can never succeed, while
-the test suite patches the seam and stays green. That "tested green, half-dead
-in production" shape is exactly the class of rot that bit RA-033 (tools silently
-never executing). RA-051's fix (real projections, or honest deletion) forces the
-one true story about what doctor does — and it shares a file with RA-065, so the
-two optimize naturally together. RA-053 (the CLI isn't even mounted) and RA-066
-(trust classification) are the runners-up on the "production differs from
-promise" axis.
+**RA-081 first**: the box sandbox boundary is the only candidate where a *security*
+bug rides the production path today (prefix-escape in BoxAccessor.resolve_path while
+the correct relative_to implementation sits in the test-covered but
+production-unused adapter) — locality failure = security failure, and the fix shape
+is already proven in-tree. Runner-up: **RA-082** (run-lifecycle envelope) — the
+largest structural duplication, and outcome-translation rules are the most
+edit-fragile part of the agent core.
 
-Diversity quota: satisfied — all 30 stories come from the friction walk
-(shallow modules, leaky seams, no-locality call-site bugs, testability gaps);
-zero pure-duplication stories.
+Dependency order for the optimize loop: RA-083 before RA-084 (split the module
+before growing its protocol); RA-085 before RA-086 before RA-087 (registry cleanup
+→ executor convergence → protocol promotion); RA-082 before RA-096 (envelope move
+first, replace() after).
+
+## Learnings for future iterations
+
+- `getattr(x, "method", lambda: default)()` on a protocol-declared method is a
+  review smell worth grepping for: it means the protocol exists but the caller
+  doesn't trust it (RA-089) or the capability was never declared (RA-087).
+- When two implementations of a safety invariant exist, check the *production*
+  call path first: the tested one may be the unused one (RA-081 — test coverage
+  on the wrong path is worse than no coverage because it looks safe).
+- Docstring-vs-code verbatim contradictions (lifespan.py "no plugin details" vs
+  hard import) are cheap to find and strong evidence — read the module docstring
+  first, then check every claim against the body (RA-088).
+- Assessment evidence goes stale within the same round: RA-083/086/087 share
+  registry.py + executor; implement in dependency order and re-grep before each.
+- `str(path).startswith(str(root))` is a containment bug until proven otherwise;
+  `relative_to` is the correct idiom — grep the tree for more startswith-containments.

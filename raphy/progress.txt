@@ -2023,3 +2023,20 @@
     跨 story 的 policy 依赖要按顺序做。
 - Tests: 新 pin 文件 5 passed；skills/overlay/global_link/materialize_link/
   invariants/merged_store 共 162 passed。ruff 全过。
+
+
+## 2026-10-09 10:35 CST - Round 14 assess（branch raphy/arch-20261009-1008，基线 0127c7120）
+
+- 上下文：上一轮 raphy/arch-20261009-0107 已合 main（merge 0127c7120），RA-051~RA-080 全 done，无残留；80 stories 全 done（1 dropped）。
+- 摩擦漫步三区拆给 3 个全新会话子任务（5 问必答、端到端精读，只读零写入）：agent core runtime（agent/ 397行 cognitive_agent + runtime/loop 605行 runtime_loop + lca_kernel/boot 全读）、cognition+contracts（body 工具分发链 + prompt 组装 + atoms 小模块）、infrastructure 余块（cli services 簇 293行 steps.py + box 沙箱边界 + tools path seam）。禁区全部遵守（preamble.py、gate_chain_strategy.py 未读、ralph Round 2、lca-1000 迁移领地、typed ports）。
+- **运行时验证（实跑，LLM_API_KEY=<redacted>
+- **16 个 stories 入 prd.json（RA-081~RA-096）**：Strong 10 个（RA-081 box 沙箱边界双实现+前缀逃逸真 bug；RA-082 CognitiveAgent/TeamHandle run-lifecycle 包络逐行重复；RA-084 Service 协议被 downcast+跨模块私有调用架空；RA-085 registry.py 死审计函数+__all__ 缺口+白名单双写；RA-086 executor 绕过 select_effect 自建 effects 解析；RA-087 select_mode_with_audit 未声明的 getattr 探测；RA-088 cron daemon 藏在 make_lifespan（docstring 自相矛盾）；RA-089 widget 待审批两处 getattr/dict 嗅探；RA-090 transcript_features 推导住错 module），Worth exploring 6 个（RA-083 service.py 协议+探测原语混装；RA-091 wire-block Observation 双构造器；RA-092 SelectorDecisionPath 双词汇表；RA-093 ContextManifest kind→payload 三处散落；RA-094 assembler catalog 缝 object 类型+doc/impl 漂移；RA-095 path-arg seam 半接线；RA-096 _enrich_run_context 逐字段重建）。
+- Top 推荐 **RA-081**：locality 缺失直接等于安全缺失——生产流量走有前缀逃逸漏洞的 BoxAccessor.resolve_path，正确的 relative_to 实现躺在测试覆盖但生产不用的 adapter 里；修法已在树内验证。Runner-up：RA-082（outcome 翻译规则是最易改崩的部分）。
+- 依赖顺序：RA-083→RA-084（先拆模块再长协议）；RA-085→RA-086→RA-087（registry 清理→executor 收敛→协议扶正）；RA-082→RA-096（先搬包络再 replace）。
+- diversity quota 满足：duplication 类 3/16（RA-082、RA-085 白名单部分、RA-091）；friction walk 来源 12 个。
+- **Learnings for future iterations:**
+  - `getattr(x, "method", lambda: default)()` 出现在协议已声明方法上时，是"调用方不信任协议"的审查气味——grep 可批量找（RA-087/089 同类）。
+  - 安全 invariant 有双实现时，先查生产调用路径：测试覆盖的可能是没用的那条（RA-081——盖错路径的覆盖比没覆盖更危险，因为它看起来安全）。
+  - docstring 与代码逐字矛盾是最便宜的强证据：先读模块 docstring，再逐条核对 body（RA-088）。
+  - `str(path).startswith(str(root))` 在 containment 场景下默认按 bug 处理，正确 idiom 是 `relative_to`——全树 grep 找更多同类。
+  - 同轮 stories 共享文件时（registry.py/executor），按依赖顺序做、每动手前重 grep，评估证据会过期。

@@ -1154,6 +1154,243 @@
       "passes": true,
       "priority": 3,
       "title": "Converge the three skill-source directory walks (importing/overlay/bundled rglob trio)"
+    },
+    {
+      "acceptanceCriteria": [
+        "One containment impl with relative_to semantics (prefix-escape rejected); new pin proves BoxAccessor.resolve_path rejects a sibling-prefix path like /home/box2/evil (behavior change, record as bugfix).",
+        "One atomic-write impl (ADR-0251 tmp+fsync+os.replace); one sudo/su hard-gate copy.",
+        "self.adapter vestigial wiring resolved (used or deleted); get_box_adapter callers audited.",
+        "test_box_sandbox_adapter.py green; tools/box behavior unchanged; ruff clean."
+      ],
+      "branchName": "raphy/arch-20261009-1008",
+      "description": "As an LCA maintainer, I want ONE owner for the box sandbox boundary, because today BoxAccessor (sync, production path) and LocalBoxAdapter (async, port impl) each re-implement path containment, atomic write and sudo/su hard-gates — and their correctness has diverged: BoxAccessor.resolve_path uses str(resolved).startswith(str(root_dir)) (box_accessor.py:37), which lets /home/box2/evil escape a /home/box root; LocalBoxAdapter._resolve_safe_path uses relative_to (correct). Production traffic (tools/box/tool.py:67/124/168 via asyncio.to_thread) goes through the vulnerable path. Also: two byte-identical atomic-write copies, two identical sudo/su hard-gate copies (117 vs 229 lines), and BoxAccessor.__init__ lazily imports LocalBoxAdapter into self.adapter which is written 3x and never read (vestigial; BoxExecutionPort is a hypothetical seam on the sync path). get_box_adapter has zero production callers (tests only). Deletion test: concentrates — security invariants converge in one gate.",
+      "id": "RA-081",
+      "notes": "Source: Round 14 friction walk, infra zone (Strong; leaky seam + real security bug on production path). Constraints: ADR-0248 §3.2 sandbox root + no sudo/su; ADR-0251 atomic write; tools/box sync-via-to_thread shape kept; BoxExecutionPort contract intact.",
+      "passes": false,
+      "priority": 1,
+      "title": "Converge the box sandbox boundary; fix prefix-escape bug in BoxAccessor"
+    },
+    {
+      "acceptanceCriteria": [
+        "One envelope seam; agent and team supply started/finished factories + outcome-translation policy (agent keeps Cancelled/LoopObligation branches, team does not).",
+        "Journal payloads byte-identical: tests/scenario/team_1/test_team_modes_scripted.py, tests/scenario/journal_0/*, tests/transport/test_carrier_terminal_observation.py green.",
+        "_RunEventSessionBinder defined once.",
+        "New table-driven unit tests for the outcome matrix (success/cancelled/failed/loop-obligation × agent/team); ruff clean."
+      ],
+      "branchName": "raphy/arch-20261009-1008",
+      "description": "As an LCA maintainer, I want ONE run-lifecycle envelope seam, because lca/agent/cognitive_agent.py (_run_lifecycle/_run_lifecycle_body) and lca/agent/team_handle.py (run/_run_body) each hand-write a structurally line-corresponding iteration envelope: emit_agent_loop_iteration_start → bind_backends + run_scope → active_publish_session() cheap check (same todo-38 comment verbatim) → record Started → five mutable locals (finish_status/finish_output/finish_steps/finish_error/iteration_outcome) → try/execute/except/finally outcome translation → record Finished → emit end. Even the 3-line _RunEventSessionBinder Protocol is defined verbatim twice. The two outcome-translation rules (CancelledError routing, Exception routing) are hand-written twice — editing one side will forget the other. Deletion test: concentrates — the real complexity is the outcome-translation matrix (exit paths × carriers), which converges to one place.",
+      "id": "RA-082",
+      "notes": "Source: Round 14 friction walk, agent-runtime zone (Strong; structural duplication of the most fragile part). Constraints: journal payloads byte-identical; ADR-0037 team semantics; RA-046/RA-023 agent-only branches; todo-38 hot-path comment (do not 'optimize' the cheap check away).",
+      "passes": false,
+      "priority": 1,
+      "title": "Converge the CognitiveAgent/TeamHandle run-lifecycle envelope into one seam"
+    },
+    {
+      "acceptanceCriteria": [
+        "service.py holds only protocol types (Service/ServiceStatus/HealthCheck/ServiceState + CliShippingService disposition per RA-084 dependency).",
+        "7 primitives moved to an honestly-named deep module (host/process probing); probing semantics byte-identical (fallback order, timeouts, listening-only, health-body rule).",
+        "All import sites updated; service/ vs services/ naming disambiguated on the import side.",
+        "New fake-subprocess tests pin fallback semantics (lsof missing → ss); ruff clean."
+      ],
+      "branchName": "raphy/arch-20261009-1008",
+      "description": "As an LCA maintainer, I want service.py to be only the Service protocol, because its second half is 7 bare subprocess primitives (kill_tree/free_port/pid_alive/pid_on_port/pid_on_listening_port/http_ready/http_code/health_body_ok) encoding production gotchas (fuser stray-PID → lsof/ss fallback; listening-only semantics; /health must be 200 + body status==ok). Two cohesion axes share one module name ('the core abstraction'), and cli/service/ (singular) vs cli/services/ (plural) are sibling dirs — grep 'service' hits three different things. Deletion test: concentrates — the gotcha set becomes a discoverable, testable deep module; the protocol half becomes a pure interface.",
+      "id": "RA-083",
+      "notes": "Source: Round 14 friction walk, infra zone (Worth exploring; discoverability + testability, no leak fix). Do BEFORE RA-084. Constraints: probing semantics must not change by one word; Service protocol public shape unchanged.",
+      "passes": false,
+      "priority": 1,
+      "title": "Split cli/service/service.py: pure protocol vs host-probing deep module"
+    },
+    {
+      "acceptanceCriteria": [
+        "No isinstance downcast in steps.py; no cross-module calls to underscore-private methods.",
+        "Respawn capability and CLI-deployment-fingerprint capability are first-class protocol members (CliShippingService either promoted to a public capability protocol or folded into Service).",
+        "stack_heal/daemon_ensure driven in tests by pure protocol fakes (prove the downcast is dead, privates untouched).",
+        "All lca-ops command behavior unchanged; ruff clean."
+      ],
+      "branchName": "raphy/arch-20261009-1008",
+      "description": "As an LCA maintainer, I want the Service protocol to declare the capabilities CLI actually needs, because today stack_heal (steps.py:234) isinstance-downcasts Service to KernelServeService to reach .spawner() (with a TypeError guard apologizing for the dishonest seam), and daemon_ensure (steps.py:113) cross-module calls the underscore-private _cli_deployed()/_cli_source_changed() on CliShippingService — the only cross-module caller repo-wide of those privates. CliShippingService has a single implementation (DaemonService) whose docstring says 'no other service may type-check against this': a single-impl, private-method, cross-module-called pseudo-protocol. 14 mechanical step wrappers + step_map string dispatch = two adapters over one seam. Consequence: 'The interface is NOT the test surface' — testing stack_heal requires a KernelServeService-shaped fake, not a Service-protocol fake.",
+      "id": "RA-084",
+      "notes": "Source: Round 14 friction walk, infra zone (Strong; seam leak: protocol bypassed by callers). Do AFTER RA-083. Constraints: ADR-0119 decision 4 (lca-ops does not manage LCA processes; kernel_serve only state/heal); Service idempotency semantics; do not invent a second CliShippingService implementation for 'generality'.",
+      "passes": false,
+      "priority": 1,
+      "title": "Promote Service protocol capabilities: kill the isinstance downcast and cross-module private calls"
+    },
+    {
+      "acceptanceCriteria": [
+        "audit_tool_manifest_effects deleted (zero callers confirmed by grep).",
+        "__all__ covers all public functions incl. register_manifest_with_audit and EFFECTS_UNSET; test file uses normal imports.",
+        "Whitelist converges to one module-level constant (_AUDITED_DEFAULT_TOOLS).",
+        "test_registry_effects.py fully green; ToolEffectsDeclarationError fail-loud semantics unchanged; EFFECTS_UNSET sentinel semantics kept; ruff clean."
+      ],
+      "branchName": "raphy/arch-20261009-1008",
+      "description": "As an LCA maintainer, I want lca/contracts/cognition/body/tools/registry.py to show only its real enforcement surface, because: (1) audit_tool_manifest_effects has zero callers repo-wide and its body returns immediately ('best-effort logs a warning only' — it never even logs; RA-061-class dead code); (2) __all__ omits register_manifest_with_audit and EFFECTS_UNSET, so tests import them by full path (test_registry_effects.py:131) — the export table disagrees with the public API; (3) the hardcoded whitelist {'bash','file-write','profile_apply','profile_diff'} is written verbatim twice (assert_effects_declared + register_manifest_with_audit) — a future 5th audited tool risks updating one and diverging the other. Deletion test: concentrates — the module's actual enforcement face becomes visible.",
+      "id": "RA-085",
+      "notes": "Source: Round 14 friction walk, cognition zone (Strong; dead code + export gap + mechanical duplication in one file). Do BEFORE RA-086.",
+      "passes": false,
+      "priority": 1,
+      "title": "Clean registry.py: delete dead audit fn, complete __all__, converge whitelist"
+    },
+    {
+      "acceptanceCriteria": [
+        "Executor calls a registry-level tool-effects resolution seam (input Tool or manifest → ToolEffects); _resolve_tool_effects/_resolve_tool_grant helpers deleted from the executor.",
+        "No inline ('read','write','external') membership check in the executor.",
+        "Illegal effects on the executor path fail loud instead of silently becoming sequential (behavior change, record explicitly).",
+        "test_registry_effects.py and test_tool_batch_executor_parallel.py green (read+concurrent→PARALLEL preserved); new pin: illegal-effects tool on executor path raises; ruff clean."
+      ],
+      "branchName": "raphy/arch-20261009-1008",
+      "description": "As an LCA maintainer, I want tool-level effects resolution to live in registry.py (the taxonomy's home), because registry.py declares select_effect(api) as a fail-loud enforcement point with zero production callers, while ToolBatchExecutor._resolve_tool_effects re-implements it inline: getattr chain through tool.manifest.api[0], illegal values silently fall back to 'external' (registry semantics = raise), and a ('read','write','external') membership check duplicates _VALID_EFFECTS. Two drifts: failure policy (silent vs fail-loud) and the 'first API's effects represent a multi-API tool' manifest-shape decision, which lives in the executor instead of next to the taxonomy. Leaky adapter: the executor knows too much of ToolManifest's internal shape. Deletion test: concentrates — manifest-structure knowledge moves into the taxonomy module.",
+      "id": "RA-086",
+      "notes": "Source: Round 14 friction walk, cognition zone (Strong; leaky adapter, zero-caller seam vs inline copy). Do AFTER RA-085. Constraints: ToolEffects 3-value closed set is ADR-bound (new values need ADR, do not expand); PR-3 conservative default (unaudited→sequential) kept.",
+      "passes": false,
+      "priority": 1,
+      "title": "Make ToolBatchExecutor resolve tool effects through the select_effect seam"
+    },
+    {
+      "acceptanceCriteria": [
+        "Audit channel is declared: either an explicit audit-aware extension protocol the default policy declares, or ReadOnlyToolBatchEntry's enrichment facts folded into ToolBatchEntry with the probe branch deleted.",
+        "Executor dispatches via isinstance/protocol, not getattr probing.",
+        "A policy implementing only the base protocol gets explicit (non-silent) behavior; documented.",
+        "Tests target the declared protocol; select_mode signature unchanged; ADR-0232 PARALLEL semantics (read + grant.concurrent) unchanged; ruff clean."
+      ],
+      "branchName": "raphy/arch-20261009-1008",
+      "description": "As an LCA maintainer, I want the audit channel to be a first-class protocol, because the entire PARALLEL-decision logic (PR-3 / ADR-0232's core behavior) lives in select_mode_with_audit — a method the ToolBatchExecutionPolicy protocol never declares. The only consumer (ToolBatchExecutor) capability-probes it with getattr(self._policy, 'select_mode_with_audit', None); the only implementer is the default policy itself; ADR-0232 never mentions the overload. One adapter (getattr probe) + one implementer = hypothetical seam. Consequences: any third-party policy implementing only select_mode silently degrades to SEQUENTIAL with no warning; tests must call select_mode_with_audit directly (test_tool_batch_executor_parallel.py:218-246), penetrating the interface — 'The interface is the test surface' fails. Deletion test: concentrates — 'the audit channel exists' moves from scattered getattr/comments into the protocol definition.",
+      "id": "RA-087",
+      "notes": "Source: Round 14 friction walk, cognition zone (Strong; 1 probe site + 1 implementer + 0 ADR mentions + tests forced to bypass the protocol). Do AFTER RA-086. Constraints: ToolBatchExecutionPolicy is a published extension point; select_mode signature frozen.",
+      "passes": false,
+      "priority": 1,
+      "title": "Promote the audit channel to a declared protocol; delete the select_mode_with_audit getattr probe"
+    },
+    {
+      "acceptanceCriteria": [
+        "make_lifespan(ctx) keeps signature; body = mount app.state.ctx + yield + shutdown cleanup (~15 lines, an honest protocol impl).",
+        "Cron daemon start/stop is a named step in webserver plugin server setup (which owns ctx+app and may import the dispatcher); daemon start-failure policy stated explicitly (fail-loud or explicit degradation), not hidden in try/except.",
+        "Docstring honest; no getattr duck-reads on ctx for lock_dir/workspace.",
+        "test_cron_lifespan_integration.py follows the behavior (plugin setup path); ADR-0268 cron behavior preserved; tests/boot/ unaffected; ruff clean."
+      ],
+      "branchName": "raphy/arch-20261009-1008",
+      "description": "As an LCA maintainer, I want make_lifespan to be only an ASGI protocol adapter, because its module docstring promises 'no dependency on any plugin/cli implementation details' while _lifespan hard-imports lca.plugins.transport.webserver.handlers.runs.terminal.handoff_dispatch.LcaRunHandoffDispatcher and starts CronDaemonService — boot protocol-adapter layer leaking transport-plugin composition logic. The docstring also claims 'shared by both (plugin/cli)' but the only production caller is server.py:156 (lca_kernel/cli/cli.py explicitly says it does NOT mount the starlette lifespan). Secondary: getattr(ctx, 'lock_dir', None) duck-reads cordis Context; daemon start failure is swallowed by except Exception in an otherwise fail-loud boot (RA-071 echo). Deletion test: for make_lifespan it's just moves (lifespan becomes purer); for the plugin side it concentrates (composition returns where its deps live).",
+      "id": "RA-088",
+      "notes": "Source: Round 14 friction walk, agent-runtime zone (Strong; docstring-vs-code verbatim contradiction + single production caller). Constraints: ADR-0119 decisions 3/4 (lifespan protocol shape, acyclic direction); ADR-0268 (cron is a production-runtime need, behavior kept); ADR-0115 closure discipline (K3 untouched); _FakeCtx test semantics preserved, relocated.",
+      "passes": false,
+      "priority": 1,
+      "title": "Move cron daemon startup out of make_lifespan into the webserver plugin setup"
+    },
+    {
+      "acceptanceCriteria": [
+        "No getattr bypass of is_awaiting_widget in _run_driver; no 'widget'/'message_id'/'content' string sniffing in driver or projection.",
+        "Vocal protocol gains typed query(s) (e.g. pending_widget_approval() -> WidgetApproval | None, delivered visible texts); impl by the gate classes that own message shape.",
+        "approval_request payload {type,message_id,content,options} byte-identical (frontend contract via loop_drivers.py:130 → session.approval_request → projection.py:49).",
+        "Driver keeps only state-set + extra['approval_request'] (no double-append of pause events per ADR-0248); gate projection independently unit-testable; driver testable with a stub protocol object; ruff clean."
+      ],
+      "branchName": "raphy/arch-20261009-1008",
+      "description": "As an LCA maintainer, I want a typed vocal projection seam for pending widget approval, because _run_driver (runtime_loop.py:507-516) bypasses the VocalGateProtocol with getattr(vocal_ctx.gate, 'is_awaiting_widget', lambda: False)() even though the protocol DECLARES is_awaiting_widget(), and both _run_driver and result_projection.py:193 sniff gate internals with hasattr/getattr for get_visible_outputs (not on the protocol) plus string probes m.get('type')=='widget', v['content'], latest_widget.get('message_id'). Generic run-driver and result-projection code speaks vocal-mechanism internals; swapping the gate impl silently no-ops both. One adapter = hypothetical seam, two = real — here there are two adapters. Deletion test: concentrates — message-dict shape knowledge moves back to its owner (the gate impl); the driver loses vocal vocabulary.",
+      "id": "RA-089",
+      "notes": "Source: Round 14 friction walk, agent-runtime zone (Strong; leaky seam, protocol declared but bypassed). Constraints: ADR-0248 (vocal runtime + hard gate; INPUT_REQUIRED pause facts owned by RuntimeResultFinalizer only); VocalGateProtocol runtime_checkable compat; approval_request shape byte-identical.",
+      "passes": false,
+      "priority": 1,
+      "title": "Give 'widget pending approval' a typed seam; delete the two getattr/dict sniffs"
+    },
+    {
+      "acceptanceCriteria": [
+        "Derivation function lives in lca/application/initiative/ next to evaluate_initiative: input (prior_turns, extra_override) → features dict.",
+        "_run_driver collapses the 15 lines to one call; no getattr duck-read on RunContext.prior_turns.",
+        "RunContext stays a read-only input; result written to Result.extra['initiative_offer'] (contract in comments kept).",
+        "extra['transcript_features'] caller-override semantics preserved; ADR-0248 slice 8 (successful runs feed InitiativeHook) kept; pure unit tests for role counting (empty/mixed/override); existing initiative_offer pins green; ruff clean."
+      ],
+      "branchName": "raphy/arch-20261009-1008",
+      "description": "As an LCA maintainer, I want the transcript-features derivation to live with its only consumer, because _run_driver's finally hides ~15 lines of 'count user/assistant roles in prior_turns' feature derivation whose sole consumer is lca/application/initiative/hooks.py::evaluate_initiative — no locality, and a role-miscount bug would hide in the generic driver's finally where nobody looks. It also duck-reads getattr(ctx, 'prior_turns', ()) on a typed dataclass whose field is declared. 'The interface is the test surface': today this logic is only reachable by driving a full run. Deletion test: concentrates — the derivation rule moves in with its only consumer; the driver's finally becomes a 3-line call.",
+      "id": "RA-090",
+      "notes": "Source: Round 14 friction walk, agent-runtime zone (Strong; no locality + testability). Constraints: RunContext is read-only input, not an output bus (per comments); caller override semantics kept.",
+      "passes": false,
+      "priority": 1,
+      "title": "Move transcript_features fallback derivation next to evaluate_initiative"
+    },
+    {
+      "acceptanceCriteria": [
+        "One private _wire_block_observation(status, reason, ...) constructor seam; the two gates supply only condition+status+reason; public signatures unchanged.",
+        "Guidance text single-sourced; ADR-0047 trigger semantics (ToolCall native fields first, extra fallback) unchanged; unexposed_tool_block_observation defer semantics untouched.",
+        "Parameterized test asserts both gates share the blocking-observation extra contract; existing wire-gate tests green; ruff clean."
+      ],
+      "branchName": "raphy/arch-20261009-1008",
+      "description": "As an LCA maintainer, I want one wire-block Observation constructor seam in tool_wire_gate.py, because tool_wire_block_observation and missing_arguments_block_observation build identically-shaped Observations (FAILURE_KIND_TOOL_WIRE + TOOL_RESULT kind + status/reason extra) and the model-facing guidance text 'arguments incomplete or invalid; do not treat as successful tool result; shorten code/args or split into smaller steps and retry' appears verbatim twice. Only the trigger conditions differ; the guidance text is product behavior — a future rewording will miss one copy. Deletion test: just moves (two public fns → one private seam), but the move is convergence, not diffusion.",
+      "id": "RA-091",
+      "notes": "Source: Round 14 friction walk, cognition zone (Worth exploring; small mechanical duplication, product-text drift risk).",
+      "passes": false,
+      "priority": 2,
+      "title": "Converge the two wire-block Observation constructors into one seam"
+    },
+    {
+      "acceptanceCriteria": [
+        "Trace channel and SkillRouted.decision_path speak the same vocabulary (either SkillRouted adopts the closed set or the set absorbs the router's real reason values); the two router protocols' division of labor documented.",
+        "Contract test: every reason value a router emits is in the closed set (unwritable today).",
+        "_coerce_decision_path fallback behavior documented/kept where downstream (reflection_events.py) depends on it; ADR-0175 D2 trace structure intact; existing test_skill_router.py green; ruff clean."
+      ],
+      "branchName": "raphy/arch-20261009-1008",
+      "description": "As an LCA maintainer, I want ONE vocabulary for 'why was this template chosen', because the trace channel uses the closed SelectorDecisionPath Literal (unknown coerced to 'legacy' via _coerce_decision_path) while harness SkillRouted.decision_path is a bare str, and KeywordSkillRouter emits 'keyword_match'/'keyword_default' — values that do not exist in the closed set. The two channels can never agree on 'reason'; downstream attribution either drops info (coerced to legacy) or speaks two dialects. Also SkillRouter.route() -> str vs PromptTemplateSelector.select() -> str | tuple[str,str] are two near-identical protocols with different reason-carrying (side channel vs inline). Deletion test: concentrates — 'reason' gets one source of truth.",
+      "id": "RA-092",
+      "notes": "Source: Round 14 friction walk, cognition zone (Worth exploring; honest boundary: KeywordSkillRouter has no production wiring today, impact TBD). Constraints: PromptTrace.selector_decision_path is str-typed; ADR-0175 D2.",
+      "passes": false,
+      "priority": 2,
+      "title": "Converge the SelectorDecisionPath dual vocabulary (trace vs SkillRouted)"
+    },
+    {
+      "acceptanceCriteria": [
+        "Typed accessor (e.g. payload_of(kind)) on/near ContextManifest: the manifest itself knows 'clock's payload is str'; types.py's four helpers converge onto it (thin wrappers or deleted).",
+        "_manifest_items None-tolerance semantics (unbound manifest → empty) preserved.",
+        "ContextManifest stays additive (cross-layer contract perceive→reasoner); ItemKind closed-set discipline kept.",
+        "Per-kind payload-type contract tests (unwritable today); existing prompt-render tests green; ruff clean."
+      ],
+      "branchName": "raphy/arch-20261009-1008",
+      "description": "As an LCA maintainer, I want the kind→payload-type knowledge to live in one typed seam, because today it is split three ways: ContextItem's docstring (one sentence), types.py's four helpers (clock/subtasks/artifacts/memory_*_from_manifest) each doing their own isinstance checks, and the ItemKind Literal — while ContextManifest already HAS by_kind(kind) which the cognition layer bypasses with its own _manifest_items (whose only functional delta is None-tolerance). Adding a new kind touches three places; payload-type mismatches surface only at render time. Deletion test: concentrates — four lookalike helpers' query+assert logic collapses into one place.",
+      "id": "RA-093",
+      "notes": "Source: Round 14 friction walk, cognition zone (Worth exploring; by_kind exists yet bypassed; four helpers structurally identical). Constraints: additive change to the cross-layer contract; new kinds (e.g. policy_fact already in Literal) get one pairing point.",
+      "passes": false,
+      "priority": 2,
+      "title": "Give ContextManifest a typed kind→payload accessor; converge the four helpers"
+    },
+    {
+      "acceptanceCriteria": [
+        "catalog_provider typed as BrainPromptCatalog | None (or the declared minimal shape); getattr duck-probing deleted.",
+        "Docstring matches implementation: explicitly choose fix-doc or add-the-missing-fallback and say which.",
+        "_catalog()'s INTENTIONAL swallow (catalog not ready → treated as absent) kept, not turned fail-loud; ADR-0185 AvailableSkillsReason derivation unchanged.",
+        "New test: bad-shape catalog behavior is explicit (not silent 0); existing no-catalog→0 compat tests green; ruff clean."
+      ],
+      "branchName": "raphy/arch-20261009-1008",
+      "description": "As an LCA maintainer, I want the assembler's catalog seam honestly typed, because contracts declares BrainPromptCatalog (render_brain_skills() etc.) yet assembler.py types catalog as object / catalog_provider as Callable[[], object], then duck-probes with getattr(catalog, 'installed_skills', None) + try: len() except TypeError — the seam's real shape exists only in probe code. Worse, _catalog_skill_count's docstring promises three fallback strategies (installed_skills → render_brain_skills() line count → 0) but implements only the first — the doc lies. Deletion test: concentrates — probing logic deleted, the seam's shape owned by the type declaration.",
+      "id": "RA-094",
+      "notes": "Source: Round 14 friction walk, cognition zone (Worth exploring; 'The interface is the test surface' — today there is no interface). Constraints: INTENTIONAL swallow is deliberate design; AvailableSkillsReason logic (ADR-0185) untouched.",
+      "passes": false,
+      "priority": 2,
+      "title": "Type the assembler catalog seam as BrainPromptCatalog; fix the doc/impl drift"
+    },
+    {
+      "acceptanceCriteria": [
+        "Explicit choice recorded: (a) all guest-path entries (read/write/edit/list/search) flow through one choke point, or (b) the seam is honestly scoped to the read path (module/docstring renamed to say so).",
+        "'Who calls the adapter' decided in one place, not per-method.",
+        "New pin on the wiring scope (all-entries-must-flow for (a), or the converged actual scope for (b)); test_file_ref_args.py kept; ADR-0121 PR-C /files/<aid> interception + allowed_refs + UnresolvedFileRefError→passthrough semantics unchanged; ruff clean."
+      ],
+      "branchName": "raphy/arch-20261009-1008",
+      "description": "As an LCA maintainer, I want the file_ref_args seam's wiring to match its contract, because file_ref_args.py (ADR-0121 PR-C) docstring claims 'Every tool call that takes a path argument flows through resolve_path_arg' — yet the tools/ layer has zero callers, and the only production wiring is computer/sandbox/computer.py's read_file via _resolve_path_arg_or_passthrough (lazy import), while write_file/edit_file/list_files in the same file call normalize_sandbox_path directly. Result: /files/<aid> resolves to a FileRef for read_file but takes a different path for write_file — the seam's contract is unenforced and behavior is inconsistent across methods. test_file_ref_args.py only tests the adapter in isolation; no test pins which entries flow through the seam. Deletion test: choice (a) concentrates (real single choke); choice (b) just moves (honest docstring).",
+      "id": "RA-095",
+      "notes": "Source: Round 14 friction walk, infra zone (Worth exploring; half-wired seam; needs optimizer judgment on (a) vs (b)). Related but not duplicate of RA-076 (different module).",
+      "passes": false,
+      "priority": 3,
+      "title": "Make the path-arg resolution seam honest: universal choke or honest scoping"
+    },
+    {
+      "acceptanceCriteria": [
+        "replace(ctx, deadline=...) used instead of 8-line enumeration.",
+        "Defensive copies of context_refs (list(...)) and extra (dict(...)) preserved — naive replace would alias the originals and change downstream-mutation behavior.",
+        "deadline short-circuit semantics (workspace.deadline None / ctx already has deadline) unchanged.",
+        "Regression test pins 'no field dropped' (assert against fields() or a future-field fixture); existing deadline-propagation tests green; ruff clean."
+      ],
+      "branchName": "raphy/arch-20261009-1008",
+      "description": "As an LCA maintainer, I want _enrich_run_context (cognitive_agent.py) to use dataclasses.replace instead of hand-enumerating all 8 RunContext fields, because today it rebuilds trace_id=ctx.trace_id, session_id=ctx.session_id, … field by field — all 8 currently match, but the 9th field added later will be silently dropped. The classic 'no bug today, guaranteed bug tomorrow' shape. Deletion test: concentrates — 'fill the default deadline' collapses from 8 enumerated lines to one expression.",
+      "id": "RA-096",
+      "notes": "Source: Round 14 friction walk, agent-runtime zone (Worth exploring; preventive, with a copy-semantics trap to respect). Do AFTER RA-082 (same file, envelope moved first).",
+      "passes": false,
+      "priority": 3,
+      "title": "Rebuild _enrich_run_context with dataclasses.replace"
     }
   ]
 }
