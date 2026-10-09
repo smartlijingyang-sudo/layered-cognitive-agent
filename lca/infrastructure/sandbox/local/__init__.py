@@ -1,4 +1,4 @@
-﻿"""Local host-backed Sandbox backend."""
+"""Local host-backed Sandbox backend."""
 
 from lca.infrastructure.sandbox.local.adapter import LocalSandboxAdapter, default_local_root
 
