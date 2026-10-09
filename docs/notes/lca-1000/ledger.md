@@ -1294,3 +1294,13 @@
 - commit: 无代码 commit；本台账单独 docs commit（沿用 0521–0541 `docs(lca-1000): 第NNNN轮台账` 模式）。
 - 备注: 只 commit docs/notes/lca-1000/ledger.md（`git add` + `git commit -- <path>` 显式路径；-m 须在 -- 之前，见 AGENTS.md 教训）。台账文本经 exec stdin → ssh252 原样追加（UTF-8，未走 base64 管道；沿用 0536–0541）。扫描输出存 252 /tmp（ast0542_out.txt、dead0542_out.txt、dead0542b_out.txt、sndb0542_out.txt、shallow0542_out.txt）。新教训：无（纯基线复核 + 最浅项深读轮）。
 --
+
+## 第0543轮 (2026-10-09 08:33-08:50 CST)
+- 改了什么: 无代码改动。**本轮未发现新的实质机会**（依据 body 规则 4：不硬凑 trivial commit）。
+  1. explore：重读 skill 四文件全文（SKILL.md/DEEPENING.md/LANGUAGE.md/INTERFACE-DESIGN.md，252 上 md5: 38f20893 / ebdd48f7 / 680627d8 / aee2c069）。四路扫描（shallow/ast/dead/sndb，沿用 0527–0542 版脚本，252 /tmp/*0543_out.txt）。
+  2. shallow-facade —— /tmp/shallow0543_out.txt 与 shallow0542_out.txt 逐字节一致（total: 61）；最浅未裁决项 **lca/contracts/observability/spine/context.py**（10/15，SpineContext / SpanContext / PhaseMachineViolation，143 行）深读裁决：驳回。Deletion test：删去该 Module 会把 8 个 contextvar 名（"lca_spine_*"）、I13 phase-machine EP-mismatch raise、span_id 生成格式（lca-span-%08x）+ counter 递增语义、seq/epoch 单调计数器、hash-chain 链式读/写协议散到 33 个 caller 文件 —— 复杂度不消失，是真实 seam。10 个 pass-through classmethod 是刻意设计的窄接口（类 docstring 明示 "All classmethods; no instance"）：把 context-local 突变协议（get+1+set、栈 push/pop 不变量）统一收敛，contextvar 命名或突变协议演进不波及 caller，非无依据 indirection。ADR-0165（I13）/ ADR-0183 §3.9 PR-12（trace_id 兜底）立项，按 SKILL.md ADR 规则不 re-litigate。deslop 清单复核：module docstring + ADR 引用含真实设计知识（contract 层零 infra 依赖、infra re-export 保持 import path）；`PhaseMachineViolation` 兼容别名带 live 依据（infrastructure re-export、contracts __init__、deriver、tests 引用，非死兼容）；trace_id contextvar 注释交代了 EnvelopeBus.publish 注入与老 write 路径兜底关系，非叙事性注释。
+  3. 候选清单其余：ast0543 / dead0543 与 0542 逐字节一致（true_dead=17，无新项）；sndb0543 唯一差异是 laya_backend.py#271→#272 的行号漂移（他人提交加了一行），decide 组内各 site sig 各异属命名多样性，非 drift，无新候选。
+- 依据 skill 哪一节: SKILL.md Deletion test（驳回依据）+ ADR 规则（不 re-litigate ADR-0165/ADR-0183）+ LANGUAGE.md Depth/Leverage/Locality + DEEPENING.md Seam discipline（10 个 pass-through 是内部 seam 收敛，非 hypothetical）。
+- 验证结果: 无代码改动，无需验证门。扫描脚本 exit 0（ast0543/dead0543/sndb0543/shallow0543）；开工/收工时工作区均在 main，未 push（no-push 规则）。
+- commit: 无代码 commit；本台账单独 docs commit（沿用 0521–0542 `docs(lca-1000): 第NNNN轮台账` 模式）。
+- 备注: 只 commit docs/notes/lca-1000/ledger.md（`git add` + `git commit -m <msg> -- <path>` 显式路径；-m 须在 -- 之前，见 AGENTS.md 教训）。并发会话未提交改动（.agent/skills/airtap-automation/SKILL.md；本轮 explore 期间又多了 docs/adr/0294-sandbox-paths-single-mapping-mechanism.md）全程未触碰。台账文本经 exec stdin 原样追加（UTF-8，未走 base64 管道；沿用 0536–0542）。扫描输出存 252 /tmp（ast0543_out.txt、dead0543_out.txt、shallow0543_out.txt、sndb0543_out.txt）。新教训：ssh252 远程命令里 for 循环的 `$var` 变量名展开不可靠（本轮 wc 循环取到空名；裸 $var 通常可展开但循环场景翻车）——以后远程循环统一写死文件名或本地拼命令串；cmp/无变量命令不受影响。
