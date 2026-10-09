@@ -71,10 +71,12 @@ async def test_approve_gate_approved_command_proceeds_with_rich_requirement():
 
 
 @pytest.mark.asyncio
-async def test_approve_gate_refuses_ungranted_privilege_with_typed_requirement():
-    """ADR-0292 §10: typed ApprovalRequirement(required=True) + a tool call
-    with no grant in the ambient TrustEnvelope -> refused to
-    terminal.commit, with approval_requirement echoed."""
+async def test_approve_gate_is_hitl_only_ignores_grant_absence() -> None:
+    """ADR-0292 §10 P3 后 approve_gate 只做 HITL 路由。
+
+    即使 ambient TrustEnvelope 没有 grant，需要审批的动作也走
+    ``intervene.interrupt``；授权检查前移到 ``act.authorize``（grant_routing）。
+    """
     assert get_current_trust_envelope() is None  # no envelope bound in test
     executor = ApproveGateExecutor()
     dec = Decision(
@@ -96,8 +98,8 @@ async def test_approve_gate_refuses_ungranted_privilege_with_typed_requirement()
         NodeInput(port_values={"decision": dec, "approval_requirement": req}),
     )
     routing = result.port_values["approval_routing"]
-    assert routing.next_node == "terminal.commit"
-    assert routing.next_hint is not None and "reject" in routing.next_hint
+    assert routing.next_node == "intervene.interrupt"
+    assert routing.next_hint == "approve_interrupt"
     assert result.port_values["approval_requirement"] is req
 
 

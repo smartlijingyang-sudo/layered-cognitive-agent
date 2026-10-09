@@ -56,8 +56,10 @@ nodes:
     # previous ``decision.extra["needs_approval"]`` metadata grep; this is
     # the only consumer of the port within the subgraph, so the dead-port
     # risk is bounded.
-    inputs: [decision, state]
-    outputs: [decision, state, approval_required, approval_requirement]
+    # ADR-0292 §10 P3: ``tools`` 是 kernel-owned 端口（per-turn ToolsService），
+    # 用于运行时授权检查；``grant_routing`` 携带授权拒绝路由信号。
+    inputs: [decision, state, tools]
+    outputs: [decision, state, approval_required, approval_requirement, grant_routing]
     config:
       emit_on_enter: [think.gate.start]
       emit_on_exit: []
@@ -228,13 +230,14 @@ edges:
     to: act.authorize
     when: true
   # ADR-0237 / PR-1b: gate sits between act.authorize and act.envelope.
-  # The edge is unconditional (``when: true``): the gate reads the typed
-  # ``approval_requirement`` port (ADR-0292 §10), not the
-  # ``approval_required`` bool — that bool is historical residue, unread
-  # by any executor or predicate.
+  # The edge is conditional: grant 被拒（grant_refused）时不进入审批 gate，
+  # 子图直接完成并由外层 plan 的 grant_refused 边路由到 terminal.commit。
   - from: act.authorize
     to: act.approve.gate
-    when: true
+    when:
+      kind: ne
+      port: { name: grant_routing, field: next_hint }
+      value: grant_refused
   # approve_skipped (no-approval-needed) and approve_approved
   # (Command.kind == "approve") both route forward to act.envelope;
   # approve_interrupt and approve_rejected have no inner edge so the

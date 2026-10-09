@@ -14,8 +14,9 @@ Behaviour covered:
     ``profile_path`` and forwarded ``session_id``.
   * ``activation_ref`` is stable across repeated calls and stable against
     the harness-layer ``compute_activation_ref`` reference impl.
-  * The returned ``SessionActivation`` carries the empty trust envelope
-    (until P3 enriches it) and the compiled plan from the service.
+  * The returned ``SessionActivation`` carries the real trust envelope
+    (assistant grants ∪ RULE_DEFAULTS，ADR-0292 §10 P3) and the compiled
+    plan from the service.
 
 The dispatch half of the facade is exercised in
 ``tests/application/runtime/test_default_facade_dispatch.py`` (P1-10);
@@ -42,7 +43,7 @@ from lca.application.runtime.plan_resolution import (
 )
 from lca.contracts.runtime.activation import SessionActivation
 from lca.contracts.runtime.intent import RunIntent
-from lca.contracts.runtime.trust import EMPTY_TRUST_ENVELOPE
+from lca.contracts.runtime.trust import EMPTY_TRUST_ENVELOPE, RULE_DEFAULTS
 from lca.harness.runtime.activation_ref import compute_activation_ref
 
 # ── Helpers ───────────────────────────────────────────────────────────
@@ -255,14 +256,53 @@ class TestActivationRefStability:
 
 
 class TestSessionActivationSurface:
-    def test_session_activation_carries_trust_envelope_empty(self) -> None:
-        """Until P3 the trust envelope is the empty singleton."""
+    def test_session_activation_carries_real_trust_envelope(self) -> None:
+        """P3 落地后 envelope 携带 RULE_DEFAULTS，不再是空单例。"""
         service = _make_service()
         facade = _facade(service)
 
         act = facade.resolve_activation(_intent(session_id="sess-1"))
 
-        assert act.trust_envelope is EMPTY_TRUST_ENVELOPE
+        assert act.trust_envelope is not EMPTY_TRUST_ENVELOPE
+        assert act.trust_envelope.grants("platform.basic")
+        assert act.trust_envelope.grants("hitl.interact")
+        assert act.trust_envelope.grants("trust.empty") is False
+        assert act.trust_envelope.granted_privileges == RULE_DEFAULTS
+
+    def test_session_activation_carries_assistant_grants(self, tmp_path, monkeypatch) -> None:
+        """P3 落地：envelope 的 grant 集 = assistant grants.yaml ∪ RULE_DEFAULTS。"""
+        home = tmp_path / "lca_home"
+        asst_home = home / "assistants" / "asst_test"
+        asst_home.mkdir(parents=True)
+        (asst_home / "grants.yaml").write_text(
+            "grants:\n  - workspace.write\n",
+            encoding="utf-8",
+        )
+        monkeypatch.setattr(
+            "lca.application.runtime.default_facade.get_lca_home",
+            lambda: home,
+        )
+        service = _make_service()
+        facade = _facade(service)
+        intent = _intent(session_id="sess-1")
+        intent = RunIntent(
+            profile_path=intent.profile_path,
+            user_text=intent.user_text,
+            mode=intent.mode,
+            session_id=intent.session_id,
+            assistant_id="asst_test",
+            attachment_ids=intent.attachment_ids,
+            prior_turns=intent.prior_turns,
+            execution_target=intent.execution_target,
+            options=intent.options,
+            surface=intent.surface,
+        )
+
+        act = facade.resolve_activation(intent)
+
+        assert act.trust_envelope.grants("workspace.write")
+        assert act.trust_envelope.grants("hitl.interact")
+        assert act.trust_envelope.granted_privileges == RULE_DEFAULTS | {"workspace.write"}
 
     def test_session_activation_carries_compiled_plan(self) -> None:
         """The compiled plan is forwarded verbatim from the plan service."""

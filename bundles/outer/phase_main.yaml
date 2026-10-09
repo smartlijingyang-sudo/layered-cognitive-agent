@@ -68,18 +68,22 @@ nodes:
     # (per ActValidateExecutor.declared_inputs). The kernel-wide
     # port registry exposes ``decision`` (the typed-port D4 boundary
     # carried from think.subgraph via the registry) so act subgraph
-    # receives it.
-    declared_inputs: [decision]
+    # receives it. ``tools`` 是 kernel-owned 端口（per-turn ToolsService），
+    # 供 ``act.authorize`` 的运行时授权检查读取。
+    declared_inputs: [decision, tools]
     # Inner act.subgraph emits ``should_terminate`` (via act.observe)
     # and the ``decision`` carried through validate/authorize/envelope.
     # ``approval_routing`` is the typed ``RoutingDecision`` written by
     # ``act.approve.gate`` (now nested inside act_subgraph per
-    # ADR-0237 / PR-1b, spec §3.2 原位). ``PortRegistry.exit_subgraph``
-    # (ADR-0217 §3.3.3 iron rule 1) forwards the named port to the
-    # outer caller so the 3 mutually-exclusive routing edges below
-    # can read it. Renamed from ``routing`` to avoid collision with
-    # ``act.fanout``'s ``routing`` (last-write-wins would overwrite).
-    declared_outputs: [decision, should_terminate, approval_routing]
+    # ADR-0237 / PR-1b, spec §3.2 原位). ``grant_routing`` is the typed
+    # ``RoutingDecision`` written by ``act.authorize``（ADR-0292 §10 P3
+    # 授权检查；grant 缺失时 ``next_hint="grant_refused"``）。
+    # ``PortRegistry.exit_subgraph`` (ADR-0217 §3.3.3 iron rule 1)
+    # forwards the named ports to the outer caller so the mutually
+    # exclusive routing edges below can read them. Renamed from
+    # ``routing`` to avoid collision with ``act.fanout``'s ``routing``
+    # (last-write-wins would overwrite).
+    declared_outputs: [decision, should_terminate, approval_routing, grant_routing]
 
   - id: reflect.main
     region: phase:reflect
@@ -203,6 +207,16 @@ edges:
       kind: eq
       port: { name: should_terminate }
       value: true
+
+  # act → terminal.commit on grant_refused (ADR-0292 §10 P3 授权拒绝)。
+  # 必须排在 re-ask 边之前：grant 缺失时 ``approval_routing`` 未设置，
+  # 但显式边保证授权拒绝优先于任何重入循环。
+  - from: act.main
+    to: terminal.commit
+    when:
+      kind: eq
+      port: { name: grant_routing, field: next_hint }
+      value: grant_refused
 
   - from: act.main
     to: think.main
