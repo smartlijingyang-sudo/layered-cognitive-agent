@@ -2347,3 +2347,25 @@ Tests:
 Learnings:
 - `isinstance(MagicMock(), HasHooks)` is False even though `hasattr(mock, "hooks")` is True — runtime-checkable protocol isinstance does not see through MagicMock's dynamic attribute creation. The positive test needs a real stub with a concrete `hooks` attribute. Worth remembering whenever pinning protocol-gated branches: stub the attribute for real.
 - Verified no production caller of `CognitiveAgent.register_hook` exists in lca/ (only audit tooling mentions the name), so the previously silent branch was dead in prod paths — the raise cannot break a working flow, only surface a misconfiguration earlier.
+
+## 2026-10-09 21:20 CST - RA-101
+
+Implemented:
+- `PortReader.port_has_value(name: str)` 委托给 `self.registry.has_port(PortName(name))`，
+  不再走 `name in self.registry.snapshot()` 的全量复制路径；签名不变，`snapshot()` 语义不变。
+- `tests/framework/graph/test_port_reader.py` 新增 3 个三态测试：
+  从未写入→False、已写入→True、被清空（None 值）→与 `has_port` 一致为 True。
+
+Files:
+- lca/framework/graph/port_reader.py
+- tests/framework/graph/test_port_reader.py
+
+Tests:
+- tests/framework/graph/test_port_reader.py + test_predicate_evaluator.py + tests/cognition/wire/test_close_out_adapter.py: 24 passed
+- tests/framework/graph/ 全目录：115 passed, 1 failed（`test_gate_chain_annotations_resolve::test_every_strategy_module_annotation_resolves`，经 git stash 验证是基线 7ce6becc0 上已有的红，与本改动无关）
+- ruff check: clean
+
+Learnings:
+- `PortName` 是 `str` 的 NewType，`PortName(name)` 转换只为取悦类型检查器，运行时零成本——seam 侧的类型收紧不增加运行时负担时，直接转。
+- `read` 把 value=None 视为 Unset（抛错），而 `has_port`/`port_has_value` 只看 key 存在性——"存在"与"可读"是两个不同的问题，改 seam 前先确认三态语义一致，否则会把清空语义改错。
+---

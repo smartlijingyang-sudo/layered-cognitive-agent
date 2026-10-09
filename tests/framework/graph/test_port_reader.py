@@ -78,3 +78,32 @@ def test_read_field_on_untyped_non_dict_raises_unknown_field_error() -> None:
     reader = PortReader(source_node="test_node", registry=reg)
     with pytest.raises(UnknownFieldError):
         reader.read(PortRef(name="observation", field="anything"))
+def test_port_has_value_false_for_never_written_port() -> None:
+    """port_has_value is False for a port that was never written."""
+    reg = PortRegistry()
+    reader = PortReader(source_node="test_node", registry=reg)
+    assert reader.port_has_value("missing") is False
+
+
+def test_port_has_value_true_for_written_port() -> None:
+    """port_has_value is True for a port with a value."""
+    reg = PortRegistry()
+    reg.set_typed_port("decision", _RoutingPayload(), payload_type=_RoutingPayload)
+    reader = PortReader(source_node="test_node", registry=reg)
+    assert reader.port_has_value("decision") is True
+
+
+def test_port_has_value_agrees_with_has_port_on_cleared_port() -> None:
+    """A cleared port (key present, value None) counts as present — same as has_port.
+
+    The interpreter's declared-outputs contract clears ports to None via
+    merge_output; port_has_value must agree with the registry seam on this
+    tristate, not invent its own answer.
+    """
+    from lca.contracts.protocols.graph.ports import PortName
+
+    reg = PortRegistry()
+    reg.set_typed_port("cleared", None)
+    reader = PortReader(source_node="test_node", registry=reg)
+    assert reg.has_port(PortName("cleared")) is True
+    assert reader.port_has_value("cleared") is True

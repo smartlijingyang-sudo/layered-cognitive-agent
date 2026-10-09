@@ -71,8 +71,13 @@ class PortReader(BaseModel):
         return self._resolve_field(ref.name, ref.field, value)
 
     def port_has_value(self, name: str) -> bool:
-        """Check whether the port is set in the registry (without raising)."""
-        return name in self.registry.snapshot()
+        """Check whether the port is set in the registry (without raising).
+
+        Delegates to the registry's declared ``has_port`` seam (RA-101)
+        instead of materializing a full ``snapshot()`` copy for a
+        membership test.
+        """
+        return self.registry.has_port(PortName(name))
 
     def _resolve_field(self, port_name: PortName, field_name: str, value: Any) -> Any:
         """Navigate into ``field_name`` on ``value``."""

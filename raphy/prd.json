@@ -1467,9 +1467,9 @@
       "branchName": "raphy/arch-20261009-2045",
       "description": "As an LCA maintainer, I want `PortReader.port_has_value` to delegate to the declared `PortRegistry.has_port` seam, because today it bypasses that seam with `name in self.registry.snapshot()` — a full copy of the port store on every call — while `predicate_evaluator` invokes it up to 3 times per edge predicate evaluation, so loop-heavy graphs (e.g. the act→think re-ask loop) pay a full-dict copy per edge per iteration for a mere membership test.",
       "id": "RA-101",
-      "implemented": false,
-      "notes": "Source: Round 16 friction walk, Area C (port_reader.py, Q2/Q4). Leaky seam: the registry already declares port-existence as a seam (has_port, used by close_out_adapter with an explicit test pin), but the reader goes around it. Strength: Strong.",
-      "passes": false,
+      "implemented": true,
+      "notes": "Source: Round 16 friction walk, Area C (port_reader.py, Q2/Q4). Leaky seam: the registry already declares port-existence as a seam (has_port, used by close_out_adapter with an explicit test pin), but the reader goes around it. Strength: Strong.\n\nImplemented 2026-10-09 (round 16): `PortReader.port_has_value` now delegates to `self.registry.has_port(PortName(name))`; the `snapshot()` copy path is gone. Added 3 tristate tests to tests/framework/graph/test_port_reader.py (never-written / written / cleared-None agrees with has_port). tests/framework/graph/test_port_reader.py + test_predicate_evaluator.py + tests/cognition/wire/test_close_out_adapter.py: 24 passed; full tests/framework/graph/: 115 passed, 1 failed (test_gate_chain_annotations_resolve::test_every_strategy_module_annotation_resolves — pre-existing red on base 7ce6becc0, verified via git stash; unrelated to this change). ruff check clean. IMPL vs ASSESSMENT: as assessed.",
+      "passes": true,
       "priority": "P1",
       "title": "Make PortReader.port_has_value delegate to the declared PortRegistry.has_port seam"
     },
