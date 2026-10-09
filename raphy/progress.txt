@@ -2159,3 +2159,23 @@
   - Typing a dataclass field from `str` to a Literal is safe for readers; check constructors pass literals (they did here).
   - Honest boundary from the story held: KeywordSkillRouter has no production wiring — the change is contract hygiene, verified by the closed-set test.
 ---
+
+## 2026-10-09 11:55 - RA-093
+- What was implemented: typed kind->payload accessor on ContextManifest
+  (KIND_PAYLOAD_TYPES table covering all 9 closed-set kinds + payload_of(kind)
+  method on the manifest); the four structurally-identical helpers in
+  cognition/brain/sections/types.py converged onto it as thin wrappers over a
+  None-tolerant _payloads_of() wrapper; private _manifest_items deleted.
+- Files changed:
+  - lca/contracts/models/core/perceive/perception.py (KIND_PAYLOAD_TYPES, payload_of)
+  - lca/cognition/brain/sections/types.py (converged helpers, dropped _manifest_items)
+  - tests/contracts/test_ra093_payload_contracts.py (new, 6 tests)
+- **Learnings for future iterations:**
+  - Patterns discovered: kind->payload-type knowledge now has exactly one pairing
+    point (KIND_PAYLOAD_TYPES); a new kind pairs one Literal member with one table entry.
+  - Gotchas encountered: assistant-bootstrap emits dict payloads under
+    "workspace_artifacts" (face items) — declared consumer contract is (list,),
+    so payload_of filters them, exactly matching the old inline isinstance behavior;
+    documented in the table comment. Ruff UP035: import Mapping from collections.abc,
+    not typing, in contracts code.
+---

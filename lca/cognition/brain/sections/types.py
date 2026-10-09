@@ -5,12 +5,11 @@ from __future__ import annotations
 import re
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from lca.contracts.atoms.enums.enums import MemoryCategory, MemoryLayer, MemoryRecordKind
 from lca.contracts.models.core.conversation.memory import MemoryRecord, MemoryTrust
 from lca.contracts.models.core.perceive.perception import (
-    ContextItem,
     ContextManifest,
     ItemKind,
 )
@@ -194,40 +193,47 @@ def render_context_lines(
     return "\n\n".join(sections) or _EMPTY_CONTEXT
 
 
-def _manifest_items(manifest: ContextManifest | None, kind: ItemKind) -> tuple[ContextItem, ...]:
+def _payloads_of(manifest: ContextManifest | None, kind: ItemKind) -> list[Any]:
+    """None-tolerant typed payload query: unbound manifest -> empty.
+
+    The kind->payload-type knowledge lives on the manifest itself
+    (ContextManifest.payload_of); this wrapper only preserves the
+    None-tolerance the section helpers historically offered.
+    """
     if manifest is None:
-        return ()
-    return tuple(item for item in manifest.items if item.kind == kind)
+        return []
+    return manifest.payload_of(kind)
 
 
 def clock_from_manifest(manifest: ContextManifest | None) -> ManifestClock | None:
-    for item in _manifest_items(manifest, "clock"):
-        if isinstance(item.payload, str):
-            return ManifestClock(text=item.payload)
-    return None
+    payloads = _payloads_of(manifest, "clock")
+    return ManifestClock(text=payloads[0]) if payloads else None
 
 
 def subtasks_from_manifest(manifest: ContextManifest | None) -> ManifestSubtasks:
-    for item in _manifest_items(manifest, "subtasks"):
-        if isinstance(item.payload, list):
-            return ManifestSubtasks(items=tuple(str(x) for x in item.payload))
-    return ManifestSubtasks(items=())
+    payloads = _payloads_of(manifest, "subtasks")
+    if not payloads:
+        return ManifestSubtasks(items=())
+    return ManifestSubtasks(items=tuple(str(x) for x in payloads[0]))
 
 
 def artifacts_from_manifest(manifest: ContextManifest | None) -> ManifestArtifacts:
-    entries: list[Mapping[str, object]] = []
-    for item in _manifest_items(manifest, "workspace_artifacts"):
-        if isinstance(item.payload, list):
-            entries.extend(art for art in item.payload if isinstance(art, Mapping))
+    entries: list[Mapping[str, object]] = [
+        art
+        for payload in _payloads_of(manifest, "workspace_artifacts")
+        for art in payload
+        if isinstance(art, Mapping)
+    ]
     return ManifestArtifacts(items=tuple(entries))
 
 
 def memory_records_from_manifest(manifest: ContextManifest | None) -> tuple[MemoryRecord, ...]:
-    records: list[MemoryRecord] = []
-    for item in _manifest_items(manifest, "memory"):
-        if isinstance(item.payload, list):
-            records.extend(r for r in item.payload if isinstance(r, MemoryRecord))
-    return tuple(records)
+    return tuple(
+        record
+        for payload in _payloads_of(manifest, "memory")
+        for record in payload
+        if isinstance(record, MemoryRecord)
+    )
 
 
 def render_subtasks_block(manifest: ContextManifest | None) -> str:

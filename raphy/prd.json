@@ -1344,7 +1344,8 @@
       "description": "As an LCA maintainer, I want the kind→payload-type knowledge to live in one typed seam, because today it is split three ways: ContextItem's docstring (one sentence), types.py's four helpers (clock/subtasks/artifacts/memory_*_from_manifest) each doing their own isinstance checks, and the ItemKind Literal — while ContextManifest already HAS by_kind(kind) which the cognition layer bypasses with its own _manifest_items (whose only functional delta is None-tolerance). Adding a new kind touches three places; payload-type mismatches surface only at render time. Deletion test: concentrates — four lookalike helpers' query+assert logic collapses into one place.",
       "id": "RA-093",
       "notes": "Source: Round 14 friction walk, cognition zone (Worth exploring; by_kind exists yet bypassed; four helpers structurally identical). Constraints: additive change to the cross-layer contract; new kinds (e.g. policy_fact already in Literal) get one pairing point.",
-      "passes": false,
+      "passes": true,
+      "implemented": "2026-10-09: payload_of on ContextManifest + KIND_PAYLOAD_TYPES (all 9 kinds); _manifest_items deleted; 4 helpers thin-wrapped over _payloads_of; 6 new tests green.",
       "priority": 2,
       "title": "Give ContextManifest a typed kind→payload accessor; converge the four helpers"
     },
