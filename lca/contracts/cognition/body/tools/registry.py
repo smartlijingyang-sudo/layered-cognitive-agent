@@ -38,6 +38,12 @@ ToolEffects = Literal["read", "write", "external"]
 # Closed set: any new effect taxonomy requires an ADR (AGENTS.md §3 C11).
 _VALID_EFFECTS: frozenset[str] = frozenset({"read", "write", "external"})
 
+# Tools audited by G-21 (PR-3): allowed to rely on the conservative
+# "external" default. Single source for both audit entry points.
+_AUDITED_DEFAULT_TOOLS: frozenset[str] = frozenset(
+    {"bash", "file-write", "profile_apply", "profile_diff"}
+)
+
 
 class ToolEffectsDeclarationError(ValueError):
     """Raised when a tool manifest is missing an explicit ``effects`` value.
@@ -47,27 +53,6 @@ class ToolEffectsDeclarationError(ValueError):
     time, so this error means a downstream audit caught a manifest that
     was registered without ever selecting one of the three values.
     """
-
-
-def audit_tool_manifest_effects(manifest: ToolManifest) -> None:
-    """Reject any manifest whose every API falls back to the default.
-
-    The default ``"external"`` is sequential-safe; the audit only raises
-    when *every* API in the manifest is still on the default.  This
-    catches tools that were never touched by G-21 without penalising
-    new manifests that explicitly choose ``"external"``.
-    """
-
-    if not manifest.api:
-        return
-    if all(api.effects == "external" for api in manifest.api):
-        # Distinguish "explicit external" from "never declared".
-        # Dataclass default is "external"; we cannot tell apart from a
-        # frozen read, so require at least one API to opt-in explicitly.
-        # For practical purposes: if the manifest has no ``effects=`` kwarg
-        # at construction, callers should reach for ``assert_effects_declared``
-        # instead.  This audit is best-effort and logs a warning only.
-        return
 
 
 def assert_effects_declared(manifests: Iterable[ToolManifest]) -> None:
@@ -88,9 +73,8 @@ def assert_effects_declared(manifests: Iterable[ToolManifest]) -> None:
     """
 
     offenders: list[str] = []
-    audited_defaults = {"bash", "file-write", "profile_apply", "profile_diff"}
     for manifest in manifests:
-        if manifest.identifier in audited_defaults:
+        if manifest.identifier in _AUDITED_DEFAULT_TOOLS:
             continue
         if not manifest.api:
             continue
@@ -132,10 +116,9 @@ def register_manifest_with_audit(
     must declare every API and any undeclared one is rejected.
     """
 
-    audited_defaults = {"bash", "file-write", "profile_apply", "profile_diff"}
     api_names = {api.name for api in manifest.api}
     missing = api_names - set(declared_effects)
-    if missing and manifest.identifier not in audited_defaults:
+    if missing and manifest.identifier not in _AUDITED_DEFAULT_TOOLS:
         raise ToolEffectsDeclarationError(
             f"manifest {manifest.identifier!r} missing effects= on APIs "
             f"{sorted(missing)} (ADR-0232 §Decision 2)"
@@ -160,9 +143,10 @@ def select_effect(api: ToolApi) -> ToolEffects:
 
 
 __all__ = [
+    "EFFECTS_UNSET",
     "ToolEffects",
     "ToolEffectsDeclarationError",
     "assert_effects_declared",
-    "audit_tool_manifest_effects",
+    "register_manifest_with_audit",
     "select_effect",
 ]

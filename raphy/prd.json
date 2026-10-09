@@ -1225,8 +1225,8 @@
       "branchName": "raphy/arch-20261009-1008",
       "description": "As an LCA maintainer, I want lca/contracts/cognition/body/tools/registry.py to show only its real enforcement surface, because: (1) audit_tool_manifest_effects has zero callers repo-wide and its body returns immediately ('best-effort logs a warning only' — it never even logs; RA-061-class dead code); (2) __all__ omits register_manifest_with_audit and EFFECTS_UNSET, so tests import them by full path (test_registry_effects.py:131) — the export table disagrees with the public API; (3) the hardcoded whitelist {'bash','file-write','profile_apply','profile_diff'} is written verbatim twice (assert_effects_declared + register_manifest_with_audit) — a future 5th audited tool risks updating one and diverging the other. Deletion test: concentrates — the module's actual enforcement face becomes visible.",
       "id": "RA-085",
-      "notes": "Source: Round 14 friction walk, cognition zone (Strong; dead code + export gap + mechanical duplication in one file). Do BEFORE RA-086.",
-      "passes": false,
+      "notes": "Source: Round 14 friction walk, cognition zone (Strong; dead code + export gap + mechanical duplication in one file). Do BEFORE RA-086. | Implemented 2026-10-09: deleted audit_tool_manifest_effects (zero callers confirmed by grep; body was a no-op returning in all paths); completed __all__ (added register_manifest_with_audit and EFFECTS_UNSET, removed the dead fn); converged the duplicated whitelist literal into one module-level _AUDITED_DEFAULT_TOOLS frozenset used by assert_effects_declared and register_manifest_with_audit; test_registry_effects.py now imports register_manifest_with_audit at top level. ToolEffectsDeclarationError fail-loud semantics and EFFECTS_UNSET sentinel semantics unchanged.",
+      "passes": true,
       "priority": 1,
       "title": "Clean registry.py: delete dead audit fn, complete __all__, converge whitelist"
     },

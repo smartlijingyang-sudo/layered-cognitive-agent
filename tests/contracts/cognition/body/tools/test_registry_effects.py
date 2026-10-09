@@ -22,6 +22,7 @@ from lca.contracts.cognition.body.tools.registry import (
     ToolEffects,
     ToolEffectsDeclarationError,
     assert_effects_declared,
+    register_manifest_with_audit,
     select_effect,
 )
 from lca.contracts.models.core.execution.tool import ToolApi, ToolManifest
@@ -127,8 +128,6 @@ def test_assert_effects_declared_passes_for_audited_manifests() -> None:
 
 def test_assert_effects_declared_rejects_unknown_id_with_default_effects() -> None:
     """A brand-new identifier that never declared effects is rejected by the strict audit."""
-
-    from lca.contracts.cognition.body.tools.registry import register_manifest_with_audit
 
     manifest = ToolManifest(
         identifier="probe.unknown_tool",

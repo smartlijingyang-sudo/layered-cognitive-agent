@@ -2081,3 +2081,12 @@
   - A source-level pin test (no "isinstance" in steps.py) is the cheapest way to prove a downcast stays dead; pair it with behavioral tests on pure fakes.
   - TYPE_CHECKING import for a concrete return-type annotation in a protocol module avoids import cycles while keeping the annotation honest.
 ---
+
+## 2026-10-09 12:15 CST - RA-085
+- Implemented: registry.py cleanup — deleted `audit_tool_manifest_effects` (zero callers, body was a no-op); completed `__all__` (added `register_manifest_with_audit` + `EFFECTS_UNSET`, removed the dead fn); converged the duplicated whitelist literal into one module-level `_AUDITED_DEFAULT_TOOLS` frozenset used by both audit entry points; test file now imports `register_manifest_with_audit` at top level.
+- Files changed: lca/contracts/cognition/body/tools/registry.py, tests/contracts/cognition/body/tools/test_registry_effects.py, raphy/prd.json, raphy/progress.txt
+- Tests: 10 passed (tests/contracts/cognition/body/tools/test_registry_effects.py); ruff clean.
+- **Learnings for future iterations:**
+  - Deleting a dead function: grep for callers AND check `__all__` (star-import exposure) — both must be clean.
+  - When a test does a function-level import of a same-module name, that's a smell pointing at an incomplete `__all__` or an unclear public surface; fix the module, then normalize the test import.
+---
