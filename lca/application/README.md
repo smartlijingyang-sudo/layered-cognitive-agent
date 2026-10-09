@@ -17,14 +17,18 @@ LCA 框架的组成部分。具体职责参见同目录下各子包的 README �
 - 暴露的公共 API：5 个显式 __all__ 条目； 88 个定义符号中，66 个为公共命名
 
 ## 5. 允许依赖
-—
+- `lca.contracts`
+- `lca.infrastructure`
+- `lca.cognition`
+- `lca.runtime`
+- `lca.agent`
+- `lca.harness`（组合根按 ADR-0199 P1-06/P1-07 依赖 K1/K2 与 activation_ref hashing）
+- `lca.plugins`（组合根装配插件实现）
 
 ## 6. 禁止依赖
 **pyproject.toml `[tool.lca.package_contracts.lca.application].forbidden_dependencies`**:
 
 - `gateway`
-- `lca.harness`
-- `lca.plugins`
 
 ## 7. 副作用
 log:emit

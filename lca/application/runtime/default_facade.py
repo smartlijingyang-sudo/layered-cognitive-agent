@@ -32,15 +32,13 @@ Dispatch contract (PR-0199-P1-10):
 
 .. note::
 
-   ``lca.application`` is declared forbidden from depending on
-   ``lca.harness`` / ``lca.plugins`` in :file:`pyproject.toml`. The
-   current PR imports :func:`lca.harness.runtime.activation_ref.compute_activation_ref`
-   as a transitive seam that ADR-0199 §2.2.2 mandates (activation_ref
-   hashing is owned by the harness layer per P1-06). This is a soft-
-   layering deviation that the parallel P1-07 / P1-11 PRs also carry.
-   No current ``importlinter`` rule enforces the soft boundary;
-   promoting ``compute_activation_ref`` to ``lca.contracts.runtime.activation_ref``
-   is tracked under the ADR-0199 P1 cleanup backlog.
+   ``lca.application`` is the composition root. Per ADR-0199 P1-06 the
+   activation_ref hashing stays owned by the harness layer, and P1-07
+   resolves profiles through harness K1/K2. The package contract in
+   :file:`pyproject.toml` therefore allows ``lca.harness`` /
+   ``lca.plugins`` and forbids only ``gateway``;
+   ``scripts/check_package_contracts.py`` enforces the forbidden list
+   against actual imports (``check_actual_forbidden_imports``).
 """
 
 from __future__ import annotations

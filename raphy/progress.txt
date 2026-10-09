@@ -1,5 +1,14 @@
 ## Codebase Patterns
 
+- **Package contract enforcement must scan actual imports（RA-107）：**
+  `check_package_contracts.py` 的 L1↔L2 cross-check 只验证 README *提到* 了
+  forbidden dep，从不扫描真实 import——`lca.application` 契约禁
+  `lca.harness` 而 `runtime/` 一直在 import，静默违规。全仓 actual-import
+  扫描揭示 142 处既有 forbidden-dep 违规：package contract 普遍是理想声明。
+  修法：组合根的契约按真实 wiring 更新（允许 harness+plugins，只禁
+  gateway），再把 `check_actual_forbidden_imports` 接进脚本 main() 做强制。
+  验证时用 `--package <pkg>` 聚焦本 story 包，其余违规记为基线。
+
 - **环境输入（cwd）绝不能冒充诊断输入（RA-060）：** `run(profile_path)` 接受参数又
   `del` 掉、转去读 `Path.cwd()`，是典型的环境泄漏进纯诊断域。修法：repo root
   必须从 profile_path 派生（walk-up 找 repo marker）或显式传入；找不到 marker
@@ -2456,4 +2465,46 @@ Learnings:
 - Files: lca/application/routine/tick.py, lca/infrastructure/mcp/routing.py, lca/plugins/observability/spine/derivers/anomaly.py, lca/nodes/think/decision_repair/repair.py, lca/contracts/protocols/{act/tool/batch_execution,runtime/runtime/lifecycle,state/reducer}.py, lca/nodes/fast_path.py, lca/runtime/support/runtime_bindings.py, lca/nodes/intervene/approve_gate.py, 5 test files.
 - 145 related tests pass; ruff clean on touched files.
 - Learnings: Chinese comments legitimately use '——' as punctuation; the unslop em-dash rule applies to English AI-tell prose only. 'Leverage' is a defined architecture term in this repo (improve-codebase-architecture vocabulary), not slop.
+---
+
+## [2026-10-10] - RA-107
+- SPIKE：枚举全部 `lca.application -> lca.harness` import（`default_facade.py`
+  → `lca.harness.runtime.activation_ref.compute_activation_ref`；
+  `plan_resolution.py` → `lca.harness.plan.compiled_run_plan_ref` /
+  `declarative_plan_hash` + `lca.harness.profile.resolve.resolve.resolve_profile` /
+  `ResolvedProfile` + `lca.harness.profile.validate.errors.ProfileResolveError`）。
+  选 option (b)：组合根合法依赖 harness（ADR-0199 P1-06 把 activation_ref
+  hashing 放在 harness；P1-07 经 harness K1/K2 解析 profile）。移动
+  `compute_activation_ref` 会违背 ADR 归属；`compiled_run_plan_ref` /
+  `declarative_plan_hash` 深缠在 `lca/harness/plan.py`（移动 = 搬半个模块），
+  都不是"小纯函数"。把 `lca.application` 契约更新为允许 `lca.harness` +
+  `lca.plugins`（组合根也装配插件：spawn / dream_scheduler / adapters），
+  只禁 `gateway`。
+- Enforcement：`scripts/check_package_contracts.py` 新增
+  `check_actual_forbidden_imports(root, packages)`——扫描每个包所有模块对
+  `forbidden_dependencies` 的实际 import（regex
+  `^\s*(?:import|from)\s+<dep>(?:\s|\.|import)`），接入 `main()`。
+  `--package lca.application` 现 exit 0（无 gateway import）。全量跑 198
+  issues：62 条既有 L1/L2/__all__ + 136 条 actual 层既有违规（基线，非本轮引入）。
+- `default_facade.py`：删掉 "soft-layering deviation / P1 cleanup backlog" 注记，
+  换成决议说明（契约允许 harness/plugins、只禁 gateway、由
+  `check_actual_forbidden_imports` 强制）。
+- Files changed: `pyproject.toml`、`lca/application/README.md`、
+  `lca/application/runtime/default_facade.py`、`scripts/check_package_contracts.py`、
+  `tests/scripts/test_check_package_contracts.py`（+2 个新 checker 测试；顺手修正
+  过期的 `gateway in pkgs` 断言——`gateway/` 已按 ADR-0119 物理删除）。
+- Tests：142 passed（`tests/application/runtime/` +
+  `tests/scripts/test_check_package_contracts.py` +
+  `tests/architecture/test_0199_phase1_acceptance.py`）；ruff check + format
+  clean；`git diff --check` clean。
+- **Learnings for future iterations:**
+  - option (a) 并不最小：`compiled_run_plan_ref` / `declarative_plan_hash`
+    依赖 `lca/harness/plan.py` 半模块（`canonical_json` / `_canonicalize` /
+    `_unwrap_v2` / `_declarative_payload`…），"移动小纯函数"实为"搬迁模块"。
+    ADR-0199 P1-06 显式把 activation_ref hashing 放在 harness——移动即违背 ADR。
+  - 全仓 actual-import 扫描暴露 142 处既有 forbidden-dep 违规：package
+    contract 普遍是理想声明。扩展 checker 后聚焦验证本 story 包
+    （`--package lca.application`），其余记为基线。
+  - `gateway` 包已物理删除（ADR-0119）；断言
+    `"gateway" in discover_packages(...)` 的测试过期，应断言缺席。
 ---

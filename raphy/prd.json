@@ -1563,7 +1563,7 @@
         "Application/runtime tests + package-contract check pass (pre-existing check_package_contracts failures documented as baseline, not introduced); ruff clean."
       ],
       "priority": 1,
-      "passes": false,
+      "passes": true,
       "branchName": "raphy/deslop-100",
       "notes": "Source: DESLOP-100 friction walk, Area A (composition root). Strength: Strong (declared contract violated, self-documented deviation, unenforced). ADR conflict: ADR-0199 P1-06 says activation_ref hashing is owned by harness — moving compute_activation_ref to contracts changes that ownership and may need an ADR note; the code's own docstring already tracks this move as the ADR-0199 P1 cleanup backlog, so surface only because the friction is real and self-documented. Dependencies: PlanResolutionService/DefaultRuntimeFacade callers (CLI/HTTP/tests) must see identical refs."
     },

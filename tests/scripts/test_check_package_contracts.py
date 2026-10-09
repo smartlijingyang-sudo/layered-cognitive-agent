@@ -10,6 +10,7 @@ sys.path.insert(0, str(ROOT / "scripts"))
 
 from check_package_contracts import (  # noqa: E402
     Issue,
+    check_actual_forbidden_imports,
     check_l1_readme_exists,
     check_l2_pyproject_section,
     cross_check_l1_l2,
@@ -64,7 +65,9 @@ def test_discover_packages_in_repo():
     assert "lca" in pkgs
     assert "lca.contracts" in pkgs
     assert "lca.contracts.atoms" in pkgs
-    assert "gateway" in pkgs
+    # gateway/ was physically deleted (ADR-0119 followup) — discovery
+    # must not report it.
+    assert "gateway" not in pkgs
 
 
 def test_check_l2_pyproject_section_finds_real_sections():
@@ -136,3 +139,37 @@ def test_cross_check_l1_public_api_smoke():
 def test_issue_render():
     issue = Issue(package="lca.foo", layer="L1", message="test")
     assert issue.render() == "[L1] lca.foo: test"
+
+
+def test_check_actual_forbidden_imports_detects_violation(tmp_path):
+    """A module importing a declared forbidden dep is flagged."""
+    pkg = tmp_path / "lca" / "fake"
+    pkg.mkdir(parents=True)
+    (pkg / "__init__.py").write_text(
+        "from lca.harness.plan import compiled_run_plan_ref\n",
+        encoding="utf-8",
+    )
+    (tmp_path / "pyproject.toml").write_text(
+        '[tool.lca.package_contracts."lca.fake"]\nforbidden_dependencies = ["lca.harness"]\n',
+        encoding="utf-8",
+    )
+    issues = check_actual_forbidden_imports(tmp_path, ["lca.fake"])
+    assert len(issues) == 1
+    assert issues[0].layer == "actual"
+    assert "lca.harness" in issues[0].message
+
+
+def test_check_actual_forbidden_imports_passes_when_clean(tmp_path):
+    """A module importing only allowed deps produces no issues."""
+    pkg = tmp_path / "lca" / "fake"
+    pkg.mkdir(parents=True)
+    (pkg / "__init__.py").write_text(
+        "from lca.contracts.plan import x\n",
+        encoding="utf-8",
+    )
+    (tmp_path / "pyproject.toml").write_text(
+        '[tool.lca.package_contracts."lca.fake"]\nforbidden_dependencies = ["lca.harness"]\n',
+        encoding="utf-8",
+    )
+    issues = check_actual_forbidden_imports(tmp_path, ["lca.fake"])
+    assert issues == []

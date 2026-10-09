@@ -179,6 +179,46 @@ def cross_check_l1_public_api(packages: list[str]) -> list[Issue]:
     return issues
 
 
+def check_actual_forbidden_imports(root: Path, packages: list[str]) -> list[Issue]:
+    """Scan each package's source for imports of its declared forbidden deps.
+
+    The L1↔L2 cross-check only verifies the README *mentions* each
+    forbidden dependency. This layer reads the actual source so a declared
+    contract cannot be silently violated by a new import.
+    """
+    issues: list[Issue] = []
+    pyproject = root / "pyproject.toml"
+    if not pyproject.exists():
+        return issues
+    data = tomllib.loads(pyproject.read_text(encoding="utf-8"))
+    contracts = data.get("tool", {}).get("lca", {}).get("package_contracts", {})
+    for pkg in packages:
+        section = contracts.get(pkg, {})
+        forbidden = [dep for dep in section.get("forbidden_dependencies", []) if dep]
+        if not forbidden:
+            continue
+        pkg_path = package_to_path(root, pkg)
+        if not pkg_path.exists():
+            continue
+        for py_file in sorted(pkg_path.rglob("*.py")):
+            if any(part in EXCLUDE_DIRS for part in py_file.parts):
+                continue
+            try:
+                text = py_file.read_text(encoding="utf-8")
+            except (OSError, UnicodeDecodeError):
+                continue
+            rel = py_file.relative_to(pkg_path)
+            module = ".".join(rel.with_suffix("").parts)
+            for dep in forbidden:
+                pattern = re.compile(
+                    rf"^\s*(?:import|from)\s+{re.escape(dep)}(?:\s|\.|import)",
+                    re.MULTILINE,
+                )
+                if pattern.search(text):
+                    issues.append(Issue(pkg, "actual", f"{module} imports forbidden dep {dep}"))
+    return issues
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--package", help="check only this package")
@@ -194,6 +234,7 @@ def main() -> int:
     all_issues.extend(check_l2_pyproject_section(packages))
     all_issues.extend(cross_check_l1_l2(packages))
     all_issues.extend(cross_check_l1_public_api(packages))
+    all_issues.extend(check_actual_forbidden_imports(args.root, packages))
 
     if not all_issues:
         print(f"OK: {len(packages)} packages checked, no issues")
