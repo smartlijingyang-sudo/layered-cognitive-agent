@@ -2369,3 +2369,27 @@ Learnings:
 - `PortName` 是 `str` 的 NewType，`PortName(name)` 转换只为取悦类型检查器，运行时零成本——seam 侧的类型收紧不增加运行时负担时，直接转。
 - `read` 把 value=None 视为 Unset（抛错），而 `has_port`/`port_has_value` 只看 key 存在性——"存在"与"可读"是两个不同的问题，改 seam 前先确认三态语义一致，否则会把清空语义改错。
 ---
+
+## 2026-10-09 21:35 CST - RA-102
+
+Implemented:
+- `PlanInterpreter` 新增私有 `_record_visit_end(...)` 方法，收敛三处 visit-end
+  仪式块（routing-terminate break / terminal_predicate break / 循环末尾正常路径）：
+  observe(visit-end) → latency.record → VisitRecord → recorder.record →
+  visits.append → facts.extend。dispatch kind 作为参数传入；
+  `terminal_reason` 赋值与 `terminal_node = node.id` 留在调用方。
+- 为 helper 签名补了 `NodeInput` import（原只 import 了 NodeOutput）。
+
+Files:
+- lca/framework/graph/interpreter.py
+
+Tests:
+- tests/framework/graph/ + tests/integration/test_run_with_consecutive_tool_calls.py + test_end_to_end_think_to_act.py：120 passed, 1 failed（基线已知红 test_gate_chain_annotations_resolve，与改动无关）
+- ruff check: clean
+
+Learnings:
+- 收敛"仪式块"时最容易踩的是**隐式顺序依赖**：原正常路径里 `_edge_of` 的 observe
+  夹在 visit-end observe 和 VisitRecord 构造之间——helper 只收"无副作用顺序"的
+  部分（observer 事件顺序 visit_end→edge 保持不变），`_edge_of` 留在调用方。
+  机械收敛前先列出每块的事件发射顺序，逐项对齐。
+---

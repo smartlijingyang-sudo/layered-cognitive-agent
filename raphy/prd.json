@@ -1482,9 +1482,9 @@
       "branchName": "raphy/arch-20261009-2045",
       "description": "As an LCA maintainer, I want the three near-identical visit-end ceremony blocks in `PlanInterpreter.run()` converged into one private helper, because today the routing-terminate break, the terminal_predicate break, and the normal loop-end path each repeat the same ~20-line ritual (observe visit-end, record latency, build VisitRecord, record it, append, extend facts) differing only in dispatch kind — the next person adding a visit-end concern must touch all three.",
       "id": "RA-102",
-      "implemented": false,
-      "notes": "Source: Round 16 friction walk, Area A (interpreter.py, Q1). Mechanical duplication class: 3x ~20-line blocks, diff is dispatch kind + terminal_reason. Strength: Worth exploring.",
-      "passes": false,
+      "implemented": true,
+      "notes": "Source: Round 16 friction walk, Area A (interpreter.py, Q1). Mechanical duplication class: 3x ~20-line blocks, diff is dispatch kind + terminal_reason. Strength: Worth exploring.\n\nImplemented 2026-10-09 (round 16): added private `PlanInterpreter._record_visit_end(...)` covering the six-step ceremony (observe visit-end → latency.record → VisitRecord → recorder.record → visits.append → facts.extend); the three exit paths (routing-terminate break / terminal_predicate break / normal loop end) now call it with their dispatch kind. terminal_reason assignment and `terminal_node = node.id` stay at the call sites. Behavior verified zero-change: tests/framework/graph/ (116 incl. predicate/port-reader) + 2 interpreter integration tests: 120 passed, 1 pre-existing red (gate_chain_annotations_resolve, baseline). ruff clean. IMPL vs ASSESSMENT: as assessed; also imported NodeInput for the helper signature.",
+      "passes": true,
       "priority": "P2",
       "title": "Converge the three visit-end ceremony blocks in PlanInterpreter.run()"
     },
