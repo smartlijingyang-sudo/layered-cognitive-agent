@@ -213,7 +213,7 @@ class TestSubgraphStrategy:
             plan_ref="outer.yaml",
             node_id="dispatch",
             binding_kind=BindingKind.SUBGRAPH,
-            node_config={},  # notably: no "_port_registry" string key
+            node_config={},  # no "_port_registry" string key
             subgraph_ref=ref,
             outer_ports=outer,
         )
@@ -259,9 +259,7 @@ class TestSubgraphStrategy:
                 node_id="d",
                 binding_kind=BindingKind.SUBGRAPH,
                 node_config={},
-                subgraph_ref=SubgraphReference(
-                    plan_ref="x.yaml", entry_node="a", binding_edge="x"
-                ),
+                subgraph_ref=SubgraphReference(plan_ref="x.yaml", entry_node="a", binding_edge="x"),
             )
             with pytest.raises(RuntimeError, match="subgraph recursion exceeded"):
                 await strategy.execute(ctx, NodeInput())
