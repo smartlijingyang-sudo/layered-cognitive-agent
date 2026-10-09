@@ -11,9 +11,14 @@ from __future__ import annotations
 import asyncio
 import os
 import shutil
-import uuid
 from pathlib import Path
 
+from lca.infrastructure.computer.box_gate import (
+    atomic_write_text,
+    check_no_privilege_escalation,
+    contain_path,
+    resolve_box_root,
+)
 from lca.infrastructure.computer.box_port import BoxCommandResult, BoxExecutionPort
 
 
@@ -26,26 +31,12 @@ class LocalBoxAdapter(BoxExecutionPort):
     """
 
     def __init__(self, root_dir: str | Path = "/home/box") -> None:
-        self.root_dir = Path(root_dir).resolve()
-        try:
-            self.root_dir.mkdir(parents=True, exist_ok=True)
-        except (PermissionError, OSError):
-            from lca.infrastructure.path.locator import get_lca_home
-
-            fallback = Path(os.environ.get("LCA_BOX_ROOT", get_lca_home() / "box"))
-            fallback.mkdir(parents=True, exist_ok=True)
-            self.root_dir = fallback.resolve()
+        # 沙箱根解析收敛到 box_gate.resolve_box_root（mkdir 回退逻辑只此一处）
+        self.root_dir = resolve_box_root(root_dir)
 
     def _resolve_safe_path(self, path: str) -> Path:
-        clean_sub = path.lstrip("/")
-        target = (self.root_dir / clean_sub).resolve()
-        try:
-            target.relative_to(self.root_dir)
-        except ValueError:
-            raise PermissionError(
-                f"越权访问受阻：路径 '{path}' 超出员工电脑沙箱范围 ({self.root_dir})"
-            ) from None
-        return target
+        # 路径 containment 收敛到 box_gate.contain_path（relative_to 语义）
+        return contain_path(self.root_dir, path)
 
     async def read_file(
         self,
@@ -74,22 +65,8 @@ class LocalBoxAdapter(BoxExecutionPort):
         if create_directories:
             target.parent.mkdir(parents=True, exist_ok=True)
 
-        # 原子刷盘（临时文件落地 + fsync + 原子 os.replace）
-        tmp_target = target.parent / f".tmp_{target.name}_{uuid.uuid4().hex[:8]}"
-
-        def _do_write() -> None:
-            with tmp_target.open("w", encoding="utf-8") as fh:
-                fh.write(content)
-                fh.flush()
-                os.fsync(fh.fileno())
-            os.replace(tmp_target, target)
-
-        try:
-            await asyncio.to_thread(_do_write)
-        except BaseException:
-            if tmp_target.exists():
-                tmp_target.unlink()
-            raise
+        # ADR-0251 决策一：原子刷盘收敛到 box_gate.atomic_write_text
+        await asyncio.to_thread(atomic_write_text, target, content)
         return str(target)
 
     async def list_files(
@@ -111,15 +88,8 @@ class LocalBoxAdapter(BoxExecutionPort):
         command: str,
         timeout_s: int = 30,
     ) -> BoxCommandResult:
-        cmd_stripped = command.strip()
-        # INV-04 安全硬闸：禁止 sudo / su / chroot 提权命令
-        if (
-            cmd_stripped.startswith("sudo ")
-            or cmd_stripped.startswith("su ")
-            or " sudo " in command
-            or " su " in command
-        ):
-            raise PermissionError("安全硬闸：员工电脑沙箱禁止提权命令 (sudo/su)")
+        # INV-04 安全硬闸收敛到 box_gate.check_no_privilege_escalation
+        check_no_privilege_escalation(command)
 
         proc = await asyncio.create_subprocess_shell(
             command,
@@ -224,14 +194,8 @@ class OnlyboxesBoxAdapter(BoxExecutionPort):
         if not self._check_docker():
             return await self._fallback.run_command(command, timeout_s)
 
-        cmd_stripped = command.strip()
-        if (
-            cmd_stripped.startswith("sudo ")
-            or cmd_stripped.startswith("su ")
-            or " sudo " in command
-            or " su " in command
-        ):
-            raise PermissionError("安全硬闸：员工电脑沙箱禁止提权命令 (sudo/su)")
+        # INV-04 安全硬闸收敛到 box_gate.check_no_privilege_escalation
+        check_no_privilege_escalation(command)
 
         exec_cmd = [
             "docker",

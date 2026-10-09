@@ -18,7 +18,7 @@ import time
 from collections.abc import Iterator
 from typing import Any
 
-from lca.infrastructure.cli.service.service import health_body_ok
+from lca.infrastructure.cli.service.host_probing import health_body_ok
 from lca.infrastructure.cli.services.kernel.supervisor.decisions import (
     _EXIT_CLEAN,
     decide_restart,

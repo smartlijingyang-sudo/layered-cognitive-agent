@@ -23,6 +23,7 @@ from lca.cognition.body.tools.execution_policy import (
     ReadOnlyToolBatchEntry,
 )
 from lca.cognition.body.tools.tool_batch_executor import ToolBatchExecutor
+from lca.contracts.cognition.body.tools.registry import ToolEffectsDeclarationError
 from lca.contracts.models.core.execution.decision import Observation, ToolCall
 from lca.contracts.models.core.execution.tool import ToolApi, ToolManifest
 from lca.contracts.protocols import Tool
@@ -244,3 +245,99 @@ def test_select_mode_with_audit_falls_back_to_sequential_on_mixed() -> None:
     from lca.contracts.protocols.act.tool.batch_execution import ToolBatchExecutionMode
 
     assert policy.select_mode_with_audit(audited) == ToolBatchExecutionMode.SEQUENTIAL
+@pytest.mark.asyncio
+async def test_illegal_effects_tool_on_executor_path_raises() -> None:
+    """RA-086 behavior change, explicit: an illegal effects value on the
+    executor path fails loud instead of silently degrading to sequential."""
+    tools = {
+        "good": _make_tool("good", effects="read", grant_concurrent=True),
+        "bogus": _make_tool("bogus", effects="bogus", grant_concurrent=True),
+    }
+    registry = _Registry(tools)
+    executor = ToolBatchExecutor(registry, _SafeExecutor(per_call_latency_s=0))
+
+    with pytest.raises(ToolEffectsDeclarationError):
+        await executor.execute(_calls(list(tools)))
+
+
+# ----- RA-087: protocol-targeted tests ----------------------------------------
+
+
+def test_default_policy_declares_audit_aware_protocol() -> None:
+    """The default policy explicitly declares the audit channel."""
+    from lca.cognition.body.tools.execution_policy import (
+        ParallelReadOnlyToolBatchPolicy,
+    )
+    from lca.contracts.protocols.act.tool.batch_execution import (
+        AuditAwareToolBatchPolicy,
+    )
+
+    assert isinstance(
+        ParallelReadOnlyToolBatchPolicy(), AuditAwareToolBatchPolicy
+    )
+
+
+class _BaseOnlyPolicy:
+    """Implements only the base protocol: no audit channel declared."""
+
+    def select_mode(self, entries):  # type: ignore[no-untyped-def]
+        from lca.contracts.protocols.act.tool.batch_execution import (
+            ToolBatchExecutionMode,
+        )
+
+        return ToolBatchExecutionMode.SEQUENTIAL
+
+
+class _AuditSpyPolicy:
+    """Declares the audit channel and records the enriched entries."""
+
+    def __init__(self) -> None:
+        self.seen: tuple = ()
+
+    def select_mode(self, entries):  # type: ignore[no-untyped-def]
+        from lca.contracts.protocols.act.tool.batch_execution import (
+            ToolBatchExecutionMode,
+        )
+
+        return ToolBatchExecutionMode.SEQUENTIAL
+
+    def select_mode_with_audit(self, audited):  # type: ignore[no-untyped-def]
+        from lca.contracts.protocols.act.tool.batch_execution import (
+            ToolBatchExecutionMode,
+        )
+
+        self.seen = audited
+        return ToolBatchExecutionMode.SEQUENTIAL
+
+
+@pytest.mark.asyncio
+async def test_base_only_policy_gets_explicit_protocol_level_behavior() -> None:
+    """A policy without the audit channel never sees enriched entries;
+    the executor defers to protocol-level select_mode (explicit, not silent)."""
+    tools = {"r": _make_tool("r", effects="read", grant_concurrent=True)}
+    safe = _SafeExecutor(per_call_latency_s=0)
+    executor = ToolBatchExecutor(
+        _Registry(tools), safe, policy=_BaseOnlyPolicy()
+    )
+
+    observation = await executor.execute(_calls(["r", "r"]))
+
+    assert observation.success
+    # protocol-level select_mode said SEQUENTIAL: no overlap happened
+    assert safe.max_active == 1
+
+
+@pytest.mark.asyncio
+async def test_audit_aware_policy_receives_enriched_entries() -> None:
+    """A policy declaring the audit channel gets effects+grant enrichment."""
+    policy = _AuditSpyPolicy()
+    tools = {"r": _make_tool("r", effects="read", grant_concurrent=True)}
+    executor = ToolBatchExecutor(
+        _Registry(tools), _SafeExecutor(per_call_latency_s=0), policy=policy
+    )
+
+    await executor.execute(_calls(["r", "r"]))
+
+    assert len(policy.seen) == 2
+    assert policy.seen[0].effects == "read"
+    assert policy.seen[0].grant == {"concurrent": True}

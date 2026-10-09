@@ -1,7 +1,11 @@
-"""Tool-dispatch path resolution (ADR-0121 PR-C).
+"""Read-path attachment-URL interception (ADR-0121 PR-C).
 
-Every tool call that takes a ``path`` argument flows through
-:func:`resolve_path_arg` before reaching the sandbox / machine backend.
+Translates a model-produced ``path`` string into a concrete
+:class:`ResolvedPathArg` for the single guest entry wired to this seam:
+``SandboxComputer.read_file`` (via
+``lca.infrastructure.computer.sandbox.computer._resolve_read_path_arg_or_passthrough``,
+lazy import to break the sandbox_computer <-> tools cycle).
+
 The function translates three categories of "raw strings the model might
 say" into a concrete :class:`FileRef`:
 
@@ -17,6 +21,16 @@ say" into a concrete :class:`FileRef`:
 The seam is *strict about the LLM-facing wire string*: an input that
 matches no known shape still passes through, but its resolution is logged
 so a future regression in another call site shows up in the journal.
+
+Scope (RA-095, choice (b) — honest read-path scoping): this seam is
+deliberately read-path-only. ``write_file`` / ``edit_file`` /
+``list_files`` / ``search_files`` / ``move_files`` go straight to
+``normalize_sandbox_path`` and never see this adapter. Resolving
+``/files/<aid>`` to its real guest path for a *write* would let the model
+overwrite attachment backing files, so the interception stays read-scoped
+by design. Widening the scope (choice (a)) needs a security review and
+must update the wiring pin in
+``tests/lca/infrastructure/computer/sandbox/test_path_arg_wiring_scope.py``.
 """
 
 from __future__ import annotations

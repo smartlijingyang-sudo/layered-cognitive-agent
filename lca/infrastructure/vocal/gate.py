@@ -6,6 +6,7 @@ from lca.contracts.models.vocal.models import (
     DeliveryReceipt,
     SendMessagePayload,
     VocalMessageType,
+    WidgetApproval,
 )
 from lca.contracts.models.vocal.wake import WakeContext, WakeSource
 from lca.contracts.protocols.vocal.protocol import VocalGateProtocol
@@ -37,6 +38,12 @@ class DirectVocalGate(VocalGateProtocol):
 
     def reset_awaiting_widget(self) -> None:
         pass
+
+    def pending_widget_approval(self) -> WidgetApproval | None:
+        return None
+
+    def delivered_visible_texts(self) -> tuple[str, ...]:
+        return tuple(str(v["content"]) for v in self._visible if v.get("content"))
 
     def get_visible_outputs(self) -> list[dict[str, Any]]:
         return list(self._visible)
@@ -121,6 +128,24 @@ class GatedVocalGate(VocalGateProtocol):
     def reset_awaiting_widget(self) -> None:
         """重置 widget 停等标记（在用户回复 resume 后调用）。"""
         self._awaiting_widget = False
+
+    def pending_widget_approval(self) -> WidgetApproval | None:
+        # The gate owns the visible-message shape: the latest widget
+        # record becomes the typed approval.  Callers must not sniff
+        # these dicts themselves.
+        if not self._awaiting_widget:
+            return None
+        for record in reversed(self._visible):
+            if record.get("type") == "widget":
+                return WidgetApproval(
+                    message_id=record["message_id"],
+                    content=record.get("content"),
+                    options=list(record.get("options", [])),
+                )
+        return None
+
+    def delivered_visible_texts(self) -> tuple[str, ...]:
+        return tuple(str(v["content"]) for v in self._visible if v.get("content"))
 
     def get_visible_outputs(self) -> list[dict[str, Any]]:
         return list(self._visible)

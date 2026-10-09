@@ -383,10 +383,6 @@ _LINE_COUNT_EXEMPT: dict[str, str] = {
         "lca-ops runs CLI 命令装配（含 --facade in-process 分发）；命令入口集中（2026-10-05 Phase C batch-1 "
         "审计，ADR-0291 §5① 仲裁；Phase D 点亮）"
     ),
-    "lca/infrastructure/cli/service/service.py": (
-        "Service Protocol 核心抽象 + 进程/端口/健康检查工具函数族（kill_tree/free_port/pid_alive "
-        "等）；平台服务边界内聚（2026-10-05 Phase C batch-2 审计，ADR-0291 §5① 仲裁；Phase D 点亮）"
-    ),
     "lca/infrastructure/cli/services/kernel/restart_report.py": (
         "kernel 重启后三阶段健康检查编排单模块（boot_check/fiber_report/health_probe）（2026-10-05 Phase C batch-1 "
         "审计，ADR-0291 §5① 仲裁；Phase D 点亮）"

@@ -24,7 +24,10 @@ ADR-0119 决定 1 + 决定 3 + ADR-0119 followup-2。``lca-web-server`` 是 L1 S
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, cast
+from pathlib import Path
+from typing import TYPE_CHECKING, Any, cast
+
+import structlog
 
 from lca.contracts.atoms.control.slot import ControlSlot
 from lca.contracts.atoms.functional.group import FunctionalGroup
@@ -42,6 +45,11 @@ from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import
 )
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 from lca_kernel.boot.lifespan import make_lifespan
+
+if TYPE_CHECKING:
+    from lca.infrastructure.cron.daemon import CronDaemonService
+
+_log = structlog.get_logger(__name__)
 
 
 @dataclass(frozen=True, slots=True)
@@ -77,6 +85,57 @@ class WebServerHandle:
         self.ctx.effect(server.shutdown, label="lca-web-server.uvicorn.shutdown")
 
         await server.serve()
+
+
+async def start_cron_daemon(
+    app: Any,
+    lock_dir: Path | None = None,
+    workspace_path: str | None = None,
+) -> CronDaemonService | None:
+    """命名组合步骤:启动常驻 Cron 调度守护协程(ADR-0268 生产运行态)。
+
+    webserver plugin 拥有这次组合:它用显式输入构造 cron store + daemon,
+    ``start()`` 后把运行中的 daemon 返回给调用方挂载到
+    ``app.state.cron_daemon``。Starlette lifespan
+    (``lca_kernel.boot.lifespan.make_lifespan``)不构造 cron,只在 shutdown
+    时把它停掉。
+
+    输入全部显式声明为参数(无 ctx getattr 鸭子读取):
+
+    - ``app``:Starlette 应用;``LcaRunHandoffDispatcher(app)`` 在派发时才
+      从 ``app.state`` 解析 run_port / registry,因此与 webserver bootstrap
+      的启动顺序无关。
+    - ``lock_dir``:cron 文件锁目录;默认 ``<lca_home>/locks``。
+    - ``workspace_path``:cron worker 的工作区;默认 ``<lca_home>``。
+
+    启动失败策略(显式降级,非静默 try/except):daemon 起不来时记 error 日志
+    并返回 ``None``;webserver 照常 boot 并对外服务,只是没有 cron 调度。
+    理由:cron 是后台生产运行态需求(ADR-0268),不是请求路径依赖——降级启动
+    让服务平面保持可用,失败本身在日志里可见。
+    """
+    from lca.domain.cron.store import MultiAssistantCronStore
+    from lca.infrastructure.cron.daemon import CronDaemonService
+    from lca.infrastructure.path.locator import get_lca_home
+    from lca.plugins.transport.webserver.handlers.runs.terminal.handoff_dispatch import (
+        LcaRunHandoffDispatcher,
+    )
+
+    lca_home = get_lca_home()
+    try:
+        daemon = CronDaemonService(
+            store=MultiAssistantCronStore(lca_home / "assistants"),
+            lock_dir=lock_dir if lock_dir is not None else (lca_home / "locks"),
+            workspace_path=workspace_path if workspace_path is not None else str(lca_home),
+            # Resolves run_port / registry off app.state at dispatch time,
+            # so boot ordering between the webserver bootstrap and this
+            # step does not matter.
+            handoff_dispatcher=LcaRunHandoffDispatcher(app),
+        )
+        await daemon.start()
+    except Exception:
+        _log.exception("webserver: failed to start CronDaemonService; continuing without cron")
+        return None
+    return daemon
 
 
 @plugin(
@@ -155,9 +214,16 @@ async def setup(ctx: PluginContext, config: Any) -> None:
     # 不写"app.state.ctx = inner" hack(短期凑合)
     app.router.lifespan_context = cast("Any", make_lifespan(inner))
 
+    # 3e. 常驻 Cron 调度守护(ADR-0268 生产运行态)——命名组合步骤。
+    # 构造+启动在这里,shutdown 时的 stop() 由 make_lifespan 负责(LIFO dispose)。
+    # 显式降级:起不来返回 None,webserver 照常对外服务(无 cron),见 start_cron_daemon。
+    cron_daemon = await start_cron_daemon(app)
+    if cron_daemon is not None:
+        app.state.cron_daemon = cron_daemon
+
     # 4. provide web_server 句柄(cli.py:serve 会 await 它)
     handle = WebServerHandle(app=app, config=cfg, ctx=inner)
     ctx.provide("web_server", handle)
 
 
-__all__ = ["LcaWebServerConfig", "WebServerHandle"]
+__all__ = ["LcaWebServerConfig", "WebServerHandle", "start_cron_daemon"]

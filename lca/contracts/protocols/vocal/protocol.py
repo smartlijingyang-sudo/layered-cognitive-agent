@@ -4,6 +4,7 @@ from lca.contracts.models.vocal.models import (
     DeliveryReceipt,
     SendMessagePayload,
     VocalMode,
+    WidgetApproval,
 )
 from lca.contracts.models.vocal.wake import WakeContext
 
@@ -26,6 +27,22 @@ class VocalGateProtocol(Protocol):
 
     def reset_awaiting_widget(self) -> None:
         """重置 Widget 停等标记（在用户回复 resume 后调用）。"""
+        ...
+
+    def pending_widget_approval(self) -> WidgetApproval | None:
+        """返回当前正等待用户审批的 Widget，无则返回 None。
+
+        门控拥有可见消息的形状知识；调用方不得再嗅探
+        ``get_visible_outputs`` 的 dict 结构。
+        """
+        ...
+
+    def delivered_visible_texts(self) -> tuple[str, ...]:
+        """返回已正式投递的可见气泡文本（按投递顺序）。
+
+        供终态投影在 ``final_output_ref`` 为空时回退取文本；同样替代
+        对 ``get_visible_outputs`` 的 hasattr 嗅探。
+        """
         ...
 
 

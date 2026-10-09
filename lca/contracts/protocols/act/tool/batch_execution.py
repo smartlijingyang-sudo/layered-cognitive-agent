@@ -10,6 +10,7 @@ cognitive phase or action type.
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass
 from enum import StrEnum
 from typing import Protocol, runtime_checkable
@@ -34,6 +35,29 @@ class ToolBatchEntry:
     call_id: str
     tool_name: str
     is_idempotent: bool
+
+
+@dataclass(frozen=True, slots=True)
+class ReadOnlyToolBatchEntry:
+    """Bundle-side facts a policy needs to gate the parallel default.
+
+    ``ToolBatchEntry`` (protocol-level) carries only ``call_id`` /
+    ``tool_name`` / ``is_idempotent``.  PR-3 (ADR-0232) adds an audit
+    channel: the Body passes the per-entry ``effects`` value (resolved
+    via the tool registry,
+    see ``lca/contracts/cognition/body/tools/registry.py``) plus the
+    resolved capability-grant map so the policy can check the
+    ``concurrent`` sub-key without re-querying either store.
+
+    Moved here from ``lca.cognition.body.tools.execution_policy`` (RA-087):
+    the audit channel's facts type is part of the policy contract, and
+    contracts must not import from cognition.
+    """
+
+    call_id: str
+    tool_name: str
+    effects: str  # "read" | "write" | "external"
+    grant: Mapping[str, object]
 
 
 @dataclass(frozen=True, slots=True)
@@ -80,6 +104,29 @@ class ToolBatchSegmentPlanningPolicy(Protocol):
         ...
 
 
+@runtime_checkable
+class AuditAwareToolBatchPolicy(Protocol):
+    """Additive extension for policies that gate on per-entry audit facts.
+
+    A policy declares the audit channel by implementing
+    ``select_mode_with_audit``; the Body then enriches each
+    ``ToolBatchEntry`` into a ``ReadOnlyToolBatchEntry`` (resolved
+    ``effects`` + capability grant) and dispatches through this overload.
+
+    Policies implementing only the base ``ToolBatchExecutionPolicy``
+    have no audit channel: the Body never enriches entries for them
+    and defers to the protocol-level ``select_mode``.  That fallback is
+    explicit and documented on the Body side — never a silent
+    enrich-and-ignore.
+    """
+
+    def select_mode_with_audit(
+        self, audited: tuple[ReadOnlyToolBatchEntry, ...]
+    ) -> ToolBatchExecutionMode:
+        """Return the policy-approved mode for the audit-enriched batch."""
+        ...
+
+
 def validate_tool_batch_execution_segments(
     segments: tuple[ToolBatchExecutionSegment, ...], *, entry_count: int
 ) -> None:
@@ -112,6 +159,8 @@ def validate_tool_batch_execution_segments(
 
 
 __all__ = [
+    "AuditAwareToolBatchPolicy",
+    "ReadOnlyToolBatchEntry",
     "ToolBatchEntry",
     "ToolBatchExecutionMode",
     "ToolBatchExecutionPolicy",

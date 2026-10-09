@@ -31,6 +31,7 @@ from lca.contracts.harness.memory.events import (
     ToolSchemaPublished,
 )
 from lca.contracts.harness.memory.skill import SkillCatalogEntry
+from lca.contracts.models.cognition.prompt_assembly import SelectorDecisionPath
 from lca.contracts.models.messaging.reaction import MessageReaction
 from lca.contracts.models.messaging.reaction_event import ReactionAddedCommitted
 from lca.contracts.observability.closure.skill_meta_ep_closure import (
@@ -213,7 +214,7 @@ def emit_skill_catalog_published(
 def emit_skill_routed(
     *,
     template_id: str,
-    decision_path: str,
+    decision_path: SelectorDecisionPath,
     source: str = "skill_router",
     actor: str = "system",
 ) -> Any | None:

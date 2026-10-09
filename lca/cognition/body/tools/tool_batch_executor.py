@@ -22,11 +22,14 @@ from lca.contracts.atoms.semantic.keys import (
     OBS_TOOL_RESULTS,
     fold_failure_kinds,
 )
+from lca.contracts.cognition.body.tools.registry import resolve_tool_effects
 from lca.contracts.models.core.execution.decision import Observation, ToolCall
 from lca.contracts.models.core.execution.result import ToolExecutionError
 from lca.contracts.models.team.role.team import CacheConfig, RetryPolicy
 from lca.contracts.protocols import SafeExecutor, Tool, ToolRegistry
 from lca.contracts.protocols.act.tool.batch_execution import (
+    AuditAwareToolBatchPolicy,
+    ReadOnlyToolBatchEntry,
     ToolBatchEntry,
     ToolBatchExecutionMode,
     ToolBatchExecutionPolicy,
@@ -98,30 +101,36 @@ class ToolBatchExecutor:
         entries: tuple[ToolBatchEntry, ...],
         resolved: Sequence[tuple[ToolCall, Tool]],
     ) -> ToolBatchExecutionMode | None:
-        """Resolve the batch mode, preferring the audit-aware overload when present.
+        """Resolve the batch mode, preferring the audit-aware overload when declared.
 
-        Returns ``None`` when the policy only exposes the protocol-level
-        ``select_mode`` (no audit channel); the caller then defers to
-        ``_select_segments`` which uses that legacy path.
+        Returns ``None`` when the policy implements only the base
+        ``ToolBatchExecutionPolicy`` (no audit channel declared).  The
+        caller then defers to ``_select_segments``, which uses the
+        protocol-level ``select_mode``.  This fallback is explicit and
+        documented — a base-only policy never sees enriched entries,
+        and its ``select_mode`` return value is the whole scheduling
+        decision (never a silent enrich-and-ignore).
         """
 
-        select_with_audit = getattr(self._policy, "select_mode_with_audit", None)
-        if select_with_audit is None:
+        if not isinstance(self._policy, AuditAwareToolBatchPolicy):
             return None
-        from lca.cognition.body.tools.execution_policy import (
-            ReadOnlyToolBatchEntry,
-        )
 
-        audited = tuple(
-            ReadOnlyToolBatchEntry(
-                call_id=entry.call_id,
-                tool_name=entry.tool_name,
-                effects=_resolve_tool_effects(tool),
-                grant=_resolve_tool_grant(tool),
+        audited_entries: list[ReadOnlyToolBatchEntry] = []
+        for entry, (_call, tool) in zip(entries, resolved, strict=True):
+            grant = getattr(tool, "grant", None)
+            audited_entries.append(
+                ReadOnlyToolBatchEntry(
+                    call_id=entry.call_id,
+                    tool_name=entry.tool_name,
+                    effects=resolve_tool_effects(tool),
+                    # The Body owns the authoritative capability grant; a
+                    # missing/non-dict grant degrades to {} so the policy's
+                    # grant.concurrent check is False and the batch falls
+                    # back to sequential (safe-by-default).
+                    grant=grant if isinstance(grant, dict) else {},
+                )
             )
-            for entry, (_call, tool) in zip(entries, resolved, strict=True)
-        )
-        return select_with_audit(audited)
+        return self._policy.select_mode_with_audit(tuple(audited_entries))
 
     def _resolve_tools(self, tool_calls: Sequence[ToolCall]) -> list[tuple[ToolCall, Tool]]:
         """Resolve every tool before dispatching any world effect.
@@ -295,39 +304,3 @@ def _canonicalise_tool_name(name: str) -> str:
     return name
 
 
-def _resolve_tool_effects(tool: Tool) -> str:
-    """Return the declared ``effects`` value for ``tool``, defaulting to ``external``.
-
-    The lookup prefers the manifest's first ``ToolApi.effects`` value
-    because most tools expose exactly one API; for multi-API tools
-    the first declared effect wins (the audit must opt the whole tool
-    in to a non-default value at registration time, see
-    ``lca/contracts/cognition/body/tools/registry.py``).
-    """
-
-    manifest = getattr(tool, "manifest", None)
-    if manifest is not None and getattr(manifest, "api", None):
-        effects = getattr(manifest.api[0], "effects", "external")
-        if effects in ("read", "write", "external"):
-            return effects
-    # Fallback: tools without a manifest (legacy Protocol-only shape)
-    # are conservatively treated as ``external`` so the parallel
-    # default refuses to overlap an unaudited tool.
-    return "external"
-
-
-def _resolve_tool_grant(tool: Tool) -> dict[str, object]:
-    """Return the per-tool grant map used to check ``concurrent``.
-
-    The Body owns the authoritative capability grant; this helper only
-    surfaces the static ``tool.grant`` map (defaults to ``{}``) so the
-    policy's ``grant.concurrent`` check degrades to ``False`` for
-    tools that have not been wired with a grant channel.  This keeps
-    the parallel default safe-by-default: any tool whose grant is not
-    explicitly granted ``concurrent`` falls back to sequential.
-    """
-
-    grant = getattr(tool, "grant", None)
-    if isinstance(grant, dict):
-        return grant
-    return {}

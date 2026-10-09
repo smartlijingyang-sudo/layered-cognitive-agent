@@ -185,15 +185,16 @@ def _terminal_output(terminal_outcome: TerminalOutcome) -> str | None:
 
     # ADR-0248: 门控声带模式下，模型通过 send_message 发声，final_output_ref 可能为空。
     # 此时从当前绑定的 vocal_gate 提取正式投递的可见气泡文本。
+    from lca.contracts.protocols.vocal.protocol import VocalGateProtocol
     from lca.infrastructure.runtime_plane.capability_bindings import current_bindings_view
 
     view = current_bindings_view()
     if view is not None and getattr(view, "vocal_mode", "direct") == "gated":
         gate = getattr(view, "vocal_gate", None)
-        if gate is not None and hasattr(gate, "get_visible_outputs"):
-            delivered_texts = [
-                str(v["content"]) for v in gate.get_visible_outputs() if v.get("content")
-            ]
+        # Typed seam: the gate owns the visible-message shape; no
+        # hasattr/getattr probing and no dict sniffing here.
+        if isinstance(gate, VocalGateProtocol):
+            delivered_texts = gate.delivered_visible_texts()
             if delivered_texts:
                 return "\n\n".join(delivered_texts)
     return None

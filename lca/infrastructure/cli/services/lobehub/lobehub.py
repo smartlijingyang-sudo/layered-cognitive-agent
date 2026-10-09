@@ -20,10 +20,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 from lca.infrastructure.cli.config.config import KernelServeConfig, LobeHubConfig
-from lca.infrastructure.cli.service.service import (
-    HealthCheck,
-    ServiceState,
-    ServiceStatus,
+from lca.infrastructure.cli.service.host_probing import (
     free_port,
     http_code,
     http_ready,
@@ -31,6 +28,11 @@ from lca.infrastructure.cli.service.service import (
     pid_alive,
     pid_on_listening_port,
     pid_on_port,
+)
+from lca.infrastructure.cli.service.service import (
+    HealthCheck,
+    ServiceState,
+    ServiceStatus,
 )
 from lca.infrastructure.cli.state.state import StateStore
 

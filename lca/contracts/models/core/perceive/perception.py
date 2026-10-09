@@ -22,8 +22,10 @@ New kinds must be added here and to the EmitAllowlist in tests.
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from enum import StrEnum
+from types import MappingProxyType
 from typing import Any, Literal
 
 # Closed allowlist of ContextItem kinds.  Additions must be intentional.
@@ -40,6 +42,30 @@ ItemKind = Literal[
 ]
 
 
+# Single pairing point for kind->payload-type knowledge: each closed-set
+# kind maps to the tuple of acceptable Python payload shapes.  A new kind
+# pairs exactly one ItemKind member with exactly one entry here.
+#
+# This records the *consumer contract* (the shape the reasoner side
+# expects).  Producers that historically emit a different shape for a kind
+# (e.g. assistant-bootstrap face items with dict payloads under
+# "workspace_artifacts") are filtered out by ContextManifest.payload_of —
+# the same filtering the cognition helpers did inline before RA-093.
+KIND_PAYLOAD_TYPES: Mapping[ItemKind, tuple[type, ...]] = MappingProxyType(
+    {
+        "clock": (str,),
+        "workspace_artifacts": (list,),
+        "workspace_instructions": (str,),
+        "skill_catalog": (list,),
+        "inbox_facts": (list,),
+        "team_inbox": (list,),
+        "policy_fact": (str,),
+        "memory": (list,),
+        "subtasks": (list,),
+    }
+)
+
+
 class ContextClass(StrEnum):
     DATA = "data"
     INSTRUCTION = "instruction"
@@ -51,8 +77,8 @@ class ContextItem:
     """A single tagged atom in a ContextManifest.
 
     - ``kind``: one of the closed allowlist (ItemKind)
-    - ``payload``: opaque Python value (string for clock, list for
-      workspace_artifacts, etc.).  The Portal serializes via JSON.
+    - ``payload``: opaque Python value; the per-kind shape contract
+      lives in KIND_PAYLOAD_TYPES.  The Portal serializes via JSON.
     - ``ref``: optional pointer to a journal seq or blob ref for the full
       payload (forwarded-only; the spec defaults to ``refs`` + digest only)
     - ``provenance``: who emitted it (sensor name, gate name, etc.)
@@ -89,3 +115,21 @@ class ContextManifest:
 
     def has_kind(self, kind: ItemKind) -> bool:
         return any(item.kind == kind for item in self.items)
+
+    def payload_of(self, kind: ItemKind) -> list[Any]:
+        """Return payloads of ``kind`` items whose payload matches the kind's
+        declared shape (see ``KIND_PAYLOAD_TYPES``).
+
+        The manifest itself owns the kind->payload-type knowledge; callers
+        no longer repeat per-kind isinstance checks.  Items whose payload
+        does not match the declared shape are filtered out (producers may
+        emit legacy shapes; consumers only see the contract shape).
+        """
+        expected = KIND_PAYLOAD_TYPES.get(kind)
+        if not expected:
+            return []
+        return [
+            item.payload
+            for item in self.items
+            if item.kind == kind and isinstance(item.payload, expected)
+        ]

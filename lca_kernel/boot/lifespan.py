@@ -38,10 +38,6 @@ from collections.abc import AsyncIterator, Callable, Generator
 from contextlib import asynccontextmanager
 from typing import Any, cast
 
-import structlog
-
-_log = structlog.get_logger(__name__)
-
 
 def make_lifespan(
     ctx: Any,
@@ -49,63 +45,44 @@ def make_lifespan(
     """返回一个 Starlette lifespan(同步 generator function)yield ``{"ctx": ctx}``。
 
     Starlette lifespan 协议:同步 generator function,接受 app 实例,先 startup
-    阶段,后 shutdown 阶段。本实现在 startup 阶段把 ``ctx`` 写到 ``app.state.ctx``
-    (Starlette lifespan 协议的标准做法——lifespan 的目的是把运行时状态暴露给
-    handler),然后 yield ``{"ctx": ctx}`` 让测试和 uvicorn driver 都能拿到
-    同一份 ctx 引用。shutdown 阶段清空 ``app.state.ctx``(LIFO dispose)。
+    阶段,后 shutdown 阶段。本实现只做协议本身的事,不构造任何业务对象:
+
+    - startup:把 ``ctx`` 写到 ``app.state.ctx``(handler 通过
+      ``request.app.state.ctx`` 读)——lifespan 协议本身就是"在 startup
+      暴露状态给 handler";我们暴露的是 plugin 树 boot 出来的 cordis
+      Context。
+    - shutdown:按 LIFO dispose ``app.state``:先停掉 plugin setup 阶段挂载的
+      ``app.state.cron_daemon``(若有),再清空 ``app.state.ctx``。
+
+    常驻 Cron 调度守护(ADR-0268)的**启停组合**不属于 lifespan 协议:它由
+    webserver plugin setup 的命名步骤
+    ``lca.plugins.transport.webserver.server.server.start_cron_daemon``
+    负责(构造 + ``start()`` + 挂载到 ``app.state.cron_daemon``);本函数在
+    shutdown 时只负责把它停掉。
 
     返回类型:``Callable[[Any], Generator[Any, Any, Any]]``(同步 generator)
     而非 async context manager,这是 Starlette 要求的 lifespan 协议形式。
     ``@asynccontextmanager`` 装饰的内部函数自动把 async generator 转成
     同步 generator-yielding context manager。
 
-    长期可维护:本函数是 lifespan **协议实现**,不是 hack。Lifespan 协议本身
-    就是"在 startup 暴露状态给 handler";我们暴露的是 plugin 树 boot 出来的
-    cordis Context,handler 通过 ``request.app.state.ctx`` 拿。
+    长期可维护:本函数是 lifespan **协议实现**,不是 hack。
     """
 
     @asynccontextmanager
     async def _lifespan(app: Any) -> AsyncIterator[dict[str, Any]]:
         # Startup: 装 ctx 到 app.state(handler 通过 request.app.state.ctx 读)
         app.state.ctx = ctx
-
-        # 启动常驻 Cron 调度守护协程（ADR-0268 生产运行态）
-        cron_daemon = None
-        try:
-            from pathlib import Path
-
-            from lca.domain.cron.store import MultiAssistantCronStore
-            from lca.infrastructure.cron.daemon import CronDaemonService
-            from lca.infrastructure.path.locator import get_lca_home
-            from lca.plugins.transport.webserver.handlers.runs.terminal.handoff_dispatch import (
-                LcaRunHandoffDispatcher,
-            )
-
-            lca_home = get_lca_home()
-            store = MultiAssistantCronStore(lca_home / "assistants")
-            raw_lock_dir = getattr(ctx, "lock_dir", None)
-            lock_dir = Path(raw_lock_dir) if raw_lock_dir else (lca_home / "locks")
-            workspace_path = str(getattr(ctx, "workspace", "") or lca_home)
-
-            cron_daemon = CronDaemonService(
-                store=store,
-                lock_dir=lock_dir,
-                workspace_path=workspace_path,
-                # Resolves run_port / registry off app.state at dispatch time,
-                # so boot ordering between the webserver bootstrap and this
-                # block does not matter.
-                handoff_dispatcher=LcaRunHandoffDispatcher(app),
-            )
-            await cron_daemon.start()
-            app.state.cron_daemon = cron_daemon
-        except Exception:
-            _log.exception("lifespan: failed to start CronDaemonService")
-
         try:
             yield {"ctx": ctx}
         finally:
+            # Shutdown: LIFO dispose —— 先停 plugin 挂载的 cron 守护(若有),
+            # 再清空 ctx。getattr 是 Starlette state 的惯用法:直接用
+            # make_lifespan 而不经过 webserver plugin setup 的调用方
+            # (cli/test)不会挂载 cron_daemon。
+            cron_daemon = getattr(app.state, "cron_daemon", None)
             if cron_daemon is not None:
                 await cron_daemon.stop()
+            app.state.ctx = None
 
     # @asynccontextmanager 把 async function 转成 sync context manager;
     # Starlette 期望 sync generator function,运行时与 cast 标注一致。

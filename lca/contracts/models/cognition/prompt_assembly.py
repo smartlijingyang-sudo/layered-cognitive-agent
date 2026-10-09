@@ -17,7 +17,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
-from typing import ClassVar, Literal, Protocol, runtime_checkable
+from typing import ClassVar, Literal, Protocol, cast, get_args, runtime_checkable
 
 from lca.contracts.models.core.perceive.perception import ContextManifest
 from lca.contracts.models.core.state.state import AgentState
@@ -231,9 +231,21 @@ SelectorDecisionPath = Literal[
     "consult_duty",
     "team_awareness_routing",
     "profile_default",
+    "keyword_match",
+    "keyword_default",
+    "static",
     "legacy",
 ]
-"""Why a :class:`PromptTemplateSelector` chose the template it did."""
+"""Why a prompt template was chosen — the shared decision-reason vocabulary.
+
+The first four values come from :class:`PromptTemplateSelector`
+implementations (ADR-0175 D5); ``keyword_match`` / ``keyword_default`` /
+``static`` are the reason values :class:`SkillRouter` implementations emit
+on their side channels (spine ``skill_router.route`` envelope +
+``SkillRouted`` session event, RA-092).  Both channels speak this one
+vocabulary; unknown values coerce to ``"legacy"`` via
+:func:`_coerce_decision_path`.
+"""
 
 
 @runtime_checkable
@@ -300,6 +312,14 @@ class PromptTemplateSelector(Protocol):
     Selectors may return ``str`` (legacy) or ``tuple[str, str]``
     ``(template_id, decision_path)`` (new). The helper
     :func:`normalize_selector_result` flattens either shape.
+
+    Division of labor vs :class:`SkillRouter`
+    (``lca.contracts.protocols.think.cognition``): this protocol is the
+    typed ADR-0175 selector — the reason travels *in-band* as
+    ``SelectorDecisionPath``.  ``SkillRouter`` is the legacy side-channel
+    router: it returns only the template id, and its reason values flow
+    out-of-band (spine envelope + ``SkillRouted`` session event) using
+    this same vocabulary.
     """
 
     def select(
@@ -357,15 +377,14 @@ def normalize_selector_result(
 
 
 def _coerce_decision_path(value: object) -> SelectorDecisionPath:
-    """Map unknown decision paths to ``"legacy"`` rather than failing."""
-    if value == "active_template_override":
-        return "active_template_override"
-    if value == "consult_duty":
-        return "consult_duty"
-    if value == "team_awareness_routing":
-        return "team_awareness_routing"
-    if value == "profile_default":
-        return "profile_default"
+    """Map unknown decision paths to ``"legacy"`` rather than failing.
+
+    The fallback is kept (not deleted): downstream
+    ``reflection_events.py`` depends on it when the trace channel carries
+    a value outside the closed set (e.g. older persisted traces).
+    """
+    if isinstance(value, str) and value in get_args(SelectorDecisionPath):
+        return cast("SelectorDecisionPath", value)
     return "legacy"
 
 

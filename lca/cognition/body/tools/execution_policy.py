@@ -24,35 +24,25 @@ when no policy is supplied.
 
 from __future__ import annotations
 
-from collections.abc import Mapping
-from dataclasses import dataclass
-
 from lca.contracts.protocols.act.tool.batch_execution import (
+    AuditAwareToolBatchPolicy,
+    ReadOnlyToolBatchEntry,
     ToolBatchEntry,
     ToolBatchExecutionMode,
     ToolBatchExecutionPolicy,
 )
 
-
-@dataclass(frozen=True, slots=True)
-class ReadOnlyToolBatchEntry:
-    """Bundle-side facts a policy needs to gate the parallel default.
-
-    ``ToolBatchEntry`` (protocol-level) carries only ``call_id`` /
-    ``tool_name`` / ``is_idempotent``.  PR-3 adds an audit channel:
-    the Body passes the per-entry ``effects`` value (resolved via the
-    tool registry, see ``lca/contracts/cognition/body/tools/registry.py``)
-    plus the resolved ``CapabilityGrant`` map so the policy can check
-    the ``concurrent`` sub-key without re-querying either store.
-    """
-
-    call_id: str
-    tool_name: str
-    effects: str  # "read" | "write" | "external"
-    grant: Mapping[str, object]
+# Re-exported for backwards compatibility (moved to contracts in RA-087).
+__all__ = [
+    "ParallelReadOnlyToolBatchPolicy",
+    "ReadOnlyToolBatchEntry",
+    "default_tool_batch_policy",
+]
 
 
-class ParallelReadOnlyToolBatchPolicy(ToolBatchExecutionPolicy):
+class ParallelReadOnlyToolBatchPolicy(
+    ToolBatchExecutionPolicy, AuditAwareToolBatchPolicy
+):
     """PARALLEL iff every entry is read-only AND has ``grant.concurrent``.
 
     Mixed batches (any ``"write"`` / ``"external"``) fall back to
@@ -67,11 +57,10 @@ class ParallelReadOnlyToolBatchPolicy(ToolBatchExecutionPolicy):
 
     def select_mode(self, entries: tuple[ToolBatchEntry, ...]) -> ToolBatchExecutionMode:
         # The protocol-level entries tuple does not carry effects /
-        # grant metadata.  The Body constructs an enriched view via
-        # ``select_mode_with_audit`` and dispatches through that
-        # overload; this Protocol method is the no-audit fallback that
-        # preserves back-compat for any caller still passing the
-        # bare tuple.
+        # grant metadata.  The Body dispatches through the declared
+        # ``AuditAwareToolBatchPolicy.select_mode_with_audit`` overload;
+        # this Protocol method is the no-audit fallback that preserves
+        # back-compat for any caller still passing the bare tuple.
         return ToolBatchExecutionMode.SEQUENTIAL
 
     def select_mode_with_audit(
@@ -98,10 +87,3 @@ def default_tool_batch_policy() -> ToolBatchExecutionPolicy:
     """
 
     return ParallelReadOnlyToolBatchPolicy()
-
-
-__all__ = [
-    "ParallelReadOnlyToolBatchPolicy",
-    "ReadOnlyToolBatchEntry",
-    "default_tool_batch_policy",
-]

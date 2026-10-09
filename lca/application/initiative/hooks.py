@@ -1,9 +1,33 @@
+from collections.abc import Sequence
 from typing import Any
 
+from lca.contracts.models.core.conversation.conversation import ConversationTurn
 from lca.contracts.models.initiative.models import (
     InitiativeOffer,
     InitiativeSignal,
 )
+
+
+def derive_transcript_features(
+    prior_turns: Sequence[ConversationTurn],
+    extra_override: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    """Derive baseline transcript features for the initiative hook.
+
+    Caller override wins: when the caller injected richer features via
+    ``RunContext.extra["transcript_features"]`` they are returned as-is
+    (ADR-0248 slice 8).  Otherwise a baseline is derived from prior
+    turns: per-role counts plus an empty manual-action map.  Pure and
+    unit-testable; the run driver is its only consumer.
+    """
+    if extra_override:
+        return dict(extra_override)
+    turns = prior_turns or ()
+    return {
+        "user_turn_count": sum(1 for t in turns if t.role == "user"),
+        "assistant_turn_count": sum(1 for t in turns if t.role == "assistant"),
+        "manual_action_counts": {},
+    }
 
 
 def evaluate_initiative(transcript_features: dict[str, Any]) -> InitiativeOffer | None:

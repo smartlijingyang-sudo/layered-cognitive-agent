@@ -18,12 +18,14 @@ import time
 from pathlib import Path
 
 from lca.infrastructure.cli.config.config import DaemonConfig, KernelServeConfig
+from lca.infrastructure.cli.service.host_probing import (
+    http_ready,
+    pid_alive,
+)
 from lca.infrastructure.cli.service.service import (
     HealthCheck,
     ServiceState,
     ServiceStatus,
-    http_ready,
-    pid_alive,
 )
 from lca.infrastructure.cli.services.daemon.start_script import render_start_script
 from lca.infrastructure.cli.state.state import ChangeReport, StateStore
@@ -186,6 +188,11 @@ class DaemonService:
         if self._cli_deployed() and not report.has_changes and not python_stale:
             return False
         return self._deploy_cli()
+
+    def cli_fingerprint_current(self) -> bool:
+        """Public Service-protocol capability: managed CLI is deployed and
+        its source fingerprint matches the last deploy (RA-084)."""
+        return self._cli_deployed() and not self._cli_source_changed()
 
     def _cli_source_changed(self) -> bool:
         """True when CLI source differs from last deployed snapshot."""

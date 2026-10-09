@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock, patch
 
-from lca.infrastructure.cli.service.service import (
+from lca.infrastructure.cli.service.host_probing import (
     health_body_ok,
     http_code,
     http_ready,

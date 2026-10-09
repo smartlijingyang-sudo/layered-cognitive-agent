@@ -1,5 +1,6 @@
+from dataclasses import dataclass
 from enum import StrEnum
-from typing import Literal
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
@@ -55,6 +56,21 @@ class SendMessagePayload(BaseModel):
         if self.type == VocalMessageType.SECRET_REQUEST and not self.secret_key:
             raise ValueError("type='secret_request' 时 secret_key 字段不能为空")
         return self
+
+
+@dataclass(frozen=True, slots=True)
+class WidgetApproval:
+    """A widget currently awaiting user approval — the gate's typed view.
+
+    The gate owns the visible-message shape; callers (run driver,
+    projection) consume this instead of sniffing visible-output dicts.
+    ``options`` are the model-dumped option dicts, kept as-is so the
+    ``approval_request`` frontend payload stays byte-identical.
+    """
+
+    message_id: str
+    content: str | None
+    options: list[dict[str, Any]]
 
 
 class DeliveryReceipt(BaseModel):

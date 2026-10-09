@@ -2023,3 +2023,229 @@
     跨 story 的 policy 依赖要按顺序做。
 - Tests: 新 pin 文件 5 passed；skills/overlay/global_link/materialize_link/
   invariants/merged_store 共 162 passed。ruff 全过。
+
+
+## 2026-10-09 10:35 CST - Round 14 assess（branch raphy/arch-20261009-1008，基线 0127c7120）
+
+- 上下文：上一轮 raphy/arch-20261009-0107 已合 main（merge 0127c7120），RA-051~RA-080 全 done，无残留；80 stories 全 done（1 dropped）。
+- 摩擦漫步三区拆给 3 个全新会话子任务（5 问必答、端到端精读，只读零写入）：agent core runtime（agent/ 397行 cognitive_agent + runtime/loop 605行 runtime_loop + lca_kernel/boot 全读）、cognition+contracts（body 工具分发链 + prompt 组装 + atoms 小模块）、infrastructure 余块（cli services 簇 293行 steps.py + box 沙箱边界 + tools path seam）。禁区全部遵守（preamble.py、gate_chain_strategy.py 未读、ralph Round 2、lca-1000 迁移领地、typed ports）。
+- **运行时验证（实跑，LLM_API_KEY=<redacted>
+- **16 个 stories 入 prd.json（RA-081~RA-096）**：Strong 10 个（RA-081 box 沙箱边界双实现+前缀逃逸真 bug；RA-082 CognitiveAgent/TeamHandle run-lifecycle 包络逐行重复；RA-084 Service 协议被 downcast+跨模块私有调用架空；RA-085 registry.py 死审计函数+__all__ 缺口+白名单双写；RA-086 executor 绕过 select_effect 自建 effects 解析；RA-087 select_mode_with_audit 未声明的 getattr 探测；RA-088 cron daemon 藏在 make_lifespan（docstring 自相矛盾）；RA-089 widget 待审批两处 getattr/dict 嗅探；RA-090 transcript_features 推导住错 module），Worth exploring 6 个（RA-083 service.py 协议+探测原语混装；RA-091 wire-block Observation 双构造器；RA-092 SelectorDecisionPath 双词汇表；RA-093 ContextManifest kind→payload 三处散落；RA-094 assembler catalog 缝 object 类型+doc/impl 漂移；RA-095 path-arg seam 半接线；RA-096 _enrich_run_context 逐字段重建）。
+- Top 推荐 **RA-081**：locality 缺失直接等于安全缺失——生产流量走有前缀逃逸漏洞的 BoxAccessor.resolve_path，正确的 relative_to 实现躺在测试覆盖但生产不用的 adapter 里；修法已在树内验证。Runner-up：RA-082（outcome 翻译规则是最易改崩的部分）。
+- 依赖顺序：RA-083→RA-084（先拆模块再长协议）；RA-085→RA-086→RA-087（registry 清理→executor 收敛→协议扶正）；RA-082→RA-096（先搬包络再 replace）。
+- diversity quota 满足：duplication 类 3/16（RA-082、RA-085 白名单部分、RA-091）；friction walk 来源 12 个。
+- **Learnings for future iterations:**
+  - `getattr(x, "method", lambda: default)()` 出现在协议已声明方法上时，是"调用方不信任协议"的审查气味——grep 可批量找（RA-087/089 同类）。
+  - 安全 invariant 有双实现时，先查生产调用路径：测试覆盖的可能是没用的那条（RA-081——盖错路径的覆盖比没覆盖更危险，因为它看起来安全）。
+  - docstring 与代码逐字矛盾是最便宜的强证据：先读模块 docstring，再逐条核对 body（RA-088）。
+  - `str(path).startswith(str(root))` 在 containment 场景下默认按 bug 处理，正确 idiom 是 `relative_to`——全树 grep 找更多同类。
+  - 同轮 stories 共享文件时（registry.py/executor），按依赖顺序做、每动手前重 grep，评估证据会过期。
+
+## 2026-10-09 10:55 CST - RA-081
+- Implemented: new `lca/infrastructure/computer/box_gate.py` — the single owner of the box sandbox boundary: `resolve_box_root()` (mkdir + LCA_BOX_ROOT/get_lca_home fallback, moved from LocalBoxAdapter.__init__), `contain_path()` (relative_to semantics), `atomic_write_text()` (ADR-0251 tmp+fsync+os.replace), `check_no_privilege_escalation()` (INV-04 sudo/su hard gate). BoxAccessor: dropped the vestigial `adapter` param (zero readers repo-wide; no caller passed it), `__init__` uses resolve_box_root, `resolve_path`/`write_text` delegate to the gate — the prefix-escape bug is fixed. LocalBoxAdapter/OnlyboxesBoxAdapter: `_resolve_safe_path`, `write_file`, and both `run_command` hard gates delegate to the gate (6-line exact-match edits, all asserted). get_box_adapter audited: zero production callers, kept as public factory.
+- Files changed: lca/infrastructure/computer/box_gate.py (new), lca/infrastructure/computer/box_accessor.py, lca/infrastructure/computer/box_sandbox_adapter.py, tests/infrastructure/computer/test_box_accessor.py (new pin), raphy/prd.json, raphy/progress.txt
+- Tests: 19 passed (test_box_accessor.py incl. new sibling-prefix pin, test_box_sandbox_adapter.py, tests/infrastructure/tools/box/); 10 passed (test_tool_fork_adr0248_wiring.py, test_runtime_loop_gated_e2e.py); ruff clean. Pin validity: simulated old startswith impl lets ../box2/evil.txt through, new relative_to impl rejects.
+- **Learnings for future iterations:**
+  - ssh252 wrapper runs with cwd=/home/lichao/layered-cognitive-agent (main tree): bare `python3 -m pytest` imports lca from MAIN, not the worktree — worktree tests must `cd <worktree> || exit 1` first (AGENTS.md sanctioned pattern).
+  - prd.json top-level keys are insertion-ordered (not sorted) while story objects are sort_keys — full json.dump rewrite would reorder top-level keys; use targeted block splice for status updates.
+  - Deleting a constructor param is safe when grep proves zero callers pass it AND zero readers use the attribute; the story AC explicitly authorized "used or deleted".
+---
+
+## 2026-10-09 11:20 CST - RA-082
+- Implemented: new `lca/agent/run_envelope.py` — one run-lifecycle envelope seam: `RunEventSessionBinder` Protocol defined once (deleted the verbatim duplicate in both files), `TranslatedOutcome` (status/output/steps/error/outcome/disposition), `EnvelopeSpec` (carrier-supplied started/finished factories, resume hook, partial-buffer section, 4 outcome translators), `run_envelope()` owning the try/except/finally cascade (success → return; CancelledError → translate+raise; LoopObligationExceededError → translate+return-or-raise; Exception → translate+raise; finally → emit finished + end section + emit iteration end). CognitiveAgent._run_lifecycle_body and TeamHandle._run_body now only build their spec and call run_envelope. Outcome translators are module-level `_agent_translate_*` / `_team_translate_*` (4×2).
+- Files changed: lca/agent/run_envelope.py (new), lca/agent/cognitive_agent.py, lca/agent/team_handle.py, tests/agent/test_run_envelope.py (new, 13 tests), raphy/prd.json, raphy/progress.txt
+- Tests: 21 passed (tests/agent/ incl. 13 new matrix+cascade tests and the pre-existing RA-023 translation tests, which drive the new _run_lifecycle_body unchanged); 72 passed (tests/scenario/team_1/, tests/scenario/journal_0/, tests/transport/test_carrier_terminal_observation.py — journal payloads byte-identical); ruff clean (fixed S101 assert→explicit raise, B904 raise-from).
+- **Learnings for future iterations:**
+  - Converging two envelopes with different nesting (team's emit-start was outside bind_backends, agent's inside) is safe when the emitted facts' payloads are fully explicit params and the sink resolves via active_publish_session() (bound before both positions in run()); verify the sink's ambient-state reads before assuming.
+  - Preserving an odd-but-current behavior (team's CANCELED+"success" on cancel) byte-identically is correct — encode it in the translator + a test asserting the oddity, with a comment saying it's preserved, not endorsed.
+  - Module-level translator functions make the previously-unwritable outcome matrix table-testable; the envelope cascade itself only needs return-vs-raise pinning.
+---
+
+## 2026-10-09 11:40 CST - RA-083
+- Implemented: split `lca/infrastructure/cli/service/service.py` — pure Service Protocol surface (`ServiceStatus`/`HealthCheck`/`ServiceState`/`Service`/`CliShippingService`, 93 effective lines) stays; 8 host-probing primitives moved verbatim to new `lca/infrastructure/cli/service/host_probing.py` (229 effective lines). 6 importers updated (daemon/lobehub/serve mixed imports split, supervisor/spawner `health_body_ok`, test_http_ready). `service.py` removed from `_LINE_COUNT_EXEMPT` (now under the 250-line limit).
+- Files changed: lca/infrastructure/cli/service/service.py, lca/infrastructure/cli/service/host_probing.py (new), daemon.py, lobehub.py, serve.py, spawner.py, supervisor.py, tests/infrastructure/cli/test_http_ready.py, tests/scenario/code/test_code_conventions.py, raphy/prd.json, raphy/progress.txt
+- Tests: 63 passed (tests/infrastructure/cli/test_http_ready.py + daemon/lobehub/host_runtime/ops service tests); ruff: no new violations (the 15 S603/S607/S110 bandit hits on host_probing.py are verbatim-moved pre-existing code — verified old service.py fails ruff identically; fixed F821/F401/I001 introduced by the split).
+- 7 failures in the wider tests/infrastructure/cli + test_code_conventions run (test_kernel_cli_plugins L0 count 57≠59, 4× test_runs_debug_health, test_runs_health_cli, TestFileLineCountLimit on skills/disk/store.py + tools/skills/activate/tool.py) are **pre-existing**: reproduced all 7 on clean HEAD with my changes stashed.
+- **Learnings for future iterations:**
+  - Before flagging ruff hits on moved code, run ruff on the pre-change file: the S-series bandit hits were already there; a pure move must not "fix" them (scope creep) nor be blamed for them.
+  - This repo pins module-cohesion facts in tests (test_code_conventions.py `_LINE_COUNT_EXEMPT`): a split changes both the file sizes and the registry — update both sides, then re-run the conventions test itself.
+  - Pre-existing failures need a stash-and-rerun proof before being declared unrelated; the stash is safe in my own worktree (only my changes there).
+---
+
+## 2026-10-09 12:00 CST - RA-084
+- Implemented: promoted both service capabilities into the `Service` protocol (folded, per AC option 2): `Service.cli_fingerprint_current() -> bool` (default False; `DaemonService` overrides with `_cli_deployed() and not _cli_source_changed()`) and `Service.spawner() -> KernelServeSpawner | None` (default None, TYPE_CHECKING annotation, cycle-safe; `KernelServeService.spawner()` already satisfies it). Deleted the private `CliShippingService` protocol. `steps.py`: `daemon_ensure` calls `svc.cli_fingerprint_current()` (no isinstance, no cross-module `_cli_*` calls); `stack_heal` kernel branch checks `spawner() is None` and fail-louds with TypeError (no `isinstance(KernelServeService)`). Dropped the now-unused concrete imports in steps.py.
+- Files changed: lca/infrastructure/cli/service/service.py, lca/infrastructure/cli/service/host_probing.py (docstring), lca/infrastructure/cli/steps/steps.py, lca/infrastructure/cli/services/daemon/daemon.py, tests/infrastructure/cli/test_service_capabilities.py (new, 7 tests), raphy/prd.json, raphy/progress.txt
+- Tests: 7 passed (new capability tests: pure protocol fakes drive daemon_ensure + stack_heal, source pins for no-isinstance/no-private-calls); 282 passed in tests/infrastructure/cli/ (6 failures are the pre-existing ones confirmed on clean HEAD); ruff clean on all touched files (host_probing.py S-series unchanged pre-existing).
+- **Learnings for future iterations:**
+  - Killing an isinstance downcast against a concrete class: fold the capability into the protocol with a safe default (False/None) rather than a second capability protocol — the default must make the "absent" case behave sanely for ALL existing callers (fall through to ensure_ready / fail-loud).
+  - A source-level pin test (no "isinstance" in steps.py) is the cheapest way to prove a downcast stays dead; pair it with behavioral tests on pure fakes.
+  - TYPE_CHECKING import for a concrete return-type annotation in a protocol module avoids import cycles while keeping the annotation honest.
+---
+
+## 2026-10-09 12:15 CST - RA-085
+- Implemented: registry.py cleanup — deleted `audit_tool_manifest_effects` (zero callers, body was a no-op); completed `__all__` (added `register_manifest_with_audit` + `EFFECTS_UNSET`, removed the dead fn); converged the duplicated whitelist literal into one module-level `_AUDITED_DEFAULT_TOOLS` frozenset used by both audit entry points; test file now imports `register_manifest_with_audit` at top level.
+- Files changed: lca/contracts/cognition/body/tools/registry.py, tests/contracts/cognition/body/tools/test_registry_effects.py, raphy/prd.json, raphy/progress.txt
+- Tests: 10 passed (tests/contracts/cognition/body/tools/test_registry_effects.py); ruff clean.
+- **Learnings for future iterations:**
+  - Deleting a dead function: grep for callers AND check `__all__` (star-import exposure) — both must be clean.
+  - When a test does a function-level import of a same-module name, that's a smell pointing at an incomplete `__all__` or an unclear public surface; fix the module, then normalize the test import.
+---
+
+## 2026-10-09 12:30 CST - RA-086
+- Implemented: `registry.py` gained `resolve_tool_effects(tool) -> ToolEffects` (tool-level seam: manifest's first `ToolApi.effects` via fail-loud `select_effect`; manifest-less tools conservatively `"external"` per PR-3). `ToolBatchExecutor` calls the seam; `_resolve_tool_effects`/`_resolve_tool_grant` deleted (grant resolved inline at the single call site, Body-owned semantics kept as a comment). No inline `("read","write","external")` check remains in the executor.
+- **Behavior change (explicit, per AC)**: illegal effects values on the executor path now raise `ToolEffectsDeclarationError` instead of silently degrading to sequential.
+- Files changed: lca/contracts/cognition/body/tools/registry.py, lca/cognition/body/tools/tool_batch_executor.py, tests/contracts/cognition/body/tools/test_registry_effects.py (+3 tests), tests/cognition/body/tools/test_tool_batch_executor_parallel.py (+1 test), raphy/prd.json, raphy/progress.txt
+- Tests: 21 passed (13 registry + 8 parallel incl. new illegal-effects pins; read+concurrent→PARALLEL preserved); ruff clean.
+- **Learnings for future iterations:**
+  - When converging on a seam, the "deleted helper" for a different concern (grant) doesn't have to move to the same module — inline it at the single call site with the semantics as a comment, keeping the concept in its owning layer.
+  - A silent-fallback → fail-loud behavior change needs both a unit pin (seam level) and an executor-path pin (integration level); record it explicitly in commit + progress.
+---
+
+## 2026-10-09 12:50 CST - RA-087
+- Implemented: declared the audit channel — new `AuditAwareToolBatchPolicy` runtime_checkable protocol in `lca/contracts/protocols/act/tool/batch_execution.py` with `select_mode_with_audit`; `ReadOnlyToolBatchEntry` moved from `execution_policy.py` to the contracts module (re-exported for compat; contracts must not import from cognition). `ParallelReadOnlyToolBatchPolicy` explicitly inherits both protocols. Executor dispatches via `isinstance(AuditAwareToolBatchPolicy)` — getattr probe and method-local import deleted; base-only policies get explicit documented behavior (no enrichment, protocol-level `select_mode` decides).
+- Files changed: lca/contracts/protocols/act/tool/batch_execution.py, lca/cognition/body/tools/execution_policy.py, lca/cognition/body/tools/tool_batch_executor.py, tests/cognition/body/tools/test_tool_batch_executor_parallel.py (+3 tests), raphy/prd.json, raphy/progress.txt
+- Tests: 24 passed (11 parallel incl. 3 new protocol tests + 13 registry); ruff clean.
+- **Learnings for future iterations:**
+  - When a "channel" is probed via getattr, the fix is a declared protocol in the contracts layer — and the channel's facts type must move with it (contracts can't import from cognition).
+  - Explicit multiple inheritance from two Protocols (`ToolBatchExecutionPolicy, AuditAwareToolBatchPolicy`) is the clearest "declares" signal; structural isinstance still works for third parties.
+  - A protocol-targeted test needs three shapes: implementer declares it, base-only gets explicit fallback, spy proves enrichment flows.
+---
+
+## 2026-10-09 13:05 CST - RA-088
+- Implemented: `make_lifespan` is now an honest ~15-line protocol impl (mount `app.state.ctx`, yield, shutdown LIFO dispose: stop `app.state.cron_daemon` if mounted, clear ctx; docstring rewritten, structlog gone). Cron daemon construction+start moved to the webserver plugin's named step `start_cron_daemon(app, lock_dir=None, workspace_path=None)` in `lca/plugins/transport/webserver/server/server.py`, called as setup step 3e and mounted on `app.state.cron_daemon`. No ctx getattr duck-reads: paths are explicit parameters (defaults `<lca_home>/locks`, `<lca_home>`). Start-failure policy = explicit degradation (log + return None; webserver boots without cron), stated in the step docstring. `test_cron_lifespan_integration.py` rewritten to the plugin setup path + a lifespan-alone-constructs-no-cron pin; old `_FakeCtx` semantics preserved as explicit params.
+- Files changed: lca_kernel/boot/lifespan.py, lca/plugins/transport/webserver/server/server.py, tests/boot/test_cron_lifespan_integration.py, raphy/prd.json, raphy/progress.txt
+- Tests: tests/boot/ 2 passed; ruff clean (fixed E402 from module-level _log placement, UP037 quoted annotation, I001 blank line).
+- **Learnings for future iterations:**
+  - When a "protocol impl" module grows business construction, the docstring usually lies first — diff docstring claims vs imports to spot it.
+  - Ruff E402 fires on ANY module-level statement (even `_log = ...`) before imports; keep the import block pristine and put `_log` after it.
+  - Moving a step out of shared kernel code? Check all make_lifespan callers first (here: only server.py production + tests) so the shutdown-dispose contract covers every path.
+---
+
+## 2026-10-09 13:25 CST - RA-089
+- Implemented: typed seam on `VocalGateProtocol` — `pending_widget_approval() -> WidgetApproval | None` (new frozen dataclass in contracts/models/vocal/models.py) + `delivered_visible_texts() -> tuple[str, ...]`, implemented by DirectVocalGate/GatedVocalGate. `_run_driver` calls `gate.pending_widget_approval()` directly: getattr bypass + `get_visible_outputs` dict sniffing deleted; approval_request {type,message_id,content,options} byte-identical; driver keeps only state-set + extra (no pause-event double-append per ADR-0248). `result_projection` final-text fallback uses `isinstance(gate, VocalGateProtocol)` + `delivered_visible_texts()` (hasattr probe + dict sniff deleted). `get_visible_outputs` kept on gates for existing tests.
+- Files changed: lca/contracts/models/vocal/models.py, lca/contracts/protocols/vocal/protocol.py, lca/infrastructure/vocal/gate.py, lca/runtime/loop/runtime_loop.py, lca/runtime/projection/result_projection.py, tests/runtime/loop/test_run_driver_internal_paths.py (stub), tests/infrastructure/vocal/test_widget_approval_seam.py (new, 4 tests), raphy/prd.json, raphy/progress.txt
+- Tests: 96 passed total (20 vocal+driver+protocol incl. 4 new seam tests; 56 runtime/loop+binding+projection; 20 scenario adr0248/vocal); ruff clean.
+- **Learnings for future iterations:**
+  - A "typed seam" story often has TWO sniff sites (here: driver + projection fallback) — grep the accessor name repo-wide before declaring the seam done.
+  - `getattr(view, "vocal_gate", None)` on an `object`-typed field + `isinstance(x, runtime_checkable Protocol)` is the honest replacement for hasattr probing.
+  - Protocol-typed dataclass fields (gate: VocalGateProtocol) make direct calls safe; test stubs must then implement the new query — that's the "stub-protocol" AC in action.
+---
+
+## 2026-10-09 13:40 CST - RA-090
+- Implemented: new pure `derive_transcript_features(prior_turns, extra_override=None)` in `lca/application/initiative/hooks.py` next to `evaluate_initiative` (re-exported from `lca.application.initiative`). Caller override wins (detached copy); otherwise baseline from typed `prior_turns` (`t.role`, no getattr). `_run_driver` collapses the 15-line block to one call; no getattr duck-read on `RunContext.prior_turns`; RunContext stays read-only, result still in `Result.extra['initiative_offer']`; override semantics preserved; ADR-0248 slice 8 kept.
+- Files changed: lca/application/initiative/hooks.py, lca/application/initiative/__init__.py, lca/runtime/loop/runtime_loop.py, tests/application/initiative/test_initiative_hooks.py (+4 tests), raphy/prd.json, raphy/progress.txt
+- Tests: 19 passed (initiative incl. 4 new pure tests + driver internal paths + gated flow/e2e initiative_offer pins); ruff clean.
+- **Learnings for future iterations:**
+  - When the model type is already precise (`prior_turns: tuple[ConversationTurn, ...]`, `role: str`), getattr-with-default is pure noise — type the helper on the real types and the duck-reads vanish.
+  - Override-wins helpers should return a detached copy (`dict(override)`) so callers can't mutate the shared extra dict downstream.
+---
+
+## 2026-10-09 13:55 CST - RA-091
+- Implemented: private `_wire_block_observation(status, reason, tool_name, call_id, middle_parts=(), guidance=_WIRE_BLOCK_GUIDANCE, finish_reason=None, raw_preview=None)` seam in `lca/cognition/body/tools/tool_wire_gate.py`. `tool_wire_block_observation` and `missing_arguments_block_observation` now supply only condition+status+reason (+ gate-specific middle parts: `finish_reason=` / `required=`); guidance text single-sourced (was duplicated verbatim); both outputs byte-identical. Public signatures unchanged; ADR-0047 trigger semantics unchanged; `unexposed_tool_block_observation` defer semantics untouched (its message shape is a different feature, deliberately not converged).
+- Files changed: lca/cognition/body/tools/tool_wire_gate.py, tests/cognition/body/test_tool_arguments_wire_gate.py (+2 parameterized contract tests), raphy/prd.json, raphy/progress.txt
+- Tests: 24 passed (wire gate incl. 2 new + journal scan/journaled) + 29 passed (decision repair, nothing_to_do, namespace conformance); ruff clean. 2 pre-existing failures in tests/scenario/test_wire_gate_namespace.py (test_c1, test_c4) reproduce on clean HEAD via stash — NOT from this change.
+- **Learnings for future iterations:**
+  - "Converge two constructors" — first check which pair actually shares the message shape; the third similar-looking function (unexposed) had a different message and an explicit untouched constraint. Converging the wrong pair would have changed user-visible text.
+  - A `middle_parts` parameter keeps the seam honest when gates share prefix+guidance but differ in the middle (finish_reason vs required=).
+  - Pre-existing red tests: verify via `git stash push <paths>` + rerun before concluding; restore and confirm the diff is back.
+---
+
+## 2026-10-09 14:10 CST - RA-092
+- Implemented: `SelectorDecisionPath` absorbs the router's real reason values (`keyword_match`/`keyword_default`/`static`); `SkillRouted.decision_path` typed as the closed set (was bare str); `emit_skill_routed` + skill_router side-channel helpers typed; `_coerce_decision_path` rewritten as `get_args` membership (single source of truth), legacy fallback kept + documented; division of labor documented on SkillRouter protocol, PromptTemplateSelector protocol, and skill_router module. `PromptTrace.selector_decision_path` stays str-typed (ADR-0175 D2 intact).
+- Files changed: lca/contracts/models/cognition/prompt_assembly.py, lca/contracts/harness/memory/events.py, lca/cognition/brain/prompt/skill_router.py, lca/infrastructure/observability/meta_event_emit.py, lca/contracts/protocols/think/cognition.py, tests/scenario/skill/test_skill_router.py (+2 contract tests), raphy/prd.json, raphy/progress.txt
+- Tests: 13 passed (skill router incl. 2 new contract tests); 509 passed in tests/cognition/; ruff clean. 2 pre-existing failures (test_tool_using_run_evidence, test_reasoner_temporal_evidence) reproduce on clean HEAD — NOT from this change.
+- **Learnings for future iterations:**
+  - When a Literal is the vocabulary, `_coerce_*` if-chains duplicate it — rewrite as `get_args` membership so the set has exactly one source of truth.
+  - Typing a dataclass field from `str` to a Literal is safe for readers; check constructors pass literals (they did here).
+  - Honest boundary from the story held: KeywordSkillRouter has no production wiring — the change is contract hygiene, verified by the closed-set test.
+---
+
+## 2026-10-09 11:55 - RA-093
+- What was implemented: typed kind->payload accessor on ContextManifest
+  (KIND_PAYLOAD_TYPES table covering all 9 closed-set kinds + payload_of(kind)
+  method on the manifest); the four structurally-identical helpers in
+  cognition/brain/sections/types.py converged onto it as thin wrappers over a
+  None-tolerant _payloads_of() wrapper; private _manifest_items deleted.
+- Files changed:
+  - lca/contracts/models/core/perceive/perception.py (KIND_PAYLOAD_TYPES, payload_of)
+  - lca/cognition/brain/sections/types.py (converged helpers, dropped _manifest_items)
+  - tests/contracts/test_ra093_payload_contracts.py (new, 6 tests)
+- **Learnings for future iterations:**
+  - Patterns discovered: kind->payload-type knowledge now has exactly one pairing
+    point (KIND_PAYLOAD_TYPES); a new kind pairs one Literal member with one table entry.
+  - Gotchas encountered: assistant-bootstrap emits dict payloads under
+    "workspace_artifacts" (face items) — declared consumer contract is (list,),
+    so payload_of filters them, exactly matching the old inline isinstance behavior;
+    documented in the table comment. Ruff UP035: import Mapping from collections.abc,
+    not typing, in contracts code.
+---
+
+## 2026-10-09 12:10 - RA-094
+- What was implemented: typed the assembler catalog seam as
+  BrainPromptCatalog | None (catalog_provider + _catalog() + render_template);
+  deleted the getattr(installed_skills) duck probe; _catalog_skill_count now
+  takes the Protocol and narrows via a declared minimal countable shape
+  _SkillInventory (runtime_checkable Protocol, installed_skills: Sized).
+  Chose fix-doc: the docstring's render_brain_skills() line-count fallback was
+  never implemented and is deliberately NOT added (rendered display text is
+  not a count source; an empty catalog renders a non-empty marker line).
+  Bad-shape catalogs now raise TypeError (explicit, not silent 0); the
+  _catalog() INTENTIONAL swallow (provider error -> None) is untouched;
+  ADR-0185 AvailableSkillsReason derivation untouched.
+- Files changed:
+  - lca/cognition/brain/sections/assembler.py
+  - tests/cognition/test_prompt_assembler_guards.py (+2 tests: bad-shape TypeError, non-sizable -> 0)
+- **Learnings for future iterations:**
+  - Patterns discovered: when a Protocol lacks the member a seam needs, declare
+    the seam's minimal shape as a runtime_checkable Protocol and narrow with
+    isinstance + fail-loud — this replaces getattr probing without widening the
+    shared contract (RA-059 lesson: don't add impl-detail attrs to Protocols).
+  - Gotchas encountered: BrainPromptCatalog exists twice (contracts/models and
+    contracts/protocols); used the one already imported in assembler.py.
+    Production currently wires NO catalog_provider (grep finds only tests), so
+    the bad-shape TypeError cannot fire on any live path today.
+---
+
+## 2026-10-09 12:25 - RA-095
+- What was implemented: chose (b) honest read-path scoping. The seam's
+  module docstring no longer claims "every tool call that takes a path
+  argument flows through resolve_path_arg"; it now states the real wiring
+  (only SandboxComputer.read_file, via the lazy-import adapter). The
+  computer.py helper was renamed _resolve_path_arg_or_passthrough ->
+  _resolve_read_path_arg_or_passthrough so the call site reads honestly.
+  New wiring-scope pin test (inspect-based): only read_file may reference
+  the seam helper; write/edit/list/search/move go straight to
+  normalize_sandbox_path. test_file_ref_args.py untouched.
+- Files changed:
+  - lca/infrastructure/tools/seam/file_ref_args.py (docstring)
+  - lca/infrastructure/computer/sandbox/computer.py (helper rename)
+  - tests/lca/infrastructure/computer/sandbox/test_path_arg_wiring_scope.py (new pin)
+- **Learnings for future iterations:**
+  - Patterns discovered: a "who calls the adapter" pin can be an inspect-
+    based source assertion over the class's entry methods — it forces the
+    (a)-vs-(b) choice to be re-made consciously instead of drifting.
+  - Gotchas encountered: chose (b) over (a) because (a) would change
+    security-relevant behavior — resolving /files/<aid> to its real guest
+    path for a *write* would let the model overwrite attachment backing
+    files; that needs a security review, not a raphy drive-by. The (a)
+    option is recorded in the docstring as requiring that review.
+---
+
+## 2026-10-09 12:35 - RA-096
+- What was implemented: _enrich_run_context now uses
+  replace(ctx, deadline=workspace.deadline, context_refs=list(ctx.context_refs),
+  extra=dict(ctx.extra)) instead of the 8-field hand enumeration. Defensive
+  copies of context_refs/extra kept (naive replace would alias the originals
+  and change downstream mutation behavior). deadline short-circuit semantics
+  (workspace.deadline None / ctx already has deadline / ctx None) unchanged.
+- Files changed:
+  - lca/agent/cognitive_agent.py (from dataclasses import replace; one expression)
+  - tests/agent/test_cognitive_agent_enrich_run_context.py (+2 tests)
+- **Learnings for future iterations:**
+  - Patterns discovered: "no field dropped" regression = iterate
+    dataclasses.fields() and compare every field — future fields are covered
+    automatically, which is exactly the bug class the story prevents.
+  - Gotchas encountered: tuple(ctx.prior_turns) on an already-tuple field was
+    a no-op copy; replace() keeps the same reference with identical behavior.
+    RunContext is a non-frozen dataclass so replace() works directly.
+---

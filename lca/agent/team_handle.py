@@ -9,9 +9,13 @@
 from __future__ import annotations
 
 import contextlib
-from contextlib import AbstractContextManager
-from typing import Protocol
 
+from lca.agent.run_envelope import (
+    EnvelopeSpec,
+    RunEventSessionBinder,
+    TranslatedOutcome,
+    run_envelope,
+)
 from lca.contracts.models.core.conversation.message import AgentMessage, agent_message_as_text
 from lca.contracts.models.core.execution.result import Result
 from lca.contracts.models.core.state.lifecycle import TaskStatus
@@ -35,8 +39,59 @@ from lca.infrastructure.observability import (
 )
 
 
-class _RunEventSessionBinder(Protocol):
-    def bound(self, run_id: str) -> AbstractContextManager[object | None]: ...
+def _team_translate_success(result: Result) -> TranslatedOutcome:
+    """Team flavor of execute() success: finish facts mirror the Result.
+
+    Note: unlike the agent flavor, finish_error is NOT taken from
+    result.error (pre-convergence behavior preserved byte-identically).
+    """
+    return TranslatedOutcome(
+        status=result.status.value if isinstance(result.status, TaskStatus) else str(result.status),
+        output=result.output or "",
+        steps=result.total_steps,
+        error="",
+        outcome="success",
+        disposition="return",
+        result=result,
+    )
+
+
+def _team_translate_cancelled() -> TranslatedOutcome:
+    """Team flavor of CancelledError.
+
+    The team has no CancelledError branch: CancelledError is BaseException and
+    skips except Exception, so the finally records the CANCELED defaults with
+    outcome "success". Preserved byte-identically (odd but current).
+    """
+    return TranslatedOutcome(
+        status=TaskStatus.CANCELED.value,
+        output="",
+        steps=0,
+        error="",
+        outcome="success",
+        disposition="raise",
+    )
+
+
+def _team_translate_loop_obligation(err: BaseException) -> TranslatedOutcome:
+    """Team flavor of non-convergence.
+
+    The team has no loop-obligation branch: such an error falls into
+    except Exception. Kept identical to _team_translate_error.
+    """
+    return _team_translate_error(err)
+
+
+def _team_translate_error(err: Exception) -> TranslatedOutcome:
+    """Team flavor of unexpected error: fail-loud."""
+    return TranslatedOutcome(
+        status=TaskStatus.FAILED.value,
+        output="",
+        steps=0,
+        error=f"{type(err).__name__}: {err}",
+        outcome="failure",
+        disposition="raise",
+    )
 
 
 class TeamHandle(TeamUnit):
@@ -49,7 +104,7 @@ class TeamHandle(TeamUnit):
         observability: BoundObservability,
         members: tuple[AgentUnit, ...],
         lead: AgentUnit | None = None,
-        event_session_binder: _RunEventSessionBinder | None = None,
+        event_session_binder: RunEventSessionBinder | None = None,
     ) -> None:
         self._strategy = strategy
         self._profile = profile
@@ -95,19 +150,15 @@ class TeamHandle(TeamUnit):
         iteration_trace_id: str,
         iteration_role: str,
     ) -> Result:
-        from lca.loop.emit.cognitive.agent_spawn import (
-            emit_agent_loop_iteration_end,
-            emit_agent_loop_iteration_start,
-        )
+        """Run one team iteration inside the shared envelope (RA-082).
 
-        emit_agent_loop_iteration_start(
-            trace_id=iteration_trace_id,
-            role=iteration_role,
-            iteration_kind="fresh",
-        )
-        with bind_backends(self._observability), run_scope(scope):
-            from lca.infrastructure.session.bindings import active_publish_session
+        The team only supplies its Started/Finished factories and outcome
+        translations; the try/except/finally cascade lives in
+        lca.agent.run_envelope.run_envelope (shared with CognitiveAgent).
+        """
+        from lca.infrastructure.session.bindings import active_publish_session
 
+        def emit_started() -> None:
             # 热路径 cheap 检查(todo-38,2026-10-05 裁决):event_session_binder
             # 缺席时无 Session,跳过,不抛 RuntimeError。
             if active_publish_session() is not None:
@@ -125,42 +176,36 @@ class TeamHandle(TeamUnit):
                         ),
                     )
                 )
-            # 默认 CANCELED：CancelledError 是 BaseException，不会进 except Exception。
-            # finally 保证任何退出路径都发射 Finished，OTel attach 在同 task 配对 detach。
-            finish_status = TaskStatus.CANCELED.value
-            finish_output = ""
-            finish_steps = 0
-            finish_error = ""
-            iteration_outcome: str = "success"
-            try:
-                result = await self._strategy.run(text)
-                finish_status = (
-                    result.status.value
-                    if isinstance(result.status, TaskStatus)
-                    else str(result.status)
-                )
-                finish_output = result.output or ""
-                finish_steps = result.total_steps
-                return result
-            except Exception as err:
-                finish_status = TaskStatus.FAILED.value
-                finish_error = f"{type(err).__name__}: {err}"
-                iteration_outcome = "failure"
-                raise
-            finally:
-                # 热路径 cheap 检查(todo-38,2026-10-05 裁决):ContextVar 按上下文隔离,每次现查。
-                if active_publish_session() is not None:
-                    record(
-                        TeamRunFinished(
-                            status=finish_status,
-                            output_text=finish_output,
-                            steps=finish_steps,
-                            error=finish_error,
-                        )
+
+        def emit_finished(status: str, output: str, steps: int, error: str) -> None:
+            # 热路径 cheap 检查(todo-38,2026-10-05 裁决):ContextVar 按上下文隔离,每次现查。
+            if active_publish_session() is not None:
+                record(
+                    TeamRunFinished(
+                        status=status,
+                        output_text=output,
+                        steps=steps,
+                        error=error,
                     )
-                emit_agent_loop_iteration_end(
-                    trace_id=iteration_trace_id,
-                    role=iteration_role,
-                    iteration_kind="fresh",
-                    outcome=iteration_outcome,
                 )
+
+        spec = EnvelopeSpec(
+            iteration_kind="fresh",
+            trace_id=iteration_trace_id,
+            role=iteration_role,
+            begin_section=lambda: None,
+            emit_started=emit_started,
+            emit_resumed=lambda: None,
+            translate_success=_team_translate_success,
+            translate_cancelled=_team_translate_cancelled,
+            translate_loop_obligation=_team_translate_loop_obligation,
+            translate_error=_team_translate_error,
+            emit_finished=emit_finished,
+            end_section=lambda _token: None,
+        )
+
+        async def execute() -> Result:
+            return await self._strategy.run(text)
+
+        with bind_backends(self._observability), run_scope(scope):
+            return await run_envelope(spec=spec, execute=execute)
