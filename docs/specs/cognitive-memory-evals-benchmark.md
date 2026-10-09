@@ -124,7 +124,7 @@
 | #23 敏感遮蔽, #24 直接放行 | `MemoryTactFirewall.filter_for_prompt()` 意图穿透防火墙 | `lca.cognition.memory.guards.firewall` | 轨 A |
 | #25 禁显摆声带契约 | `MemoryTactFirewall.sanitize_response()` + 声带约束 | `lca.cognition.memory.guards.firewall` | 轨 A + 轨 B |
 | 避坑红线注入 | `ToolPitfallShield` TOOLS.md 毫秒级匹配 | `lca.infrastructure.tools.shield` | 轨 A |
-| 技能防野蛮生长 | `SkillQuarantineGate` 隔离待审门 | `lca.infrastructure.skills.quarantine` | 轨 A |
+| 技能防野蛮生长 | `is_skill_package_write_path` 包写守卫（RA-057：policy + executor 三处写调用点）+ `require_canonical_rel_path` 安装/读取期 canonical 校验（RA-076 收敛） | `lca.infrastructure.memory.contextfiles.domain.standing_path`、`lca.infrastructure.skills.disk.store` | 专项回归测试（`tests/infrastructure/computer/test_skill_package_write_guard.py`；原 `SkillQuarantineGate` 已由 RA-062 `3d291393a` 删除：零生产调用者） |
 
 ---
 
