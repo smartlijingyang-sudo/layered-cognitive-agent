@@ -55,7 +55,8 @@ from typing import Any
 log = logging.getLogger(__name__)
 
 DEFAULT_CHECKPOINT = "convaiinnovations/laya-typed-decisions"
-DEFAULT_CACHE_DIR = "/home/lichao/.cache/laya/checkpoints"
+# Portable: expands per-user; byte-identical to the old literal on this machine.
+DEFAULT_CACHE_DIR = os.path.expanduser("~/.cache/laya/checkpoints")
 
 # Conservative extra temperature on top of the checkpoint's fitted temperatures.
 # T > 1 flattens the distribution (counters the shipped over-confidence);
