@@ -4,17 +4,22 @@ Every managed component (lobehub, infra, daemon; ADR-0119 followup-2: kernel_ser
 this interface. The CLI never talks to processes directly — it always
 goes through a Service.
 
-Three concerns, clearly separated:
-    Lifecycle  — start / stop / restart  (process management)
-    Setup      — ensure_ready            (idempotent preparation)
-    Health     — state / heal            (observe and self-repair)
+Four concerns, clearly separated:
+    Lifecycle    — start / stop / restart  (process management)
+    Setup        — ensure_ready            (idempotent preparation)
+    Health       — state / heal            (observe and self-repair)
+    Capabilities — cli_fingerprint_current / spawner
+                   (optional; default = absent, callers fall through)
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import Enum
-from typing import Protocol, runtime_checkable
+from typing import TYPE_CHECKING, Protocol, runtime_checkable
+
+if TYPE_CHECKING:
+    from lca.infrastructure.cli.services.kernel.spawner import KernelServeSpawner
 
 
 class ServiceStatus(Enum):
@@ -111,22 +116,24 @@ class Service(Protocol):
         """
         ...
 
+    # ── Capabilities (optional; default = absent) ────────────────────
 
-@runtime_checkable
-class CliShippingService(Protocol):
-    """Services that ship a managed CLI binary on disk.
+    def cli_fingerprint_current(self) -> bool:
+        """True iff this service ships a managed CLI whose deployed copy
+        matches the source fingerprint.
 
-    Currently only ``DaemonService`` satisfies this; the CLI is the
-    sandbox-user daemon. Other services (``LobehubService``, ``InfraService``,
-    ``InfraService`` etc.) do not own a CLI and must not be type-checked
-    against this Protocol.
-    """
+        Default False: services without a managed CLI never report current,
+        so callers fall through to ``ensure_ready()``. Currently only
+        ``DaemonService`` overrides this (the sandbox-user daemon CLI).
+        """
+        return False
 
-    def _cli_deployed(self) -> bool:
-        """True iff the managed CLI binary is on disk and matches the
-        expected fingerprint."""
-        ...
+    def spawner(self) -> KernelServeSpawner | None:
+        """Return the process spawner for services that own their process
+        lifecycle.
 
-    def _cli_source_changed(self) -> bool:
-        """True iff the CLI source has changed since the last deploy."""
-        ...
+        Default None: callers fail-loud instead of hitting AttributeError.
+        Currently only ``KernelServeService`` overrides this (ADR-0213 PR-3:
+        ``stack.heal`` drives ``spawner().run()`` directly).
+        """
+        return None

@@ -9,8 +9,6 @@ Commands are sequences of steps defined in the CLI.
 from __future__ import annotations
 
 from lca.infrastructure.cli.pipeline.pipeline import PipelineContext, register_step
-from lca.infrastructure.cli.service.service import CliShippingService
-from lca.infrastructure.cli.services.kernel.serve import KernelServeService
 
 # ── Infrastructure Steps ──────────────────────────────────────────────
 
@@ -108,9 +106,8 @@ def lobehub_heal(ctx: PipelineContext) -> None:
 def daemon_ensure(ctx: PipelineContext) -> None:
     """Ensure daemon CLI is deployed and up-to-date with source."""
     svc = ctx.registry.get("daemon")
-    # only DaemonService ships a CLI; narrow for the introspection calls
-    daemon = svc if isinstance(svc, CliShippingService) else None
-    if daemon is not None and daemon._cli_deployed() and not daemon._cli_source_changed():
+    # Services without a managed CLI report False and fall through to ensure_ready().
+    if svc.cli_fingerprint_current():
         ctx.console.success("daemon CLI up-to-date (source fingerprint match)")
         return
     ctx.console.info("daemon source changed — rebuilding & redeploying CLI...")
@@ -231,15 +228,15 @@ def stack_heal(ctx: PipelineContext) -> None:
         ks = ctx.registry.get("kernel_serve")
         if ks.state().is_running:
             pass  # already healthy; skip spawn
-        elif not isinstance(ks, KernelServeService):
-            # 'kernel_serve' 恒注册为 KernelServeService；换了实现又没有
-            # spawner()，fail-loud 而不是 AttributeError。
-            raise TypeError(
-                "stack.heal expects 'kernel_serve' to be KernelServeService, "
-                f"got {type(ks).__name__}"
-            )
         else:
+            # 'kernel_serve' 恒提供 spawner()；换了实现又没有 spawner，
+            # fail-loud 而不是 AttributeError。
             spawner = ks.spawner()
+            if spawner is None:
+                raise TypeError(
+                    "stack.heal expects 'kernel_serve' to provide a spawner, "
+                    f"got {type(ks).__name__}"
+                )
             result = spawner.run()
             if not result.ok:
                 # SpawnResult 自 785e541d2 起为精简形状（ok/pid/port/

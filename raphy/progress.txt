@@ -2071,3 +2071,13 @@
   - This repo pins module-cohesion facts in tests (test_code_conventions.py `_LINE_COUNT_EXEMPT`): a split changes both the file sizes and the registry — update both sides, then re-run the conventions test itself.
   - Pre-existing failures need a stash-and-rerun proof before being declared unrelated; the stash is safe in my own worktree (only my changes there).
 ---
+
+## 2026-10-09 12:00 CST - RA-084
+- Implemented: promoted both service capabilities into the `Service` protocol (folded, per AC option 2): `Service.cli_fingerprint_current() -> bool` (default False; `DaemonService` overrides with `_cli_deployed() and not _cli_source_changed()`) and `Service.spawner() -> KernelServeSpawner | None` (default None, TYPE_CHECKING annotation, cycle-safe; `KernelServeService.spawner()` already satisfies it). Deleted the private `CliShippingService` protocol. `steps.py`: `daemon_ensure` calls `svc.cli_fingerprint_current()` (no isinstance, no cross-module `_cli_*` calls); `stack_heal` kernel branch checks `spawner() is None` and fail-louds with TypeError (no `isinstance(KernelServeService)`). Dropped the now-unused concrete imports in steps.py.
+- Files changed: lca/infrastructure/cli/service/service.py, lca/infrastructure/cli/service/host_probing.py (docstring), lca/infrastructure/cli/steps/steps.py, lca/infrastructure/cli/services/daemon/daemon.py, tests/infrastructure/cli/test_service_capabilities.py (new, 7 tests), raphy/prd.json, raphy/progress.txt
+- Tests: 7 passed (new capability tests: pure protocol fakes drive daemon_ensure + stack_heal, source pins for no-isinstance/no-private-calls); 282 passed in tests/infrastructure/cli/ (6 failures are the pre-existing ones confirmed on clean HEAD); ruff clean on all touched files (host_probing.py S-series unchanged pre-existing).
+- **Learnings for future iterations:**
+  - Killing an isinstance downcast against a concrete class: fold the capability into the protocol with a safe default (False/None) rather than a second capability protocol — the default must make the "absent" case behave sanely for ALL existing callers (fall through to ensure_ready / fail-loud).
+  - A source-level pin test (no "isinstance" in steps.py) is the cheapest way to prove a downcast stays dead; pair it with behavioral tests on pure fakes.
+  - TYPE_CHECKING import for a concrete return-type annotation in a protocol module avoids import cycles while keeping the annotation honest.
+---

@@ -7,7 +7,7 @@ No process is spawned for observation other than the probe commands
 themselves; every probe is best-effort and fail-safe.
 
 Split out of ``service.py`` (RA-083): the Service Protocol surface
-(``Service``/``CliShippingService``/``ServiceState``) must stay importable
+(``Service``/``ServiceState``) must stay importable
 without the host-probing machinery.
 """
 

@@ -189,6 +189,11 @@ class DaemonService:
             return False
         return self._deploy_cli()
 
+    def cli_fingerprint_current(self) -> bool:
+        """Public Service-protocol capability: managed CLI is deployed and
+        its source fingerprint matches the last deploy (RA-084)."""
+        return self._cli_deployed() and not self._cli_source_changed()
+
     def _cli_source_changed(self) -> bool:
         """True when CLI source differs from last deployed snapshot."""
         return self._state.detect_changes("daemon_cli", self._cli_src_paths, "*.ts").has_changes
