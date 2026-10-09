@@ -1,5 +1,14 @@
 ## Codebase Patterns
 
+- **模型身份是 LLMAdapter 契约成员，不是私有字段（RA-106）：** telemetry 的
+  ``model=`` 标签必须来自协议声明的 ``model_name`` accessor，不能 getattr 私有
+  ``_model``。协议默认实现返回 ``None``（而非 raise NotImplementedError）——
+  因为已有 ``getattr(adapter, "model_name", None)`` 消费者（model_visible
+  adapter 的 ``_resolve_model_config``），默认 raise 会炸掉它。生产适配器
+  （openai_compat/anthropic 策略/mock/model_override）覆写返回真实模型 id。
+  同类私有探针残留：``think/reasoner/credentials.py:131`` 与
+  ``cli/commands/runs/driver_debug.py:190`` 仍读 ``_model``，可后续顺手收敛。
+
 - **Package contract enforcement must scan actual imports（RA-107）：**
   `check_package_contracts.py` 的 L1↔L2 cross-check 只验证 README *提到* 了
   forbidden dep，从不扫描真实 import——`lca.application` 契约禁
@@ -2507,4 +2516,48 @@ Learnings:
     （`--package lca.application`），其余记为基线。
   - `gateway` 包已物理删除（ADR-0119）；断言
     `"gateway" in discover_packages(...)` 的测试过期，应断言缺席。
+---
+
+## 2026-10-10 02:28 - RA-106
+
+- 实现：`LLMAdapter` 协议新增 `model_name` property（默认返回 `None`，纯委托
+  wrapper 可不覆写）；`OpenAICompatAdapter`（含 Anthropic Messages 策略）、
+  `MockLLMAdapter`、`ModelOverridingLLMAdapter` 覆写返回各自模型 id。
+  `_model_label` 从 `getattr(inner, "_model", None)` 改为读声明的
+  `getattr(inner, "model_name", None)`——私有字段探针删除，模型身份成为契约。
+- 关键决策：协议默认实现返回 `None` 而非 `raise NotImplementedError`——因为
+  `model_visible/adapter.py::_resolve_model_config` 已有
+  `getattr(cur, "model_name", None)` 消费者，默认 raise 会让它炸掉；
+  返回 None 保持其行为不变（RA-059 的 raise 默认模式在这里不适用）。
+- 行为保持：OpenAICompatAdapter 的 `model_name` 返回 `self._model`（含 anthropic
+  策略），Mock 返回 `self.name`（"mock-llm"），ModelOverride 返回
+  assistant 模型；wrapper（Retrying/Failover/LlmService/Telemetry）不覆写，
+  `_model_label` 回退到 `name`/类型名——与改动前逐字一致。
+- Files changed:
+  - `lca/contracts/protocols/runtime/infra/infra.py`（协议新增 `model_name`）
+  - `lca/infrastructure/llm_adapter/openai_compat/__init__.py`
+  - `lca/infrastructure/llm_adapter/mock/llm.py`
+  - `lca/infrastructure/llm_adapter/model_override.py`
+  - `lca/infrastructure/observability/adapters/adapters.py`（`_model_label`）
+  - `tests/unit/observability/adapters/test_model_label.py`（新增 5 测试）
+  - `raphy/prd.json`（RA-106 passes=true）、`raphy/progress.txt`
+- 测试：`tests/unit/observability/adapters/` + `tests/scenario/telemetry/` +
+  `test_runnable_assembly.py` + `test_contracts.py` + `test_spawn_bind_plan.py`
+  53 passed（LLM_API_KEY=dummy；缺 env 时 spawn_bind_plan 环境性失败，与本次
+  改动无关）；ruff check 全过；`ruff format --check` 仅 infra.py/adapters.py
+  的 HEAD 遗留行 dirty（已验证 HEAD 版本同样 dirty，本次未触碰）。
+- **Learnings for future iterations:**
+  - 给 runtime_checkable Protocol 加新成员会影响 `isinstance(x, LLMAdapter)`
+    的结构检查——所有显式子类都继承默认 property（hasattr True），但鸭子类型
+    对象若没有 `model_name` 会从 isinstance 落选；本次仓库内所有 adapter 都是
+    子类，零波及。
+  - 协议成员加默认实现前，先 grep `getattr(<obj>, "<member>", <default>)`
+    消费者：默认值必须与该消费者期望的缺省值一致（这里 `getattr(cur,
+    "model_name", None)` 期望 None），否则默认 raise 会把无关路径炸掉。
+  - 仓库还有两处 `getattr(adapter, "_model", None)`（`think/reasoner/
+    credentials.py:131`、`cli/commands/runs/driver_debug.py:190`）——同类
+    私有探针，但不属于 RA-106 的 `_model_label` 范围，未动；后续可顺手收敛。
+  - 评估称"production adapters (openai_compat, anthropic, mock)"：anthropic
+    不是独立 adapter 类，是 openai_compat 内部 Strategy——`OpenAICompatAdapter.
+    model_name` 一处实现即覆盖 anthropic 风格。
 ---

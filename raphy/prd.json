@@ -1547,9 +1547,9 @@
         "ruff check clean on touched files."
       ],
       "priority": 2,
-      "passes": false,
+      "passes": true,
       "branchName": "raphy/deslop-100",
-      "notes": "Source: DESLOP-100 friction walk, Area B (observability adapters). Strength: Worth exploring. Leaky seam: model identity is not on the protocol; _model_label probes adapter._model (openai_compat.__init__ sets self._model; protocol only declares name). Deletion test: declaring the accessor concentrates model-identity knowledge in the contract; the getattr fallback disappears. Constraint: no telemetry payload/field changes; adapter name vs model id stay distinct."
+      "notes": "Source: DESLOP-100 friction walk, Area B (observability adapters). Strength: Worth exploring. Leaky seam: model identity is not on the protocol; _model_label probes adapter._model (openai_compat.__init__ sets self._model; protocol only declares name). Deletion test: declaring the accessor concentrates model-identity knowledge in the contract; the getattr fallback disappears. Constraint: no telemetry payload/field changes; adapter name vs model id stay distinct. Implemented: LLMAdapter.model_name property (default None) + production adapters override; _model_label reads model_name."
     },
     {
       "id": "RA-107",

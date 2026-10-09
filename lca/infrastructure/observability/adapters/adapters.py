@@ -57,7 +57,7 @@ _log = structlog.get_logger("lca.telemetry_llm")
 
 
 def _model_label(inner: LLMAdapter) -> str:
-    model = getattr(inner, "_model", None)
+    model = getattr(inner, "model_name", None)
     if isinstance(model, str) and model:
         return model
     name = getattr(inner, "name", None)

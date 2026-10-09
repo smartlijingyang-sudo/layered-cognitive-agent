@@ -29,6 +29,11 @@ class MockLLMAdapter(LLMAdapter):
 
     name = "mock-llm"
 
+    @property
+    def model_name(self) -> str:
+        """Mock 的模型 id（与 ``LLMResponse.model`` 一致）。"""
+        return self.name
+
     def _respond(self, text: str) -> LLMResponse:
         return LLMResponse(text=text, model=self.name)
 
