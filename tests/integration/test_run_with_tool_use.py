@@ -249,13 +249,18 @@ def test_run_with_tool_use_succeeds_on_web_standard() -> None:
     ``bash(echo hello)`` on the first call and a final ``assistant``
     reply on the second call. Runs the brief's user-text and asserts:
 
-    - ``result.status is TaskStatus.COMPLETED`` (terminal outcome
-      success; the original ``run_cc39610072bf`` failed with
-      ``budget_exceeded: node 'think.main' visited 3 times``).
+    - ``result.status is TaskStatus.INPUT_REQUIRED`` (approval era:
+      the scripted ``bash`` tool call is a privileged action —
+      ``namespace_approval`` maps the shell namespace to
+      ``require_approval`` — so with the ``bash`` grant bound the run
+      pauses for human approval, the designed success path; the
+      original ``run_cc39610072bf`` failed with ``budget_exceeded:
+      node 'think.main' visited 3 times``).
     - The wire shape derived from the bound Session's writer is
-      ``[user, assistant{tool_calls=[X]}, tool{call_id=X}, assistant{content}]``
-      with no orphan ``role=tool`` row.
-    - ``messages[-1].role == "assistant"`` with non-empty content.
+      ``[user, assistant{tool_calls=[X]}]`` with no orphan ``role=tool``
+      row (the ``tool`` row is absent by design: the tool never
+      executed because approval is pending).
+    - The assistant message declares the ``bash`` tool call.
 
     Skips with a documented reason when:
 
@@ -284,6 +289,11 @@ def test_run_with_tool_use_succeeds_on_web_standard() -> None:
         )
         from lca.contracts.protocols import LLMAdapter
         from lca.contracts.protocols.journal.spec.spec import AgentSpec
+        from lca.contracts.runtime.trust import (
+            PluginOrigin,
+            TrustEnvelope,
+            trust_envelope_scope,
+        )
         from lca.plugins.composer.composition.agent_assembly import (
             PlanBoundAgentAssembler,
         )
@@ -331,6 +341,20 @@ def test_run_with_tool_use_succeeds_on_web_standard() -> None:
                 model=self.name,
             )
 
+        async def stream(self, prompt: str, **kwargs: Any):
+            # RA-097: think.llm.invoke only consumes stream(); the COMPLETED
+            # event's response must equal complete()'s return value
+            # (LLMStreamEvent invariant).
+            from lca.contracts.models.core.conversation.llm import (
+                LLMStreamEvent,
+                LLMStreamEventType,
+            )
+
+            yield LLMStreamEvent(
+                type=LLMStreamEventType.COMPLETED,
+                response=await self.complete(prompt, **kwargs),
+            )
+
     async def _drive() -> tuple[TaskStatus, list[dict[str, Any]]]:
         ctx = await run_kernel("profiles/web-standard.yaml")
         try:
@@ -353,9 +377,27 @@ def test_run_with_tool_use_succeeds_on_web_standard() -> None:
             # is the documented cooperative behaviour).
             run_id = "run_e2e_smoke_cc39610072bf"
             bound = bind_run_event_session_from_store(store, run_id)
+            # ADR-0292 §10 (grant-absence gate): a privileged tool call
+            # without an ambient TrustEnvelope grant is fail-closed
+            # (approve_rejected). Production binds the envelope via
+            # SessionActivation; the test binds the equivalent here so the
+            # run reaches normal approval routing (bash -> require_approval
+            # -> intervene.interrupt -> INPUT_REQUIRED).
+            envelope = TrustEnvelope(
+                origins=(
+                    PluginOrigin(
+                        source="bundled",
+                        trust="core",
+                        enabled_by="test_run_with_tool_use",
+                        discovered_at="test",
+                    ),
+                ),
+                granted_privileges=frozenset({"bash"}),
+            )
             try:
                 agent = PlanBoundAgentAssembler().assemble_agent(spec, scope=ctx)
-                result = await agent.run("请用 bash 工具运行 echo hello 并把结果告诉我。")
+                with trust_envelope_scope(envelope):
+                    result = await agent.run("请用 bash 工具运行 echo hello 并把结果告诉我。")
                 msgs = bound.writer.derive_messages()
                 return result.status, msgs
             finally:
@@ -408,31 +450,46 @@ def test_run_with_tool_use_succeeds_on_web_standard() -> None:
             f"pre-existing profile/runtime defect unrelated to PR2."
         )
 
-    # Terminal outcome: the brief allows ``outcome == "success"``; the
-    # actual contract is ``Result.status is TaskStatus.COMPLETED``.
-    assert status is TaskStatus.COMPLETED, (
-        f"expected terminal outcome = success (TaskStatus.COMPLETED); "
-        f"got status={status!r}. The original run_cc39610072bf failure "
-        f"surfaced as budget_exceeded: orphan-cycle. PR2's persist-before-"
-        f"execute fix (Task 7) and orphan-drop (Task 1/2) prevent that."
+    # Terminal outcome (approval era): the scripted ``bash`` tool call is
+    # a privileged action (``namespace_approval`` maps the shell namespace
+    # to ``require_approval``, and ADR-0292 §10 additionally fail-closes
+    # ungranted privileged calls). With the ``bash`` grant bound above,
+    # the run must reach the approval gate and pause for human approval
+    # (``TaskStatus.INPUT_REQUIRED``) — the designed success path for a
+    # privileged tool call. What this test pins is that the run gets
+    # there *through the think→act path*: the stream-contract failure
+    # (empty LLM response -> declarative run failed, PR-B era) and the
+    # grant-absence refusal (ADR-0292 §10) must both be gone.
+    assert status is TaskStatus.INPUT_REQUIRED, (
+        f"expected the approval pause (TaskStatus.INPUT_REQUIRED) for the "
+        f"privileged bash tool call; got status={status!r}. A FAILED "
+        f"status here means either the stream seam regressed (empty "
+        f"LLM response) or the grant gate refused the call."
     )
 
-    # Wire shape: the canonical happy path that PR2 promises.
+    # Wire shape: ``[user, assistant{tool_calls}]``. The ``tool`` row is
+    # absent by design — the tool never executed because approval is
+    # pending — and no orphan ``role=tool`` row may survive
+    # (defence-in-depth: even if some upstream seam produced an orphan,
+    # ``derive_messages()`` drops it).
     roles = [m["role"] for m in msgs]
-    assert roles == ["user", "assistant", "tool", "assistant"], (
-        f"expected canonical wire shape [user, assistant(tool_calls), "
-        f"tool, assistant]; got roles={roles}"
+    assert roles == ["user", "assistant"], (
+        f"expected wire shape [user, assistant(tool_calls)] (tool row "
+        f"absent: approval pending by design); got roles={roles}"
     )
-    # No orphan ``role=tool`` row survived (defence-in-depth: even if
-    # some upstream seam produced an orphan, ``derive_messages()``
-    # drops it).
+    assistant_msg = msgs[1]
+    declared = [
+        tc.get("name") or tc.get("tool_name")
+        for tc in (assistant_msg.get("tool_calls") or ())
+        if isinstance(tc, dict)
+    ]
+    assert "bash" in declared, (
+        f"assistant message must declare the bash tool call; got "
+        f"tool_calls={assistant_msg.get('tool_calls')!r}"
+    )
     assert not any(m["role"] == "tool" and not _declared_match(m, msgs) for m in msgs), (
         f"orphan role=tool row survived derive_messages: {msgs!r}"
     )
-    # Brief's contract on ``messages[-1]``: assistant, non-empty content.
-    assert msgs[-1]["role"] == "assistant"
-    content = msgs[-1].get("content") or ""
-    assert content, f"final assistant message has empty content: {msgs[-1]!r}"
 
 
 def _declared_match(tool_msg: dict[str, Any], msgs: list[dict[str, Any]]) -> bool:

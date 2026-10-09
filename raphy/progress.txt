@@ -2263,3 +2263,29 @@
   - e2e 的脚本桩必须跟被测 seam 的当前契约同步：PR-B 把 invoke 从 complete 切到 stream 后，`_ScriptedEcho` 只实现 complete 就成了"测了个寂寞"——assess 运行时验证必须先确认桩走的是真路径（本轮靠 gate 探针 action_type='respond' 才定位到）。
   - `_runtime_failure_message` 的 "declarative run failed" 兜底吞证据：error_fact 无 detail 时等于零信息——排查时直接 monkeypatch 探针比读日志快。
 ---
+
+## 2026-10-09 18:30 CST - RA-097
+
+Implemented:
+- Removed the silent no-op default `stream()` on `LLMAdapter` (now `...` + MUST-override docstring); all 7 production impls already define `stream`, verified by grep.
+- `think.llm.invoke`: two fail-loud guards — (a) `stream()` result without `__aiter__` -> RuntimeError naming the adapter class (closes the un-awaited coroutine to avoid ResourceWarning); (b) assembled empty response (no text, no tool_calls, post-abort) -> RuntimeError naming the adapter.
+- `_ScriptedEcho` in `tests/integration/test_run_with_tool_use.py` now overrides `stream()` per the LLMStreamEvent invariant (COMPLETED.response identical to complete()).
+- Two new regression tests in `tests/think/llm/test_invoke.py`: complete-only adapter -> RuntimeError; contentless stream -> RuntimeError.
+
+Files:
+- lca/contracts/protocols/runtime/infra/infra.py
+- lca/nodes/think/llm/invoke.py
+- tests/integration/test_run_with_tool_use.py
+- tests/think/llm/test_invoke.py
+
+Tests:
+- tests/think/llm/: 24 passed (incl. 2 new)
+- tests/integration/test_run_with_tool_use.py: 3 passed
+- tests/scenario/llm_0/ + test_persist.py: 48 passed
+- ruff check on all 4 touched files: clean
+- Pre-existing red (verified via git stash, untouched): tests/integration/test_think_llm_journal.py::test_think_llm_journal_populates_journal_json — same approval-era cause, candidate for a future story.
+
+Learnings:
+- IMPL vs ASSESSMENT: the assessment's e2e clause expected terminal COMPLETED, but the approval era (ADR-0292 §10 grant gate + namespace_approval shell->require_approval, default policy {"shell": "require_approval"}) makes unattended bash execution impossible BY DESIGN. Forcing the old contract would mean weakening a security gate for a test. The e2e now binds a TrustEnvelope granting "bash" (production-faithful: SessionActivation binds it in prod) and asserts TaskStatus.INPUT_REQUIRED — the designed approval pause — plus wire shape [user, assistant{tool_calls}] with no orphan tool rows. Key probe results: grant "shell.exec" does NOT work (the gate passes raw tool names to envelope.grants()); grant "bash" -> grant gate passes -> approve_interrupt -> INPUT_REQUIRED.
+- The e2e failure moved in two hops during this story: (1) stream seam fixed -> run reached think.main->act.main; (2) approval gate refused (no envelope) -> envelope bound -> INPUT_REQUIRED. Each hop was verified via phase_graph edge logs, not by guessing.
+- A Protocol default method that silently produces a degenerate value (the no-op stream yielding a response-less COMPLETED) is worse than no default: every complete-only adapter became a silent empty-decision bomb. Fail-loud at the seam beats fail-silent every time.
