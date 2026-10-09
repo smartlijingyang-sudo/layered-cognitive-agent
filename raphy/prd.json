@@ -1515,9 +1515,9 @@
         "git diff --check clean; existing tests still pass (docs + script change only)."
       ],
       "priority": 1,
-      "passes": false,
+      "passes": true,
       "branchName": "raphy/deslop-100",
-      "notes": "Source: DESLOP-100 round mandate + scripts/verify_doc_slop.py read-only run (123 hits). Strength: Strong (prose deslop is a round focus). Constraints: do not delete glossary entries or resolvable commit-hash references (e.g. docs/specs/architecture.md line 185 keeps its cc17d8f81 link); historical docs (docs/adr, docs/notes, docs/debug, docs/plans, docs/design/2026-*, docs/port, dated specs) are time capsules and stay untouched. The retirement/do-not-use tables in observability docs are deliberate current-state guidance — rewrite the label, keep the table."
+      "notes": "Source: DESLOP-100 round mandate + scripts/verify_doc_slop.py read-only run (123 hits). Strength: Strong (prose deslop is a round focus). Constraints: do not delete glossary entries or resolvable commit-hash references (e.g. docs/specs/architecture.md line 185 keeps its cc17d8f81 link); historical docs (docs/adr, docs/notes, docs/debug, docs/plans, docs/design/2026-*, docs/port, dated specs) are time capsules and stay untouched. The retirement/do-not-use tables in observability docs are deliberate current-state guidance — rewrite the label, keep the table. DONE 2026-10-10: rewrote 18 change-narration findings across docs/specs/2026-09-07-lca-p1-agent-gateway-bridge.md, docs/specs/architecture.md, docs/specs/0199-delete-when-inventory.md to present tense; verify_doc_slop 123->105 (remaining are sanctioned keeps: plans/glossary/commit anchors/present-truth retirement references)."
     },
     {
       "id": "RA-105",

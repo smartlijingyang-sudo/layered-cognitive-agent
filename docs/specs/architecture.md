@@ -182,7 +182,7 @@ Build plans from Python without editing YAML by hand:
 - `PlanReader`, `PredicateEvaluator`, `PortRegistry` together form the read side ([read PR-D3](https://github.com/agents-builders/layered-cognitive-agent/commit/8dc7891ab)).
 - `PlanLiftError` carries `plan_id` to make runtime plan failures actionable ([read PR](https://github.com/agents-builders/layered-cognitive-agent/commit/447e41b20)).
 
-The `atomic cutover to typed port graph (D4)` commit ([cc17d8f81](https://github.com/agents-builders/layered-cognitive-agent/commit/cc17d8f81)) makes port-name typos a compile-time error; production bundle YAMLs can no longer silently route to a missing port.
+The `atomic cutover to typed port graph (D4)` commit ([cc17d8f81](https://github.com/agents-builders/layered-cognitive-agent/commit/cc17d8f81)) makes port-name typos a compile-time error; production bundle YAMLs cannot silently route to a missing port.
 
 ## Six-step cognition (closed set)
 

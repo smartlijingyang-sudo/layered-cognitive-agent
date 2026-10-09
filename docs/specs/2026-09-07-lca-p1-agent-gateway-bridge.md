@@ -35,7 +35,7 @@ These are not bugs in the run engine — they are properties of the transport la
 3. **WebSocket as primary transport.** Native `AgentStreamClient` (heartbeat, reconnect, `lastEventId`, `resume_complete`, `auth_expired`/`auth_failed`) handles all live, reconnect, and cross-refresh flows.
 4. **JWT auth (RS256, 5 min)** with `refreshToken` procedure, mirroring native `signUserJWT` (`packages/trpc/src/utils/internalJwt.ts:97-106`).
 5. **Live state is the Redis Stream.** `lca_running_operations` table holds only the routing/business index; terminal status is read from the Redis Stream's `status` field, liveness from the key's TTL.
-6. **HIL on the same `run_id`.** `POST /lca-api/runs/{id}/answer` continues to drive the same run, gated by `accepted_answer_keys` (now persisted in the same table).
+6. **HIL on the same `run_id`.** `POST /lca-api/runs/{id}/answer` continues to drive the same run, gated by `accepted_answer_keys` (persisted in the same table).
 7. **Cross-refresh reconnect.** `useGatewayReconnect` reads the LCA-owned table through a plain HTTP endpoint `GET /lca-api/topics/{topic_id}/running-op` (no tRPC; see §5.6).
 8. **7 e2e scenarios pass + 1 h stability smoke.** The acceptance bar before P2 starts.
 
@@ -580,7 +580,7 @@ The table is **not** a liveness source. A row exists only for runs that should b
 
 ## 6. Front-end changes (via the LCA patch mechanism)
 
-**Hard constraint:** no direct edits under `lobehub-ui/`. All front-end changes are delivered as Python patch modules under `deploy/lobehub/patches/runtime/`, applied by `python3 deploy/lobehub/patch_lobehub.py apply`. The engine's `reconcile()` (see `deploy/lobehub/engine.py:21-37`) automatically restores any lobehub-ui file that was written by a now-deleted patch module — this is the deletion primitive P1 uses to retire the 4 broken-path TS files.
+**Hard constraint:** no direct edits under `lobehub-ui/`. All front-end changes are delivered as Python patch modules under `deploy/lobehub/patches/runtime/`, applied by `python3 deploy/lobehub/patch_lobehub.py apply`. The engine's `reconcile()` (see `deploy/lobehub/engine.py:21-37`) automatically restores any lobehub-ui file that a deleted patch module had written — this is the deletion primitive P1 uses to retire the 4 broken-path TS files.
 
 The current `lca_run_driver.py` patch module writes 17 files (5 new, 6 LCA-specific helpers, 1 generated `lcaWire.ts`, 1 `lcaToolRender/`, 4 lobehub-ui source modifications). P1 splits this into 3 modules with single responsibilities, deletes the 4 broken-path source modifications, and lets `reconcile()` restore the upstream sources.
 
@@ -637,7 +637,7 @@ lobehub-ui source modifications (3 files, all using `replace_once` with explicit
 | File | Anchor / marker | What changes |
 |---|---|---|
 | `src/store/chat/slices/agentRun/actions/dispatch/agentDispatcher.ts` | `/* LCA-P1: lcaGateway runtime mode */` | `selectRuntimeType` extended to return `'lcaGateway'` when `isLcaGatewayMode` is true. The marker is appended to the file in the same patch (one anchor per file). |
-| `src/store/chat/slices/agentRun/actions/entries/conversationControl.ts` | `/* LCA-P1: skip-via-http */` and `/* LCA-P1: cancel-via-http */` | The current `lcaSkipState` / `lcaCancelState` `fetch /lca-api/runs/${runId}/answer` / `/cancel` code is **kept** (Q-Verify.1: HIL submission is plain HTTP, not WS — see §5.3.2). The marker is appended; the existing LCA fetch blocks are now both kept and recognized by the same marker. No code change in this file beyond the marker; the LCA patch re-affirms that the LCA HTTP submission path is the canonical one. |
+| `src/store/chat/slices/agentRun/actions/entries/conversationControl.ts` | `/* LCA-P1: skip-via-http */` and `/* LCA-P1: cancel-via-http */` | The current `lcaSkipState` / `lcaCancelState` `fetch /lca-api/runs/${runId}/answer` / `/cancel` code is **kept** (Q-Verify.1: HIL submission is plain HTTP, not WS — see §5.3.2). The marker is appended; the existing LCA fetch blocks are both kept and recognized by the same marker. No code change in this file beyond the marker; the LCA patch re-affirms that the LCA HTTP submission path is the canonical one. |
 | `src/store/chat/slices/agentRun/actions/entries/conversationLifecycle.ts` | `/* LCA-P1: lcaGateway send path */` | `sendMessage`'s `lcaGateway` branch added: `await this.#get().executeGatewayAgent(...)` (the same function `gateway.ts:executeGatewayAgent` defines, but bound to `lcaGatewayUrl`). |
 | `src/features/Conversation/Messages/AssistantGroup/Tool/Detail/Intervention/customInteractionHandlers.ts` | `/* LCA-P1: askUserQuestion handler */` | The current `handleLcaAskUserSubmit` (lines 138-198) is **kept verbatim** — this is the HIL submission path (Q-Verify.1). The patch module marks it with the marker; no code change. The native `findCustomInteractionSubmitHandler` lookup continues to find this handler for `lobe-user-interaction____askUserQuestion`. |
 | `src/store/chat/agents/transports/lcaToolRender/renderers/lobe-user-interaction/askUserQuestion.tsx` | `/* LCA-P1: native askUserQuestion render */` | The current LCA renderer (lines 91-94 read `pluginState.lca.run_id`) is **kept** — `requestArgs.lca_run_id` continues to be written at HIL setup. The patch module marks the file; no code change. |
@@ -658,8 +658,8 @@ lobehub-ui source modification (1 file):
 
 Path: `deploy/lobehub/patches/runtime/lca_run_driver.py` is **deleted from disk**. The engine's `reconcile()` will:
 
-- Notice the manifest entry for `lca_run_driver` no longer has a backing module.
-- Restore every file the old `lca_run_driver` had written to its git HEAD content.
+- Notice the manifest entry for `lca_run_driver` has no backing module.
+- Restore every file `lca_run_driver` had written to its git HEAD content.
 - The 5 LCA-only files (`LcaRunDriver.ts`, `lcaRunObserve.ts`, `lcaRunHil.ts`, `lcaJournal.ts`, `lcaRunCommand.ts`) had never been in upstream git, so they are simply **removed** from the working tree (the engine's restore path is a `git checkout -- <file>` for tracked files; for untracked files it is a `rm` — both are part of the engine's `orphan_restored` path).
 - The 4 modified lobehub-ui sources (`streamingExecutor.ts`, `customInteractionHandlers.ts`, `intervention/index.tsx`, `conversationControl.ts`) are restored to their upstream content. `conversationControl.ts` is **re-modified by `lca_runtime_agent_gateway`** with a different `verify_marker` (`/* LCA-P1: skip-via-ws */`), so the final content of that file is the upstream content with LCA-P1's three inserted markers, **not** the pre-P1 LCA content.
 
@@ -717,7 +717,7 @@ The retirement is **mechanical**, not logical: when `lca_run_driver.py` is delet
 | `intervention/index.tsx` (modification) | `deploy/lobehub/patches/runtime/lca_run_driver.py:37` | same — restored to upstream. The `lca_runtime_agent_gateway` patch does not modify this file (the native component already routes HIL submission through the `findCustomInteractionSubmitHandler` lookup that `customInteractionHandlers.ts` registers against). |
 | `askUserQuestion.tsx` (renderer) | not a lobehub-ui source — lives in `lcaToolRender/renderers/lobe-user-interaction/`. Currently a sibling `.ts` under `deploy/lobehub/patches/runtime/`. | **Kept in P1.** `lca_runtime_chat_persistence` ships the file unchanged. The `pluginState.lca.run_id` reader continues to work because `lcaRunHil.presentAskUserCard` continues to write the same pluginState shape. |
 | `conversationControl.ts` (modification) | `deploy/lobehub/patches/runtime/lca_run_driver.py:38` | `reconcile()` restores upstream **then** `lca_runtime_agent_gateway` re-modifies it (P1's `/* LCA-P1: skip-via-ws */` etc. are different markers). |
-| `LegacyRunDispatcher` | `lca/plugins/transport/webserver/handlers/runs/api/legacy_dispatcher_adapter.py` | full delete (`git rm`); the adapter is no longer wired. |
+| `LegacyRunDispatcher` | `lca/plugins/transport/webserver/handlers/runs/api/legacy_dispatcher_adapter.py` | full delete (`git rm`); the adapter is not wired. |
 | `LCA_RUNTIME_FACADE` env flag | `lca/plugins/transport/webserver/...` references | the flag is removed; the new path is unconditional. |
 
 The deletion gate is `scripts/audit_lca_legacy_path.py` (new, see [§10.3](#103-audit-script)): zero references anywhere in `apps/`, `lobehub-ui/src/`, `lobehub-ui/packages/`, `lca/`, or any non-archived test. The audit script also runs after every PR and on the nightly CI.
@@ -803,10 +803,10 @@ The `importlinter` contract layer purity rule already excludes `lca.infrastructu
 | LCA gateway process kill | Redis Stream survives (TTL 2 h); on restart, the same `LcaStreamEventManager` instance reads from the same key (test 4). | Single Redis instance, native `LcaStreamEventManager` keys. |
 | Gateway restart during an active reconnect | `useGatewayReconnect` reads the table, calls `connectToGateway` with `resumeOnConnect: true`; the WS path's `resume_complete` returns `running` or terminal, and the client renders accordingly (test 3). | `resume_complete` is the authoritative status; the client never guesses. |
 | Approval / HIL cross-refresh | `step_start { requiresApproval: true }` is durable in the stream. On reconnect, `useGatewayReconnect` reads the table, replays the stream, `resume_complete { status: 'waiting_input' }` triggers the client to re-render the card from the latest `step_start.data.pendingToolsCalling`. User clicks Approve → `POST /answer` → `accepted_answer_keys` persists, the WS resumes on the same connection (test 5). | Stream is the source of truth; idempotency is in the table. |
-| Idempotent resume replay | `accepted_answer_keys` is now persisted (jsonb) and survives restart. The `RunPort.resume_approval` no longer needs to consult in-process state (test 5b). | Single UPDATE per call, atomic. |
+| Idempotent resume replay | `accepted_answer_keys` persists (jsonb) and survives restart. `RunPort.resume_approval` reads persisted state instead of in-process state (test 5b). | Single UPDATE per call, atomic. |
 | Stale `runningOperation` row | `useGatewayReconnect` checks Redis `EXISTS agent_runtime_stream:{run_id}`. If absent, the row is deleted and no reconnect is attempted. | Redis is the liveness source. |
 | `auth_expired` during a long run | Client calls `POST /lca-api/runs/{run_id}/ws-token` (plain HTTP). The new JWT rides back in the response. Client then `updateToken()` + `reconnect()`. | Mirror of native `auth_expired` path. |
-| `auth_failed` (op no longer exists) | LCA's WS handler returns `auth_failed` once; the client treats it as terminal (no auto-reconnect); the `lca_running_operations` row is deleted on the next `useGatewayReconnect` if present. | Same as native. |
+| `auth_failed` (op removed) | LCA's WS handler returns `auth_failed` once; the client treats it as terminal (no auto-reconnect); the `lca_running_operations` row is deleted on the next `useGatewayReconnect` if present. | Same as native. |
 | 7 broken paths from §1 | Each maps to a fix in 5.2 / 5.3 / 5.4 / 5.7; see comments inline. | Native-equivalent guarantees. |
 
 ## 9. Acceptance
@@ -878,7 +878,7 @@ One real end-to-end human session, single round + HIL, on the LCA boot path, wit
 - `lca/plugins/transport/webserver/handlers/runs/api/query_endpoints.py:144-168` — `stream_run_live` removed.
 - `lca/plugins/transport/run_ui_encoder__encoder_provider.py` — full delete; the 4-event encoder has no equivalent in the new design.
 - `lca/plugins/transport/run_live_observe__seam.py` — full delete; superseded by the `LcaAgentRuntimeCoordinator` / `LcaAgentGateway` pair.
-- `lca/plugins/transport/webserver/handlers/runs/terminal/legacy/adapter.py` — full delete; `RegistryRunAdapter` no longer wraps the live stream (commands and queries split explicitly).
+- `lca/plugins/transport/webserver/handlers/runs/terminal/legacy/adapter.py` — full delete; `RegistryRunAdapter` does not wrap the live stream (commands and queries split explicitly).
 - `lca/plugins/transport/webserver/handlers/runs/api/legacy_dispatcher_adapter.py` — full delete; `LegacyRunDispatcher` is replaced by the new `LcaAgentRuntimeCoordinator`.
 
 **Front-end (delete via patch engine `reconcile()`):**
@@ -938,7 +938,7 @@ The five PRs are **strictly sequential** (each requires the previous one green).
 1. **PR-1: contract + manager** (no observable change, dev only)
    - Add `lca/contracts/transport/{gateway_messages,agent_stream_event,stream_keys}.py`.
    - Add `lca/infrastructure/observability/stream/stream_event_manager.py`.
-   - **Tests added in this PR:**
+   - **Tests:**
      - `lca/infrastructure/observability/stream/tests/test_stream_event_manager.py` (unit, L1).
      - `tests/contracts/transport/test_protocol_parity.py` (Python types ↔ native TS types roundtrip, L1).
    - Migration: none. Front-end: none.
@@ -946,20 +946,20 @@ The five PRs are **strictly sequential** (each requires the previous one green).
    - Add `LcaAgentRuntimeCoordinator`, `EventTranslator`, `LcaAgentGateway`.
    - Add `routes_2/routes_runs_sessions.py` WS route (mounted at `/v1/runs/{run_id}/ws`); keep `/runs/{run_id}/live` SSE in parallel so the legacy front-end still works during PR-2 / PR-3.
    - Add `lca_running_operations` migration.
-   - **Tests added in this PR:**
+   - **Tests:**
      - `lca/application/runtime/coordinator/tests/test_event_translator.py` (one test per foldable event, L1).
      - `lca/plugins/transport/webserver/handlers/runs/terminal/streaming/tests/test_lca_agent_gateway.py` (L2 single-node).
      - **L2-1** `tests/integration/p1/test_lca_p1_node_01_ws_handshake.py` (auth_success / auth_failed / auth_expired).
      - **L2-3** `tests/integration/p1/test_lca_p1_node_03_heartbeat.py`.
      - **L2-4** `tests/integration/p1/test_lca_p1_node_04_interrupt.py`.
      - **L2-6** `tests/integration/p1/test_lca_p1_node_06_redis_shape.py`.
-   - Migration: `/v1/runs/{run_id}/ws` is now a parallel path; `/runs/{id}/live` SSE still works.
+   - Migration: `/v1/runs/{run_id}/ws` is a parallel path; `/runs/{id}/live` SSE still works.
 3. **PR-3: front-end switchover via new patch modules**
    - Add `deploy/lobehub/patches/runtime/lca_runtime_chat_persistence.py` (replaces the persistence half of `lca_run_driver`).
    - Add `deploy/lobehub/patches/runtime/lca_runtime_agent_gateway.py` (8 new TS files + 3 source modifications).
    - Add `deploy/lobehub/patches/runtime/lca_runtime_use_gateway_reconnect.py` (1 source modification).
    - Add the three plain-HTTP endpoints (`POST /lca-api/runs`, `GET /lca-api/topics/{id}/running-op`, `POST /lca-api/runs/{id}/ws-token`); add `lcaGatewayUrl` to `serverConfigStore`.
-   - **Tests added in this PR:**
+   - **Tests:**
      - `tests/e2e/p1/_lca_gateway_client.py` (the Python wire harness — the bridge between tests and TS).
      - **L2-2** `tests/integration/p1/test_lca_p1_node_02_resume.py`.
      - **L2-5** `tests/integration/p1/test_lca_p1_node_05_tool_result.py`.
@@ -976,11 +976,11 @@ The five PRs are **strictly sequential** (each requires the previous one green).
    - `git rm` `deploy/lobehub/patches/runtime/lca_run_driver.py`.
    - Run `python3 deploy/lobehub/patch_lobehub.py apply` once; `reconcile()` restores the 4 lobehub-ui source modifications and removes the 5 LCA-only TS files.
    - `routes_2/routes_runs_sessions.py` returns 410 for `/runs/{run_id}/live`.
-   - **Tests added in this PR:**
+   - **Tests:**
      - `scripts/audit_lca_legacy_path.py` — exits 0 in CI.
      - All L2 + L3 tests must remain green after retirement (proves the new path is fully standalone).
 5. **PR-5: stability smoke + protocol parity** (last gate)
-   - **Tests added in this PR:**
+   - **Tests:**
      - **L4-1** `tests/e2e/p1/test_lca_p1_99_stability.py` (1 h nightly).
    - Run the 1 h smoke; record artefacts in `traces/lca-p1-smoke/`.
 

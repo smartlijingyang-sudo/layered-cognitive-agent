@@ -2443,3 +2443,10 @@ Learnings:
   overview/platform-readme 的"已退役"表 + phase-graph guide 的"旧名已退役"。
 - 禁区全部遵守（memory / webserver / gate_chain_strategy.py / preamble.py）。
 - 提交：`chore: [raphy] assess - DESLOP-100 wave 1 candidates`（未 push）。
+
+## [2026-10-10] - RA-104
+- Deslopped current-state docs: rewrote change-narration residue in the P1 agent-gateway bridge spec, architecture.md, and 0199-delete-when-inventory to present tense ('this PR'/'now'/'no longer'/'the old' removed).
+- Files: docs/specs/2026-09-07-lca-p1-agent-gateway-bridge.md, docs/specs/architecture.md, docs/specs/0199-delete-when-inventory.md.
+- verify_doc_slop.py: 123 -> 105 hits; the 105 remaining are sanctioned keeps (plan docs, glossary retire entries, resolvable commit anchors, present-truth retirement references).
+- Learnings: the slop script is a probe, not a definition; most hits in docs/plans and glossary are legitimate and must not be rewritten.
+---
