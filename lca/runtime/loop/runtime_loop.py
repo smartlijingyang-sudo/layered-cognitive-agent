@@ -11,28 +11,44 @@ from __future__ import annotations
 import asyncio
 import logging
 from collections.abc import Awaitable, Callable
+from contextvars import Token
 from typing import TYPE_CHECKING, Any, cast
 
 if TYPE_CHECKING:
     from lca.infrastructure.observability.spine.event.record import Outcome
 
 from lca.contracts.atoms.ids.ids import new_id
+from lca.contracts.models.auto_review.models import AutoReviewMode as AutoReviewModeEnum
 from lca.contracts.models.core.execution.result import Result
 from lca.contracts.models.core.policy.budget import DEFAULT_MAX_STEPS, create_budget
 from lca.contracts.models.core.state.lifecycle import TaskStatus
-from lca.contracts.models.core.state.state import StateSnapshot
+from lca.contracts.models.core.state.state import AgentState, StateSnapshot
 from lca.contracts.models.team.run.context import RunContext
+from lca.contracts.models.vocal.models import VocalMode
 from lca.contracts.observability import exc_to_record
 from lca.contracts.protocols.runtime.runtime.lifecycle import RuntimeLifecycleEventType
 from lca.contracts.protocols.runtime.runtime.runtime import Runtime
+from lca.infrastructure.auto_review.gate import AutoReviewGate
+from lca.infrastructure.computer.box_accessor import BoxAccessor
 from lca.infrastructure.observability import get_current_run_scope, get_span_context
 from lca.infrastructure.observability.spine.exception.emit import emit_exception_caught
+from lca.infrastructure.runtime_plane.capability_bindings import (
+    BindingsViewBuilder,
+    current_bindings_view,
+    reset_capability_bindings,
+    with_runtime_bindings,
+)
+from lca.infrastructure.session.bindings import resolve_session_reader
+from lca.infrastructure.session.emit.lifecycle_emit import begin_turn, reset_lifecycle
+from lca.infrastructure.skills.activation.bridge import bridge as global_bridge
+from lca.infrastructure.vocal.settle_guard import VocalSettleGuard
 from lca.runtime.loop.runtime_lifecycle_emitter import (
     RuntimeLifecycleEmitter,
     _event_type_for_result,
     _journal_sequence_from_result,
     _phase_cursor_from_result,
 )
+from lca.runtime.session.run_session_writer import RunSessionWriter
 from lca.runtime.support.checkpoint_resolution import DeclarativeCheckpoint
 from lca.runtime.support.runtime_bindings import DeclarativeRuntimeBindings
 
@@ -148,7 +164,6 @@ class CognitiveRuntime(Runtime):
         agent_role: str = "",
     ) -> Result:
         """Create fresh state and delegate it to the binding's Turn path."""
-
         span_ctx = get_span_context()
         run_scope = get_current_run_scope()
         scope_trace_id = run_scope.trace_id if run_scope and run_scope.trace_id else None
@@ -170,29 +185,7 @@ class CognitiveRuntime(Runtime):
             team_awareness=(ctx.team_awareness if ctx else None),
         )
         self._bindings.require_executable_plan()
-        from lca.infrastructure.session.bindings import (
-            resolve_session_reader,
-        )
-        from lca.infrastructure.session.emit.lifecycle_emit import (
-            begin_turn,
-            reset_lifecycle,
-        )
-
-        # PR-E:把 reducer 装到 SkillActivationReducerBridge,让
-        # ``register_activated`` 把激活 fold 进 state.activated_skills
-        # (C4 兑现路径)。dispose 由 finally 兜底,保证 run 中断不悬空。
-        # 进程级 singleton —— install 一次覆盖前一个 run 的绑定
-        # (若前一个 run 忘记 dispose,这里强制清理)。
-        from lca.infrastructure.skills.activation.bridge import bridge as global_bridge
-        from lca.runtime.session.run_session_writer import RunSessionWriter
-
-        # 持有 live state 的 closure;``state`` 是 mutable,reducer 内
-        # ``extend`` 会改 list 本身 —— 不需要 reassign 引用。
-        live_state = state
-        global_bridge.install(
-            reducer=self.reducer,
-            state_getter=lambda: live_state,
-        )
+        self._install_skill_activation_bridge(state)
         try:
             reset_lifecycle()
             # RA-029: reflect the begun turn onto the typed carrier seam.
@@ -201,125 +194,9 @@ class CognitiveRuntime(Runtime):
             # session-less run keeps the explicit 0 single-shot default.
             begun_turn = begin_turn()
             state.current_turn = begun_turn if begun_turn is not None else 0
-            session_reader = resolve_session_reader()
-            run_writer: RunSessionWriter | None = None
-            if session_reader is not None:
-                # Seam: resolve_session_reader deliberately exposes the read face
-                # (SPEC H); the bound value is always the full Session
-                # (resolve_raw_session isinstance-guaranteed), so the writer's
-                # SessionProtocol requirement holds.
-                run_writer = RunSessionWriter(session=cast("SessionProtocol", session_reader))
-                # Layer the per-run writer into the phase capabilities so
-                # think subgraph node executors (``memory.derive``,
-                # ``llm.call``) can read it via ``context.runtime.writer``;
-                # otherwise their declared ``writer`` port fails the
-                # port-required TypeError before any reasoning fires.
-                if self._bindings.capabilities.get("writer") is None:
-                    self._bindings = self._bindings.with_writer(run_writer)
-                # ADR-0244: Seed prior conversation turns via Session single track
-                prior_turns = ctx.prior_turns if ctx else ()
-                if prior_turns:
-                    run_writer.seed_prior_turns(prior_turns)
-                loop_extra: dict[str, Any] = (ctx.extra or {}) if ctx else {}
-                seed = loop_extra.get("developer_seed")
-                if isinstance(seed, str) and seed:
-                    # ADR-0268 §6：handoff 轮没有用户轮。只落 developer 消息，
-                    # 否则 user_text 上那个去重占位标记会变成一条用户气泡。
-                    run_writer.append_developer_message(
-                        message_id=f"handoff:{trace_id}",
-                        content=seed,
-                        job_id=loop_extra.get("developer_seed_job_id") or None,
-                        run_id=trace_id,
-                    )
-                else:
-                    run_writer.append_user_message(
-                        message_id=f"task:{trace_id}",
-                        role="user",
-                        content=task,
-                    )
-            # ADR-0248: 运行态声带与硬闸解析
-            vocal_mode = None
-            wake_source = "user_input"
-            wake_context = None
-            origin: str | None = None
-            auto_review_mode = "off"
-            if ctx:
-                vocal_mode = getattr(ctx, "vocal_mode", None) or (ctx.extra or {}).get("vocal_mode")
-                wake_source = (ctx.extra or {}).get("wake_source", "user_input")
-                wake_context = (ctx.extra or {}).get("wake_context")
-                origin = (ctx.extra or {}).get("origin")
-                auto_review_mode = (ctx.extra or {}).get("auto_review_mode", "off")
-
-            from lca.application.vocal.runtime_wiring import (
-                RuntimeVocalContext,
-                resolve_runtime_vocal,
-            )
-            from lca.contracts.models.vocal.models import VocalMode
-            from lca.infrastructure.runtime_plane.capability_bindings import (
-                current_bindings_view,
-            )
-            from lca.infrastructure.vocal.settle_guard import VocalSettleGuard
-
-            # 复用 carrier 在组合期创建的共享 gate（同一实例负责投递与结算）。
-            # 若存在，不新建 gate，保证 body 的 send_message 工具投递到同一个门控。
-            existing_view = current_bindings_view()
-            existing_gate = (
-                getattr(existing_view, "vocal_gate", None) if existing_view is not None else None
-            )
-            if (
-                existing_gate is not None
-                and getattr(existing_view, "vocal_mode", "direct") == VocalMode.GATED.value
-            ):
-                vocal_ctx = RuntimeVocalContext(
-                    mode=VocalMode.GATED,
-                    gate=existing_gate,  # type: ignore[arg-type]
-                    settle_guard=VocalSettleGuard(existing_gate),  # type: ignore[arg-type]
-                )
-            else:
-                vocal_ctx = resolve_runtime_vocal(
-                    vocal_mode=vocal_mode,
-                    operation_id=trace_id,
-                    wake_source=wake_source,
-                    wake_context=wake_context,
-                )
-            if vocal_ctx.mode == VocalMode.GATED:
-                self._bindings = self._bindings.with_vocal_gate(vocal_ctx.gate)
-
-            # ADR-0248 阶段二：把声带/审查/执行者身份回填到每 Run BindingsView，
-            # 使图层 concept.tool.fork 读取到同一份运行时绑定（声带工具追加、
-            # 子代理禁声、AutoReview 包装均在该 seam 消费）。
-            from lca.contracts.models.auto_review.models import (
-                AutoReviewMode as AutoReviewModeEnum,
-            )
-            from lca.infrastructure.auto_review.gate import AutoReviewGate
-            from lca.infrastructure.computer.box_accessor import BoxAccessor
-            from lca.infrastructure.runtime_plane.capability_bindings import (
-                reset_capability_bindings,
-                with_runtime_bindings,
-            )
-
-            auto_review_gate = None
-            if auto_review_mode != "off":
-                try:
-                    auto_review_gate = AutoReviewGate(mode=AutoReviewModeEnum(auto_review_mode))
-                except ValueError:
-                    auto_review_mode = "off"
-                    auto_review_gate = None
-
-            runtime_overrides: dict[str, object] = {
-                "vocal_mode": vocal_ctx.mode.value,
-                "vocal_gate": vocal_ctx.gate,
-                "auto_review_mode": auto_review_mode,
-                "auto_review_gate": auto_review_gate,
-                "box_accessor": BoxAccessor(),
-            }
-            if origin is not None:
-                # ctx is shared across runs, so it only wins when it actually
-                # names an origin. Otherwise the per-run origin the carrier
-                # stamped on the session survives instead of being reset to
-                # "user", which would drop lca.nothing_to_do off a handoff turn.
-                runtime_overrides["origin"] = origin
-            runtime_bindings_token = with_runtime_bindings(**runtime_overrides)
+            self._seed_run_session(ctx, trace_id, task)
+            vocal_ctx = self._resolve_vocal_context(ctx, trace_id)
+            runtime_bindings_token = self._apply_runtime_overrides(ctx, vocal_ctx)
             try:
                 await self._lifecycle.publish(RuntimeLifecycleEventType.STARTED, state)
                 return await self._run_driver(
@@ -332,6 +209,159 @@ class CognitiveRuntime(Runtime):
                 reset_capability_bindings(runtime_bindings_token)
         finally:
             global_bridge.dispose()
+
+    def _install_skill_activation_bridge(self, state: AgentState) -> None:
+        """Install the reducer onto the process-global SkillActivationReducerBridge.
+
+        PR-E:把 reducer 装到 SkillActivationReducerBridge,让
+        ``register_activated`` 把激活 fold 进 state.activated_skills
+        (C4 兑现路径)。dispose 由 run() 的 finally 兜底,保证 run 中断不悬空。
+        进程级 singleton —— install 一次覆盖前一个 run 的绑定
+        (若前一个 run 忘记 dispose,这里强制清理)。
+        """
+        # 持有 live state 的 closure;``state`` 是 mutable,reducer 内
+        # ``extend`` 会改 list 本身 —— 不需要 reassign 引用。
+        live_state = state
+        global_bridge.install(
+            reducer=self.reducer,
+            state_getter=lambda: live_state,
+        )
+
+    def _seed_run_session(self, ctx: RunContext | None, trace_id: str, task: str) -> None:
+        """Seed the per-run session writer and layer it into the phase capabilities.
+
+        ADR-0244: prior conversation turns are seeded via the Session single
+        track. ADR-0268 §6: a handoff turn seeds only the developer message —
+        otherwise the dedup placeholder on user_text becomes a user bubble.
+        """
+        session_reader = resolve_session_reader()
+        if session_reader is None:
+            return
+        # Seam: resolve_session_reader deliberately exposes the read face
+        # (SPEC H); the bound value is always the full Session
+        # (resolve_raw_session isinstance-guaranteed), so the writer's
+        # SessionProtocol requirement holds.
+        run_writer = RunSessionWriter(session=cast("SessionProtocol", session_reader))
+        # Layer the per-run writer into the phase capabilities so
+        # think subgraph node executors (``memory.derive``,
+        # ``llm.call``) can read it via ``context.runtime.writer``;
+        # otherwise their declared ``writer`` port fails the
+        # port-required TypeError before any reasoning fires.
+        if self._bindings.capabilities.get("writer") is None:
+            self._bindings = self._bindings.with_writer(run_writer)
+        # ADR-0244: Seed prior conversation turns via Session single track
+        prior_turns = ctx.prior_turns if ctx else ()
+        if prior_turns:
+            run_writer.seed_prior_turns(prior_turns)
+        loop_extra: dict[str, Any] = (ctx.extra or {}) if ctx else {}
+        seed = loop_extra.get("developer_seed")
+        if isinstance(seed, str) and seed:
+            # ADR-0268 §6：handoff 轮没有用户轮。只落 developer 消息，
+            # 否则 user_text 上那个去重占位标记会变成一条用户气泡。
+            run_writer.append_developer_message(
+                message_id=f"handoff:{trace_id}",
+                content=seed,
+                job_id=loop_extra.get("developer_seed_job_id") or None,
+                run_id=trace_id,
+            )
+        else:
+            run_writer.append_user_message(
+                message_id=f"task:{trace_id}",
+                role="user",
+                content=task,
+            )
+
+    def _resolve_vocal_context(
+        self, ctx: RunContext | None, trace_id: str
+    ) -> RuntimeVocalContext:
+        """Resolve the runtime vocal context for this run.
+
+        ADR-0248: 运行态声带与硬闸解析。复用 carrier 在组合期创建的共享
+        gate（同一实例负责投递与结算）——若存在，不新建 gate，保证 body 的
+        send_message 工具投递到同一个门控。
+        """
+        # RA-100: this import stays function-level on purpose. Hoisting it
+        # to module top creates a circular import for the
+        # lca.agent.cognitive_agent-first order: cognitive_agent ->
+        # lca.runtime -> runtime_loop -> lca.application.__init__ ->
+        # application.api -> spawn -> agent_assembly ->
+        # lca.agent.cognitive_agent (partially initialized).
+        from lca.application.vocal.runtime_wiring import (
+            RuntimeVocalContext,
+            resolve_runtime_vocal,
+        )
+
+        vocal_mode = None
+        wake_source = "user_input"
+        wake_context = None
+        if ctx:
+            vocal_mode = getattr(ctx, "vocal_mode", None) or (ctx.extra or {}).get("vocal_mode")
+            wake_source = (ctx.extra or {}).get("wake_source", "user_input")
+            wake_context = (ctx.extra or {}).get("wake_context")
+
+        existing_view = current_bindings_view()
+        existing_gate = (
+            getattr(existing_view, "vocal_gate", None) if existing_view is not None else None
+        )
+        if (
+            existing_gate is not None
+            and getattr(existing_view, "vocal_mode", "direct") == VocalMode.GATED.value
+        ):
+            vocal_ctx = RuntimeVocalContext(
+                mode=VocalMode.GATED,
+                gate=existing_gate,  # type: ignore[arg-type]
+                settle_guard=VocalSettleGuard(existing_gate),  # type: ignore[arg-type]
+            )
+        else:
+            vocal_ctx = resolve_runtime_vocal(
+                vocal_mode=vocal_mode,
+                operation_id=trace_id,
+                wake_source=wake_source,
+                wake_context=wake_context,
+            )
+        if vocal_ctx.mode == VocalMode.GATED:
+            self._bindings = self._bindings.with_vocal_gate(vocal_ctx.gate)
+        return vocal_ctx
+
+    def _apply_runtime_overrides(
+        self, ctx: RunContext | None, vocal_ctx: RuntimeVocalContext
+    ) -> Token[BindingsViewBuilder | None]:
+        """Build per-run runtime overrides and push the capability-bindings token.
+
+        ADR-0248 阶段二：把声带/审查/执行者身份回填到每 Run BindingsView，
+        使图层 concept.tool.fork 读取到同一份运行时绑定（声带工具追加、
+        子代理禁声、AutoReview 包装均在该 seam 消费）。The returned token
+        must be handed to reset_capability_bindings() when the run ends —
+        run() does this in a finally, so the scope never leaks.
+        """
+        auto_review_mode = "off"
+        origin: str | None = None
+        if ctx:
+            auto_review_mode = (ctx.extra or {}).get("auto_review_mode", "off")
+            origin = (ctx.extra or {}).get("origin")
+
+        auto_review_gate = None
+        if auto_review_mode != "off":
+            try:
+                auto_review_gate = AutoReviewGate(mode=AutoReviewModeEnum(auto_review_mode))
+            except ValueError:
+                auto_review_mode = "off"
+                auto_review_gate = None
+
+        runtime_overrides: dict[str, object] = {
+            "vocal_mode": vocal_ctx.mode.value,
+            "vocal_gate": vocal_ctx.gate,
+            "auto_review_mode": auto_review_mode,
+            "auto_review_gate": auto_review_gate,
+            "box_accessor": BoxAccessor(),
+        }
+        if origin is not None:
+            # ctx is shared across runs, so it only wins when it actually
+            # names an origin. Otherwise the per-run origin the carrier
+            # stamped on the session survives instead of being reset to
+            # "user", which would drop lca.nothing_to_do off a handoff turn.
+            runtime_overrides["origin"] = origin
+        return with_runtime_bindings(**runtime_overrides)
 
     async def _publish_terminal_event(self, state: object, result: Result) -> None:
         """Compatibility seam delegating terminal projection to the lifecycle emitter."""
@@ -356,8 +386,6 @@ class CognitiveRuntime(Runtime):
         # ADR-0246 PR-8: 恢复路径补跑记忆捕获——人工回答也是用户陈述，
         # 先提炼身份/偏好再进入下一轮，避免「说了但没记」。
         await self._capture_resume_memory(state, resume_input)
-        from lca.infrastructure.session.bindings import resolve_session_reader
-        from lca.runtime.session.run_session_writer import RunSessionWriter
 
         session_reader = resolve_session_reader()
         if session_reader is not None and resume_input.turn is not None:

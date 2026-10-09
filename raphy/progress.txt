@@ -2289,3 +2289,23 @@ Learnings:
 - IMPL vs ASSESSMENT: the assessment's e2e clause expected terminal COMPLETED, but the approval era (ADR-0292 §10 grant gate + namespace_approval shell->require_approval, default policy {"shell": "require_approval"}) makes unattended bash execution impossible BY DESIGN. Forcing the old contract would mean weakening a security gate for a test. The e2e now binds a TrustEnvelope granting "bash" (production-faithful: SessionActivation binds it in prod) and asserts TaskStatus.INPUT_REQUIRED — the designed approval pause — plus wire shape [user, assistant{tool_calls}] with no orphan tool rows. Key probe results: grant "shell.exec" does NOT work (the gate passes raw tool names to envelope.grants()); grant "bash" -> grant gate passes -> approve_interrupt -> INPUT_REQUIRED.
 - The e2e failure moved in two hops during this story: (1) stream seam fixed -> run reached think.main->act.main; (2) approval gate refused (no envelope) -> envelope bound -> INPUT_REQUIRED. Each hop was verified via phase_graph edge logs, not by guessing.
 - A Protocol default method that silently produces a degenerate value (the no-op stream yielding a response-less COMPLETED) is worse than no default: every complete-only adapter became a silent empty-decision bomb. Fail-loud at the seam beats fail-silent every time.
+
+## 2026-10-09 18:50 CST - RA-100
+
+Implemented:
+- `CognitiveRuntime.run()` decomposed into 4 private helpers: `_install_skill_activation_bridge` (PR-E comments moved with it), `_seed_run_session` (writer bind + prior turns + developer_seed/user message), `_resolve_vocal_context` (vocal/wake parsing + shared-gate reuse), `_apply_runtime_overrides` (auto_review/box_accessor/origin + capability token). run() body now 55 lines, orchestration only.
+- All 12 function-level import groups converged to top-level (run()'s 8 + resume()'s 2 duplicates removed); no `_late` block needed.
+
+Files:
+- lca/runtime/loop/runtime_loop.py (only file; 164+/147-)
+
+Tests:
+- tests/runtime/loop/ + test_runtime_loop_exception_path.py + test_runtime_loop_gated_flow.py: 55 passed
+- tests/integration/test_run_with_tool_use.py + tests/think/llm/test_invoke.py (RA-097 e2e): 17 passed
+- ruff check: clean
+- Import boundary verified empirically: `python -c "import lca.runtime.loop.runtime_loop"` direct and reverse-order (vocal/bridge/auto_review first) — no circular import.
+
+Learnings:
+- The AC's "python -c import 实测循环 import 真实边界" step paid off: all 12 groups moved cleanly, so no `_late` block was needed. When a codebase keeps function-level imports "just in case", the empirical import test is the cheapest way to find the real boundary — grep for direct references is necessary but not sufficient (transitive cycles only show at import time).
+- Kept the trace-id/state-creation block inline in run() (8 lines): it is the "create fresh state" half of the method's docstring contract, not a turn-preparation phase — extracting it would have been decomposition for its own sake.
+- `with_runtime_bindings(**runtime_overrides)` returns `Token[BindingsViewBuilder | None]`; the helper surfaces that type so the finally-scope contract (`reset_capability_bindings(token)`) stays visible at the seam. Used `from contextvars import Token` at top level (stdlib, zero cycle risk).
