@@ -229,3 +229,16 @@ verbose 档 console 直出，journal 落盘后可由 replay 脚本重建——�
   领域语言 Lead/Coordination（ADR-0030）。
 - 对标：OpenTelemetry GenAI semantic conventions、OpenInference span kinds、
   OpenAI Agents SDK tracing taxonomy、LangSmith run model。
+
+## 落地注记
+
+- **Stage 6（旧发射路径清除 + 机制平面降级 verbose）**：`4b9d4f135`
+  （2026-08-06，李超）"refactor(observability): Stage 6 —— 旧发射路径清除，
+  机制平面归位 verbose 档（ADR-0037）"——废除 `run.plan` /
+  `team.strategy` / `team.member_invoke` 空壳 span 与 `SpanName` 词条；
+  `loop.phase.*` / `hook.*` / `memory.*` / `transport.*` 保留为机制 span
+  （verbose 档调试细节）；`transport.request` 退出标准视图（无父发射为
+  刻意设计）；单树/委派连续性归属 journal → OtelProjector 投影面
+  （"run/delegation 容器与资源 span 以关联骨架显式查表定父"），harness
+  InMemory 采集的是 ambient 机制平面而非投影面
+  （iter-arch 2026-10-09 todo-93 裁决交叉佐证）。
