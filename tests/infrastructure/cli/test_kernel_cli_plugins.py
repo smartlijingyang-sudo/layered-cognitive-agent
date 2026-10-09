@@ -43,11 +43,13 @@ def test_kernel_plugins_lists_all_enabled(runner: CliRunner) -> None:
     assert result.exit_code == 0, result.stdout + result.stderr
     # Layer counts are a snapshot of the plugin catalog (regenerated
     # round-0424, 2026-10-02: L0 62->59, L2 82->89; total stays 262;
-    # 2026-10-04: L2 89->90 (ADR-0283 think.context.summarize, deliberate)).
+    # 2026-10-04: L2 89->90 (ADR-0283 think.context.summarize, deliberate);
+    # 2026-10-09: L0 59->57 (RA-061 c498be636: archived the decorative debug
+    # plugin seam lca-cli-debug-command-seam + lca-cli-debug-trace, deliberate)).
     # The catalog evolves intentionally (e.g. proactive three-layer
     # mechanism 14b0d5621); the --json cross-check test below guards
     # against real regressions, this one guards the human-readable form.
-    assert "L0 (59)" in result.stdout, result.stdout
+    assert "L0 (57)" in result.stdout, result.stdout
     assert "L1 (82)" in result.stdout, result.stdout
     assert "L2 (90)" in result.stdout, result.stdout
     # Sample plugin ids from each layer appear under their group.
