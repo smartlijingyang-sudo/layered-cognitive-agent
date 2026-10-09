@@ -2040,3 +2040,13 @@
   - docstring 与代码逐字矛盾是最便宜的强证据：先读模块 docstring，再逐条核对 body（RA-088）。
   - `str(path).startswith(str(root))` 在 containment 场景下默认按 bug 处理，正确 idiom 是 `relative_to`——全树 grep 找更多同类。
   - 同轮 stories 共享文件时（registry.py/executor），按依赖顺序做、每动手前重 grep，评估证据会过期。
+
+## 2026-10-09 10:55 CST - RA-081
+- Implemented: new `lca/infrastructure/computer/box_gate.py` — the single owner of the box sandbox boundary: `resolve_box_root()` (mkdir + LCA_BOX_ROOT/get_lca_home fallback, moved from LocalBoxAdapter.__init__), `contain_path()` (relative_to semantics), `atomic_write_text()` (ADR-0251 tmp+fsync+os.replace), `check_no_privilege_escalation()` (INV-04 sudo/su hard gate). BoxAccessor: dropped the vestigial `adapter` param (zero readers repo-wide; no caller passed it), `__init__` uses resolve_box_root, `resolve_path`/`write_text` delegate to the gate — the prefix-escape bug is fixed. LocalBoxAdapter/OnlyboxesBoxAdapter: `_resolve_safe_path`, `write_file`, and both `run_command` hard gates delegate to the gate (6-line exact-match edits, all asserted). get_box_adapter audited: zero production callers, kept as public factory.
+- Files changed: lca/infrastructure/computer/box_gate.py (new), lca/infrastructure/computer/box_accessor.py, lca/infrastructure/computer/box_sandbox_adapter.py, tests/infrastructure/computer/test_box_accessor.py (new pin), raphy/prd.json, raphy/progress.txt
+- Tests: 19 passed (test_box_accessor.py incl. new sibling-prefix pin, test_box_sandbox_adapter.py, tests/infrastructure/tools/box/); 10 passed (test_tool_fork_adr0248_wiring.py, test_runtime_loop_gated_e2e.py); ruff clean. Pin validity: simulated old startswith impl lets ../box2/evil.txt through, new relative_to impl rejects.
+- **Learnings for future iterations:**
+  - ssh252 wrapper runs with cwd=/home/lichao/layered-cognitive-agent (main tree): bare `python3 -m pytest` imports lca from MAIN, not the worktree — worktree tests must `cd <worktree> || exit 1` first (AGENTS.md sanctioned pattern).
+  - prd.json top-level keys are insertion-ordered (not sorted) while story objects are sort_keys — full json.dump rewrite would reorder top-level keys; use targeted block splice for status updates.
+  - Deleting a constructor param is safe when grep proves zero callers pass it AND zero readers use the attribute; the story AC explicitly authorized "used or deleted".
+---
