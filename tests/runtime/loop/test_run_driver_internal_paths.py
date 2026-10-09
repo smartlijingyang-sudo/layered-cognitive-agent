@@ -32,7 +32,7 @@ from lca.contracts.models.core.execution.result import Result
 from lca.contracts.models.core.state.lifecycle import TaskStatus
 from lca.contracts.models.core.state.state import AgentState, Budget
 from lca.contracts.models.team.run.context import RunContext
-from lca.contracts.models.vocal.models import VocalMode
+from lca.contracts.models.vocal.models import VocalMode, WidgetApproval
 from lca.contracts.protocols.runtime.runtime.lifecycle import RuntimeLifecycleEvent
 from lca.harness.declarative.compile.instrument.wrap import set_active_spine_accessor
 from lca.runtime.loop.runtime_loop import CognitiveRuntime
@@ -135,17 +135,27 @@ def _result(status: TaskStatus = TaskStatus.COMPLETED) -> Result:
 
 
 class _FakeGate:
-    """Minimal vocal gate double for the widget branch."""
+    """Minimal vocal gate double for the widget branch.
+
+    Implements the typed protocol query ``pending_widget_approval`` —
+    the driver under test must not sniff visible-output dicts.
+    """
 
     def __init__(self, awaiting: bool, visible: list[dict[str, Any]]) -> None:
         self._awaiting = awaiting
         self._visible = visible
 
-    def is_awaiting_widget(self) -> bool:
-        return self._awaiting
-
-    def get_visible_outputs(self) -> list[dict[str, Any]]:
-        return self._visible
+    def pending_widget_approval(self) -> WidgetApproval | None:
+        if not self._awaiting:
+            return None
+        for record in reversed(self._visible):
+            if record.get("type") == "widget":
+                return WidgetApproval(
+                    message_id=record["message_id"],
+                    content=record.get("content"),
+                    options=list(record.get("options", [])),
+                )
+        return None
 
 
 class _RecordingSettleGuard:

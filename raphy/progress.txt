@@ -2120,3 +2120,13 @@
   - Ruff E402 fires on ANY module-level statement (even `_log = ...`) before imports; keep the import block pristine and put `_log` after it.
   - Moving a step out of shared kernel code? Check all make_lifespan callers first (here: only server.py production + tests) so the shutdown-dispose contract covers every path.
 ---
+
+## 2026-10-09 13:25 CST - RA-089
+- Implemented: typed seam on `VocalGateProtocol` — `pending_widget_approval() -> WidgetApproval | None` (new frozen dataclass in contracts/models/vocal/models.py) + `delivered_visible_texts() -> tuple[str, ...]`, implemented by DirectVocalGate/GatedVocalGate. `_run_driver` calls `gate.pending_widget_approval()` directly: getattr bypass + `get_visible_outputs` dict sniffing deleted; approval_request {type,message_id,content,options} byte-identical; driver keeps only state-set + extra (no pause-event double-append per ADR-0248). `result_projection` final-text fallback uses `isinstance(gate, VocalGateProtocol)` + `delivered_visible_texts()` (hasattr probe + dict sniff deleted). `get_visible_outputs` kept on gates for existing tests.
+- Files changed: lca/contracts/models/vocal/models.py, lca/contracts/protocols/vocal/protocol.py, lca/infrastructure/vocal/gate.py, lca/runtime/loop/runtime_loop.py, lca/runtime/projection/result_projection.py, tests/runtime/loop/test_run_driver_internal_paths.py (stub), tests/infrastructure/vocal/test_widget_approval_seam.py (new, 4 tests), raphy/prd.json, raphy/progress.txt
+- Tests: 96 passed total (20 vocal+driver+protocol incl. 4 new seam tests; 56 runtime/loop+binding+projection; 20 scenario adr0248/vocal); ruff clean.
+- **Learnings for future iterations:**
+  - A "typed seam" story often has TWO sniff sites (here: driver + projection fallback) — grep the accessor name repo-wide before declaring the seam done.
+  - `getattr(view, "vocal_gate", None)` on an `object`-typed field + `isinstance(x, runtime_checkable Protocol)` is the honest replacement for hasattr probing.
+  - Protocol-typed dataclass fields (gate: VocalGateProtocol) make direct calls safe; test stubs must then implement the new query — that's the "stub-protocol" AC in action.
+---

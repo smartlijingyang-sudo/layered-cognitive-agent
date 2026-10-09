@@ -501,20 +501,18 @@ class CognitiveRuntime(Runtime):
             # ADR-0248: 门控声带轮次结算核验硬闸
             if vocal_ctx is not None and vocal_ctx.settle_guard is not None:
                 vocal_ctx.settle_guard.validate_turn_settle()
-            if (
-                vocal_ctx is not None
-                and vocal_ctx.gate is not None
-                and getattr(vocal_ctx.gate, "is_awaiting_widget", lambda: False)()
-            ):
+            approval = None
+            if vocal_ctx is not None and vocal_ctx.gate is not None:
+                approval = vocal_ctx.gate.pending_widget_approval()
+            if approval is not None:
+                # ADR-0248: driver 只做 state 设置 + extra["approval_request"];
+                # pause 事件发射仍归 RuntimeResultFinalizer,避免双写。
                 result.status = TaskStatus.INPUT_REQUIRED
-                visible_outputs = getattr(vocal_ctx.gate, "get_visible_outputs", lambda: [])()
-                widget_msgs = [m for m in visible_outputs if m.get("type") == "widget"]
-                latest_widget = widget_msgs[-1] if widget_msgs else {}
                 result.extra["approval_request"] = {
                     "type": "widget",
-                    "message_id": latest_widget.get("message_id"),
-                    "content": latest_widget.get("content"),
-                    "options": latest_widget.get("options", []),
+                    "message_id": approval.message_id,
+                    "content": approval.content,
+                    "options": approval.options,
                 }
         except asyncio.CancelledError as exc:
             await self._lifecycle.publish(
