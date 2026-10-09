@@ -224,7 +224,7 @@ class AnomalyDetector(Deriver):
         RA-030: the spine is multi-producer and this deriver observes a
         filtered stream, so small gaps are legitimate (healthy max 69).
         A non-positive jump means a new sequence domain -- re-baseline,
-        don't trip (run changes are additionally normalized by the
+        don't trip (run changes are also normalized by the
         ``on_event`` run reset).
         """
         last = self._last_sequence

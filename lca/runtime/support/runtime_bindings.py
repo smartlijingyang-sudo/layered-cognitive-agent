@@ -82,7 +82,7 @@ class RuntimePhaseCapabilities:
         and the runtime scope is exactly this :class:`RuntimePhaseCapabilities`.
         Composition populates the static fields (``brain``, ``body``,
         ``phase.think.*``, etc.); per-run values that arrive after
-        composition — most notably the per-run :class:`RunSessionWriter`
+        composition — in particular the per-run :class:`RunSessionWriter`
         bound by ``bind_run_event_session_from_store`` — have no other
         carrier, so we expose this seam so the run loop can layer them
         in without mutating the composition-time closure.
