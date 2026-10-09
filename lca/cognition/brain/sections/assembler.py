@@ -14,12 +14,14 @@ brain factory only knows the ``PromptAssembler`` Protocol.
 
 from __future__ import annotations
 
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Sequence, Sized
 from dataclasses import dataclass
+from typing import Protocol, runtime_checkable
 
 from lca.cognition.brain.sections.types import join_lines, strip_empty_labeled_lines
 from lca.contracts.models.cognition.prompt_assembly import (
     AvailableSkillsReason,
+    BrainPromptCatalog,
     MissingPromptSectionError,
     PromptSectionRegistry,
     PromptTemplate,
@@ -53,7 +55,7 @@ class SectionManifestPromptAssembler(Protocol_):
     registry: PromptSectionRegistry
     template_provider: PromptTemplateProvider
     strip_empty_fields: bool
-    catalog_provider: Callable[[], object] | None = None
+    catalog_provider: Callable[[], BrainPromptCatalog] | None = None
     """Optional callable returning the active ``BrainPromptCatalog`` for
     available_skills_count extraction. When ``None`` the assembler
     reports 0 (compatible with tests that don't wire a catalog)."""
@@ -87,7 +89,7 @@ class SectionManifestPromptAssembler(Protocol_):
             catalog=self._catalog(),
         )
 
-    def _catalog(self) -> object | None:
+    def _catalog(self) -> BrainPromptCatalog | None:
         if self.catalog_provider is None:
             return None
         try:
@@ -110,7 +112,7 @@ def render_template(
     activated_skills: tuple[ActivatedSkill, ...] = (),
     strip_empty_fields: bool = True,
     selector_decision_path: str = "legacy",
-    catalog: object | None = None,
+    catalog: BrainPromptCatalog | None = None,
 ) -> tuple[str, PromptTrace]:
     """Render one template through the given registry.
 
@@ -201,24 +203,48 @@ def render_template(
     return text, trace
 
 
-def _catalog_skill_count(catalog: object | None) -> int:
-    """Count entries advertised by the catalog's brain-skills renderer.
+@runtime_checkable
+class _SkillInventory(Protocol):
+    """Minimal countable shape the assembler needs from a catalog.
 
-    Tries ``installed_skills`` first (ModelPromptCatalog), then falls
-    back to ``render_brain_skills()`` line count, then to 0 when no
-    catalog or no introspectable shape is available.
+    ``BrainPromptCatalog`` (the composition contract) deliberately only
+    declares render methods; the skill *count* needs a sizable inventory.
+    This protocol is the count seam's declared surface — no getattr
+    duck-probing. A catalog that satisfies ``BrainPromptCatalog`` but not
+    this shape is a wiring error and fails loud in ``_catalog_skill_count``.
+    """
+
+    installed_skills: Sized
+
+
+def _catalog_skill_count(catalog: BrainPromptCatalog | None) -> int:
+    """Count the installed skills advertised by the catalog.
+
+    Derives from the assembler's declared minimal countable shape
+    (``_SkillInventory.installed_skills``): ``len()`` when sizable, 0
+    when no catalog is wired or the inventory is not sizable.
+
+    fix-doc (RA-094): the previous docstring promised a
+    ``render_brain_skills()`` line-count fallback that was never
+    implemented. It is deliberately NOT added: rendered display text is
+    not a count source — an empty catalog renders the non-empty marker
+    "（无可用技能）", which line-counting would report as 1.
     """
     if catalog is None:
         return 0
-    installed = getattr(catalog, "installed_skills", None)
-    if installed is not None:
-        try:
-            return len(installed)
-        except TypeError:
-            # INTENTIONAL: installed 是非 size-able 类型(generator / 单值)
-            # → 视为 0;catalog 数量统计允许非序列来源。
-            pass
-    return 0
+    if not isinstance(catalog, _SkillInventory):
+        # Explicit, not silent 0: a catalog wired here must expose the
+        # countable inventory the seam declares.
+        raise TypeError(
+            "catalog must satisfy the assembler's countable shape "
+            f"(_SkillInventory.installed_skills), got {type(catalog).__name__}"
+        )
+    try:
+        return len(catalog.installed_skills)
+    except TypeError:
+        # INTENTIONAL: installed_skills 是非 size-able 类型(generator / 单值)
+        # → 视为 0;catalog 数量统计允许非序列来源。
+        return 0
 
 
 def _dispatch(

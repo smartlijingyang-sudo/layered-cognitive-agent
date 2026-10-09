@@ -228,3 +228,35 @@ def test_render_selector_decision_path_propagated_to_trace() -> None:
         **_render_kwargs(),
     )
     assert trace.selector_decision_path == "routing"
+
+
+def test_render_catalog_bad_shape_is_explicit_not_silent_zero() -> None:
+    """RA-094: a catalog without the declared countable inventory fails loud."""
+
+    class _BadCatalog:
+        def render_brain_skills(self) -> str:
+            return "- skill-a: A"
+
+    assembler = _assembler(
+        template=_template((SectionReference(name="static", kind="pure"),)),
+        catalog_provider=lambda: _BadCatalog(),
+    )
+    with pytest.raises(TypeError, match="_SkillInventory"):
+        assembler.render(template_id="react_prompt", **_render_kwargs())
+
+
+def test_catalog_skill_count_non_sizable_inventory_is_zero() -> None:
+    """RA-094: non-sizable installed_skills keeps the INTENTIONAL 0."""
+
+    class _GenCatalog:
+        @property
+        def installed_skills(self):
+            return (s for s in ("a", "b"))
+
+    assembler = _assembler(
+        template=_template((SectionReference(name="static", kind="pure"),)),
+        catalog_provider=_GenCatalog,
+    )
+    _, trace = assembler.render(template_id="react_prompt", **_render_kwargs())
+    assert trace.available_skills_count == 0
+    assert trace.available_skills_reason == "not_enabled"

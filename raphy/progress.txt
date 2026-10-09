@@ -2179,3 +2179,29 @@
     documented in the table comment. Ruff UP035: import Mapping from collections.abc,
     not typing, in contracts code.
 ---
+
+## 2026-10-09 12:10 - RA-094
+- What was implemented: typed the assembler catalog seam as
+  BrainPromptCatalog | None (catalog_provider + _catalog() + render_template);
+  deleted the getattr(installed_skills) duck probe; _catalog_skill_count now
+  takes the Protocol and narrows via a declared minimal countable shape
+  _SkillInventory (runtime_checkable Protocol, installed_skills: Sized).
+  Chose fix-doc: the docstring's render_brain_skills() line-count fallback was
+  never implemented and is deliberately NOT added (rendered display text is
+  not a count source; an empty catalog renders a non-empty marker line).
+  Bad-shape catalogs now raise TypeError (explicit, not silent 0); the
+  _catalog() INTENTIONAL swallow (provider error -> None) is untouched;
+  ADR-0185 AvailableSkillsReason derivation untouched.
+- Files changed:
+  - lca/cognition/brain/sections/assembler.py
+  - tests/cognition/test_prompt_assembler_guards.py (+2 tests: bad-shape TypeError, non-sizable -> 0)
+- **Learnings for future iterations:**
+  - Patterns discovered: when a Protocol lacks the member a seam needs, declare
+    the seam's minimal shape as a runtime_checkable Protocol and narrow with
+    isinstance + fail-loud — this replaces getattr probing without widening the
+    shared contract (RA-059 lesson: don't add impl-detail attrs to Protocols).
+  - Gotchas encountered: BrainPromptCatalog exists twice (contracts/models and
+    contracts/protocols); used the one already imported in assembler.py.
+    Production currently wires NO catalog_provider (grep finds only tests), so
+    the bad-shape TypeError cannot fire on any live path today.
+---

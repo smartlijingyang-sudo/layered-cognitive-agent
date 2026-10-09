@@ -1360,7 +1360,8 @@
       "description": "As an LCA maintainer, I want the assembler's catalog seam honestly typed, because contracts declares BrainPromptCatalog (render_brain_skills() etc.) yet assembler.py types catalog as object / catalog_provider as Callable[[], object], then duck-probes with getattr(catalog, 'installed_skills', None) + try: len() except TypeError — the seam's real shape exists only in probe code. Worse, _catalog_skill_count's docstring promises three fallback strategies (installed_skills → render_brain_skills() line count → 0) but implements only the first — the doc lies. Deletion test: concentrates — probing logic deleted, the seam's shape owned by the type declaration.",
       "id": "RA-094",
       "notes": "Source: Round 14 friction walk, cognition zone (Worth exploring; 'The interface is the test surface' — today there is no interface). Constraints: INTENTIONAL swallow is deliberate design; AvailableSkillsReason logic (ADR-0185) untouched.",
-      "passes": false,
+      "passes": true,
+      "implemented": "2026-10-09: fix-doc choice (render_brain_skills line-count fallback dropped, never implemented, would miscount empty catalogs). catalog_provider: Callable[[], BrainPromptCatalog] | None; _catalog_skill_count takes the Protocol; getattr probe replaced by declared minimal countable shape _SkillInventory (runtime_checkable) with fail-loud TypeError on bad shape; _catalog() INTENTIONAL swallow kept; 2 new tests green.",
       "priority": 2,
       "title": "Type the assembler catalog seam as BrainPromptCatalog; fix the doc/impl drift"
     },
