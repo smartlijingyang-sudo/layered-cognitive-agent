@@ -417,6 +417,20 @@ class CognitiveAgent(AgentUnit):
         )
 
     def register_hook(self, hook_name: str, hook_fn: Hook) -> None:
+        # RA-099: fail loud when the runtime cannot host hooks. The
+        # isinstance check against the declared HasHooks protocol stays —
+        # it is the capability gate — but the else branch must not silently
+        # drop the registration: a "my hook never fires" debug session
+        # should end here, naming the runtime type, not penetrate the
+        # concrete runtime looking for a silent no-op.
         runtime = self.runtime
         if isinstance(runtime, HasHooks):
             runtime.hooks.register(hook_name, hook_fn)
+        else:
+            raise TypeError(
+                "CognitiveAgent.register_hook: runtime "
+                f"{type(runtime).__name__!r} does not implement HasHooks — "
+                f"the hook {hook_name!r} would be silently dropped. Bind the "
+                "agent to a runtime exposing a HookRegistry, or do not "
+                "register hooks."
+            )

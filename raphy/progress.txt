@@ -2328,3 +2328,22 @@ Tests:
 Learnings:
 - The `plan_ref_scope` nesting (inside bind_backends + run_scope) is a semantic invariant, not just style — the contextmanager's docstring says so explicitly, so the next person to move the nesting finds the one place and the reason together.
 - `contextlib` was already imported in cognitive_agent.py; only `Iterator` needed adding to the collections.abc import. Small diffs stay small when the module already has the tools.
+
+## 2026-10-09 19:25 CST - RA-099
+
+Implemented:
+- `CognitiveAgent.register_hook`: kept the `isinstance(runtime, HasHooks)` capability gate (it checks the declared runtime-checkable protocol), but the else branch now raises `TypeError` naming the runtime type instead of silently dropping the registration. Chose AC option B (minimal) over option A (composition-time validation).
+- New test `tests/agent/test_cognitive_agent_register_hook.py`: 3 tests pinning fail-loud on hooks-less runtime (message names the type), delegation on hooked runtime.
+
+Files:
+- lca/agent/cognitive_agent.py
+- tests/agent/test_cognitive_agent_register_hook.py (new)
+
+Tests:
+- tests/agent/test_cognitive_agent_register_hook.py: 3 passed
+- tests/agent/ + tests/composer/test_runtime_factory_plugin.py + tests/harness/test_audit_hook_attach.py: 47 passed
+- ruff check: clean
+
+Learnings:
+- `isinstance(MagicMock(), HasHooks)` is False even though `hasattr(mock, "hooks")` is True — runtime-checkable protocol isinstance does not see through MagicMock's dynamic attribute creation. The positive test needs a real stub with a concrete `hooks` attribute. Worth remembering whenever pinning protocol-gated branches: stub the attribute for real.
+- Verified no production caller of `CognitiveAgent.register_hook` exists in lca/ (only audit tooling mentions the name), so the previously silent branch was dead in prod paths — the raise cannot break a working flow, only surface a misconfiguration earlier.

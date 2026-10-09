@@ -1436,8 +1436,8 @@
       "branchName": "raphy/arch-20261009-1643",
       "description": "As an LCA maintainer, I want CognitiveAgent.register_hook to fail loud when the runtime has no hooks, because today it sniffs isinstance(runtime, HasHooks) and silently drops the registration in the else branch — the caller does not trust the declared protocol, and a 'my hook never fires' debug session has to penetrate the concrete runtime type to find the silent drop.",
       "id": "RA-099",
-      "notes": "Source: Round 15 friction walk, Area A (cognitive_agent.py, Q4/Q5). Leaky seam: declared HasHooks protocol exists, caller sniffs instead of using it; untested silent-drop branch. Strength: Worth exploring.",
-      "passes": false,
+      "notes": "Source: Round 15 friction walk, Area A (cognitive_agent.py, Q4/Q5). Leaky seam: declared HasHooks protocol exists, caller sniffs instead of using it; untested silent-drop branch. Strength: Worth exploring.\n\nImplemented 2026-10-09 (round 16), option B (minimal, AC-sanctioned): kept the isinstance(runtime, HasHooks) capability gate — it checks the declared runtime-checkable protocol — but the else branch now raises TypeError naming the runtime type instead of silently dropping the registration. New test tests/agent/test_cognitive_agent_register_hook.py pins all three behaviors: hooks-less runtime -> TypeError ('does not implement HasHooks' + runtime type name); runtime with hooks -> delegates to hooks.register. IMPL vs ASSESSMENT: chose option B over option A (composition-time validation) — no production caller of CognitiveAgent.register_hook exists in lca/, so the silent-drop branch was dead in prod paths; widening the composition contract was not justified for this P3.",
+      "passes": true,
       "implemented": "",
       "priority": 3,
       "title": "Replace the isinstance(runtime, HasHooks) sniff in register_hook with a declared seam"
