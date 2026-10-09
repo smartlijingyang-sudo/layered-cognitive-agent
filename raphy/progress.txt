@@ -2450,3 +2450,10 @@ Learnings:
 - verify_doc_slop.py: 123 -> 105 hits; the 105 remaining are sanctioned keeps (plan docs, glossary retire entries, resolvable commit anchors, present-truth retirement references).
 - Learnings: the slop script is a probe, not a definition; most hits in docs/plans and glossary are legitimate and must not be rewritten.
 ---
+
+## [2026-10-10] - RA-105
+- Deslopped code prose: replaced 'additionally'/'most notably'/'in order to'/'effectively frozen'/'notably:' with plainer wording in 10 lca/ modules and 5 test files.
+- Files: lca/application/routine/tick.py, lca/infrastructure/mcp/routing.py, lca/plugins/observability/spine/derivers/anomaly.py, lca/nodes/think/decision_repair/repair.py, lca/contracts/protocols/{act/tool/batch_execution,runtime/runtime/lifecycle,state/reducer}.py, lca/nodes/fast_path.py, lca/runtime/support/runtime_bindings.py, lca/nodes/intervene/approve_gate.py, 5 test files.
+- 145 related tests pass; ruff clean on touched files.
+- Learnings: Chinese comments legitimately use '——' as punctuation; the unslop em-dash rule applies to English AI-tell prose only. 'Leverage' is a defined architecture term in this repo (improve-codebase-architecture vocabulary), not slop.
+---
