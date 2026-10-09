@@ -1375,7 +1375,8 @@
       "description": "As an LCA maintainer, I want the file_ref_args seam's wiring to match its contract, because file_ref_args.py (ADR-0121 PR-C) docstring claims 'Every tool call that takes a path argument flows through resolve_path_arg' — yet the tools/ layer has zero callers, and the only production wiring is computer/sandbox/computer.py's read_file via _resolve_path_arg_or_passthrough (lazy import), while write_file/edit_file/list_files in the same file call normalize_sandbox_path directly. Result: /files/<aid> resolves to a FileRef for read_file but takes a different path for write_file — the seam's contract is unenforced and behavior is inconsistent across methods. test_file_ref_args.py only tests the adapter in isolation; no test pins which entries flow through the seam. Deletion test: choice (a) concentrates (real single choke); choice (b) just moves (honest docstring).",
       "id": "RA-095",
       "notes": "Source: Round 14 friction walk, infra zone (Worth exploring; half-wired seam; needs optimizer judgment on (a) vs (b)). Related but not duplicate of RA-076 (different module).",
-      "passes": false,
+      "passes": true,
+      "implemented": "2026-10-09: choice (b) honest read-path scoping. Module docstring no longer claims universal flow; helper renamed to _resolve_read_path_arg_or_passthrough (only read_file calls it); wiring-scope pin test added (inspect-based, only read_file wired); test_file_ref_args.py kept; ADR-0121 PR-C interception + allowed_refs + UnresolvedFileRefError->passthrough unchanged.",
       "priority": 3,
       "title": "Make the path-arg resolution seam honest: universal choke or honest scoping"
     },

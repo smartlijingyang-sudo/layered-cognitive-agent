@@ -2205,3 +2205,28 @@
     Production currently wires NO catalog_provider (grep finds only tests), so
     the bad-shape TypeError cannot fire on any live path today.
 ---
+
+## 2026-10-09 12:25 - RA-095
+- What was implemented: chose (b) honest read-path scoping. The seam's
+  module docstring no longer claims "every tool call that takes a path
+  argument flows through resolve_path_arg"; it now states the real wiring
+  (only SandboxComputer.read_file, via the lazy-import adapter). The
+  computer.py helper was renamed _resolve_path_arg_or_passthrough ->
+  _resolve_read_path_arg_or_passthrough so the call site reads honestly.
+  New wiring-scope pin test (inspect-based): only read_file may reference
+  the seam helper; write/edit/list/search/move go straight to
+  normalize_sandbox_path. test_file_ref_args.py untouched.
+- Files changed:
+  - lca/infrastructure/tools/seam/file_ref_args.py (docstring)
+  - lca/infrastructure/computer/sandbox/computer.py (helper rename)
+  - tests/lca/infrastructure/computer/sandbox/test_path_arg_wiring_scope.py (new pin)
+- **Learnings for future iterations:**
+  - Patterns discovered: a "who calls the adapter" pin can be an inspect-
+    based source assertion over the class's entry methods — it forces the
+    (a)-vs-(b) choice to be re-made consciously instead of drifting.
+  - Gotchas encountered: chose (b) over (a) because (a) would change
+    security-relevant behavior — resolving /files/<aid> to its real guest
+    path for a *write* would let the model overwrite attachment backing
+    files; that needs a security review, not a raphy drive-by. The (a)
+    option is recorded in the docstring as requiring that review.
+---
