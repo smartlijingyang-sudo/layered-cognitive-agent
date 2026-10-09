@@ -1,4 +1,14 @@
-"""SkillRouter 默认实现 —— 运行时动态选择 Prompt 模板。"""
+"""SkillRouter 默认实现 —— 运行时动态选择 Prompt 模板。
+
+Division of labor (RA-092): ``SkillRouter`` is the legacy side-channel
+router — ``route()`` returns only the template id, and the *reason* flows
+out-of-band via the spine ``skill_router.route`` envelope and the
+``SkillRouted`` session event.  The typed ADR-0175 selector
+(:class:`PromptTemplateSelector`) carries its reason in-band as
+``(template_id, decision_path)``.  Both channels speak the single
+``SelectorDecisionPath`` vocabulary
+(``lca.contracts.models.cognition.prompt_assembly``).
+"""
 
 from __future__ import annotations
 
@@ -6,6 +16,7 @@ import contextlib
 
 from lca.contracts.harness.memory.events import SkillRouted
 from lca.contracts.harness.memory.skill import SkillEventSink
+from lca.contracts.models.cognition.prompt_assembly import SelectorDecisionPath
 from lca.contracts.models.core.state.state import AgentState
 from lca.contracts.protocols import SkillRouter
 from lca.infrastructure.observability.meta_event_emit import emit_skill_routed
@@ -16,7 +27,7 @@ def _safe_spine_route(
     *,
     state_id: str,
     template: str,
-    decision_path: str,
+    decision_path: SelectorDecisionPath,
     outcome: str,
 ) -> None:
     """Best-effort spine envelope; routing must continue when publish is unauthorized."""
@@ -30,7 +41,9 @@ def _safe_spine_route(
 
 
 async def _emit_session_routed(
-    session_events: SkillEventSink | None, template_id: str, decision_path: str
+    session_events: SkillEventSink | None,
+    template_id: str,
+    decision_path: SelectorDecisionPath,
 ) -> None:
     """把一次路由决定写为 ``skill.routed.v1`` Session 事实。
 

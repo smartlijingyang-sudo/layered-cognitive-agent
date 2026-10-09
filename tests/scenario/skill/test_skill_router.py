@@ -255,3 +255,55 @@ class TestSkillRouterSessionEmission(_SpineSessionBound):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+# ----- RA-092: router-emitted reasons ∈ closed vocabulary ---------------------
+
+
+class _RecordingSkillEventSink:
+    """Minimal SkillEventSink double capturing appended session events."""
+
+    def __init__(self) -> None:
+        self.events: list = []
+
+    async def append(self, event_data, *, actor=None, **kwargs):
+        self.events.append(event_data)
+        return None
+
+
+class _DecisionVocabularyContract(unittest.IsolatedAsyncioTestCase):
+    """Every reason value a SkillRouter emits is in SelectorDecisionPath."""
+
+    async def test_router_emitted_reasons_are_in_closed_vocabulary(self) -> None:
+        from typing import get_args
+
+        from lca.contracts.models.cognition.prompt_assembly import (
+            SelectorDecisionPath,
+        )
+
+        sink = _RecordingSkillEventSink()
+        keyword = KeywordSkillRouter(
+            {"research_prompt": ["研究"]}, session_events=sink
+        )
+        await keyword.route(_make_state("帮我研究一下这个课题"))  # keyword_match
+        await keyword.route(_make_state("随便聊聊"))  # keyword_default
+        static = StaticSkillRouter("react_prompt", session_events=sink)
+        await static.route(_make_state("hi"))  # static
+
+        reasons = {
+            e.decision_path for e in sink.events if isinstance(e, SkillRouted)
+        }
+        self.assertEqual(reasons, {"keyword_match", "keyword_default", "static"})
+        self.assertLessEqual(reasons, set(get_args(SelectorDecisionPath)))
+
+    async def test_coerce_keeps_router_values_and_fallback(self) -> None:
+        from lca.contracts.models.cognition.prompt_assembly import (
+            _coerce_decision_path,
+        )
+
+        self.assertEqual(_coerce_decision_path("keyword_match"), "keyword_match")
+        self.assertEqual(_coerce_decision_path("static"), "static")
+        self.assertEqual(_coerce_decision_path("profile_default"), "profile_default")
+        # unknown / non-str still fall back to legacy (reflection_events depends on it)
+        self.assertEqual(_coerce_decision_path("no_such_reason"), "legacy")
+        self.assertEqual(_coerce_decision_path(None), "legacy")

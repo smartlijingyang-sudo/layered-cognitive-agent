@@ -8,6 +8,7 @@ from typing import Any, Literal
 from lca.contracts.errors import ContractViolationError
 from lca.contracts.harness.memory.skill import SkillCatalogEntry
 from lca.contracts.harness.tasks.session import session_event
+from lca.contracts.models.cognition.prompt_assembly import SelectorDecisionPath
 
 
 @session_event("session.created.v1", visibility="audit")
@@ -137,7 +138,7 @@ class SkillRouted:
     """One prompt-template routing decision produced by a SkillRouter."""
 
     template_id: str
-    decision_path: str
+    decision_path: SelectorDecisionPath
     source: str = "skill_router"
 
 

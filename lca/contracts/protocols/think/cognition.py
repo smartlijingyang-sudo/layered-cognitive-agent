@@ -189,7 +189,16 @@ class SupportsShortcut(Protocol):
 
 @runtime_checkable
 class SkillRouter(Protocol):
-    """运行时动态选择 Prompt 模板 / 工具子集。"""
+    """运行时动态选择 Prompt 模板 / 工具子集。
+
+    Legacy side-channel router (division of labor, RA-092): ``route()``
+    returns only the template id; the routing *reason* flows out-of-band
+    (spine ``skill_router.route`` envelope + ``SkillRouted`` session
+    event) using the shared ``SelectorDecisionPath`` vocabulary.  New
+    code that needs the reason in-band should implement
+    :class:`PromptTemplateSelector`
+    (``lca.contracts.models.cognition.prompt_assembly``, ADR-0175 D5).
+    """
 
     async def route(self, state: AgentState) -> str: ...
 

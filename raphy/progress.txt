@@ -2149,3 +2149,13 @@
   - A `middle_parts` parameter keeps the seam honest when gates share prefix+guidance but differ in the middle (finish_reason vs required=).
   - Pre-existing red tests: verify via `git stash push <paths>` + rerun before concluding; restore and confirm the diff is back.
 ---
+
+## 2026-10-09 14:10 CST - RA-092
+- Implemented: `SelectorDecisionPath` absorbs the router's real reason values (`keyword_match`/`keyword_default`/`static`); `SkillRouted.decision_path` typed as the closed set (was bare str); `emit_skill_routed` + skill_router side-channel helpers typed; `_coerce_decision_path` rewritten as `get_args` membership (single source of truth), legacy fallback kept + documented; division of labor documented on SkillRouter protocol, PromptTemplateSelector protocol, and skill_router module. `PromptTrace.selector_decision_path` stays str-typed (ADR-0175 D2 intact).
+- Files changed: lca/contracts/models/cognition/prompt_assembly.py, lca/contracts/harness/memory/events.py, lca/cognition/brain/prompt/skill_router.py, lca/infrastructure/observability/meta_event_emit.py, lca/contracts/protocols/think/cognition.py, tests/scenario/skill/test_skill_router.py (+2 contract tests), raphy/prd.json, raphy/progress.txt
+- Tests: 13 passed (skill router incl. 2 new contract tests); 509 passed in tests/cognition/; ruff clean. 2 pre-existing failures (test_tool_using_run_evidence, test_reasoner_temporal_evidence) reproduce on clean HEAD — NOT from this change.
+- **Learnings for future iterations:**
+  - When a Literal is the vocabulary, `_coerce_*` if-chains duplicate it — rewrite as `get_args` membership so the set has exactly one source of truth.
+  - Typing a dataclass field from `str` to a Literal is safe for readers; check constructors pass literals (they did here).
+  - Honest boundary from the story held: KeywordSkillRouter has no production wiring — the change is contract hygiene, verified by the closed-set test.
+---
