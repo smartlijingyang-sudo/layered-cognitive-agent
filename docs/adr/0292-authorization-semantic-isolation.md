@@ -159,6 +159,19 @@ run driver 已从 `SessionActivation` 绑定 ambient TrustEnvelope（§10 假定
 - （2026-10-05 22:09 iter-arch 轮更新）：§10 gate 拒绝语义实现已落地（本轮 §8 新增证据链节；§7 同步）。**当前真待办**：run driver 从 `SessionActivation` 绑定 ambient TrustEnvelope 的生产接线（§10 假定成立的前提；lane 外提案机会）；`docs/adr/0255*` 基线禁区本轮零改动。
 **当前真待办**：§10 生产 binder 已于本轮轮中落地（`91a924aba`/`5ebe7426a`/`d08d3a355`，见上补记）。剩余 lane 外项：P3 envelope 富化（PluginOrigin + granted privileges，使 binder 的 envelope 有真实内容）/ kernel HTTP 远端路径同语义 binder / cognition producer EXTERNAL 标记（§10 后为审计增强项）；`docs/adr/0255*` 基线禁区本轮零改动。
 
+**§10 机制重构：权限检查前移到 act.authorize，HITL 工具豁免**（2026-10-09；commit `6289eb490`，分支 `fix/grant-absence-hitl-separation`）：
+
+运行时失效率高：`resolve_activation` 恒构造 `EMPTY_TRUST_ENVELOPE`（P3 未落地），且 gate 用原始 `tool_name` 查 `granted_privileges`（capability.verb 格式），键不匹配。`askUserQuestion` 被误杀为 `approve_rejected`，run 直接失败（`run_c0decb030b7c`）。按业界范式（权限先于 HITL，单一 PEP）重构：
+
+- **P3 落地**：`resolve_activation` 用 `load_grants(home)` 读 assistant `grants.yaml`，构造 `TrustEnvelope(granted_privileges = assistant_grants ∪ RULE_DEFAULTS)`；`RULE_DEFAULTS = {"platform.basic", "hitl.interact"}` 保证 envelope 非空且 HITL 工具默认可用。
+- **权限检查前移**：`act.authorize` 新增 `grant_routing` 端口，用 kernel-owned `tools` 端口解析每个 tool_call 的 `required_grant`（复用 `filter._required_grant` 语义）；`required_grant` 非空且不在 envelope → 输出 `next_hint="grant_refused"` 路由到 `terminal.commit`，写 evidence。检查不读 `decision.needs_approval`，防幻觉授权目标不变。
+- **approve_gate 回归纯 HITL**：删除 `_grant_absence_refusal` 与 `_route_refusal_to_evidence`；四路由语义不变。
+- **HITL 工具豁免**：`askUserQuestion` / `request_box_help` 保持 grant-agnostic（不声明 `required_grant`），是平台基础能力，不因 envelope 内容被拒。
+- **测试**：§10 三个 pin 从 `act.approve.gate` 迁移到 `act.authorize`；新增 envelope 富化与 grant-agnostic 工具通过的 pin。
+- **验证**：目标套件 412 passed / 6 skipped / 1 既有失败；`plan compile` 通过；`lint-imports` 通过；`check_package_contracts` 无新增 issue。
+
+**当前真待办**：P3 envelope 富化已落地，本节关闭。剩余 lane 外项：kernel HTTP 远端路径同语义 binder / cognition producer EXTERNAL 标记（审计增强项）；`run_command` 等敏感工具是否声明 `required_grant="shell.exec"` 属工具分类决策，另开评估。
+
 ## 9. 后续接线设计裁决（2026-10-05，Athena 按李超授权裁决）
 
 背景：§6 三项已裁决并部分落地；剩余 3 个运行时接线点的设计方案原待李超拍板，
