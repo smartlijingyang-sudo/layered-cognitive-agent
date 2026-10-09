@@ -195,7 +195,6 @@ def test_narrative_missing_file_friendly_error(traces_root: Path) -> None:
 # ── raw 命令 ──
 
 
-
 # ── logs 命令仍存在 (向后兼容) ──
 
 
@@ -216,3 +215,32 @@ def test_chinese_preserved_in_table(traces_root: Path) -> None:
     assert "分析生成pdf版本" in result.stdout
     assert "读取 sheet 完成" in result.stdout
     assert "决定 use_tool" in result.stdout
+
+
+# ── journal step(单数)命令 ──
+
+
+def test_step_singular_shows_human_single_step(traces_root: Path) -> None:
+    """``journal step --step N`` 输出单步原始事实的纯文本块。"""
+    result = runner.invoke(
+        app,
+        ["journal", "step", "r1", "--step", "1", "--traces-root", str(traces_root)],
+    )
+    assert result.exit_code == 0
+    assert "step_id: step_1" in result.stdout
+    assert "phase: perceive" in result.stdout
+    assert "读取 sheet 完成" in result.stdout
+
+
+def test_step_singular_help_cross_references_steps() -> None:
+    """帮助文本指明 ``journal steps`` 是 step-tree 视图。"""
+    result = runner.invoke(app, ["journal", "step", "--help"])
+    assert result.exit_code == 0
+    assert "journal steps" in result.stdout
+
+
+def test_steps_help_cross_references_step_singular() -> None:
+    """帮助文本指明 ``journal step`` 是单步原始事实视图。"""
+    result = runner.invoke(app, ["journal", "steps", "--help"])
+    assert result.exit_code == 0
+    assert "journal step" in result.stdout

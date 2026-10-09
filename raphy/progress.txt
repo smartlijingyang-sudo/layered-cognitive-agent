@@ -1,5 +1,14 @@
 ## Codebase Patterns
 
+- **重叠 CLI 命令先按输出格式分类再决定 merge vs cross-reference（RA-108）：**
+  ``journal step --step N``（单步原始事实纯文本）与 ``journal steps --step N``
+  （StepNarrativeWriter narrative markdown）输出本质不同且都被 docs/ADR 引用 →
+  选 (b) 保留双命令、共享 ``read_step_document`` + ``JournalDocument.step_by_index``
+  typed seam，帮助文本互相交叉引用。收敛 raw-dict 读取前用
+  ``dataclasses.asdict(JournalStep)`` 对比渲染：key 顺序与 journal.json 原始
+  dict 完全一致，human 与 ``--json`` 输出字节等价，可放心删私有
+  ``_load_journal``/``_select_step``。
+
 - **模型身份是 LLMAdapter 契约成员，不是私有字段（RA-106）：** telemetry 的
   ``model=`` 标签必须来自协议声明的 ``model_name`` accessor，不能 getattr 私有
   ``_model``。协议默认实现返回 ``None``（而非 raise NotImplementedError）——
@@ -2560,4 +2569,44 @@ Learnings:
   - 评估称"production adapters (openai_compat, anthropic, mock)"：anthropic
     不是独立 adapter 类，是 openai_compat 内部 Strategy——`OpenAICompatAdapter.
     model_name` 一处实现即覆盖 anthropic 风格。
+---
+
+## 2026-10-10 02:44 - RA-108
+
+- **SPIKE 结论（决定 (b) cross-reference）**：对比 `journal step --step N` 与
+  `journal steps --step N` 在真实 journal.json 上的行为与输出。`journal step`
+  输出单步原始事实纯文本块（step_id/phase/thinking/tool_call/tool_result），
+  `journal steps --step N` 输出 StepNarrativeWriter 渲染的整份 narrative markdown
+  （含 Summary 表/因果链/Steps 详述）。两者都被 docs/ADR 引用且输出格式本质不同
+  （原始事实 vs narrative），合并会丢一种视图 → 保留双命令，共享 journal 读取 seam。
+- **实现**：`journal step` 删除私有 `_load_journal`（raw dict JSON 解析）与
+  `_select_step`（dict 扫描），改走 `journal steps` 同款 typed seam——
+  `read_step_document` + `JournalDocument.step_by_index`；渲染用
+  `dataclasses.asdict(step)` 喂给既有 `_format_step_human`（key 顺序与
+  journal.json 原始 dict 完全一致，human/`--json` 输出字节等价，改动前已用
+  golden 对比验证）。`--json` 输出 `asdict(step)`；model-visible 分支改用
+  `step.step_id`。帮助文本双向交叉引用：`journal step --help` 指向
+  `journal steps --step N`（narrative markdown），`journal steps --help` 指向
+  `journal step --step N`（单步原始事实）。
+- Files changed:
+  - `lca/infrastructure/cli/commands/journal/step.py`（删私有读取/选择，走 typed seam）
+  - `lca/infrastructure/cli/commands/journal_extra/journal_steps.py`（帮助文本交叉引用）
+  - `tests/infrastructure/cli/test_journal_step_load.py`（改测 `_load_journal_document`，
+    新增非 step-tree schema 判损用例）
+  - `tests/scenario/cli/test_cli_journal_steps.py`（新增 `journal step` 单步输出 +
+    双向帮助交叉引用 pin）
+  - `raphy/prd.json`（RA-108 passes=true）、`raphy/progress.txt`
+- 测试：`tests/infrastructure/cli/` + `tests/scenario/cli/` 320 passed（1 既有
+  skip）；`ruff check` + `ruff format --check` 触及 4 文件全过；SPIKE 脚本重跑
+  输出与改动前逐字一致。
+- **Learnings for future iterations:**
+  - 双命令重叠的收敛决策先问"输出格式是否本质不同 + 是否都被外部引用"：
+    是 → (b) 共享读取 seam + 帮助文本交叉引用，别强行合并丢视图。
+  - `dataclasses.asdict(frozen_dataclass)` 的 key 顺序与 `JournalDocumentWriter`
+    写出的 journal.json 原始 dict 完全一致（字段声明序 == 写盘序），可用它把
+    raw-dict 渲染安全收敛到 typed reader；但收敛前必须跑 golden 对比验证
+    字节等价（human + `--json` 都要比）。
+  - `read_step_document` 要求完整 JournalDocument 形状（schema/metadata 等）：
+    `_load_journal` 旧测试的 `{"steps": [...]}` 极简 fixture 不再是合法输入，
+    测试 fixture 要跟着 seam 升级。
 ---

@@ -1578,7 +1578,7 @@
         "Existing journal CLI tests green (or updated with the decision recorded); new pin covers the chosen surface; ruff clean."
       ],
       "priority": 2,
-      "passes": false,
+      "passes": true,
       "branchName": "raphy/deslop-100",
       "notes": "Source: DESLOP-100 friction walk, Area C (CLI observation/journal). Strength: Worth exploring. Locality: two modules own the same 'view one step' concept; reading/rendering is duplicated. This is the wave's single duplication-class story (quota satisfied by the other five friction/deslop stories). Constraint: CLI surface is user-facing — choose merge vs cross-reference with evidence, don't break existing scripts (journal step / journal steps both used in docs)."
     },

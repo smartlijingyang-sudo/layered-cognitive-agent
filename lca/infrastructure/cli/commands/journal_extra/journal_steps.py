@@ -8,6 +8,10 @@
 
     lcaops journal narrative <run_id>       # 输出 narrative.md
 
+单步原始事实(thinking / tool_call / tool_result 纯文本块)是
+``journal step --step N`` 的职责;本命令的 ``--step N`` 走
+StepNarrativeWriter 输出 narrative markdown。
+
 设计:
     - 输入: <run_id> + traces 根目录(--traces-root 默认 "traces")
     - 路径解析: 走 FilesystemRunLocator(直接构造,不用 boot 全套)
@@ -140,14 +144,22 @@ def register(app: typer.Typer) -> None:
     @app.command(name="steps")
     def steps_cmd(
         run_id: str = typer.Argument(..., help="run_id (e.g. run_c38532761cfb)"),
-        step_index: int | None = typer.Option(None, "--step", "-s", help="只看第 N步 (1-based)"),
+        step_index: int | None = typer.Option(
+            None,
+            "--step",
+            "-s",
+            help="只看第 N步 (1-based);单步原始事实用 journal step --step",
+        ),
         summary_only: bool = typer.Option(False, "--summary", help="只输出 prior_summary_chain"),
         json_output: bool = typer.Option(False, "--json", help="完整 JournalDocument JSON"),
         traces_root: Path = typer.Option(
             _DEFAULT_TRACES_ROOT, "--traces-root", help="traces 根目录"
         ),
     ) -> None:
-        """列 step-tree: 表格 / 单步详情 / 因果链 / 完整 JSON."""
+        """列 step-tree: 表格 / 单步详情 / 因果链 / 完整 JSON.
+
+        单步原始事实(thinking / tool_call / tool_result)请用 ``journal step --step N``。
+        """
         doc = _read_doc_or_exit(traces_root, run_id)
         if json_output:
             payload = _document_to_dict(doc)

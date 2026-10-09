@@ -4,6 +4,10 @@
 thinking + tool_call + tool_result 五个原语到一个干净块。
 不做 sub-step 嵌套 / 不做 phase tree, 一张表一个 step。
 
+与 ``journal steps --step N``(StepNarrativeWriter 的 narrative markdown)互补:
+本命令输出单 step 原始事实的纯文本块, 不做 narrative 包装。两者共用
+``read_step_document`` + ``JournalDocument.step_by_index`` 读同一份 journal.json。
+
 设计原则 (first-principles):
 
 1. 单一源是 ``journal.json`` (lca.journal/3.1);不在端点再去 grep spine。
@@ -20,35 +24,33 @@ from __future__ import annotations
 
 import json
 import sys
+from dataclasses import asdict
 from pathlib import Path
 from typing import Any
 
 import typer
 
+from lca.contracts.models.observability.journal.doc import JournalDocument
 from lca.infrastructure.cli.commands.kernel._shared import resolve_run_dir
+from lca.infrastructure.observability.journal.step.reader import read_step_document
 
 _DEFAULT_TRACES_ROOT = Path("traces")
 
 
-def _load_journal(run_dir: Path) -> dict[str, Any] | None:
+def _load_journal_document(run_dir: Path) -> JournalDocument | None:
+    """Load ``journal.json`` via the shared typed reader.
+
+    Returns ``None`` for the two real failure conditions (file cannot be read,
+    or it is not a valid step-tree document). Anything else is a bug in this
+    command and must not be reported to the user as "journal 不存在或损坏".
+    """
     journal_path = run_dir / "journal.json"
     if not journal_path.exists():
         return None
     try:
-        data: dict[str, Any] = json.loads(journal_path.read_text(encoding="utf-8"))
-        return data
+        return read_step_document(journal_path)
     except (OSError, ValueError):
-        # Unreadable file or malformed JSON only. Anything else is a bug in this
-        # command and must not be reported to the user as "journal 不存在或损坏".
         return None
-
-
-def _select_step(doc: dict[str, Any], step_index: int) -> dict[str, Any] | None:
-    for st in doc.get("steps", []):
-        if int(st.get("step_index", 0)) == step_index:
-            step: dict[str, Any] = st
-            return step
-    return None
 
 
 def _format_section(title: str, body: str | None) -> list[str]:
@@ -167,7 +169,11 @@ def register(app: typer.Typer) -> None:
             "",
             help="run_id (e.g. run_c38532761cfb);空 = traces/runs 下 mtime 最新的 run",
         ),
-        step_index: int = typer.Option(..., "--step", help="step_index (1-based) within the run"),
+        step_index: int = typer.Option(
+            ...,
+            "--step",
+            help="step_index (1-based) within the run;想看 narrative markdown 用 journal steps --step",
+        ),
         json_output: bool = typer.Option(False, "--json", help="完整 step JSON 输出"),
         model_visible: bool = typer.Option(
             False,
@@ -181,7 +187,11 @@ def register(app: typer.Typer) -> None:
             _DEFAULT_TRACES_ROOT, "--traces-root", help="traces 根目录"
         ),
     ) -> None:
-        """打印单个 step 的全部事实(thinking / tool_call / tool_result)。"""
+        """打印单个 step 的全部事实(thinking / tool_call / tool_result)。
+
+        单 step 原始事实的纯文本块;step-tree 表 / narrative markdown 请用
+        ``journal steps``(``--step N`` 输出 StepNarrativeWriter 渲染的单步文档)。
+        """
         run_dir = resolve_run_dir(run_id, traces_root)
         if run_dir is None:
             print(f"无 run 可用 (run_id={run_id!r})")
@@ -189,30 +199,30 @@ def register(app: typer.Typer) -> None:
         if not run_dir.exists():
             print(f"run_dir 不存在: {run_dir}")
             raise typer.Exit(1)
-        doc = _load_journal(run_dir)
+        doc = _load_journal_document(run_dir)
         if doc is None:
             print(f"journal.json 不存在或损坏: {run_dir / 'journal.json'}")
             raise typer.Exit(1)
-        step = _select_step(doc, step_index)
+        step = doc.step_by_index(step_index)
         if step is None:
-            n = len(doc.get("steps", []))
+            n = doc.total_steps()
             print(f"step_index={step_index} 不存在;该 run 共 {n} 个 steps")
             raise typer.Exit(1)
 
         if json_output:
-            sys.stdout.write(json.dumps(step, default=str, ensure_ascii=False) + "\n")
+            sys.stdout.write(json.dumps(asdict(step), default=str, ensure_ascii=False) + "\n")
             return
 
-        print(f"run_id: {doc.get('run_id')}")
-        print(f"trace_id: {doc.get('trace_id')}")
-        print(_format_step_human(step), end="")
+        print(f"run_id: {doc.run_id}")
+        print(f"trace_id: {doc.trace_id}")
+        print(_format_step_human(asdict(step)), end="")
 
         if model_visible:
             from lca.infrastructure.observability.spine.sinks.naming import (
                 spine_filename_for_run,
             )
 
-            step_id = step.get("step_id") or ""
+            step_id = step.step_id or ""
             spine_file = run_dir / spine_filename_for_run(run_dir.name)
             print("")
             if spine_file.exists():
@@ -221,9 +231,7 @@ def register(app: typer.Typer) -> None:
                     f" 调用 lca_kernel.events.fold.foldRequestHeader"
                 )
             else:
-                print(
-                    f"model_visible: fold unavailable (no {spine_file.name}; sidecar retired)"
-                )
+                print(f"model_visible: fold unavailable (no {spine_file.name}; sidecar retired)")
 
 
 __all__ = ["register"]
