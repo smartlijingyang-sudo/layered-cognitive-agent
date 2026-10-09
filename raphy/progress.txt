@@ -2139,3 +2139,13 @@
   - When the model type is already precise (`prior_turns: tuple[ConversationTurn, ...]`, `role: str`), getattr-with-default is pure noise — type the helper on the real types and the duck-reads vanish.
   - Override-wins helpers should return a detached copy (`dict(override)`) so callers can't mutate the shared extra dict downstream.
 ---
+
+## 2026-10-09 13:55 CST - RA-091
+- Implemented: private `_wire_block_observation(status, reason, tool_name, call_id, middle_parts=(), guidance=_WIRE_BLOCK_GUIDANCE, finish_reason=None, raw_preview=None)` seam in `lca/cognition/body/tools/tool_wire_gate.py`. `tool_wire_block_observation` and `missing_arguments_block_observation` now supply only condition+status+reason (+ gate-specific middle parts: `finish_reason=` / `required=`); guidance text single-sourced (was duplicated verbatim); both outputs byte-identical. Public signatures unchanged; ADR-0047 trigger semantics unchanged; `unexposed_tool_block_observation` defer semantics untouched (its message shape is a different feature, deliberately not converged).
+- Files changed: lca/cognition/body/tools/tool_wire_gate.py, tests/cognition/body/test_tool_arguments_wire_gate.py (+2 parameterized contract tests), raphy/prd.json, raphy/progress.txt
+- Tests: 24 passed (wire gate incl. 2 new + journal scan/journaled) + 29 passed (decision repair, nothing_to_do, namespace conformance); ruff clean. 2 pre-existing failures in tests/scenario/test_wire_gate_namespace.py (test_c1, test_c4) reproduce on clean HEAD via stash — NOT from this change.
+- **Learnings for future iterations:**
+  - "Converge two constructors" — first check which pair actually shares the message shape; the third similar-looking function (unexposed) had a different message and an explicit untouched constraint. Converging the wrong pair would have changed user-visible text.
+  - A `middle_parts` parameter keeps the seam honest when gates share prefix+guidance but differ in the middle (finish_reason vs required=).
+  - Pre-existing red tests: verify via `git stash push <paths>` + rerun before concluding; restore and confirm the diff is back.
+---

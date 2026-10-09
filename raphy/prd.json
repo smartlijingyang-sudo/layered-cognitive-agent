@@ -1314,8 +1314,8 @@
       "branchName": "raphy/arch-20261009-1008",
       "description": "As an LCA maintainer, I want one wire-block Observation constructor seam in tool_wire_gate.py, because tool_wire_block_observation and missing_arguments_block_observation build identically-shaped Observations (FAILURE_KIND_TOOL_WIRE + TOOL_RESULT kind + status/reason extra) and the model-facing guidance text 'arguments incomplete or invalid; do not treat as successful tool result; shorten code/args or split into smaller steps and retry' appears verbatim twice. Only the trigger conditions differ; the guidance text is product behavior — a future rewording will miss one copy. Deletion test: just moves (two public fns → one private seam), but the move is convergence, not diffusion.",
       "id": "RA-091",
-      "notes": "Source: Round 14 friction walk, cognition zone (Worth exploring; small mechanical duplication, product-text drift risk).",
-      "passes": false,
+      "notes": "Source: Round 14 friction walk, cognition zone (Worth exploring; small mechanical duplication, product-text drift risk). | Implemented 2026-10-09: private _wire_block_observation(status, reason, tool_name, call_id, middle_parts=(), guidance=_WIRE_BLOCK_GUIDANCE, finish_reason=None, raw_preview=None) seam in lca/cognition/body/tools/tool_wire_gate.py. tool_wire_block_observation and missing_arguments_block_observation now supply only condition+status+reason (+ gate-specific middle parts); guidance text single-sourced (was duplicated verbatim); both byte-identical outputs verified by existing tests. Public signatures unchanged; ADR-0047 trigger semantics (ToolCall native fields first, extra fallback) unchanged; unexposed_tool_block_observation defer semantics untouched. New: parameterized test (wire-status-gate + missing-arguments-gate) asserting the shared blocking-observation extra contract.",
+      "passes": true,
       "priority": 2,
       "title": "Converge the two wire-block Observation constructors into one seam"
     },

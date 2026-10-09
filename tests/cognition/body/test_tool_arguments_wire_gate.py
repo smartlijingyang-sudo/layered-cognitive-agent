@@ -17,9 +17,12 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
+import pytest
+
 from lca.cognition.body.tools.tool_wire_gate import (
     missing_arguments_block_observation,
     required_arguments,
+    tool_wire_block_observation,
 )
 from lca.contracts.atoms.enums.enums import ActionType
 from lca.contracts.atoms.semantic.keys import FAILURE_KIND, TOOL_WIRE_STATUS
@@ -255,3 +258,60 @@ def test_gate_blocks_tool_call_wire_status_even_without_decision_extra() -> None
     assert observation is not None
     assert observation.success is False
     assert "writeFile" in (observation.error or "")
+
+
+# ----- RA-091: both gates share the blocking-observation extra contract ------
+
+
+def _incomplete_wire_decision() -> Decision:
+    call = ToolCall(
+        call_id="c-wire",
+        tool_name="writeFile",
+        arguments={},
+        wire_status="incomplete",
+        wire_reason="truncated",
+    )
+    return _decision(call)
+
+
+def _missing_args_decision() -> tuple[Decision, _Registry]:
+    call = ToolCall(call_id="c-args", tool_name="writeFile", arguments={})
+    registry = _Registry(
+        tools={"writeFile": _Tool(name="writeFile", parameters={"required": ["path"]})}
+    )
+    return _decision(call), registry
+
+
+@pytest.mark.parametrize(
+    "make_obs",
+    [
+        pytest.param(
+            lambda: tool_wire_block_observation(_incomplete_wire_decision()),
+            id="wire-status-gate",
+        ),
+        pytest.param(
+            lambda: missing_arguments_block_observation(*_missing_args_decision()),
+            id="missing-arguments-gate",
+        ),
+    ],
+)
+def test_both_wire_gates_share_blocking_observation_contract(make_obs) -> None:
+    """The converged seam guarantees one blocking-observation contract."""
+    from lca.contracts.atoms.enums.enums import MemoryRecordKind
+    from lca.contracts.atoms.semantic.keys import (
+        FAILURE_KIND_TOOL_WIRE,
+        OBS_RESULT_KIND,
+        TOOL_WIRE_REASON,
+    )
+
+    obs = make_obs()
+    assert obs is not None
+    assert obs.success is False
+    assert obs.extra[FAILURE_KIND] == FAILURE_KIND_TOOL_WIRE
+    assert obs.extra[OBS_RESULT_KIND] == MemoryRecordKind.TOOL_RESULT
+    assert obs.extra[TOOL_WIRE_STATUS] in ("incomplete", "invalid")
+    assert isinstance(obs.extra[TOOL_WIRE_REASON], str) and obs.extra[TOOL_WIRE_REASON]
+    # single-sourced guidance text, identical in both gates
+    assert (
+        "do not treat as successful tool result" in (obs.error or "")
+    )

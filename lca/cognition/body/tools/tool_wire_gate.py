@@ -7,6 +7,8 @@
 
 from __future__ import annotations
 
+from collections.abc import Sequence
+
 from lca.contracts.atoms.enums.enums import MemoryRecordKind
 from lca.contracts.atoms.ids.ids import new_id
 from lca.contracts.atoms.semantic.keys import (
@@ -23,6 +25,56 @@ from lca.contracts.atoms.semantic.keys import (
 from lca.contracts.models.core.execution.decision import Decision, Observation
 
 _BLOCKING: frozenset[str] = frozenset({TOOL_WIRE_INCOMPLETE, TOOL_WIRE_INVALID})
+
+_WIRE_BLOCK_GUIDANCE = (
+    "arguments incomplete or invalid; do not treat as successful tool result; "
+    "shorten code/args or split into smaller steps and retry"
+)
+
+
+def _wire_block_observation(
+    *,
+    status: str,
+    reason: str,
+    tool_name: str,
+    call_id: str,
+    middle_parts: Sequence[str] = (),
+    guidance: str = _WIRE_BLOCK_GUIDANCE,
+    finish_reason: object = None,
+    raw_preview: object = None,
+) -> Observation:
+    """Single constructor seam for wire-gate blocking Observations.
+
+    The gates supply only condition + status + reason (+ gate-specific
+    middle parts); the guidance text is single-sourced here so the
+    product text cannot drift between gates.  Public gate signatures
+    are unchanged.
+    """
+    parts = [
+        f"tool_wire_{status}",
+        f"tool={tool_name}",
+        f"reason={reason}",
+        *middle_parts,
+        guidance,
+    ]
+    extra: dict[str, object] = {
+        FAILURE_KIND: FAILURE_KIND_TOOL_WIRE,
+        OBS_RESULT_KIND: MemoryRecordKind.TOOL_RESULT,
+        TOOL_WIRE_STATUS: status,
+        TOOL_WIRE_REASON: reason,
+    }
+    if finish_reason is not None:
+        extra[TOOL_WIRE_FINISH_REASON] = finish_reason
+    if raw_preview is not None:
+        extra[TOOL_WIRE_RAW_PREVIEW] = raw_preview
+    return Observation(
+        observation_id=new_id("obs"),
+        success=False,
+        payload=None,
+        error="; ".join(parts),
+        tool_call_id=call_id,
+        extra=extra,
+    )
 
 
 def tool_wire_block_observation(decision: Decision) -> Observation | None:
@@ -41,34 +93,14 @@ def tool_wire_block_observation(decision: Decision) -> Observation | None:
     reason = (tc.wire_reason or "").strip() or str(decision.extra.get(TOOL_WIRE_REASON) or status)
     finish = decision.extra.get(TOOL_WIRE_FINISH_REASON)
     preview = (tc.wire_raw_preview or "").strip() or decision.extra.get(TOOL_WIRE_RAW_PREVIEW)
-    parts = [
-        f"tool_wire_{status}",
-        f"tool={tc.tool_name}",
-        f"reason={reason}",
-    ]
-    if finish:
-        parts.append(f"finish_reason={finish}")
-    parts.append(
-        "arguments incomplete or invalid; do not treat as successful tool result; "
-        "shorten code/args or split into smaller steps and retry"
-    )
-    extra: dict[str, object] = {
-        FAILURE_KIND: FAILURE_KIND_TOOL_WIRE,
-        OBS_RESULT_KIND: MemoryRecordKind.TOOL_RESULT,
-        TOOL_WIRE_STATUS: status,
-        TOOL_WIRE_REASON: reason,
-    }
-    if finish is not None:
-        extra[TOOL_WIRE_FINISH_REASON] = finish
-    if preview is not None:
-        extra[TOOL_WIRE_RAW_PREVIEW] = preview
-    return Observation(
-        observation_id=new_id("obs"),
-        success=False,
-        payload=None,
-        error="; ".join(parts),
-        tool_call_id=tc.call_id,
-        extra=extra,
+    return _wire_block_observation(
+        status=status,
+        reason=reason,
+        tool_name=tc.tool_name,
+        call_id=tc.call_id,
+        middle_parts=[f"finish_reason={finish}"] if finish else [],
+        finish_reason=finish,
+        raw_preview=preview,
     )
 
 
@@ -158,26 +190,11 @@ def missing_arguments_block_observation(
         provided = tc.arguments or {}
         if any(name in provided for name in required):
             continue
-        parts = [
-            "tool_wire_incomplete",
-            f"tool={tc.tool_name}",
-            "reason=missing_required_arguments",
-            f"required={','.join(required)}",
-            "arguments incomplete or invalid; do not treat as successful tool result; "
-            "shorten code/args or split into smaller steps and retry",
-        ]
-        extra: dict[str, object] = {
-            FAILURE_KIND: FAILURE_KIND_TOOL_WIRE,
-            OBS_RESULT_KIND: MemoryRecordKind.TOOL_RESULT,
-            TOOL_WIRE_STATUS: TOOL_WIRE_INCOMPLETE,
-            TOOL_WIRE_REASON: "missing_required_arguments",
-        }
-        return Observation(
-            observation_id=new_id("obs"),
-            success=False,
-            payload=None,
-            error="; ".join(parts),
-            tool_call_id=tc.call_id,
-            extra=extra,
+        return _wire_block_observation(
+            status=TOOL_WIRE_INCOMPLETE,
+            reason="missing_required_arguments",
+            tool_name=tc.tool_name,
+            call_id=tc.call_id,
+            middle_parts=[f"required={','.join(required)}"],
         )
     return None
