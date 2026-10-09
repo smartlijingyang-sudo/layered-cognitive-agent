@@ -2393,3 +2393,30 @@ Learnings:
   部分（observer 事件顺序 visit_end→edge 保持不变），`_edge_of` 留在调用方。
   机械收敛前先列出每块的事件发射顺序，逐项对齐。
 ---
+
+## 2026-10-09 21:50 CST - RA-103
+
+Implemented:
+- `AnomalyDetector` 删掉 ghost state：`_recent_points` deque、`CYCLE_WINDOW`
+  类属性、`_check_cycle` 返回值里的 `and point in self._recent_points` 恒真条件；
+  `_check_cycle` docstring 与 `__init__` 注释改写为 consecutive-count 语义；
+  无他用的 `deque` import 一并删除。
+- `test_anomaly_detector_class_constants_are_well_named` 曾把 CYCLE_WINDOW==100
+  当 review guard pin——按 story 意图改成断言该属性已删除（其余阈值断言保留）。
+
+Files:
+- lca/plugins/observability/spine/derivers/anomaly.py
+- tests/lca_plugins/observability/spine/test_anomaly_detector.py
+
+Tests:
+- test_anomaly_detector.py + test_cycle_detector_fingerprint.py + test_spine_anomaly_observer.py: 37 passed
+- ruff check: clean
+
+Learnings:
+- 删"恒真条件"前先证明它是恒真：`point in self._recent_points` 之所以恒真，
+  是因为同一函数里刚 `append(point)`——证据在代码里，不在直觉里。
+  写进 story AC 时把这条证据链写清楚，implementer 就不用重新证明一遍。
+- Review guard 测试（"constants must be class-level and well named"）pin 的是
+  旧语义时，改测试不是"破坏 pin"，而是 story 的一部分——但要在 commit body
+  里点名，否则后人以为测试被悄悄放水。
+---

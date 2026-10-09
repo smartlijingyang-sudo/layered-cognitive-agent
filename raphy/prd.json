@@ -1497,9 +1497,9 @@
       "branchName": "raphy/arch-20261009-2045",
       "description": "As an LCA maintainer, I want the vestigial `_recent_points` rolling-window state removed from `AnomalyDetector`, because RA-030 rewrote cycle detection as consecutive-count with per-EP baselines but left the deque behind: it is appended on every event and consumed only by `point in self._recent_points`, which is always True since the point was just appended — the class attribute, comments, and docstring still narrate a window semantics the implementation no longer has.",
       "id": "RA-103",
-      "implemented": false,
-      "notes": "Source: Round 16 friction walk, Area B (anomaly.py, Q2). Vestigial state: deletion concentrates the detector's state on the one real semantics (consecutive-count). Strength: Worth exploring.",
-      "passes": false,
+      "implemented": true,
+      "notes": "Source: Round 16 friction walk, Area B (anomaly.py, Q2). Vestigial state: deletion concentrates the detector's state on the one real semantics (consecutive-count). Strength: Worth exploring.\n\nImplemented 2026-10-09 (round 16): deleted `_recent_points` deque, `CYCLE_WINDOW` class attribute, and the `and point in self._recent_points` tautology from `_check_cycle`; rewrote the stale docstring/__init__ comments to consecutive-count semantics; dropped the now-unused `deque` import. Updated `test_anomaly_detector_class_constants_are_well_named` (it pinned CYCLE_WINDOW == 100 as a review guard) to assert the attribute is gone. 8 `_check_*` methods, CYCLE_BASELINES, CYCLE_BASELINE_DEFAULT untouched. anomaly detector + cycle fingerprint + spine_anomaly observer tests: 37 passed. ruff clean. IMPL vs ASSESSMENT: as assessed, plus the expected test-guard update.",
+      "passes": true,
       "priority": "P2",
       "title": "Delete the vestigial CYCLE_WINDOW rolling-window state in AnomalyDetector"
     }
