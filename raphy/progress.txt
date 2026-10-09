@@ -2110,3 +2110,13 @@
   - Explicit multiple inheritance from two Protocols (`ToolBatchExecutionPolicy, AuditAwareToolBatchPolicy`) is the clearest "declares" signal; structural isinstance still works for third parties.
   - A protocol-targeted test needs three shapes: implementer declares it, base-only gets explicit fallback, spy proves enrichment flows.
 ---
+
+## 2026-10-09 13:05 CST - RA-088
+- Implemented: `make_lifespan` is now an honest ~15-line protocol impl (mount `app.state.ctx`, yield, shutdown LIFO dispose: stop `app.state.cron_daemon` if mounted, clear ctx; docstring rewritten, structlog gone). Cron daemon construction+start moved to the webserver plugin's named step `start_cron_daemon(app, lock_dir=None, workspace_path=None)` in `lca/plugins/transport/webserver/server/server.py`, called as setup step 3e and mounted on `app.state.cron_daemon`. No ctx getattr duck-reads: paths are explicit parameters (defaults `<lca_home>/locks`, `<lca_home>`). Start-failure policy = explicit degradation (log + return None; webserver boots without cron), stated in the step docstring. `test_cron_lifespan_integration.py` rewritten to the plugin setup path + a lifespan-alone-constructs-no-cron pin; old `_FakeCtx` semantics preserved as explicit params.
+- Files changed: lca_kernel/boot/lifespan.py, lca/plugins/transport/webserver/server/server.py, tests/boot/test_cron_lifespan_integration.py, raphy/prd.json, raphy/progress.txt
+- Tests: tests/boot/ 2 passed; ruff clean (fixed E402 from module-level _log placement, UP037 quoted annotation, I001 blank line).
+- **Learnings for future iterations:**
+  - When a "protocol impl" module grows business construction, the docstring usually lies first — diff docstring claims vs imports to spot it.
+  - Ruff E402 fires on ANY module-level statement (even `_log = ...`) before imports; keep the import block pristine and put `_log` after it.
+  - Moving a step out of shared kernel code? Check all make_lifespan callers first (here: only server.py production + tests) so the shutdown-dispose contract covers every path.
+---
