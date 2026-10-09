@@ -30,7 +30,7 @@ class FastPathCounter:
     def __post_init__(self) -> None:
         # Invoked by the dataclass-generated __init__ of the executor.
         # object.__setattr__ bypasses the frozen __setattr__ for this
-        # observability-only slot; domain fields remain effectively frozen.
+        # observability-only slot; domain fields remain frozen.
         object.__setattr__(self, "_fast_path_count", 0)
 
     def note_fast_path(self) -> None:

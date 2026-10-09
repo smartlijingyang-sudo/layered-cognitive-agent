@@ -82,7 +82,7 @@ def _validate_or_repair_calls(
             if wire_bad:
                 # Keep the incomplete call so Body can emit the ADR-0047
                 # Observation; re-routing here would skip the error the
-                # model needs in order to stop repeating the same payload.
+                # model needs to stop repeating the same payload.
                 repaired.append(call)
                 continue
             return _REPAIR_REJECTED, list(tool_calls)

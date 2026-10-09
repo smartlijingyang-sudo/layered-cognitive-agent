@@ -13,7 +13,7 @@ def build_tool_routing_table(
     """Map lookup keys to the (server_name, tool) pair that hosts them.
 
     Every tool is addressable by its qualified name (``mcp__{server}__{tool}``).
-    A raw tool name is additionally routable only when it is unambiguous across
+    A raw tool name is also routable only when it is unambiguous across
     all servers; colliding raw names are excluded from the table and reported
     with the server names they appeared on.
     """

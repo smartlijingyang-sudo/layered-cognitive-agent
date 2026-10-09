@@ -234,7 +234,7 @@ class TestImportIsolation:
 
     These checks run the import in a *clean subprocess* (fresh
     ``sys.modules``) so other tests in the pytest session cannot leak
-    the forbidden modules into the probe. They additionally do a static
+    the forbidden modules into the probe. They also do a static
     AST scan of the barrel itself to catch direct ``import lca.harness``
     statements that would silently violate the contract regardless of
     import order.

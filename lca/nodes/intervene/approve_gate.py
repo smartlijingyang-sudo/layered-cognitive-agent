@@ -162,7 +162,7 @@ class ApproveGateExecutor:
     grant-absence gate refuses privileged actions whose tool privileges are
     absent from the ambient TrustEnvelope (ADR-0199, bound via
     ``trust_envelope_scope``) — fail-closed allowlist, ``content_origin``
-    as audit metadata only. On the refused path only, the gate additionally
+    as audit metadata only. On the refused path only, the gate also
     routes the refusal payload to the run-trace evidence ledger through the
     ambient observability seam (shared ``resolve_evidence_store`` seam;
     no-ref path when unbound) —

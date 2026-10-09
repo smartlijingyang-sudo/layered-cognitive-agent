@@ -13,7 +13,7 @@ tick. Per routine, in order:
 Failure semantics (ADR-0263 §9 ruling 3, pinned by the acceptance tests):
 retry up to 3 attempts with 1min/5min/15min backoff; the 3rd failure moves the
 routine to a dead letter queryable for 7 days. Every failure emits
-``routine.failed.v1``; the crossing failure additionally emits
+``routine.failed.v1``; the crossing failure also emits
 ``routine.dead_lettered.v1``. An executor exception never kills the tick —
 it becomes a ``FAILED`` result and the driver continues with the next routine.
 

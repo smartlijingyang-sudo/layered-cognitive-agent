@@ -452,7 +452,7 @@ def test_run_with_tool_use_succeeds_on_web_standard() -> None:
 
     # Terminal outcome (approval era): the scripted ``bash`` tool call is
     # a privileged action (``namespace_approval`` maps the shell namespace
-    # to ``require_approval``, and ADR-0292 §10 additionally fail-closes
+    # to ``require_approval``, and ADR-0292 §10 also fail-closes
     # ungranted privileged calls). With the ``bash`` grant bound above,
     # the run must reach the approval gate and pause for human approval
     # (``TaskStatus.INPUT_REQUIRED``) — the designed success path for a
