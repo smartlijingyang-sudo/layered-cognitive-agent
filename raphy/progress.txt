@@ -2309,3 +2309,22 @@ Learnings:
 - The AC's "python -c import 实测循环 import 真实边界" step paid off: all 12 groups moved cleanly, so no `_late` block was needed. When a codebase keeps function-level imports "just in case", the empirical import test is the cheapest way to find the real boundary — grep for direct references is necessary but not sufficient (transitive cycles only show at import time).
 - Kept the trace-id/state-creation block inline in run() (8 lines): it is the "create fresh state" half of the method's docstring contract, not a turn-preparation phase — extracting it would have been decomposition for its own sake.
 - `with_runtime_bindings(**runtime_overrides)` returns `Token[BindingsViewBuilder | None]`; the helper surfaces that type so the finally-scope contract (`reset_capability_bindings(token)`) stays visible at the seam. Used `from contextvars import Token` at top level (stdlib, zero cycle risk).
+
+## 2026-10-09 19:10 CST - RA-098
+
+Implemented:
+- Added private `_plan_scoped()` contextmanager on `CognitiveAgent` — the single home of the `if self._plan_ref: with plan_ref_scope(...)` conditional. `run()` and `resume()` now spell `with bind_backends(...), run_scope(scope), self._plan_scoped():` (one line each); their objective/ctx differences preserved (`objective=text` vs `objective=f"resume:{snapshot.snapshot_id}"`).
+- New test `tests/agent/test_cognitive_agent_plan_scoped.py`: binds the scope when plan_ref is set (and resets on exit), passthrough when unset.
+
+Files:
+- lca/agent/cognitive_agent.py (20+/24-)
+- tests/agent/test_cognitive_agent_plan_scoped.py (new)
+
+Tests:
+- tests/agent/ + tests/runtime/loop/: 72 passed
+- tests/architecture/test_capability_snapshot.py (plan_ref golden, byte-identical) + tests/integration/test_run_with_tool_use.py: 13 passed
+- ruff check: clean
+
+Learnings:
+- The `plan_ref_scope` nesting (inside bind_backends + run_scope) is a semantic invariant, not just style — the contextmanager's docstring says so explicitly, so the next person to move the nesting finds the one place and the reason together.
+- `contextlib` was already imported in cognitive_agent.py; only `Iterator` needed adding to the collections.abc import. Small diffs stay small when the module already has the tools.
