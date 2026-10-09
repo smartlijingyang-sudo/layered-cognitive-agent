@@ -57,8 +57,7 @@ def _default_reducer(
     """Last-write-wins reducer; deterministic given input order."""
     merged: dict[PortName, Any] = {}
     for output in per_child_outputs:
-        for key, value in output.items():
-            merged[key] = value
+        merged.update(output)
     return merged
 
 
