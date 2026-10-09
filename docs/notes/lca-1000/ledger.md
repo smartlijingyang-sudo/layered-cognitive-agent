@@ -1279,3 +1279,18 @@
 - commit: 无代码 commit；本台账单独 docs commit（沿用 0521–0540 `docs(lca-1000): 第NNNN轮台账` 模式）。
 - 备注: 只 commit docs/notes/lca-1000/ledger.md（`git add` + `git commit -m <msg> -- <path>` 显式路径；-m 须在 -- 之前，见 AGENTS.md 教训）。台账文本经 exec stdin 原样追加（UTF-8，未走 base64 管道；沿用 0536–0540）。扫描输出存 252 /tmp（ast0541_out.txt、dead0541_out.txt、dead0541b_out.txt、sndb0541_out.txt、shallow0541_out.txt）。新教训两条：(1) ssh252 包装的 git-status banner 只进包装自身 stdout，不进远程 `> 重定向` 写出的文件 —— 0540 及本轮首轮"基线文件含 banner"系误读；扫描器原始输出可直接 cmp，无需剥离。(2) awk 剥离脚本在空 payload 上 cmp 得出虚假 IDENTICAL —— cmp 前务必先 wc -l 核验 payload 非空（本轮差点误判，幸被空文件发现）。
 
+
+## 第0542轮 (2026-10-09 08:03-08:12 CST)
+- 改了什么: 无代码改动。**本轮未发现新的实质机会**（依据 body 规则 4：不硬凑 trivial commit）。
+- 依据 skill 哪一节: SKILL.md Deletion test + LANGUAGE.md（深度即杠杆/真实 seam/接口即测试面）+ DEEPENING.md Seam discipline + SKILL.md 的 ADR 不 re-litigate 规则 —— 见候选清单的驳回依据。
+- 关键设计决策（夜间跳过 grilling，记台账）: 自 0541（07:39）后无新落盘 —— HEAD 仍为 c82320337（`docs(lca-1000): 第0541轮台账`）。唯一未提交改动 .agent/skills/airtap-automation/SKILL.md 属并发会话，按 0.5/规则 5 绝不动、不细看（沿用 0522–0541 判例）。时间窗（08:03）与分支（main）两硬门槛均过；skill 四文件（SKILL.md/DEEPENING.md/LANGUAGE.md/INTERFACE-DESIGN.md）逐字完整重读。
+- 候选清单（本轮 explore：AST 同体 + dead a/b + 同名异体 + shallow-facade 最浅未裁决项深读 + deslop 清单 + 新鲜 diff 复查）:
+  1. AST —— /tmp/ast0542_out.txt 与 ast0541_out.txt 逐字节一致（914 行，243 组，零新组；0522/0523 已逐组人工裁决）。
+  2. dead a / dead b —— 与 dead0541_out.txt / dead0541b_out.txt 逐字节一致；真死 17 与 0522–0541 裁决集合一致。
+  3. sndb —— 与 sndb0541_out.txt 逐字节一致（1224 行，295 组，含 0527 新裁决的 5 组）。
+  4. shallow-facade —— /tmp/shallow0542_out.txt 与 shallow0541_out.txt 逐字节一致（total: 61）；最浅未裁决项 **lca/infrastructure/observability/journal/engine/engine.py**（13/17，RunStore，379 行）深读裁决：驳回。Deletion test：删去该 Module 会把"单一追加入口"的实质（单一临界区锁 L1、strict seq + expected_run_seq 比对 L1/L3、durable commit + terminal seal L2/L7、event 类型 + frozen dataclass 验证 L4、commit 边界数据策略 L8、commit 后 projection 通知）散到所有 append 调用方 —— 复杂度不消失，是真实 seam。13 个 pass-through（is_sealed/run_seq/seq 别名/run_id/stats/events/projections/with_projection/backend/policy/write 别名/get/read_from/flush/close）是刻意设计的窄读面（接口即测试面），把账本读面稳定下来，backend/policy/装配内部演进不波及 caller，非无依据 indirection。`seq` 兼容别名在 lca/+tests/ 仍有引用（旧调用方面向），`write` 为 JournalBackend 协议入口，`RunLedger = RunStore` 别名被 7 个文件引用 —— 均为带 ADR-0065 依据的 compatibility seam，非死兼容。PR-8/MVA-3 行内注释含真实设计知识（31 个调用方兼容 + ADR-0096 依据），非叙事性 slop。按 SKILL.md ADR 规则不 re-litigate ADR-0065/ADR-0096。
+  5. deslop：TODO/FIXME/HACK/XXX lca/ = 8（既往裁决项，无新增）；except Exception lca/ = 442（与基线一致）；noqa F401 lca/ = 1（cli.py side-effect registry 老项）；deprecated 无新增（git diff c82320337..HEAD -- lca/ 为空，生产代码零变更）。
+- 验证结果: 无代码改动，无需验证门。扫描脚本全部 exit 0（ast0527.py/dead0527.py/dead0522b.py/sndb0527.py/shallow_scan.py 确定性重跑）；开工/收工工作区 on main（并发会话的未提交改动始终不动）。
+- commit: 无代码 commit；本台账单独 docs commit（沿用 0521–0541 `docs(lca-1000): 第NNNN轮台账` 模式）。
+- 备注: 只 commit docs/notes/lca-1000/ledger.md（`git add` + `git commit -- <path>` 显式路径；-m 须在 -- 之前，见 AGENTS.md 教训）。台账文本经 exec stdin → ssh252 原样追加（UTF-8，未走 base64 管道；沿用 0536–0541）。扫描输出存 252 /tmp（ast0542_out.txt、dead0542_out.txt、dead0542b_out.txt、sndb0542_out.txt、shallow0542_out.txt）。新教训：无（纯基线复核 + 最浅项深读轮）。
+--
