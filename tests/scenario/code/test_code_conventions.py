@@ -780,6 +780,15 @@ _LINE_COUNT_EXEMPT: dict[str, str] = {
         "typer 命令聚合点（soul + skill/relink 系），与 runs/tools.py 豁免同构"
         "（ADR-0295，2026-10-09 iter-quality 03:09 登记临时豁免）"
     ),
+    "lca/infrastructure/skills/disk/store.py": (
+        "DiskSkillPackageStore 双 Protocol 实现 + 包磁盘路径语义 helper（canonical rel path / resources "
+        "前缀剥离 / 源文件 walk）同属包在磁盘上单一内聚单元；RA-076 刚把 safe_rel_path 策略收敛进本模块，"
+        "硬拆反收敛（ADR-0296 todo-95 裁决 (b)；2026-10-09 登记）"
+    ),
+    "lca/infrastructure/tools/skills/activate/tool.py": (
+        "SkillActivateTool + 激活引用构建 helper 同属激活语义单元，仅超 16 行，拆分收益不成比例"
+        "（ADR-0296 todo-95 裁决 (b)；2026-10-09 登记）"
+    ),
 }
 
 
