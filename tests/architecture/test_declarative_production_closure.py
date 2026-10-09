@@ -109,8 +109,16 @@ def test_plan_binding_rejects_a_scope_without_the_boot_frozen_plan():
 
     resolved = resolve_profile("profiles/web-standard.yaml")
 
+    # RA-069 (202d00468): boot products are read via scope.inject (the
+    # provide/inject idiom); a bare SimpleNamespace no longer quacks like a
+    # scope. Model "no boot products attached" with an inject stub returning
+    # the default, so the MissingCapabilityError path is still exercised.
+    scope = SimpleNamespace(
+        resolved_profile=resolved,
+        inject=lambda key, default=None: default,
+    )
     with pytest.raises(MissingCapabilityError, match="compiled_run_plan"):
-        compiled_plan_from_scope(SimpleNamespace(resolved_profile=resolved))
+        compiled_plan_from_scope(scope)
 
 
 def test_dual_write_module_does_not_exist():
