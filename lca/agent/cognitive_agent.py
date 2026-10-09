@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import contextlib
 from collections.abc import Awaitable, Callable
+from dataclasses import replace
 
 from lca.agent.run_envelope import (
     EnvelopeSpec,
@@ -408,14 +409,14 @@ class CognitiveAgent(AgentUnit):
             return ctx
         if ctx is None:
             return RunContext(deadline=workspace.deadline)
-        return RunContext(
-            trace_id=ctx.trace_id,
-            session_id=ctx.session_id,
-            from_role=ctx.from_role,
-            context_refs=list(ctx.context_refs),
-            prior_turns=tuple(ctx.prior_turns),
+        # dataclasses.replace: future RunContext fields ride along instead of
+        # being silently dropped. The defensive copies are kept — naive
+        # replace would alias context_refs/extra and change downstream
+        # mutation behavior.
+        return replace(
+            ctx,
             deadline=workspace.deadline,
-            team_awareness=ctx.team_awareness,
+            context_refs=list(ctx.context_refs),
             extra=dict(ctx.extra),
         )
 

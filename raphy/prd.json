@@ -1391,7 +1391,8 @@
       "description": "As an LCA maintainer, I want _enrich_run_context (cognitive_agent.py) to use dataclasses.replace instead of hand-enumerating all 8 RunContext fields, because today it rebuilds trace_id=ctx.trace_id, session_id=ctx.session_id, … field by field — all 8 currently match, but the 9th field added later will be silently dropped. The classic 'no bug today, guaranteed bug tomorrow' shape. Deletion test: concentrates — 'fill the default deadline' collapses from 8 enumerated lines to one expression.",
       "id": "RA-096",
       "notes": "Source: Round 14 friction walk, agent-runtime zone (Worth exploring; preventive, with a copy-semantics trap to respect). Do AFTER RA-082 (same file, envelope moved first).",
-      "passes": false,
+      "passes": true,
+      "implemented": "2026-10-09: replace(ctx, deadline=..., context_refs=list(...), extra=dict(...)); defensive copies kept; fields()-driven no-drop regression test + defensive-copy test added; 5 tests green.",
       "priority": 3,
       "title": "Rebuild _enrich_run_context with dataclasses.replace"
     }

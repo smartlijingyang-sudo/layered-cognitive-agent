@@ -71,3 +71,62 @@ def test_enrich_run_context_with_existing_deadline_returns_same() -> None:
         enriched = CognitiveAgent._enrich_run_context(ctx)
 
     assert enriched is ctx
+
+
+def test_enrich_run_context_drops_no_fields() -> None:
+    """RA-096: dataclasses.replace() must carry every RunContext field.
+
+    Asserts against dataclasses.fields() so a 9th field added later is
+    covered automatically — the exact bug the hand-enumeration invited.
+    """
+    from dataclasses import fields
+
+    awareness = object()
+    new_deadline = object()
+    ctx = RunContext(
+        trace_id="trace-1",
+        session_id="sess-1",
+        from_role="lead",
+        context_refs=["r1"],
+        team_awareness=awareness,  # type: ignore[arg-type]
+        prior_turns=(ConversationTurn(role="user", content="hi"),),
+        extra={"k": "v"},
+    )
+
+    class _Workspace:
+        deadline = new_deadline
+
+    with patch(
+        "lca.agent.cognitive_agent.get_run_workspace",
+        return_value=_Workspace(),
+    ):
+        enriched = CognitiveAgent._enrich_run_context(ctx)
+
+    assert enriched is not None
+    assert enriched is not ctx
+    for f in fields(RunContext):
+        if f.name == "deadline":
+            assert enriched.deadline is new_deadline
+        else:
+            assert getattr(enriched, f.name) == getattr(ctx, f.name), f.name
+
+
+def test_enrich_run_context_keeps_defensive_copies() -> None:
+    """RA-096: naive replace() would alias context_refs/extra; copies kept."""
+    ctx = RunContext(context_refs=["r1"], extra={"k": "v"})
+    with patch(
+        "lca.agent.cognitive_agent.get_run_workspace",
+        return_value=_workspace_with_deadline(),
+    ):
+        enriched = CognitiveAgent._enrich_run_context(ctx)
+
+    assert enriched is not None
+    assert enriched.context_refs == ["r1"]
+    assert enriched.context_refs is not ctx.context_refs
+    assert enriched.extra == {"k": "v"}
+    assert enriched.extra is not ctx.extra
+    # downstream mutation of the enriched copies must not leak back
+    enriched.context_refs.append("r2")
+    enriched.extra["k2"] = "v2"
+    assert ctx.context_refs == ["r1"]
+    assert ctx.extra == {"k": "v"}

@@ -2230,3 +2230,22 @@
     files; that needs a security review, not a raphy drive-by. The (a)
     option is recorded in the docstring as requiring that review.
 ---
+
+## 2026-10-09 12:35 - RA-096
+- What was implemented: _enrich_run_context now uses
+  replace(ctx, deadline=workspace.deadline, context_refs=list(ctx.context_refs),
+  extra=dict(ctx.extra)) instead of the 8-field hand enumeration. Defensive
+  copies of context_refs/extra kept (naive replace would alias the originals
+  and change downstream mutation behavior). deadline short-circuit semantics
+  (workspace.deadline None / ctx already has deadline / ctx None) unchanged.
+- Files changed:
+  - lca/agent/cognitive_agent.py (from dataclasses import replace; one expression)
+  - tests/agent/test_cognitive_agent_enrich_run_context.py (+2 tests)
+- **Learnings for future iterations:**
+  - Patterns discovered: "no field dropped" regression = iterate
+    dataclasses.fields() and compare every field — future fields are covered
+    automatically, which is exactly the bug class the story prevents.
+  - Gotchas encountered: tuple(ctx.prior_turns) on an already-tuple field was
+    a no-op copy; replace() keeps the same reference with identical behavior.
+    RunContext is a non-frozen dataclass so replace() works directly.
+---
