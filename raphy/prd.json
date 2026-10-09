@@ -1300,8 +1300,8 @@
       "branchName": "raphy/arch-20261009-1008",
       "description": "As an LCA maintainer, I want the transcript-features derivation to live with its only consumer, because _run_driver's finally hides ~15 lines of 'count user/assistant roles in prior_turns' feature derivation whose sole consumer is lca/application/initiative/hooks.py::evaluate_initiative — no locality, and a role-miscount bug would hide in the generic driver's finally where nobody looks. It also duck-reads getattr(ctx, 'prior_turns', ()) on a typed dataclass whose field is declared. 'The interface is the test surface': today this logic is only reachable by driving a full run. Deletion test: concentrates — the derivation rule moves in with its only consumer; the driver's finally becomes a 3-line call.",
       "id": "RA-090",
-      "notes": "Source: Round 14 friction walk, agent-runtime zone (Strong; no locality + testability). Constraints: RunContext is read-only input, not an output bus (per comments); caller override semantics kept.",
-      "passes": false,
+      "notes": "Source: Round 14 friction walk, agent-runtime zone (Strong; no locality + testability). Constraints: RunContext is read-only input, not an output bus (per comments); caller override semantics kept. | Implemented 2026-10-09: new pure derive_transcript_features(prior_turns, extra_override=None) in lca/application/initiative/hooks.py next to evaluate_initiative (re-exported from lca.application.initiative). Caller override wins (returned as a detached copy); otherwise baseline from typed prior_turns (t.role, no getattr). _run_driver collapses the 15-line block to one call; no getattr duck-read on RunContext.prior_turns; RunContext stays read-only, result still lands in Result.extra['initiative_offer']; extra['transcript_features'] override semantics preserved (empty override falls back to baseline, as before); ADR-0248 slice 8 kept. New: 4 pure unit tests (empty/mixed/override/detach) in tests/application/initiative/test_initiative_hooks.py.",
+      "passes": true,
       "priority": 1,
       "title": "Move transcript_features fallback derivation next to evaluate_initiative"
     },

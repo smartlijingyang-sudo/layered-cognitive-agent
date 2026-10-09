@@ -2130,3 +2130,12 @@
   - `getattr(view, "vocal_gate", None)` on an `object`-typed field + `isinstance(x, runtime_checkable Protocol)` is the honest replacement for hasattr probing.
   - Protocol-typed dataclass fields (gate: VocalGateProtocol) make direct calls safe; test stubs must then implement the new query — that's the "stub-protocol" AC in action.
 ---
+
+## 2026-10-09 13:40 CST - RA-090
+- Implemented: new pure `derive_transcript_features(prior_turns, extra_override=None)` in `lca/application/initiative/hooks.py` next to `evaluate_initiative` (re-exported from `lca.application.initiative`). Caller override wins (detached copy); otherwise baseline from typed `prior_turns` (`t.role`, no getattr). `_run_driver` collapses the 15-line block to one call; no getattr duck-read on `RunContext.prior_turns`; RunContext stays read-only, result still in `Result.extra['initiative_offer']`; override semantics preserved; ADR-0248 slice 8 kept.
+- Files changed: lca/application/initiative/hooks.py, lca/application/initiative/__init__.py, lca/runtime/loop/runtime_loop.py, tests/application/initiative/test_initiative_hooks.py (+4 tests), raphy/prd.json, raphy/progress.txt
+- Tests: 19 passed (initiative incl. 4 new pure tests + driver internal paths + gated flow/e2e initiative_offer pins); ruff clean.
+- **Learnings for future iterations:**
+  - When the model type is already precise (`prior_turns: tuple[ConversationTurn, ...]`, `role: str`), getattr-with-default is pure noise — type the helper on the real types and the duck-reads vanish.
+  - Override-wins helpers should return a detached copy (`dict(override)`) so callers can't mutate the shared extra dict downstream.
+---

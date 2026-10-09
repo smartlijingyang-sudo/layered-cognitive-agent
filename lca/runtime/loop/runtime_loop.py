@@ -543,30 +543,22 @@ class CognitiveRuntime(Runtime):
                     outcome=outcome_holder["value"],
                 )
             if outcome_holder["value"] == "success" and ctx is not None:
-                # ADR-0248 切片 8：InitiativeHook 需要 transcript_features。
-                # 若调用方未提供，运行时从可用输入（prior_turns）派生基线特征，
-                # 保证钩子在真实 Run 成功路径上被调用。调用方可在
-                # RunContext.extra["transcript_features"] 注入更丰富的特征。
-                features = (ctx.extra or {}).get("transcript_features")
-                if not features:
-                    prior_turns = getattr(ctx, "prior_turns", ()) or ()
-                    features = {
-                        "user_turn_count": sum(
-                            1 for t in prior_turns if getattr(t, "role", "") == "user"
-                        ),
-                        "assistant_turn_count": sum(
-                            1 for t in prior_turns if getattr(t, "role", "") == "assistant"
-                        ),
-                        "manual_action_counts": {},
-                    }
-                if features:
-                    from lca.application.initiative.hooks import evaluate_initiative
+                # ADR-0248 切片 8:InitiativeHook 需要 transcript_features。
+                # 派生规则收敛在 lca.application.initiative.derive_transcript_features:
+                # 调用方经 RunContext.extra["transcript_features"] 注入更丰富的特征时
+                # 优先采用,否则从 prior_turns 派生基线。RunContext 是只读输入;
+                # initiative_offer 是运行时派生投影,写入 Result.extra 而非回写输入。
+                from lca.application.initiative.hooks import (
+                    derive_transcript_features,
+                    evaluate_initiative,
+                )
 
-                    offer = evaluate_initiative(features)
-                    if offer is not None:
-                        # initiative_offer 是运行时派生投影，写入 Result.extra 而非回写
-                        # 输入契约 RunContext.extra（RunContext 是只读输入，不是输出总线）。
-                        result.extra["initiative_offer"] = offer.model_dump()
+                features = derive_transcript_features(
+                    ctx.prior_turns, (ctx.extra or {}).get("transcript_features")
+                )
+                offer = evaluate_initiative(features)
+                if offer is not None:
+                    result.extra["initiative_offer"] = offer.model_dump()
             # ADR-0166 S5: 异常路径走 exception.finally；正常路径走
             # lifecycle.finally —— reader 不再被「成功也发 exception.*」混淆。
             if outcome_holder["value"] == "success":
