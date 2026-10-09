@@ -2060,3 +2060,14 @@
   - Preserving an odd-but-current behavior (team's CANCELED+"success" on cancel) byte-identically is correct — encode it in the translator + a test asserting the oddity, with a comment saying it's preserved, not endorsed.
   - Module-level translator functions make the previously-unwritable outcome matrix table-testable; the envelope cascade itself only needs return-vs-raise pinning.
 ---
+
+## 2026-10-09 11:40 CST - RA-083
+- Implemented: split `lca/infrastructure/cli/service/service.py` — pure Service Protocol surface (`ServiceStatus`/`HealthCheck`/`ServiceState`/`Service`/`CliShippingService`, 93 effective lines) stays; 8 host-probing primitives moved verbatim to new `lca/infrastructure/cli/service/host_probing.py` (229 effective lines). 6 importers updated (daemon/lobehub/serve mixed imports split, supervisor/spawner `health_body_ok`, test_http_ready). `service.py` removed from `_LINE_COUNT_EXEMPT` (now under the 250-line limit).
+- Files changed: lca/infrastructure/cli/service/service.py, lca/infrastructure/cli/service/host_probing.py (new), daemon.py, lobehub.py, serve.py, spawner.py, supervisor.py, tests/infrastructure/cli/test_http_ready.py, tests/scenario/code/test_code_conventions.py, raphy/prd.json, raphy/progress.txt
+- Tests: 63 passed (tests/infrastructure/cli/test_http_ready.py + daemon/lobehub/host_runtime/ops service tests); ruff: no new violations (the 15 S603/S607/S110 bandit hits on host_probing.py are verbatim-moved pre-existing code — verified old service.py fails ruff identically; fixed F821/F401/I001 introduced by the split).
+- 7 failures in the wider tests/infrastructure/cli + test_code_conventions run (test_kernel_cli_plugins L0 count 57≠59, 4× test_runs_debug_health, test_runs_health_cli, TestFileLineCountLimit on skills/disk/store.py + tools/skills/activate/tool.py) are **pre-existing**: reproduced all 7 on clean HEAD with my changes stashed.
+- **Learnings for future iterations:**
+  - Before flagging ruff hits on moved code, run ruff on the pre-change file: the S-series bandit hits were already there; a pure move must not "fix" them (scope creep) nor be blamed for them.
+  - This repo pins module-cohesion facts in tests (test_code_conventions.py `_LINE_COUNT_EXEMPT`): a split changes both the file sizes and the registry — update both sides, then re-run the conventions test itself.
+  - Pre-existing failures need a stash-and-rerun proof before being declared unrelated; the stash is safe in my own worktree (only my changes there).
+---

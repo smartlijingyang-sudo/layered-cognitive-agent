@@ -32,7 +32,7 @@ import time
 from pydantic import BaseModel, ConfigDict
 
 from lca.infrastructure.cli.config.config import KernelServeConfig
-from lca.infrastructure.cli.service.service import health_body_ok
+from lca.infrastructure.cli.service.host_probing import health_body_ok
 
 _HEALTH_TIMEOUT_S = 30.0
 _HEALTH_POLL_S = 0.5

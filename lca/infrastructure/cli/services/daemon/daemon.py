@@ -18,12 +18,14 @@ import time
 from pathlib import Path
 
 from lca.infrastructure.cli.config.config import DaemonConfig, KernelServeConfig
+from lca.infrastructure.cli.service.host_probing import (
+    http_ready,
+    pid_alive,
+)
 from lca.infrastructure.cli.service.service import (
     HealthCheck,
     ServiceState,
     ServiceStatus,
-    http_ready,
-    pid_alive,
 )
 from lca.infrastructure.cli.services.daemon.start_script import render_start_script
 from lca.infrastructure.cli.state.state import ChangeReport, StateStore

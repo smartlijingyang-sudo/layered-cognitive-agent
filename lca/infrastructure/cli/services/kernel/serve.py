@@ -40,11 +40,11 @@ from __future__ import annotations
 from pathlib import Path
 
 from lca.infrastructure.cli.config.config import KernelServeConfig
+from lca.infrastructure.cli.service.host_probing import health_body_ok
 from lca.infrastructure.cli.service.service import (
     HealthCheck,
     ServiceState,
     ServiceStatus,
-    health_body_ok,
 )
 from lca.infrastructure.cli.services.kernel.spawner import KernelServeSpawner
 
