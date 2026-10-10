@@ -82,12 +82,16 @@ async def setup(ctx: PluginContext, config: Config) -> None:
             if policy is not None
             else AttributePolicy(verbosity=cfg.verbosity, redact=cfg.redact_enabled)
         )
+        from lca.contracts.observability.event.identity_registry import (
+            resolve_identity_provider,
+        )
         from lca.infrastructure.observability.backends.journal_backend import MemoryJournal
 
         return MemoryJournal(
             policy=pol,
             projections=projections,
             descriptor_registry=descriptor_registry,
+            identity_provider=resolve_identity_provider(),
         )
 
     registry.register("memory", _make_memory)

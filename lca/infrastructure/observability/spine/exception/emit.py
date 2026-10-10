@@ -14,7 +14,7 @@ from typing import Any, Literal
 
 from lca.contracts.observability import ExceptionRecord as ExceptionRecordT
 from lca.contracts.observability.evidence.outcome import Outcome
-from lca.harness.declarative.compile.instrument.wrap import resolve_active_spine
+from lca.contracts.observability.spine_accessors import resolve_active_spine
 from lca.infrastructure.observability.spine.event.record import Channel, EventRecord
 
 _EXECUTION_POINT = "exception.caught"

@@ -19,7 +19,10 @@ from lca.contracts.harness.composition.plugin_contract import (
     PluginContract,
     PluginIdentity,
 )
-from lca.contracts.observability.schemas.v2 import JournalSchema
+from lca.contracts.observability.schemas.journal_schema_registry import (
+    JournalSchemaRegistry,
+    install_journal_schema_registry,
+)
 from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import (
     OwnershipDeclaration,
 )
@@ -28,28 +31,6 @@ from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 
 class Config(BaseModel):
     model_config = {"extra": "forbid"}
-
-
-class JournalSchemaRegistry:
-    """Named registry of JournalSchema implementations.
-
-    Task 1 used a placeholder; Task 3 registers ``schema-v2.0.0`` at boot.
-    """
-
-    def __init__(self) -> None:
-        self._schemas: dict[str, JournalSchema] = {}
-
-    def name(self) -> str:
-        return "JournalSchemaRegistry"
-
-    def register(self, version: str, schema: JournalSchema) -> None:
-        self._schemas[version] = schema
-
-    def get(self, version: str) -> JournalSchema | None:
-        return self._schemas.get(version)
-
-    def all(self) -> dict[str, JournalSchema]:
-        return dict(self._schemas)
 
 
 @plugin(
@@ -80,8 +61,11 @@ class JournalSchemaRegistry:
     ),
 )
 async def setup(ctx: PluginContext, config: Config) -> None:
-    from lca.plugins.journal.journal.schema_v2_provider import EnvelopeV2Schema
+    from lca.contracts.observability.schemas.envelope_v2_schema import (
+        EnvelopeV2Schema,
+    )
 
     registry = JournalSchemaRegistry()
     registry.register("v2.0.0", EnvelopeV2Schema())
+    install_journal_schema_registry(registry)
     ctx.provide("journal_schemas", registry)

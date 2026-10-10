@@ -55,11 +55,11 @@ from collections.abc import Callable
 from typing import Any
 
 from lca.contracts.observability import EventSpine
-from lca.harness.declarative.compile.instrument.wrap import (
-    _emit_spine_direct,
+from lca.contracts.observability.spine_accessors import (
+    resolve_active_spine as _seam_resolve_active_spine,
 )
 from lca.harness.declarative.compile.instrument.wrap import (
-    resolve_active_spine as _harness_resolve_active_spine,
+    _emit_spine_direct,
 )
 from lca.infrastructure.observability.spine.context.context import SpineContext
 from lca.infrastructure.observability.spine.event.record import Channel
@@ -78,14 +78,14 @@ WRAP_INSTRUMENTED_ATTR = "__lca_instrumented__"
 def resolve_active_spine() -> EventSpine | None:
     """Return the active ``EventSpine``, or ``None`` when unwired.
 
-    Delegates to the harness-side public accessor
-    (:func:`lca.harness.declarative.compile.instrument.accessors.resolve_active_spine`),
+    Delegates to the contracts-side seam accessor
+    (:func:`lca.contracts.observability.spine_accessors.resolve_active_spine`),
     which resolves through the same seam with identical swallow-and-warn
     semantics (probe 0293: three scenarios equivalent). This keeps one
     canonical implementation instead of the racy set/restore readback
     trick it replaces (B-072).
     """
-    return _harness_resolve_active_spine()
+    return _seam_resolve_active_spine()
 
 
 # ── shared emission seam ─────────────────────────────────────────────

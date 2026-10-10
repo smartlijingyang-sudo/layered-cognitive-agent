@@ -13,6 +13,8 @@ from __future__ import annotations
 from lca.contracts.models.observability.journal.journal import JournalEvent, StampedEvent
 from lca.contracts.observability.core.ports import AttributePolicyBackend, JournalBackend
 from lca.contracts.observability.event.descriptor_registry import EventDescriptorRegistry
+from lca.contracts.observability.event.identity import EventIdentityProvider
+from lca.contracts.observability.event.identity_registry import resolve_identity_provider
 from lca.infrastructure.observability.facade.projection.registry import EventProjection
 from lca.infrastructure.observability.journal.engine.engine import RunStore
 
@@ -26,11 +28,15 @@ class MemoryJournal(JournalBackend):
         policy: AttributePolicyBackend | None = None,
         projections: tuple[EventProjection, ...] = (),
         descriptor_registry: EventDescriptorRegistry | None = None,
+        identity_provider: EventIdentityProvider | None = None,
     ) -> None:
         self._store = RunStore(
             policy=policy,
             projections=projections,
             descriptor_registry=descriptor_registry,
+            identity_provider=(
+                identity_provider if identity_provider is not None else resolve_identity_provider()
+            ),
         )
 
     @property
