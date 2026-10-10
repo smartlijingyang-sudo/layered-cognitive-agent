@@ -1720,10 +1720,10 @@
         "No behavior change on real runs; tests covering effect.execute attribution pass; ruff check clean on touched files."
       ],
       "priority": 2,
-      "passes": false,
+      "passes": true,
       "branchName": "raphy/arch-20261010-2345",
-      "notes": "Source: friction walk Area B. Strength: Strong. Deletion test: deleting one probe concentrates the ritual in the seam — earns existence. Constraint: the isinstance(AgentState) gate is load-bearing for legacy fixtures on the fail-loud path. Test survival: tests/nodes/test_effect_execute_batch_attribution.py (172 lines); add a mapping-style runtime ({'state': ...}) resolution case — currently silently None.",
-      "implemented": false,
+      "notes": "Source: friction walk Area B. Strength: Strong. Deletion test: deleting one probe concentrates the ritual in the seam — earns existence. Constraint: the isinstance(AgentState) gate is load-bearing for legacy fixtures on the fail-loud path. Test survival: tests/nodes/test_effect_execute_batch_attribution.py (172 lines); add a mapping-style runtime ({'state': ...}) resolution case — currently silently None. Implemented 2026-10-11: seam gained required: bool (default True); both execute.py probes converged with required=False; 3 new seam tests added; 29 tests green (incl. persist/invoke fail-loud regression).",
+      "implemented": true,
       "dropped": false
     },
     {

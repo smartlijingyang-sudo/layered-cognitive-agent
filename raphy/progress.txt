@@ -1,5 +1,11 @@
 ## Codebase Patterns
 
+- **mapping 式 runtime 是 NodeContext 的类型签名承诺（RA-119 实证）：**
+  `NodeContext.__init__` 把 `runtime` 声明为 `Mapping[str, Any]`，所以
+  attribute-then-`.get` 的 two-shape probe 不是方便写法而是类型契约的
+  履行——评估"手写 getattr 是否多余"时先读 carrier 类型的签名，签名是
+  Mapping 就说明 `.get` 回退本该存在。
+
 - **验证环境必须用干净树（2026-10-10 23:45 轮教训）：** 运行时验证的 prompt
   字面写 `cd ~/layered-cognitive-agent`，但主树脏（agy/grok 未提交改动在干活）
   时必须改在干净 worktree（本轮 main tip）跑——只读执行不算"碰"，但读脏树
@@ -2920,3 +2926,29 @@ Learnings for future iterations:
 - 合并前已核验：main tip 48bf2d6a3 未动；名义分支 tip 仍为 48bf2d6a3（无外来提交）。
 - 下轮 close：只合 -b 分支（git checkout main && git merge --no-ff raphy/arch-20261010-1245-b）；合前重验 main tip 与 -b tip（-b 应为 5d1bf7863 起）；名义分支确认无独有 commits 后 git branch -D；删 worktree ~/.lca-worktrees/raphy-20261010-1245。
 - 风险提示：若并发 lane 在名义分支的 checkout 上 commit 了它的 10 个文件，名义分支将含有外来提交——下轮也只合 -b，名义分支交由其作者自行处理，绝不代合、代删。
+## [2026-10-11 00:20 Asia/Shanghai] - RA-119
+- 实现了什么：`resolve_runtime_state` 加 `required: bool = True`（镜像
+  `resolve_writer`）；`concept/effect/execute.py` 的两处 fail-soft
+  `getattr(context.runtime, "state", None)` 探针（`node_execute` ~125 与
+  `_append_tool_result_surface` ~295）收敛到
+  `resolve_runtime_state(context=context, node="effect.execute", required=False)`；
+  `node_execute` 的 `isinstance(runtime_state, AgentState)` 门与
+  `_append_tool_result_surface` 的 `getattr(state, "step", 0) or 0` 原样保留。
+- 改动文件：`lca/nodes/_resolve.py`（seam + docstring）、
+  `lca/nodes/concept/effect/execute.py`（import + 两处探针）、
+  `tests/nodes/test_effect_execute_batch_attribution.py`（3 个新测试）、
+  `raphy/prd.json`（RA-119 passes=true）。
+- 测试：`tests/nodes/test_effect_execute_batch_attribution.py` +
+  `tests/think/llm/test_persist.py` + `tests/think/llm/test_invoke.py`
+  共 29 passed（`LLM_API_KEY=dummy --no-cov`）；`ruff check` 三文件全过。
+- **Learnings for future iterations:**
+  - `resolve_runtime_state` 的旧 docstring 只有一句话（"Pull state from
+    the whitelisted kernel runtime carrier"），把 fail-loud/fail-soft 的
+    语义写进 docstring 后，调用方不用再读实现就能选对 flag——seam 的
+    docstring 是契约的一部分，不是装饰。
+  - `_dispatch` 里的 `getattr(runtime, "effect_gateway", None)` 仍是
+    attribute-only（dict runtime 会走 RuntimeError），但它是 gateway 能力
+    查找、不是 state 探针，不在 RA-119 范围内——收敛时别顺手扩大 scope。
+  - ruff RUF043：`pytest.raises(..., match="...")` 的模式含元字符时用
+    `excinfo` + `in` 断言代替，更干净。
+---
