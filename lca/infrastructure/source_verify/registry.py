@@ -6,6 +6,7 @@ ProvenanceGuard 的第一原则: 绝不把证据塌缩成一个匿名上下文.
 
 from __future__ import annotations
 
+import re
 from collections.abc import MutableMapping
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -92,9 +93,26 @@ class SourceRegistry:
         return len(self._entries)
 
 
+# `[source:<id>]` wire 格式的单一所有者: 生产(`source_marker`)与解析
+# (`extract_explicit_source_ids`)都从 `_SOURCE_MARKER_TAG` 派生.
+# RA-120: claims 侧曾独立维护 `_EXPLICIT_MARKER` regex, 与生产侧 f-string
+# 各自定义一份格式 (RA-116 prompt markers 同类 drift); 现由生产侧 seam 导出.
+_SOURCE_MARKER_TAG = "source"
+_SOURCE_MARKER_PATTERN = re.compile(rf"\[{re.escape(_SOURCE_MARKER_TAG)}:([^\]]+)\]")
+
+
 def source_marker(source_id: str) -> str:
     """模型可见的工具结果首行标记 —— 模型引用来源时用的稳定 ID."""
-    return f"[source:{source_id}]"
+    return f"[{_SOURCE_MARKER_TAG}:{source_id}]"
+
+
+def extract_explicit_source_ids(text: str) -> tuple[str, ...]:
+    """从文本中按出现顺序提取 `[source:<id>]` 显式标记的 source_id.
+
+    与 :func:`source_marker` 配对的解析 seam; 两侧空白的 strip 语义与
+    既有消费侧保持一致.
+    """
+    return tuple(m.group(1).strip() for m in _SOURCE_MARKER_PATTERN.finditer(text))
 
 
 _SOURCE_REGISTRY_CAPABILITY = "source_registry"

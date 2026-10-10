@@ -2952,3 +2952,29 @@ Learnings for future iterations:
   - ruff RUF043：`pytest.raises(..., match="...")` 的模式含元字符时用
     `excinfo` + `in` 断言代替，更干净。
 ---
+## 2026-10-11 00:21 CST - RA-120
+- 实现: `[source:<id>]` wire 格式收敛到单一 seam. `registry.py` 新增
+  `_SOURCE_MARKER_TAG = "source"` + `_SOURCE_MARKER_PATTERN`(从 tag 派生)
+  + `extract_explicit_source_ids(text)` 解析函数(保序、strip、tuple);
+  `source_marker` 改从 tag 生产, 文本输出与钉住的 `"[source:tool:c1]"`
+  逐字一致. `claims.py` 删除 `_EXPLICIT_MARKER` regex 与 TYPE_CHECKING
+  导入, 改为运行时 import 解析函数(无循环导入: registry 不依赖 claims);
+  `__init__.py` 导出新函数. 新增 round-trip 测试
+  `test_explicit_marker_round_trip_single_seam`(生产→解析→同一 source_id
+  + 宽容空白语义).
+- 改动文件: lca/infrastructure/source_verify/registry.py,
+  lca/infrastructure/source_verify/claims.py,
+  lca/infrastructure/source_verify/__init__.py,
+  tests/infrastructure/source_verify/test_source_verify.py
+- 测试: test_source_verify.py 19 passed(含新 round-trip);
+  tests/cognition/test_delivery_satisfied_gate.py +
+  tests/composer/test_capability_resolution.py 15 passed;
+  ruff check 全过(4 文件). 带 LLM_API_KEY=dummy + --no-cov 跑的.
+- **Learnings for future iterations:**
+  - seam 导出解析函数时, 消费者侧的归一化语义(strip/空值过滤/去重)要落在哪一层:
+    本次把 strip 收入 seam(parse 的一部分), 空值+去重留在 consumer(与 label
+    引用的共享去重逻辑在一起)——seam 只做"忠实解析", 不碰业务去重.
+  - f-string 生产 + regex 解析的配对 seam, regex 必须从字面量常量派生
+    (rf 模板里拼 tag 常量), 而不是再手写一遍 pattern——否则只是把两处字面量
+    搬成一处常量 + 一处 regex, drift 类没消.
+---

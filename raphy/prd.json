@@ -1737,10 +1737,10 @@
         "ruff check clean on touched files."
       ],
       "priority": 2,
-      "passes": false,
+      "passes": true,
       "branchName": "raphy/arch-20261010-2345",
-      "notes": "Source: friction walk Area B (leaky seam). Strength: Strong. Deletion test: deleting the duplicate regex concentrates format knowledge — earns existence. Constraint: wire format is model-visible and pinned by tests; ProvenanceGuard/ADR-0292 honesty semantics unchanged. test_source_verify.py pins format text and extract_citations behavior.",
-      "implemented": false,
+      "notes": "Source: friction walk Area B (leaky seam). Strength: Strong. Deletion test: deleting the duplicate regex concentrates format knowledge — earns existence. Constraint: wire format is model-visible and pinned by tests; ProvenanceGuard/ADR-0292 honesty semantics unchanged. test_source_verify.py pins format text and extract_citations behavior. [done 2026-10-11] registry.py 现为单一 seam 所有者: `_SOURCE_MARKER_TAG` + `_SOURCE_MARKER_PATTERN`, 导出 `source_marker` 与 `extract_explicit_source_ids`; claims.py 删除 `_EXPLICIT_MARKER` 改 import 解析函数; 新增 round-trip 测试 test_explicit_marker_round_trip_single_seam; test_source_verify.py 19 passed, 相关消费者测试 15 passed, ruff clean.",
+      "implemented": true,
       "dropped": false
     },
     {
