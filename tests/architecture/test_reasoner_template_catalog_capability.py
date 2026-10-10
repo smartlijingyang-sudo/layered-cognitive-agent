@@ -4,6 +4,9 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
+from pydantic import ValidationError
+
 from lca.contracts.capabilities import (
     PROMPT_ASSEMBLER,
     PROMPT_TEMPLATE_PROVIDER,
@@ -28,7 +31,10 @@ def test_builtin_provider_has_the_complete_standard_template_set() -> None:
 def test_provider_config_keeps_extra_fields_out() -> None:
     """A misconfigured provider fails closed at Pydantic parse time."""
 
-    ProviderConfig(profile_templates=(), section_overrides={})
+    with pytest.raises(ValidationError):
+        ProviderConfig(  # type: ignore[call-arg]
+            profile_templates=(), section_overrides={}, rogue_field="kept-out"
+        )
 
 
 def test_standard_brain_plugins_require_the_template_provider() -> None:
