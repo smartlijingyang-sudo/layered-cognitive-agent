@@ -434,7 +434,8 @@ def _run_health_probe(host: str, port: int, findings: list[Finding]) -> PhaseRes
     error: str | None = None
     try:
         # NOTE: probe URL scheme is fixed to http://{host}:{port}/health; not user-controlled.
-        with urllib.request.urlopen(url, timeout=2.0) as resp:
+        req = urllib.request.Request(url)  # noqa: S310 -- scheme is audited literal http://
+        with urllib.request.urlopen(req, timeout=2.0) as resp:  # noqa: S310 -- scheme is audited literal http://
             raw = resp.read().decode("utf-8")
             body = cast("dict[str, Any]", json.loads(raw))
     except (urllib.error.URLError, TimeoutError, json.JSONDecodeError, OSError) as exc:

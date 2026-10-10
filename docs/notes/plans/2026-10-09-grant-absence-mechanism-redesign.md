@@ -152,6 +152,22 @@ ADR-0292 §10 的 P3（envelope 富化）在 ADR 中列为 lane 外待办，始�
 
 PR-1 触及的 `tests/contracts/test_adr0292_authorization_semantic_isolation.py`、`tests/intervene/`、`tests/application/runtime/` 的基线在开工前逐条记录，验收只比对失败集增量。
 
+## 实施结果（2026-10-09）
+
+PR-1 与 PR-2 已落地在分支 `fix/grant-absence-hitl-separation`。
+
+| PR | commit | 变更量 | 结果 |
+|---|---|---|---|
+| PR-1 | `6289eb490` | 9 files, +365/−208 | 代码+测试闭环；目标套件 412 passed / 6 skipped / 1 既有失败 |
+| PR-2 | `38ecb9a4c` | 1 file, +13 | ADR-0292 §10 补记，P3 待办关闭 |
+
+验证：`plan compile profiles/web-standard.yaml` 通过；`lint-imports` 通过；
+`check_package_contracts.py` 62 issues（基线同值，无新增）；`audit-plugin-shape`
+无本计划新增 finding；文档四脚本零新增失败。
+
+未做：实时 E2E（LLM 调用 askUserQuestion 触发 `intervene.interrupt`）未在本轮执行，
+因需要内核重启加载改动且 LLM 调用随机；建议合并前用 `lca-ops runs create` 验证。
+
 ## 复盘触发
 
 每个 PR 落地后：

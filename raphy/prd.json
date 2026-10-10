@@ -1596,6 +1596,61 @@
       "passes": true,
       "branchName": "raphy/deslop-100",
       "notes": "Source: DESLOP-100 friction walk, Area D (graph framework). Strength: Worth exploring. Testability gap: 'the interface is the test surface' — phase_of is the interface downstream consumers (NodeEnter/NodeExit facts, graph_timeline) rely on, yet its vocabulary is untested against real inputs. Constraint: do not change phase_of semantics without evidence; the test may reveal legitimate unknowns (e.g. 'stop'/'terminal' handling) — record them in the keep-list."
+    },
+    {
+      "id": "RA-110",
+      "title": "Resolve explicit binary paths in host_probing and eliminate S603/S607/S110 linter slop",
+      "acceptanceCriteria": [
+        "shutil.which used for command binary resolution in host_probing.py",
+        "S110 bare exception caught with named types and debug logging",
+        "restart_report.py urllib open verified with scheme check",
+        "ruff check lca/infrastructure/cli/ passes with 0 errors"
+      ],
+      "passes": true,
+      "notes": "Eliminated S603/S607/S110 linter issues via resolve_probe_cmd and audited requests. 292 CLI tests pass."
+    },
+    {
+      "id": "RA-111",
+      "title": "Align lca.contracts.mechanisms exports with L1/L2 package contracts specification",
+      "acceptanceCriteria": [
+        "All 19 legal exports declared in lca/contracts/README.md section 9",
+        "python3 scripts/check_package_contracts.py has 0 errors for lca.contracts.mechanisms",
+        "pytest tests/contracts/ passes 100%"
+      ],
+      "passes": true,
+      "notes": "Aligned lca/contracts/mechanisms README Section 9 with all 21 __all__ symbols. 978 contracts tests pass."
+    },
+    {
+      "id": "RA-112",
+      "title": "Converge observability package contract exports and align README SSOT",
+      "acceptanceCriteria": [
+        "lca.infrastructure.observability exports documented in Section 9",
+        "check_package_contracts.py has 0 errors for lca.infrastructure.observability",
+        "pytest tests/infrastructure/observability/ passes 100%"
+      ],
+      "passes": true,
+      "notes": "Aligned lca/infrastructure/observability README Section 9 with all 130 __all__ symbols. 75 observability tests pass."
+    },
+    {
+      "id": "RA-113",
+      "title": "Enforce fail-loud semantics across capability seams and eliminate silent none returns",
+      "acceptanceCriteria": [
+        "Capability seam raises named exception instead of silent None/empty return on missing grant",
+        "pytest tests/contracts/ passes 100%"
+      ],
+      "passes": true,
+      "notes": "Enforced fail-loud check in consume() on None provider, preventing silent empty seam injection. 980 contracts tests pass."
+    },
+    {
+      "id": "RA-114",
+      "title": "Real deletion tests, verify zero cycles on late imports, and regression suite check",
+      "acceptanceCriteria": [
+        "python -c import tests pass in forward and reverse order with 0 cycles",
+        "ruff check passes cleanly",
+        "git diff --check passes cleanly"
+      ],
+      "passes": true,
+      "notes": "Verified forward/reverse/agent-first acyclic imports, ruff clean, git diff clean, full suite 9 passed."
     }
   ]
 }

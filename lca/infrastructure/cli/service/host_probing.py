@@ -11,15 +11,36 @@ Split out of ``service.py`` (RA-083): the Service Protocol surface
 without the host-probing machinery.
 """
 
+from __future__ import annotations
+
 import contextlib
+import json
+import logging
+import os
+import re
+import shutil
+import subprocess
+
+logger = logging.getLogger(__name__)
+
+
+def resolve_probe_cmd(name: str) -> str:
+    """Resolve an executable name to its absolute binary path on host."""
+    path = shutil.which(name)
+    if path:
+        return path
+    for prefix in ("/usr/bin", "/bin", "/usr/sbin", "/sbin"):
+        candidate = f"{prefix}/{name}"
+        if os.path.exists(candidate):
+            return candidate
+    return name
+
 
 # ── Process management primitives ─────────────────────────────────────
 
 
 def kill_tree(pid: int, sig: int = 15) -> None:
     """Kill a process and all its descendants."""
-    import os
-
     if pid <= 0:
         return
 
@@ -30,10 +51,9 @@ def kill_tree(pid: int, sig: int = 15) -> None:
 
     # Kill children first (depth-first)
     try:
-        import subprocess
-
-        children = subprocess.run(
-            ["pgrep", "-P", str(pid)],
+        pgrep = resolve_probe_cmd("pgrep")
+        children = subprocess.run(  # noqa: S603 -- argv fixed with internal pid
+            [pgrep, "-P", str(pid)],
             capture_output=True,
             text=True,
             timeout=5,
@@ -41,9 +61,9 @@ def kill_tree(pid: int, sig: int = 15) -> None:
         for child_pid in children.stdout.strip().split("\n"):
             if child_pid.strip():
                 kill_tree(int(child_pid.strip()), sig)
-    except Exception:
+    except Exception as exc:
         # INTENTIONAL: kill_tree 在 subprocess 不在时抛;视为 cleanup 已完成。
-        pass
+        logger.debug("kill_tree child scan ignored error: %s", exc)
 
     with contextlib.suppress(ProcessLookupError):
         os.kill(pid, sig)
@@ -51,11 +71,10 @@ def kill_tree(pid: int, sig: int = 15) -> None:
 
 def free_port(port: int) -> None:
     """Release a port from any holder."""
-    import subprocess
-
+    fuser = resolve_probe_cmd("fuser")
     with contextlib.suppress(Exception):
-        subprocess.run(
-            ["fuser", "-k", f"{port}/tcp"],
+        subprocess.run(  # noqa: S603 -- port is typed int
+            [fuser, "-k", f"{port}/tcp"],
             capture_output=True,
             timeout=5,
         )
@@ -63,8 +82,6 @@ def free_port(port: int) -> None:
 
 def pid_alive(pid: int) -> bool:
     """Check if a PID is alive."""
-    import os
-
     if pid <= 0:
         return False
     try:
@@ -82,12 +99,10 @@ def pid_on_port(port: int) -> int | None:
     Prefer ``lsof`` / ``ss``. ``fuser`` is not used: it prints stray PIDs
     that are not bound to the port, which made the Vite sidecar look up.
     """
-    import re
-    import subprocess
-
+    lsof = resolve_probe_cmd("lsof")
     try:
-        result = subprocess.run(
-            ["lsof", "-ti", f"tcp:{port}"],
+        result = subprocess.run(  # noqa: S603 -- port is typed int
+            [lsof, "-ti", f"tcp:{port}"],
             capture_output=True,
             text=True,
             timeout=5,
@@ -100,9 +115,10 @@ def pid_on_port(port: int) -> int | None:
         # caller 视为"无 holder",走下一种释放策略。
         pass
 
+    ss = resolve_probe_cmd("ss")
     try:
-        result = subprocess.run(
-            ["ss", "-tlnp"],
+        result = subprocess.run(  # noqa: S603 -- constant argv
+            [ss, "-tlnp"],
             capture_output=True,
             text=True,
             timeout=5,
@@ -128,12 +144,10 @@ def pid_on_listening_port(port: int) -> int | None:
     outbound connection to the dev server never looks like the port is still
     occupied. Used when waiting for a port to be released after a kill.
     """
-    import re
-    import subprocess
-
+    ss = resolve_probe_cmd("ss")
     try:
-        result = subprocess.run(
-            ["ss", "-tlnp"],
+        result = subprocess.run(  # noqa: S603 -- constant argv
+            [ss, "-tlnp"],
             capture_output=True,
             text=True,
             timeout=5,
@@ -157,12 +171,11 @@ def http_ready(url: str, timeout: float = 2.0) -> bool:
     4xx/5xx means the listener answered but is not ready — e.g. ``/health``
     returning 500 must not report ``kernel_serve`` as healthy.
     """
-    import subprocess
-
+    curl = resolve_probe_cmd("curl")
     try:
-        r = subprocess.run(
+        r = subprocess.run(  # noqa: S603 -- internal probe url with timeout
             [
-                "curl",
+                curl,
                 "--noproxy",
                 "*",
                 "-sS",
@@ -196,12 +209,11 @@ def http_code(url: str, timeout: float = 2.0) -> int:
     the LobeHub route-integrity probe: ``/signin`` answering a redirect means
     the dev route table collapsed, which ``http_ready`` would miss).
     """
-    import subprocess
-
+    curl = resolve_probe_cmd("curl")
     try:
-        r = subprocess.run(
+        r = subprocess.run(  # noqa: S603 -- internal probe url with timeout
             [
-                "curl",
+                curl,
                 "--noproxy",
                 "*",
                 "-sS",
@@ -237,13 +249,11 @@ def health_body_ok(url: str, timeout: float = 2.0) -> bool:
     original ``http_ready`` retains its 2xx/3xx semantics for non-health
     probes.
     """
-    import json
-    import subprocess
-
+    curl = resolve_probe_cmd("curl")
     try:
-        r = subprocess.run(
+        r = subprocess.run(  # noqa: S603 -- internal probe url with timeout
             [
-                "curl",
+                curl,
                 "-sS",
                 "--max-time",
                 str(timeout),

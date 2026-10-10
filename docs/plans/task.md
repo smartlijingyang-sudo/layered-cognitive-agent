@@ -622,3 +622,15 @@
 | ARCH-R10-INFRA-FILE-STORE | Round 10 - Infrastructure File / Attachment / Storage Roots 单向依赖与无用抽象清理 | Pending | 待执行 |
 | ARCH-R11-HARNESS-PROFILE | Round 11 - Harness Activation & Profile Resolution 声明式解析与 DAG 验证深度聚合 | Pending | 待执行 |
 | ARCH-R12-CONVERGENCE-AUDIT | Round 12 - 全系统架构不变量终审、契约门禁全量回归与架构基准对齐 | Pending | 待执行 |
+| BRAINSTORM-DESLOP-100-CONTEXT | 深度梳理代码库与文档 Slop 现状、Raphy 100 轮历史与架构优化热点 | Completed | 已深度梳理 ADR-0293 raphy 100 stories (RA-001~RA-100 已达标，worktree 拓展至 RA-103)、88 处 verify_doc_slop 命中、check_package_contracts 62 项偏差及 ruff/contracts 边界 |
+| BRAINSTORM-DESLOP-100-QUESTIONS | 澄清「100次真实优化与去冗」的具体目标、执行载体与边界（单步提问） | Completed | 用户明确选定：基于 ADR-0293 与 improve-codebase-architecture 开启全新一轮 Raphy 架构加深与去冗循环，派生高质量真实优化故事集并单流交付 |
+| BRAINSTORM-DESLOP-100-APPROACHES | 提出 2-3 种大规模去冗与深度优化实施方案及权衡对比 | Completed | 用户明确确认选定方案 A（波次渐进 Raphy 循环，Batch-Wave Loop，每波 5~10 stories 动态评估与落地） |
+| BRAINSTORM-DESLOP-100-DESIGN-SECTIONS | 逐步呈现分节架构规范（边界/治理清单/执行流水线/测试不变量）并呈批 | Completed | §1 边界与自治、§2 核心架构模型与流水线时序、§3 不变量断言与测试矩阵全部获用户批准通过 |
+| BRAINSTORM-DESLOP-100-DESIGN-DOC | 沉淀去冗与架构优化设计文档至 docs/plans/ 并提交 git | Completed | 成功落盘 docs/plans/2026-10-10-raphy-100-deslop-and-optimization-design.md 并提交 git |
+| BRAINSTORM-DESLOP-100-TRANSITION | 转换至实施计划制定（调用 writing-plans 规划单流落地） | Completed | 成功落盘实施方案 docs/plans/2026-10-10-raphy-100-deslop-and-optimization-plan.md 并完成 Wave 1 任务分解 |
+| RAPHY-WAVE1-HARNESS | 波次驱动与状态机接缝初始化 (`scripts/run_raphy_wave.py`) | Completed | 成功落地 scripts/run_raphy_wave.py 与 test_run_raphy_wave.py (3/3 通过)，在 raphy/prd.json 播种 Wave 1 五大故事 (RA-104~RA-108) |
+| RA-104-HOST-PROBING | [RA-104] 收敛 host_probing.py 显式路径解析，消除 16 处 S603/S607/S110 linter 坏味道 | Completed | 落地 resolve_probe_cmd 显式解析主机二进制路径，消除 S603/S607/S110 告警，292 项 CLI 测试 100% 全绿，commit 5175347ca |
+| RA-105-CONTRACTS-ALIGNMENT | [RA-105] 治理 lca.contracts.mechanisms 导出与 L1/L2 声明偏差 | Completed | 对齐 README.md 第 9 段公共入口与 __all__ 21 项符号，check_package_contracts 0 报错，978 项 contracts 单测全绿，commit efe35692b |
+| RA-106-OBSERVABILITY-EXPORTS | [RA-106] 治理 lca.infrastructure.observability 契约接口与 README 导出偏差 | Completed | 对齐 README.md 第 9 段公共入口与 __all__ 全部 130 项符号，check_package_contracts 0 报错，75 项单测全绿，commit ba11028f6 |
+| RA-107-FAIL-LOUD-SEAM | [RA-107] 接缝显式 Fail-Loud 加固与隐式 None/降级清除 | Completed | 在 consume() 组合期接缝处断言 None provider 即刻抛出 ValueError，阻止静默空接缝，980 项契约测试全绿，commit a0f547f91 |
+| RA-108-DELETION-TEST-VERIFY | [RA-108] 真实删除测试与双向循环导入体检，全链路回归与 Wave 1 归档 | Completed | 验证三向动态导入 0 循环、ruff check 0 报错、git diff 干净，Wave 1 全部 5 个 Story (RA-104~RA-108) 100% 达成，progress.txt 经验沉淀闭环 |

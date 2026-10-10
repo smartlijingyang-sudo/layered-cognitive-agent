@@ -44,14 +44,22 @@ Dispatch contract (PR-0199-P1-10):
 from __future__ import annotations
 
 import secrets
+from pathlib import Path
 from typing import TYPE_CHECKING, Protocol, runtime_checkable
 
 from lca.application.runtime.plan_resolution import PlanResolutionService
 from lca.contracts.runtime.activation import SessionActivation
 from lca.contracts.runtime.facade import RunHandle, RuntimeFacade
 from lca.contracts.runtime.intent import RunIntent
-from lca.contracts.runtime.trust import EMPTY_TRUST_ENVELOPE, trust_envelope_scope
+from lca.contracts.runtime.trust import (
+    RULE_DEFAULTS,
+    PluginOrigin,
+    TrustEnvelope,
+    trust_envelope_scope,
+)
 from lca.harness.runtime.activation_ref import compute_activation_ref
+from lca.infrastructure.assistant.io import load_grants
+from lca.infrastructure.path.locator import get_lca_home
 
 if TYPE_CHECKING:
     from lca.application.runtime.plan_resolution import PlanResolutionResult
@@ -75,6 +83,49 @@ def _new_session_id() -> str:
     ``RunIntent.session_id`` skip the RNG entirely.
     """
     return f"{_SESSION_ID_PREFIX}{secrets.token_hex(_SESSION_ID_BYTES)}"
+
+
+def _assistant_home(assistant_id: str) -> Path | None:
+    """Resolve ``{lca_home}/assistants/{assistant_id}``; None when unbound."""
+    if not assistant_id:
+        return None
+    return get_lca_home() / "assistants" / assistant_id
+
+
+def _assistant_grants(assistant_id: str) -> frozenset[str]:
+    """Read the assistant's ``grants.yaml`` grant set (ADR-0242 D13)."""
+    home = _assistant_home(assistant_id)
+    if home is None:
+        return frozenset()
+    return load_grants(home)
+
+
+def _plugin_origins(result: PlanResolutionResult, profile_path: str) -> tuple[PluginOrigin, ...]:
+    """Build envelope origins from the resolved profile's plugin specs.
+
+    ``PluginSpec`` 不携带 source/trust（``PluginOrigin`` 的审计字段），统一按
+    bundled/core 记录。origins 只用于审计闭包，不参与 ``grants()`` 判定。
+    非 tuple（测试桩 / 未编译计划）时回退到单一 profile origin。
+    """
+    specs = getattr(result.compiled_plan, "plugin_specs", None)
+    if not isinstance(specs, tuple) or not specs:
+        return (
+            PluginOrigin(
+                source="bundled",
+                trust="core",
+                enabled_by=profile_path,
+                discovered_at="resolve_activation",
+            ),
+        )
+    return tuple(
+        PluginOrigin(
+            source="bundled",
+            trust="core",
+            enabled_by=profile_path,
+            discovered_at="resolve_activation",
+        )
+        for _ in specs
+    )
 
 
 @runtime_checkable
@@ -157,11 +208,10 @@ class DefaultRuntimeFacade(RuntimeFacade):
              sha256 per C8.
           4. Return ``SessionActivation(activation_ref=..., plan_ref=...,
              graph_ref=..., plugin_set_ref=..., profile_path=...,
-             session_id=..., trust_envelope=EMPTY_TRUST_ENVELOPE,
-             compiled_plan=plan)``.
+             session_id=..., trust_envelope=<真实 grant 集>, compiled_plan=plan)``.
 
-        The trust envelope starts empty. P3 enriches it with
-        ``PluginOrigin`` + granted privileges — out of scope for P1-09.
+        The trust envelope carries the assistant's grants plus rule defaults
+        (ADR-0292 §10 P3): ``load_grants(home) | RULE_DEFAULTS``.
         """
         session_id = intent.session_id or _new_session_id()
 
@@ -188,9 +238,23 @@ class DefaultRuntimeFacade(RuntimeFacade):
             plugin_set_ref=result.plugin_set_ref,
             profile_path=str(intent.profile_path),
             session_id=session_id,
-            trust_envelope=EMPTY_TRUST_ENVELOPE,
+            trust_envelope=self._build_trust_envelope(intent, result),
             compiled_plan=result.compiled_plan,
         )
+
+    def _build_trust_envelope(
+        self, intent: RunIntent, result: PlanResolutionResult
+    ) -> TrustEnvelope:
+        """ADR-0292 §10 P3: 构造带真实 grant 的 TrustEnvelope。
+
+        ``granted_privileges = assistant grants.yaml ∪ RULE_DEFAULTS``；
+        ``origins`` 取 resolved profile 的插件集（PluginSpec 不携带
+        source/trust，统一按 bundled/core 记录）。origins 只用于审计闭包，
+        不参与 ``grants()`` 判定。
+        """
+        granted = _assistant_grants(intent.assistant_id) | RULE_DEFAULTS
+        origins = _plugin_origins(result, str(intent.profile_path))
+        return TrustEnvelope(origins=origins, granted_privileges=granted)
 
     # ── Dispatch surface (P1-10) ───────────────────────────────────────
 

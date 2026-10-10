@@ -28,6 +28,7 @@ from typing import Literal, Self, cast
 
 __all__ = (
     "EMPTY_TRUST_ENVELOPE",
+    "RULE_DEFAULTS",
     "PluginOrigin",
     "PluginSource",
     "PluginTrustLevel",
@@ -53,6 +54,18 @@ PluginTrustLevel = Literal["core", "trusted", "untrusted"]
 - ``trusted`` — operator-vetted source; may opt in via profile.
 - ``untrusted`` — default for ``project`` and ``pip``; must be explicitly
   enabled in a profile and fail-closed on privilege escalation (I-HPC-11).
+"""
+
+RULE_DEFAULTS: frozenset[str] = frozenset({"platform.basic", "hitl.interact"})
+"""规则默认 grant 集（ADR-0292 C2「用户显式授权 + 规则默认」）。
+
+- ``platform.basic`` — 平台基础工具的占位 grant；grant-agnostic 工具不受
+  运行时授权检查约束，该条目保证 envelope 非空校验通过。
+- ``hitl.interact`` — HITL 交互工具（askUserQuestion / request_box_help）
+  的规则默认 grant；它们是审批通道本身，不是需要用户显式授权的副作用。
+
+``resolve_activation`` 构造真实 envelope 时把 ``load_grants(home)`` 的
+assistant grants 与 ``RULE_DEFAULTS`` 合并（见 ADR-0292 §10 P3）。
 """
 
 _CORE_ONLY_SOURCES: frozenset[str] = frozenset({"bundled"})

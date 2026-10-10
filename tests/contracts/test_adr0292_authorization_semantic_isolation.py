@@ -49,7 +49,6 @@ from lca.cognition.body.emit.observation_surface import observation_content
 from lca.contracts.atoms.ids.ids import new_id
 from lca.contracts.models.core.execution import decision as _decision_module
 from lca.contracts.models.core.execution import external_content as _external_content_module
-from lca.contracts.models.core.execution.approval import ApprovalRequirement
 from lca.contracts.models.core.execution.decision import (
     Decision,
     Observation,
@@ -381,6 +380,20 @@ def _s9_privilege_tool_calls() -> list[ToolCall]:
     ]
 
 
+class _StubGrantTool:
+    """A minimal ``Tool``-like object declaring a required grant."""
+
+    name = "shell.exec"
+    required_grant = "shell.exec"
+
+
+class _GrantToolRegistry:
+    """Per-run ToolsService stub: only ``shell.exec`` is present."""
+
+    def get(self, name: str):
+        return _StubGrantTool() if name == "shell.exec" else None
+
+
 def test_s9_decision_carries_content_origin_field() -> None:
     """ADR-0292 §9-①: Decision gains optional content_origin (+ trigger-text ref).
 
@@ -418,11 +431,11 @@ def test_s9_decision_carries_content_origin_field() -> None:
 
 
 @pytest.mark.asyncio
-async def test_s10_approve_gate_refuses_privilege_without_grant() -> None:
-    """ADR-0292 §10 T1: act.approve.gate refuses a privileged action when the
-    ambient TrustEnvelope lacks the grant — terminal.commit, never act.envelope.
+async def test_s10_authorize_refuses_privilege_without_grant() -> None:
+    """ADR-0292 §10 T1: act.authorize refuses a privileged action when the
+    ambient TrustEnvelope lacks the grant — grant_refused → terminal.commit.
     Fail-closed: no envelope bound at all also refuses (§10 allowlist)."""
-    from lca.nodes.intervene.approve_gate import ApproveGateExecutor
+    from lca.nodes.act.authorize.authorize import ActAuthorizeExecutor
 
     assert get_current_trust_envelope() is None  # no envelope bound in test
     decision = Decision(
@@ -433,24 +446,22 @@ async def test_s10_approve_gate_refuses_privilege_without_grant() -> None:
         needs_approval=True,
         tool_calls=_s9_privilege_tool_calls(),  # tool_name="shell.exec"
     )
-    # Privileged = the approval policies flagged it (authoritative signal).
-    req = ApprovalRequirement(required=True)
-    executor = ApproveGateExecutor()
+    executor = ActAuthorizeExecutor()
     output = await executor.node_execute(
         NodeContext(runtime={}, budget={}, metadata={}),
-        NodeInput(port_values={"decision": decision, "approval_requirement": req}),
+        NodeInput(port_values={"decision": decision, "tools": _GrantToolRegistry()}),
     )
-    routing = output.port_values["approval_routing"]
+    routing = output.port_values["grant_routing"]
     assert routing.next_node == "terminal.commit"
-    assert routing.next_hint is not None and "reject" in routing.next_hint
+    assert routing.next_hint == "grant_refused"
 
 
 @pytest.mark.asyncio
-async def test_s10_approve_gate_passes_privilege_with_grant() -> None:
+async def test_s10_authorize_passes_privilege_with_grant() -> None:
     """Control for §10 T1: a privileged action WITH the grant in the ambient
-    TrustEnvelope is NOT refused by the grant gate — it proceeds to normal
+    TrustEnvelope is NOT refused by the grant check — it proceeds to normal
     approval routing (needs_approval + no command → intervene.interrupt)."""
-    from lca.nodes.intervene.approve_gate import ApproveGateExecutor
+    from lca.nodes.act.authorize.authorize import ActAuthorizeExecutor
 
     envelope = TrustEnvelope(
         origins=(
@@ -471,28 +482,25 @@ async def test_s10_approve_gate_passes_privilege_with_grant() -> None:
         needs_approval=True,
         tool_calls=_s9_privilege_tool_calls(),
     )
-    req = ApprovalRequirement(required=True)
-    executor = ApproveGateExecutor()
+    executor = ActAuthorizeExecutor()
     with trust_envelope_scope(envelope):
         assert get_current_trust_envelope() is envelope
         output = await executor.node_execute(
             NodeContext(runtime={}, budget={}, metadata={}),
-            NodeInput(port_values={"decision": decision, "approval_requirement": req}),
+            NodeInput(port_values={"decision": decision, "tools": _GrantToolRegistry()}),
         )
     assert get_current_trust_envelope() is None  # scope resets
-    routing = output.port_values["approval_routing"]
-    assert routing.next_node == "intervene.interrupt"
-    assert routing.next_hint == "approve_interrupt"
+    routing = output.port_values["grant_routing"]
+    assert routing.next_hint is None  # 无授权拒绝
 
 
 @pytest.mark.asyncio
-async def test_s10_approve_gate_refuses_hallucinated_authorization() -> None:
-    """ADR-0292 §10 (§10 'hallucinated authorization'): a model that claims
-    authorization and skips needs_approval is still refused when the approval
-    policies flag its tool calls (approval_requirement.required) and the
-    ambient TrustEnvelope lacks the grant. Source-independent: no
-    content_origin needed for the refusal."""
-    from lca.nodes.intervene.approve_gate import ApproveGateExecutor
+async def test_s10_authorize_refuses_hallucinated_authorization() -> None:
+    """ADR-0292 §10 ('hallucinated authorization'): a model that claims
+    authorization and skips needs_approval is still refused when its tool
+    call requires a grant absent from the ambient TrustEnvelope.
+    Source-independent: no content_origin needed for the refusal."""
+    from lca.nodes.act.authorize.authorize import ActAuthorizeExecutor
 
     decision = Decision(
         decision_id="dec_s10_gate_003",
@@ -502,22 +510,52 @@ async def test_s10_approve_gate_refuses_hallucinated_authorization() -> None:
         needs_approval=False,  # model does not request approval
         tool_calls=_s9_privilege_tool_calls(),
     )
-    # The approval policies flag the dangerous tool call even though the
-    # model did not set needs_approval.
-    req = ApprovalRequirement(required=True)
-    executor = ApproveGateExecutor()
+    executor = ActAuthorizeExecutor()
     output = await executor.node_execute(
         NodeContext(runtime={}, budget={}, metadata={}),
         NodeInput(
             port_values={
                 "decision": decision,
-                "approval_requirement": req,
+                "tools": _GrantToolRegistry(),
             }
         ),
     )
-    routing = output.port_values["approval_routing"]
+    routing = output.port_values["grant_routing"]
     assert routing.next_node == "terminal.commit"
-    assert routing.next_hint is not None and "reject" in routing.next_hint
+    assert routing.next_hint == "grant_refused"
+
+
+@pytest.mark.asyncio
+async def test_s10_authorize_passes_grant_agnostic_tool() -> None:
+    """ADR-0292 §10 P3 + 平台基础能力：grant-agnostic 工具（如 askUserQuestion）
+    不声明 required_grant，即使 envelope 未绑定也通过授权检查（无拒绝）。"""
+    from lca.nodes.act.authorize.authorize import ActAuthorizeExecutor
+
+    assert get_current_trust_envelope() is None  # no envelope bound in test
+
+    class _AskTool:
+        name = "askUserQuestion"
+        required_grant = ""
+
+    class _AskRegistry:
+        def get(self, name: str):
+            return _AskTool() if name == "askUserQuestion" else None
+
+    decision = Decision(
+        decision_id="dec_s10_gate_004",
+        action_type="use_tool",
+        rationale="ask the user a clarifying question",
+        confidence=1.0,
+        needs_approval=True,
+        tool_calls=[ToolCall(call_id="tc_ask", tool_name="askUserQuestion", arguments={})],
+    )
+    executor = ActAuthorizeExecutor()
+    output = await executor.node_execute(
+        NodeContext(runtime={}, budget={}, metadata={}),
+        NodeInput(port_values={"decision": decision, "tools": _AskRegistry()}),
+    )
+    routing = output.port_values["grant_routing"]
+    assert routing.next_hint is None  # 无授权拒绝
 
 
 def test_s9_standing_write_refused_for_external_ambient_decision() -> None:
