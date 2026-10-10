@@ -126,7 +126,9 @@ class EffectExecuteExecutor:
                 state = runtime_state
 
         receipt, observation, dispatch_error = await _dispatch(envelope, context, decision, state)
-        _append_tool_result_surface(context, envelope, receipt, observation, dispatch_error)
+        _append_tool_result_surface(
+            context, envelope, receipt, observation, dispatch_error, decision=decision
+        )
         return NodeOutput(port_values={PortName("receipts"): [receipt]})
 
 
@@ -203,6 +205,7 @@ def _owed_rows(
     receipt: EffectReceipt,
     observation: Observation | None,
     dispatch_error: str | None,
+    decision: Decision | None = None,
 ) -> tuple[_ToolResultRow, ...]:
     """Resolve every ``surface/tool_result`` row this dispatch owes the model.
 
@@ -213,14 +216,41 @@ def _owed_rows(
     effect was not a tool call (``memory.update`` returns a dict receipt
     and no Observation), so nothing model-visible is owed.
     """
-    rows = _batch_rows(observation)
+    rows = list(_batch_rows(observation))
     if rows:
-        return rows
+        # If the batch observation is partial and missing some declared tool_calls,
+        # fill in the missing calls so every declared call_id receives a response.
+        if decision is not None and decision.tool_calls:
+            covered_call_ids = {r.call_id for r in rows}
+            for tc in decision.tool_calls:
+                if tc.call_id not in covered_call_ids:
+                    rows.append(
+                        _ToolResultRow(
+                            call_id=str(tc.call_id),
+                            observation=None,
+                            dispatch_error=dispatch_error
+                            or f"batch call {tc.tool_name} missing result",
+                        )
+                    )
+        return tuple(rows)
+
     # RA-033: metadata 契约经 ToolsEnvelopeMeta 类型化 seam 读取 —— 不再手写
     # metadata["tool_call_id"] / metadata["effect_class"] 字符串 key。
     meta = tools_meta_of(envelope)
     if meta.effect_class != "tools":
         return ()
+
+    # If dispatch raised and decision declared calls: every declared call owes an error row.
+    if dispatch_error is not None and decision is not None and decision.tool_calls:
+        return tuple(
+            _ToolResultRow(
+                call_id=str(tc.call_id),
+                observation=None,
+                dispatch_error=dispatch_error,
+            )
+            for tc in decision.tool_calls
+        )
+
     call_id = meta.tool_call_id or getattr(observation, "tool_call_id", None)
     if call_id:
         return (_ToolResultRow(str(call_id), observation, dispatch_error),)
@@ -257,6 +287,7 @@ def _append_tool_result_surface(
     receipt: EffectReceipt,
     observation: Observation | None,
     dispatch_error: str | None,
+    decision: Decision | None = None,
 ) -> None:
     """Append one ``surface/tool_result`` per executed call id.
 
@@ -266,7 +297,7 @@ def _append_tool_result_surface(
     failures stay best-effort (the side effect already happened and must
     not be rolled back); attribution failures raise instead.
     """
-    rows = _owed_rows(envelope, receipt, observation, dispatch_error)
+    rows = _owed_rows(envelope, receipt, observation, dispatch_error, decision=decision)
     if not rows:
         return
     writer = _resolve_writer(context)
