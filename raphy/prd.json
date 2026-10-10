@@ -1755,10 +1755,10 @@
         "ruff check clean on touched files."
       ],
       "priority": 3,
-      "passes": false,
+      "passes": true,
       "branchName": "raphy/arch-20261010-2345",
       "notes": "Source: friction walk Area A (testability/validation gap). Strength: Worth exploring. Deletion test: concentrates the scattered str(... or '') defaults into one explicit contract — earns existence. Real silent-degradation path; no observed failure yet, hence not Strong.",
-      "implemented": false,
+      "implemented": true,
       "dropped": false
     },
     {

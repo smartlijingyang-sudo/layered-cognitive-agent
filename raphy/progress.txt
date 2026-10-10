@@ -1,5 +1,13 @@
 ## Codebase Patterns
 
+- **resume_point 校验复用 fail-closed 的 deserialize（RA-121 实证）：**
+  `deserialize_resume_point` 对任何非法字段直接 raise，所以 bundle 校验
+  不必手写字段检查——`validate_bundle` 只需 try/except 包一层即得"不可解析"
+  拒绝语义。共享 seam 选的是**落盘 dict 校验**而非 session 属性守卫
+  （write 侧既有 locator/approval_request/snapshot 属性守卫是另一类守卫），
+  write 侧用法是 post-build 最后把关（best-effort skip，不 raise）。
+
+
 - **mapping 式 runtime 是 NodeContext 的类型签名承诺（RA-119 实证）：**
   `NodeContext.__init__` 把 `runtime` 声明为 `Mapping[str, Any]`，所以
   attribute-then-`.get` 的 two-shape probe 不是方便写法而是类型契约的
@@ -2977,4 +2985,34 @@ Learnings for future iterations:
   - f-string 生产 + regex 解析的配对 seam, regex 必须从字面量常量派生
     (rf 模板里拼 tag 常量), 而不是再手写一遍 pattern——否则只是把两处字面量
     搬成一处常量 + 一处 regex, drift 类没消.
+---
+## 2026-10-11 00:35 (Asia/Shanghai) - RA-121
+- What was implemented: shared `validate_bundle(data, run_id) -> dict | None`
+  seam in `lca/plugins/transport/webserver/carrier/runs/recovery.py`, used by
+  `load_resume_bundle` and as a best-effort pre-write guard by
+  `write_resume_bundle`. Rejects: non-dict JSON, missing/ill-typed
+  `approval_request`, missing/empty `approval_id`, missing/unparseable
+  `resume_point` (validated by reusing fail-closed `deserialize_resume_point`
+  instead of hand-checking fields). Corrupt bundle -> `load` returns `None`
+  with a `resume_bundle_rejected` warning -> handler's existing "run not found"
+  404 path (`_run_is_recoverable` / `restore_waiting_run`). Write side never
+  raises (`resume_bundle_invalid_skip` warning on the pause path).
+- Files changed:
+  - `lca/plugins/transport/webserver/carrier/runs/recovery.py`
+    (new `validate_bundle` seam, `__all__` updated)
+  - `tests/plugins/transport/webserver/test_run_restart_recovery.py`
+    (7 new parametrized corrupt-bundle cases; `test_restore_waiting_run_reuses_existing_session`
+    fixture now writes a real bundle via `write_resume_bundle` -- the old
+    hand-written `{schema, run_id}` dict is corrupt under the new contract)
+- Tests: `test_run_restart_recovery.py` 13 passed (6 existing + 7 new);
+  neighbors `test_resume_run_id_binding.py` + `tests/plugins/transport/webserver/carrier`
+  11 passed; `ruff check` clean on both touched files.
+- **Learnings for future iterations:**
+  - Existing test fixtures can encode the OLD contract: the reuse test's
+    minimal bundle passed the old `run_id`-only check but is corrupt under
+    the new load contract. Fixing the fixture to write a real bundle is more
+    honest than relaxing the new validation.
+  - A fail-closed deserializer (`deserialize_resume_point`) is itself a
+    validation primitive: wrap it in try/except and you get the "unparseable"
+    rejection for free, no hand-rolled field checks.
 ---

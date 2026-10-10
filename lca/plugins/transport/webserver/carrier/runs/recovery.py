@@ -99,6 +99,14 @@ def write_resume_bundle(session: RunSession) -> None:
         "resume_point": resume_point,
         "started_at": session.started_at,
     }
+    if validate_bundle(bundle, session.run_id) is None:
+        # The write side stays best-effort: a malformed bundle is skipped,
+        # never raised, on the pause path.
+        _log.warning(
+            "resume_bundle_invalid_skip",
+            run_id=session.run_id,
+        )
+        return
     try:
         run_dir = locator.run_dir(session.run_id)
         run_dir.mkdir(parents=True, exist_ok=True)
@@ -114,8 +122,47 @@ def write_resume_bundle(session: RunSession) -> None:
         )
 
 
+def validate_bundle(data: Any, run_id: str) -> dict[str, Any] | None:
+    """Check a parsed resume bundle against the load contract.
+
+    The load seam is the one place that decides what a resume bundle must
+    contain: a non-dict JSON body, an ill-typed ``approval_request``, a
+    missing ``approval_id``, or an unparseable ``resume_point`` all mean the
+    bundle can never rebuild a real ``WAITING_INPUT`` session, so they are
+    rejected here instead of degrading into a zombie session with silent
+    ``str(... or "")`` defaults downstream.
+
+    Returns the bundle when valid, ``None`` when corrupt.  ``None`` keeps
+    mapping to the handler's existing "run not found" 404 path
+    (``_run_is_recoverable`` / ``restore_waiting_run``).
+    """
+    if not isinstance(data, dict) or data.get("run_id") != run_id:
+        return None
+    approval_request = data.get("approval_request")
+    if not isinstance(approval_request, dict):
+        return None
+    if not isinstance(approval_request.get("approval_id"), str) or not approval_request["approval_id"]:
+        return None
+    resume_point = data.get("resume_point")
+    if not isinstance(resume_point, dict):
+        return None
+    try:
+        from lca.plugins.session.runtime.resume.point import deserialize_resume_point
+
+        # deserialize_resume_point is fail-closed (raises on any malformed
+        # field), so the seam reuses it instead of hand-checking fields.
+        deserialize_resume_point(resume_point)
+    except Exception:
+        return None
+    return data
+
+
 def load_resume_bundle(run_id: str, locator: Any) -> dict[str, Any] | None:
-    """Read the durable resume bundle for ``run_id``, or ``None``."""
+    """Read the durable resume bundle for ``run_id``, or ``None``.
+
+    Corrupt bundles are rejected at this seam (a structured warning is
+    logged) and map to ``None`` exactly like a missing bundle.
+    """
     try:
         run_dir = locator.run_dir(run_id)
     except Exception:
@@ -127,9 +174,10 @@ def load_resume_bundle(run_id: str, locator: Any) -> dict[str, Any] | None:
         data = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError):
         return None
-    if not isinstance(data, dict) or data.get("run_id") != run_id:
-        return None
-    return data
+    bundle = validate_bundle(data, run_id)
+    if bundle is None:
+        _log.warning("resume_bundle_rejected", run_id=run_id)
+    return bundle
 
 
 # ---------------------------------------------------------------------------
@@ -361,5 +409,6 @@ async def _assemble_runnable(
 __all__ = [
     "load_resume_bundle",
     "restore_waiting_run",
+    "validate_bundle",
     "write_resume_bundle",
 ]
