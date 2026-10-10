@@ -47,8 +47,7 @@ class ComposioHttpClient:
             )
         if not response.content:
             return {}
-        data = response.json()
-        return data
+        return response.json()
 
     async def list_auth_configs(self) -> list[dict[str, Any]]:
         data = await self._request("GET", "/auth_configs")
