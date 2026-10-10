@@ -1466,8 +1466,8 @@
         "restart_report.py urllib open verified with scheme check",
         "ruff check lca/infrastructure/cli/ passes with 0 errors"
       ],
-      "passes": false,
-      "notes": "Wave 1 story: eliminate 16 linter warnings in CLI probing."
+      "passes": true,
+      "notes": "Eliminated S603/S607/S110 linter issues via resolve_probe_cmd and audited requests. 292 CLI tests pass."
     },
     {
       "id": "RA-105",
