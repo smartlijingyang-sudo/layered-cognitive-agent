@@ -2836,3 +2836,28 @@ Learnings for future iterations:
     not role alone. A mixed text+tool_result user message never occurs from this
     projection; treat it as text (fail-closed: triggers closure).
 ---
+
+## 2026-10-10 13:30 CST - RA-118
+
+- What was implemented: converged the runtime-writer two-shape probe into
+  ``lca/nodes/_resolve.py::resolve_writer(*, context, node, required: bool)``.
+  ``think/llm/persist.py`` now calls it with ``required=True`` (fail-loud,
+  byte-identical TypeError message); ``concept/effect/execute.py`` with
+  ``required=False`` (fail-soft None + debug log for legacy harnesses, branch
+  preserved). Both local ``_resolve_writer`` copies deleted; probe order
+  (attribute first, then ``.get``) unchanged.
+- Files changed:
+  - lca/nodes/_resolve.py
+  - lca/nodes/think/llm/persist.py
+  - lca/nodes/concept/effect/execute.py
+  - raphy/prd.json
+- **Learnings for future iterations:**
+  - Patterns discovered: ``lca/nodes/_resolve.py`` is the established home for
+    node resolve rituals (module docstring: "One Module, one Interface") — new
+    resolve-shaped duplications should land there with the differing semantics
+    as an explicit parameter, not as a second copy.
+  - Gotchas encountered: when a wrapper's TypeError message is part of the
+    contract (tests / fail-loud tracebacks), keep it byte-identical by
+    interpolating the same ``node`` prefix convention the module already uses.
+    Verify via ``git show HEAD:<file>`` string comparison, not just "it raises".
+---

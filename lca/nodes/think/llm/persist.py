@@ -47,7 +47,7 @@ from lca.contracts.protocols.session.run_session_writer import (
     RunSessionWriterProtocol,
 )
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
-from lca.nodes._resolve import resolve_runtime_state, resolve_typed_port
+from lca.nodes._resolve import resolve_runtime_state, resolve_typed_port, resolve_writer
 
 
 @dataclass(frozen=True, slots=True)
@@ -74,7 +74,7 @@ class LlmPersistExecutor:
         sibling ``think.llm.invoke``.
         """
         state = resolve_runtime_state(context=context, node="llm.persist")
-        writer = _resolve_writer(context=context)
+        writer = resolve_writer(context=context, node="llm.persist", required=True)
         response = resolve_typed_port(PortName("llm_response"), input=input, node="llm.persist")
         step = int(getattr(state, "step", 0) or 0)
         _persist_assistant(writer=writer, response=response, step=step)
@@ -121,17 +121,6 @@ def _persist_assistant(
             name=tc.name,
             arguments=str(tc.arguments),
         )
-
-
-def _resolve_writer(*, context: NodeContext) -> RunSessionWriterProtocol:
-    """Pull the ``RunSessionWriterProtocol`` from the runtime carrier."""
-    runtime = getattr(context, "runtime", None)
-    writer = getattr(runtime, "writer", None) if runtime is not None else None
-    if writer is None and runtime is not None and hasattr(runtime, "get"):
-        writer = runtime.get("writer")
-    if writer is None:
-        raise TypeError("llm.persist: 'writer' must be supplied via context.runtime")
-    return writer  # type: ignore[no-any-return]
 
 
 @plugin(

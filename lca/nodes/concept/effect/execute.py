@@ -52,6 +52,7 @@ from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import
     OwnershipDeclaration,
 )
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
+from lca.nodes._resolve import resolve_writer
 
 _log = logging.getLogger(__name__)
 
@@ -130,22 +131,6 @@ class EffectExecuteExecutor:
             context, envelope, receipt, observation, dispatch_error, decision=decision
         )
         return NodeOutput(port_values={PortName("receipts"): [receipt]})
-
-
-def _resolve_writer(context: NodeContext) -> Any:
-    """Read the run-scoped ``RunSessionWriter`` off ``context.runtime``.
-
-    Mirrors ``llm.call``: ``writer`` is a kernel-injected runtime port, not
-    a value produced by a graph predecessor. Returns ``None`` when the
-    runtime is unbound (legacy harnesses, unit fixtures).
-    """
-    runtime = getattr(context, "runtime", None)
-    if runtime is None:
-        return None
-    writer = getattr(runtime, "writer", None)
-    if writer is None and hasattr(runtime, "get"):
-        writer = runtime.get("writer")
-    return writer
 
 
 class ToolResultAttributionError(RuntimeError):
@@ -300,7 +285,7 @@ def _append_tool_result_surface(
     rows = _owed_rows(envelope, receipt, observation, dispatch_error, decision=decision)
     if not rows:
         return
-    writer = _resolve_writer(context)
+    writer = resolve_writer(context=context, node="effect.execute", required=False)
     if writer is None:
         _log.debug(
             "effect.execute: no bound writer; tool result not surfaced (invocation_id=%s)",

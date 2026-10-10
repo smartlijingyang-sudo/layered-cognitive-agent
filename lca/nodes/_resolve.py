@@ -9,6 +9,12 @@ lookup order or the error wording is fixed once, fixed everywhere.
 The node argument is the node's dotted scope prefix (e.g.
 "llm.persist"); it is interpolated verbatim into the TypeError so
 fail-loud tracebacks keep pointing at the node that declared the port.
+
+RA-118 also converged the ``_resolve_writer`` two-shape probe here:
+``think.llm.persist`` (fail-loud) and ``concept.effect.execute``
+(fail-soft) shared the same attribute-then-``.get`` ritual with
+different missing-writer semantics; ``resolve_writer`` makes that
+difference an explicit ``required`` flag.
 """
 
 from __future__ import annotations
@@ -54,6 +60,28 @@ def resolve_typed_port_or_runtime(
             f"{node}: '{name}' port must be supplied via input.port_values or context.runtime"
         )
     return value
+
+
+def resolve_writer(*, context: NodeContext, node: str, required: bool) -> Any:
+    """Resolve the run-scoped writer off ``context.runtime``.
+
+    Two-shape probe (attribute first, then mapping-style ``.get``) —
+    the same ritual ``resolve_typed_port_or_runtime`` uses.
+
+    ``required=True`` (fail-loud, e.g. ``think.llm.persist``): a missing
+    writer raises ``TypeError`` naming the node.
+    ``required=False`` (fail-soft, e.g. ``concept.effect.execute``): a
+    missing writer returns ``None`` so legacy harnesses / unit fixtures
+    without a bound writer keep working (the call site's debug-log
+    branch stays load-bearing).
+    """
+    runtime = getattr(context, "runtime", None)
+    writer = getattr(runtime, "writer", None) if runtime is not None else None
+    if writer is None and runtime is not None and hasattr(runtime, "get"):
+        writer = runtime.get("writer")
+    if writer is None and required:
+        raise TypeError(f"{node}: 'writer' must be supplied via context.runtime")
+    return writer
 
 
 def resolve_runtime_state(*, context: NodeContext, node: str) -> Any:

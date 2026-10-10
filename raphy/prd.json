@@ -1705,7 +1705,7 @@
         "Tests covering both nodes pass; ruff check clean on touched files."
       ],
       "priority": 3,
-      "passes": false,
+      "passes": true,
       "branchName": "raphy/arch-20261010-1245-b",
       "notes": "Source: duplication scan. Strength: Worth exploring. Deletion test: deleting one copy concentrates the probe ritual in the shared seam; the differing fail-loud/fail-soft semantics become an explicit 'required' parameter instead of two subtly different copies. Constraint: execute.py's fail-soft path is load-bearing for legacy harnesses without a bound writer (debug-log branch must survive)."
     }
