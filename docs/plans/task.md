@@ -622,3 +622,9 @@
 | ARCH-R10-INFRA-FILE-STORE | Round 10 - Infrastructure File / Attachment / Storage Roots 单向依赖与无用抽象清理 | Pending | 待执行 |
 | ARCH-R11-HARNESS-PROFILE | Round 11 - Harness Activation & Profile Resolution 声明式解析与 DAG 验证深度聚合 | Pending | 待执行 |
 | ARCH-R12-CONVERGENCE-AUDIT | Round 12 - 全系统架构不变量终审、契约门禁全量回归与架构基准对齐 | Pending | 待执行 |
+| BRAINSTORM-DESLOP-100-CONTEXT | 深度梳理代码库与文档 Slop 现状、Raphy 100 轮历史与架构优化热点 | Completed | 已深度梳理 ADR-0293 raphy 100 stories (RA-001~RA-100 已达标，worktree 拓展至 RA-103)、88 处 verify_doc_slop 命中、check_package_contracts 62 项偏差及 ruff/contracts 边界 |
+| BRAINSTORM-DESLOP-100-QUESTIONS | 澄清「100次真实优化与去冗」的具体目标、执行载体与边界（单步提问） | Completed | 用户明确选定：基于 ADR-0293 与 improve-codebase-architecture 开启全新一轮 Raphy 架构加深与去冗循环，派生高质量真实优化故事集并单流交付 |
+| BRAINSTORM-DESLOP-100-APPROACHES | 提出 2-3 种大规模去冗与深度优化实施方案及权衡对比 | Completed | 用户明确确认选定方案 A（波次渐进 Raphy 循环，Batch-Wave Loop，每波 5~10 stories 动态评估与落地） |
+| BRAINSTORM-DESLOP-100-DESIGN-SECTIONS | 逐步呈现分节架构规范（边界/治理清单/执行流水线/测试不变量）并呈批 | Completed | §1 边界与自治、§2 核心架构模型与流水线时序、§3 不变量断言与测试矩阵全部获用户批准通过 |
+| BRAINSTORM-DESLOP-100-DESIGN-DOC | 沉淀去冗与架构优化设计文档至 docs/plans/ 并提交 git | Completed | 成功落盘 docs/plans/2026-10-10-raphy-100-deslop-and-optimization-design.md 并提交 git |
+| BRAINSTORM-DESLOP-100-TRANSITION | 转换至实施计划制定（调用 writing-plans 规划单流落地） | In_Progress | 正在调用 writing-plans 编写详细实施方案 docs/plans/2026-10-10-raphy-100-deslop-and-optimization-plan.md |
