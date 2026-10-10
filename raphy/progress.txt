@@ -1,5 +1,26 @@
 ## Codebase Patterns
 
+- **"5-gate" 叙事与实现对不上时先数 gate 再信 verdict（RA-115）：**
+  `pre_dispatch_envelope_check` 的 module docstring/yaml 自称 5-gate atomic check，
+  `_ALL_REF_ORDER` 含 `safe-boundary:valid`，但 `execute()` 只实现 4 个 gate——
+  safe-boundary 从 PR-2 抽取（39fa69654）起就没在该 node 跑过，真正的 safe-boundary
+  在 dispatch 时由 `ControlSlot.ACT_SAFE_BOUNDARY` 插件执行。修法二选一：实现 gate
+  或删 verdict + 改叙事（"删掉承诺也是诚实解"，RA-039 同款）；验收必须钉
+  "verdict 集合 == 实际跑的 gate 集合"。
+- **prompt 内部标记要有单一注册 seam（RA-116）：** leak guard 的 markers 写在消费侧
+  （parse.py regex），生产侧散在 3+ 处（assemble.py 常量 / tool_defer/session.py
+  行内字面量 / prompts/sections/memory.py）；"Deferred tool namespaces" 有两个独立
+  生产者；guard 里 "## 认知闭集/## 核心不变量/## 系统指令" 在 prompt 生产代码里根本
+  不存在（只在 parse.py 自身出现）——drift 已发生过一次。改 section 名必须只改一处。
+- **provider wire shape 的防御必须对称（RA-117）：** 8d1fe6f44 给 OpenAI 加了
+  hanging-tool-call 闭合 sanitizer，anthropic 路径没有，且
+  `tests/infrastructure/llm_adapter/` 下零 anthropic history 测试；两个 projection
+  消费同一份 journal-derived history，不对称就是 400 形状的坑。
+- **并发 lane 在同一 checkout 写未提交文件时 assess 停手（2026-10-10）：**
+  raphy/arch-20261010-1245 评估中途 skills/* 等 10 文件变脏——按 driver 指令停手、
+  不写 raphy/、不 commit，deliverable 以内容形式交回 coordinator。长评估里读文件
+  继续用 marker/版本锁定；写动作只在树干净时做。
+
 - **Phase-alias 词汇用真实 bundle 语料钉住，跨 phase region 进 keep-list（RA-109）：**
   收集节点语料只认 ``nodes:`` list 里的 ``id``（裸 grep ``id:`` 会混入
   plugin/provider 注册 id）。无 phase 前缀分两类：think 内层节点
@@ -244,6 +265,44 @@
   `git show <sha>:` 锁定版本；子任务误报写树时先查 reflog 再定论。
 
 ---
+
+
+## Round — assess (2026-10-10 12:45, branch raphy/arch-20261010-1245)
+
+- 按硬化版 `raphy-assess.md` 执行：读 SKILL.md / CONTEXT.md / `git log -40` /
+  progress.txt `## Codebase Patterns` 全量 / prd.json（`userStories` 键，RA-104~114
+  字段格式）；friction walk 精读三区（effect 执行 seam 4 文件 / decision parse +
+  3 生产者 / history sanitization + anthropic 路径，5 问必答）；duplication 副扫描；
+  self-grilling 写进 assessment.md；diversity quota 满足（3 friction + 1 duplication）。
+- 热点来源：parallel tool execution & run stability wave（plan lift、fanout_ntom 边、
+  batch envelopes、tool result attribution、history sanitization、decision output
+  hygiene guard）。
+- 产出 4 个 stories（`passes: false`），续号 RA-115~118：
+  - RA-115（P1, Strong）：pre_dispatch_envelope_check 自称 5-gate、只跑 4 个，
+    `safe-boundary:valid` verdict 从 PR-2 起从未被 earn；实现 gate 或删 verdict。
+  - RA-116（P2, Worth exploring）：prompt-leak markers 消费侧定义、生产侧 3+ 处，
+    两处独立生产同一 defer header，guard 含已死 markers（drift 实证）。
+  - RA-117（P2, Worth exploring）：hanging-tool_use 闭合 invariant 只在 OpenAI
+    路径，anthropic 路径无等价物、无测试。
+  - RA-118（P3, Worth exploring）：两处 `_resolve_writer` 双形 probe 收敛进
+    `lca/nodes/_resolve.py`（two adapters = real seam）。
+- 丢弃（有证据）：`_ToolResultRow` 助手函数群（deletion test 通过，earns existence）；
+  `_guard_acknowledgement` 单行 adapter（one adapter = hypothetical seam）；
+  `_derive_outcome`/`_extract_observation` unwrap 重复（2 处，未达收敛 bar）；
+  ModelVisibleHook 占位（ADR-0185 PR-3 显式计划，不重审）。
+- Runtime verification：scripted LLM 全量 run——basic→COMPLETED、同 agent 双
+  run→COMPLETED/COMPLETED、tool-call（bash）→INPUT_REQUIRED（approval era 设计路径）；
+  pytest 17 passed（leak-guard 6 + history-guard…/batch-attribution+envelope-check 8 +
+  run_with_tool_use e2e 3，含完整 CognitiveAgent.run()）。
+- 发现 pre-existing 失败（main 上已存在，非本轮）：test_think_llm_journal e2e 断言
+  COMPLETED，approval era 下得 INPUT_REQUIRED（a1c20526d, 2026-10-01）——stale
+  assertion，转 iter-tests lane，不开 story。
+- **Coordinator 收尾（13:05）**：评估中途主 checkout 被并发 lane 写脏（10 文件，
+  未动），按指令评估员停手未写盘。coordinator 在隔离 worktree
+  `~/.lca-worktrees/raphy-20261010-1245`（分支 `raphy/arch-20261010-1245-b`，起于
+  `48bf2d6a3`）写盘三文件并 commit `chore: [raphy] assess - 4 architecture candidates`。
+  名义分支 `raphy/arch-20261010-1245` 的 checkout 仍被外来 lane 占用，保持不动；
+  story 的 `branchName` 字段记为实际工作分支 `-b`。主 checkout 的 10 个脏文件全程未碰。
 
 ## Round 6 — assess (2026-10-07 23:15, branch raphy/arch-20261007-2315)
 
