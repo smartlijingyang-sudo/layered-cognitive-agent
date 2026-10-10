@@ -1456,6 +1456,61 @@
       "implemented": "",
       "priority": 2,
       "title": "Deepen CognitiveRuntime.run(): extract the turn-preparation phases, converge the late imports"
+    },
+    {
+      "id": "RA-104",
+      "title": "Resolve explicit binary paths in host_probing and eliminate S603/S607/S110 linter slop",
+      "acceptanceCriteria": [
+        "shutil.which used for command binary resolution in host_probing.py",
+        "S110 bare exception caught with named types and debug logging",
+        "restart_report.py urllib open verified with scheme check",
+        "ruff check lca/infrastructure/cli/ passes with 0 errors"
+      ],
+      "passes": false,
+      "notes": "Wave 1 story: eliminate 16 linter warnings in CLI probing."
+    },
+    {
+      "id": "RA-105",
+      "title": "Align lca.contracts.mechanisms exports with L1/L2 package contracts specification",
+      "acceptanceCriteria": [
+        "All 19 legal exports declared in lca/contracts/README.md section 9",
+        "python3 scripts/check_package_contracts.py has 0 errors for lca.contracts.mechanisms",
+        "pytest tests/contracts/ passes 100%"
+      ],
+      "passes": false,
+      "notes": "Wave 1 story: package contracts convergence for mechanisms."
+    },
+    {
+      "id": "RA-106",
+      "title": "Converge observability package contract exports and align README SSOT",
+      "acceptanceCriteria": [
+        "lca.infrastructure.observability exports documented in Section 9",
+        "check_package_contracts.py has 0 errors for lca.infrastructure.observability",
+        "pytest tests/infrastructure/observability/ passes 100%"
+      ],
+      "passes": false,
+      "notes": "Wave 1 story: package contracts convergence for observability."
+    },
+    {
+      "id": "RA-107",
+      "title": "Enforce fail-loud semantics across capability seams and eliminate silent none returns",
+      "acceptanceCriteria": [
+        "Capability seam raises named exception instead of silent None/empty return on missing grant",
+        "pytest tests/contracts/ passes 100%"
+      ],
+      "passes": false,
+      "notes": "Wave 1 story: fail loud at seams."
+    },
+    {
+      "id": "RA-108",
+      "title": "Real deletion tests, verify zero cycles on late imports, and regression suite check",
+      "acceptanceCriteria": [
+        "python -c import tests pass in forward and reverse order with 0 cycles",
+        "ruff check passes cleanly",
+        "git diff --check passes cleanly"
+      ],
+      "passes": false,
+      "notes": "Wave 1 story: full regression and deletion test."
     }
   ]
 }
