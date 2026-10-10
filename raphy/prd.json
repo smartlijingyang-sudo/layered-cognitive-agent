@@ -1488,8 +1488,8 @@
         "check_package_contracts.py has 0 errors for lca.infrastructure.observability",
         "pytest tests/infrastructure/observability/ passes 100%"
       ],
-      "passes": false,
-      "notes": "Wave 1 story: package contracts convergence for observability."
+      "passes": true,
+      "notes": "Aligned lca/infrastructure/observability README Section 9 with all 130 __all__ symbols. 75 observability tests pass."
     },
     {
       "id": "RA-107",
