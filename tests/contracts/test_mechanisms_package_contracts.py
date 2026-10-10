@@ -1,6 +1,7 @@
 import subprocess
 import sys
 
+
 def test_mechanisms_package_contract_clean():
     res = subprocess.run(
         [sys.executable, "scripts/check_package_contracts.py"],

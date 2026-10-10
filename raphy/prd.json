@@ -1509,8 +1509,8 @@
         "ruff check passes cleanly",
         "git diff --check passes cleanly"
       ],
-      "passes": false,
-      "notes": "Wave 1 story: full regression and deletion test."
+      "passes": true,
+      "notes": "Verified forward/reverse/agent-first acyclic imports, ruff clean, git diff clean, full suite 9 passed."
     }
   ]
 }

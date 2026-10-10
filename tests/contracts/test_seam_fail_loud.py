@@ -1,5 +1,7 @@
 import pytest
+
 from lca.contracts.mechanisms.seam.seam import consume
+
 
 def test_consume_returns_provider_when_valid():
     obj = object()

@@ -628,9 +628,9 @@
 | BRAINSTORM-DESLOP-100-DESIGN-SECTIONS | 逐步呈现分节架构规范（边界/治理清单/执行流水线/测试不变量）并呈批 | Completed | §1 边界与自治、§2 核心架构模型与流水线时序、§3 不变量断言与测试矩阵全部获用户批准通过 |
 | BRAINSTORM-DESLOP-100-DESIGN-DOC | 沉淀去冗与架构优化设计文档至 docs/plans/ 并提交 git | Completed | 成功落盘 docs/plans/2026-10-10-raphy-100-deslop-and-optimization-design.md 并提交 git |
 | BRAINSTORM-DESLOP-100-TRANSITION | 转换至实施计划制定（调用 writing-plans 规划单流落地） | Completed | 成功落盘实施方案 docs/plans/2026-10-10-raphy-100-deslop-and-optimization-plan.md 并完成 Wave 1 任务分解 |
-| RAPHY-WAVE1-HARNESS | 波次驱动与状态机接缝初始化 (`scripts/run_raphy_wave.py`) | Pending | 待执行 |
-| RA-104-HOST-PROBING | [RA-104] 收敛 host_probing.py 显式路径解析，消除 16 处 S603/S607/S110 linter 坏味道 | Pending | 待执行 |
-| RA-105-CONTRACTS-ALIGNMENT | [RA-105] 治理 lca.contracts.mechanisms 导出与 L1/L2 声明偏差 | Pending | 待执行 |
-| RA-106-OBSERVABILITY-EXPORTS | [RA-106] 治理 lca.infrastructure.observability 契约接口与 README 导出偏差 | Pending | 待执行 |
-| RA-107-FAIL-LOUD-SEAM | [RA-107] 接缝显式 Fail-Loud 加固与隐式 None/降级清除 | Pending | 待执行 |
-| RA-108-DELETION-TEST-VERIFY | [RA-108] 真实删除测试与双向循环导入体检，全链路回归与 Wave 1 归档 | Pending | 待执行 |
+| RAPHY-WAVE1-HARNESS | 波次驱动与状态机接缝初始化 (`scripts/run_raphy_wave.py`) | Completed | 成功落地 scripts/run_raphy_wave.py 与 test_run_raphy_wave.py (3/3 通过)，在 raphy/prd.json 播种 Wave 1 五大故事 (RA-104~RA-108) |
+| RA-104-HOST-PROBING | [RA-104] 收敛 host_probing.py 显式路径解析，消除 16 处 S603/S607/S110 linter 坏味道 | Completed | 落地 resolve_probe_cmd 显式解析主机二进制路径，消除 S603/S607/S110 告警，292 项 CLI 测试 100% 全绿，commit 5175347ca |
+| RA-105-CONTRACTS-ALIGNMENT | [RA-105] 治理 lca.contracts.mechanisms 导出与 L1/L2 声明偏差 | Completed | 对齐 README.md 第 9 段公共入口与 __all__ 21 项符号，check_package_contracts 0 报错，978 项 contracts 单测全绿，commit efe35692b |
+| RA-106-OBSERVABILITY-EXPORTS | [RA-106] 治理 lca.infrastructure.observability 契约接口与 README 导出偏差 | Completed | 对齐 README.md 第 9 段公共入口与 __all__ 全部 130 项符号，check_package_contracts 0 报错，75 项单测全绿，commit ba11028f6 |
+| RA-107-FAIL-LOUD-SEAM | [RA-107] 接缝显式 Fail-Loud 加固与隐式 None/降级清除 | Completed | 在 consume() 组合期接缝处断言 None provider 即刻抛出 ValueError，阻止静默空接缝，980 项契约测试全绿，commit a0f547f91 |
+| RA-108-DELETION-TEST-VERIFY | [RA-108] 真实删除测试与双向循环导入体检，全链路回归与 Wave 1 归档 | Completed | 验证三向动态导入 0 循环、ruff check 0 报错、git diff 干净，Wave 1 全部 5 个 Story (RA-104~RA-108) 100% 达成，progress.txt 经验沉淀闭环 |

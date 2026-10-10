@@ -1,4 +1,5 @@
-from lca.infrastructure.cli.service.host_probing import resolve_probe_cmd, pid_alive
+from lca.infrastructure.cli.service.host_probing import pid_alive, resolve_probe_cmd
+
 
 def test_resolve_probe_cmd():
     # Should resolve standard binaries like sh or python3 to absolute paths

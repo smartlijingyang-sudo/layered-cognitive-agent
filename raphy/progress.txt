@@ -2347,3 +2347,30 @@ Tests:
 Learnings:
 - `isinstance(MagicMock(), HasHooks)` is False even though `hasattr(mock, "hooks")` is True — runtime-checkable protocol isinstance does not see through MagicMock's dynamic attribute creation. The positive test needs a real stub with a concrete `hooks` attribute. Worth remembering whenever pinning protocol-gated branches: stub the attribute for real.
 - Verified no production caller of `CognitiveAgent.register_hook` exists in lca/ (only audit tooling mentions the name), so the previously silent branch was dead in prod paths — the raise cannot break a working flow, only surface a misconfiguration earlier.
+
+## 2026-10-10 09:20 CST - Wave 1 (RA-104 ~ RA-108)
+
+Implemented:
+- [RA-104]: 收敛 `host_probing.py` 命令路径解析（`resolve_probe_cmd` 使用 `shutil.which` + 系统备选绝对路径），消除 S603/S607 告警；消除 S110 静默异常；`restart_report.py` 对 `urllib.request.Request` 增加方案审计；292 项 CLI 关联测试全绿。
+- [RA-105]: 对齐 `lca/contracts/mechanisms/README.md` 第 9 段公共入口与 `__all__` 全部 21 项符号，`check_package_contracts.py` 报错清零，978 项 contracts 测试全绿。
+- [RA-106]: 对齐 `lca/infrastructure/observability/README.md` 第 9 段公共入口与 `__all__` 全部 130 项符号，`check_package_contracts.py` 报错清零，75 项 observability 测试全绿。
+- [RA-107]: 加固 `consume()` 接缝组合期闸门，当 provider 为 None 时抛出具名 `ValueError`，杜绝静默 None 导致运行时深层 AttributeError，980 项契约测试全绿。
+- [RA-108]: 验证正向、逆向、Agent-first 三向动态加载零循环导入死锁；通过 `scripts/run_raphy_wave.py` 状态机闭环驱动 Wave 1。
+
+Files:
+- scripts/run_raphy_wave.py (new)
+- tests/scripts/test_run_raphy_wave.py (new)
+- lca/infrastructure/cli/service/host_probing.py
+- lca/infrastructure/cli/services/kernel/restart_report.py
+- tests/infrastructure/cli/test_host_probing.py (new)
+- lca/contracts/mechanisms/README.md
+- tests/contracts/test_mechanisms_package_contracts.py (new)
+- lca/infrastructure/observability/README.md
+- tests/infrastructure/observability/test_observability_package_contracts.py (new)
+- lca/contracts/mechanisms/seam/seam.py
+- tests/contracts/test_seam_fail_loud.py (new)
+- raphy/prd.json
+
+Learnings for future iterations:
+- `scripts/check_package_contracts.py` 要求 L1 README.md 第 9 段必须用反引号包裹每一个符号名，且必须与 `__init__.py` 的 `__all__` 双向完全一致。
+- 函数内 import 可以通过多顺序实测（direct, reverse, consumer-first）验证是否存在真实循环，绝大多数早期留存的函数级 import 可以安全提升或收敛。
