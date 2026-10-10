@@ -641,8 +641,8 @@
 | BRAINSTORM-RUN-STABILITY-DESIGN-SECTIONS | 逐步呈现设计细节（Owns/Does NOT own/不变量测试）并获取审批 | Completed | 设计细节（Owns/Does NOT own/不变量断言）全部呈批通过 |
 | BRAINSTORM-RUN-STABILITY-DESIGN-DOC | 沉淀设计文档至 docs/plans/ 并提交 git | Completed | 成功落盘 docs/plans/2026-10-10-parallel-tool-execution-and-run-stability-design.md 并已提交 git |
 | BRAINSTORM-RUN-STABILITY-TRANSITION | 转换至实施计划制定（writing-plans） | Completed | 成功落盘 docs/plans/2026-10-10-parallel-tool-execution-and-run-stability-plan.md 并分解为 6 大单流任务 |
-| RUN-STAB-TASK-1-TOPOLOGY | [拓扑接通] `bundles/act/act_subgraph.yaml` 闭环 `fanout_ntom` 出边 | Pending | 待执行 |
-| RUN-STAB-TASK-2-ENVELOPE-CHECK | [原子校验] `pre_dispatch_envelope_check` 升级多 Envelopes 批量原子校验 | Pending | 待执行 |
+| RUN-STAB-TASK-1-TOPOLOGY | [拓扑接通] `bundles/act/act_subgraph.yaml` 闭环 `fanout_ntom` 出边 | Completed | 已落地 `[fanout_1to1, fanout_ntom]` 谓词，通过 INV-PARALLEL-01 测试，8 passed |
+| RUN-STAB-TASK-2-ENVELOPE-CHECK | [原子校验] `pre_dispatch_envelope_check` 升级多 Envelopes 批量原子校验 | In_Progress | 编写 INV-PARALLEL-01 多 envelope 原子体检测试与实现 |
 | RUN-STAB-TASK-3-EXECUTE-ATTRIBUTION | [事实闭环] `effect.execute` 确保并发工具调用每个 `call_id` 均有对应回执落盘 | Pending | 待执行 |
 | RUN-STAB-TASK-4-HISTORY-HYGIENE | [协议合规] `_history.py` 悬挂 tool_calls 协议自愈与合规守护 | Pending | 待执行 |
 | RUN-STAB-TASK-5-OUTPUT-GUARD | [声带净化] `decision/parse.py` Prompt 泄露与反刍条文净化门禁 | Pending | 待执行 |

@@ -255,11 +255,11 @@ edges:
   - from: act.fanout
     to: effect.pre_dispatch.envelope_check
     when:
-      kind: eq
+      kind: in
       port:
         name: routing
         field: next_hint
-      value: fanout_1to1
+      value: [fanout_1to1, fanout_ntom]
 
   # PR-2 / ADR-0234: envelope_check → dispatch passes verdict_refs typed-port.
   # On any 5-gate failure the node raises and emits no verdict_refs; the

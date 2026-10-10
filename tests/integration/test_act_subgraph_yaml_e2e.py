@@ -308,7 +308,8 @@ def test_act_fanout_to_envelope_check_carries_fanout_1to1_predicate() -> None:
     plan = _lift_bundle()
     edge = next(
         (
-            e for e in plan.edges
+            e
+            for e in plan.edges
             if e.source == "act.fanout" and e.target == "effect.pre_dispatch.envelope_check"
         ),
         None,
@@ -324,16 +325,23 @@ def test_act_fanout_to_envelope_check_carries_fanout_1to1_predicate() -> None:
         f"got {type(edge.when).__name__}. An unconditional edge (None/True) "
         f"bypasses the 1:1 routing decision."
     )
-    assert edge.when.kind == "eq", f"expected eq predicate, got kind={edge.when.kind!r}"
+    assert edge.when.kind in ("eq", "in"), (
+        f"expected eq or in predicate, got kind={edge.when.kind!r}"
+    )
     assert edge.when.port is not None and edge.when.port.name == "routing", (
         f"expected port.name='routing', got {edge.when.port!r}"
     )
     assert edge.when.port.field == "next_hint", (
         f"expected port.field='next_hint', got {edge.when.port.field!r}"
     )
-    assert edge.when.value == "fanout_1to1", (
-        f"expected value='fanout_1to1', got {edge.when.value!r}"
-    )
+    if edge.when.kind == "in":
+        assert set(edge.when.value) == {"fanout_1to1", "fanout_ntom"}, (
+            f"expected values to contain fanout_1to1 and fanout_ntom, got {edge.when.value!r}"
+        )
+    else:
+        assert edge.when.value == "fanout_1to1", (
+            f"expected value='fanout_1to1', got {edge.when.value!r}"
+        )
 
 
 def test_envelope_check_to_act_dispatch_is_unconditional() -> None:
@@ -345,20 +353,19 @@ def test_envelope_check_to_act_dispatch_is_unconditional() -> None:
     plan = _lift_bundle()
     edge = next(
         (
-            e for e in plan.edges
+            e
+            for e in plan.edges
             if e.source == "effect.pre_dispatch.envelope_check" and e.target == "act.dispatch"
         ),
         None,
     )
     assert edge is not None, (
-        "effect.pre_dispatch.envelope_check -> act.dispatch edge is missing "
-        "from the lifted plan."
+        "effect.pre_dispatch.envelope_check -> act.dispatch edge is missing from the lifted plan."
     )
     # ``None`` is the kernel's "unconditional" representation after
     # ``coerce_when`` strips `True` / `false` / empty strings.
     assert edge.when is None, (
-        f"envelope_check -> act.dispatch must be unconditional, "
-        f"got predicate {edge.when!r}"
+        f"envelope_check -> act.dispatch must be unconditional, got predicate {edge.when!r}"
     )
 
 
