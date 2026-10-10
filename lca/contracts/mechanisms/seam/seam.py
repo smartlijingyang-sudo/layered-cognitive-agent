@@ -18,5 +18,12 @@ T = TypeVar("T")
 
 
 def consume(definition: str, provider: T, consumer: Any) -> T:
-    """Composition-time gate. Returns provider unchanged."""
+    """Composition-time gate. Returns provider unchanged.
+
+    Fails loud if provider is None, protecting domain classes from silent empty seams.
+    """
+    if provider is None:
+        raise ValueError(
+            f"Seam {definition!r} cannot be consumed with None provider for consumer {consumer!r}"
+        )
     return provider

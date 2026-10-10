@@ -1498,8 +1498,8 @@
         "Capability seam raises named exception instead of silent None/empty return on missing grant",
         "pytest tests/contracts/ passes 100%"
       ],
-      "passes": false,
-      "notes": "Wave 1 story: fail loud at seams."
+      "passes": true,
+      "notes": "Enforced fail-loud check in consume() on None provider, preventing silent empty seam injection. 980 contracts tests pass."
     },
     {
       "id": "RA-108",
