@@ -10,18 +10,24 @@ fail-loud —— 两条安装路径语义一致且有据可查。
 
 from __future__ import annotations
 
+import io
 import json
 import tempfile
 import unittest
+import zipfile
 from pathlib import Path
 from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from lca.contracts.protocols.memory.operational_skills import SkillContractError
+from lca.contracts.protocols.memory.operational_skills import (
+    SkillContractError,
+    SkillImportError,
+)
 from lca.infrastructure.skills.disk.store import DiskSkillPackageStore
 from lca.infrastructure.skills.http.importer import HttpSkillImporter
 from lca.infrastructure.skills.settings.settings import SkillSettings
+from lca.infrastructure.skills.url.sources import parse_skill_url
 
 
 class _RecordingStore:
@@ -116,3 +122,42 @@ class TestHttpImporterReferences(unittest.IsolatedAsyncioTestCase):
         # get() 回读同样带记录
         reread = self.store.get("flagged")
         assert reread.references_assumed_empty is True
+
+    def test_market_download_url_is_a_market_identifier_even_when_kind_says_url(self) -> None:
+        parsed = parse_skill_url(
+            "https://market.lobehub.com/api/v1/skills/openclaw-skills-ai-news-feed/download",
+            kind="url",
+        )
+        assert parsed.kind == "market"
+        assert parsed.market_identifier == "openclaw-skills-ai-news-feed"
+
+    async def test_market_package_without_references_installs_real_markdown(self) -> None:
+        skill_md = "---\nname: ai-news-feed\ndescription: news\n---\n# AI news\n"
+        buf = io.BytesIO()
+        with zipfile.ZipFile(buf, "w") as archive:
+            archive.writestr("SKILL.md", skill_md)
+        with (
+            patch.object(
+                self.importer._market, "download_zip", AsyncMock(return_value=buf.getvalue())
+            ),
+            patch.object(self.importer._market, "fetch_detail", AsyncMock(return_value={})),
+        ):
+            pkg = await self.importer.import_from_market("openclaw-skills-ai-news-feed")
+        assert pkg.skill_id == "openclaw-skills-ai-news-feed"
+        assert pkg.references_assumed_empty is True
+        assert "AI news" in pkg.content
+        written = (Path(self._tmp.name) / pkg.skill_id / "SKILL.md").read_bytes()
+        assert not written.startswith(b"PK")
+        manifest = json.loads(
+            (Path(self._tmp.name) / pkg.skill_id / "manifest.json").read_text(encoding="utf-8")
+        )
+        assert manifest["references_assumed_empty"] is True
+
+    async def test_zip_bytes_are_refused_as_markdown(self) -> None:
+        payload = b"PK\x03\x04" + b"\x00" * 32
+        with (
+            patch.object(self.importer, "_fetch_bytes", AsyncMock(return_value=payload)),
+            pytest.raises(SkillImportError, match="ZIP"),
+        ):
+            await self.importer.import_from_url("https://example.com/download", kind="url")
+        assert not (Path(self._tmp.name) / "download").exists()

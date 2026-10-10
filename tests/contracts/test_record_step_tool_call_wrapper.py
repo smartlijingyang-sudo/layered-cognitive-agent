@@ -29,6 +29,36 @@ def _capture_publish_ep() -> dict[str, Any]:
     return {}
 
 
+def test_record_step_tool_call_uses_the_step_set_actor_wrote() -> None:
+    from lca.infrastructure.observability.facade.facade.facade import RunContext, bind
+
+    captured: list[dict[str, Any]] = []
+
+    def fake_publish_ep(
+        ep: str,
+        payload: dict[str, Any],
+        *,
+        state: Any = None,
+        session: Any = None,
+        actor: str = "body",
+    ) -> None:
+        del ep, state, session, actor
+        captured.append(dict(payload))
+
+    with (
+        bind(RunContext(step=7)),
+        patch("lca.loop.commit.tool_journal.publish_ep_bound", side_effect=fake_publish_ep),
+    ):
+        record_step_tool_call(
+            tool_name="import_skill",
+            invocation_id="inv-step",
+            arguments={"identifier": "openclaw-skills-ai-news-feed"},
+        )
+
+    assert captured[0]["step"] == 7
+    assert captured[0]["tool_name"] == "import_skill"
+
+
 def test_record_step_tool_call_publishes_step_tool_call_record_ep() -> None:
     captured: list[tuple[str, dict[str, Any]]] = []
 
@@ -270,6 +300,4 @@ def test_business_path_no_longer_imports_cursor_record() -> None:
     assert not hasattr(pipe_mod, "CursorRecord"), (
         "pipeline_safe_executor must not re-export CursorRecord"
     )
-    assert not hasattr(tj_mod, "CursorRecord"), (
-        "tool_journal must not re-export CursorRecord"
-    )
+    assert not hasattr(tj_mod, "CursorRecord"), "tool_journal must not re-export CursorRecord"

@@ -32,6 +32,12 @@ def _phase_tool_context() -> tuple[int, str]:
         ambit = current_run_ambit()
         if ambit is not None and ambit.run_id:
             run_id = str(ambit.run_id)
+    # set_actor 写的是 RunContext.step。RunScope.step 停在默认 0。
+    from lca.infrastructure.observability.facade.facade.facade import current_context
+
+    ctx = current_context()
+    if ctx is not None:
+        step = ctx.step
     return step, run_id
 
 

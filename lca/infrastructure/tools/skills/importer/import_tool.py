@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import time
+from pathlib import Path
 from typing import Any, ClassVar
 
 from lca.contracts.atoms.enums.enums import ContentType
@@ -11,7 +12,12 @@ from lca.contracts.atoms.semantic.keys import FAILURE_KIND, FAILURE_KIND_VALIDAT
 from lca.contracts.models.core.execution.decision import Observation
 from lca.contracts.models.core.policy.budget import DEFAULT_TOOL_TIMEOUT_S
 from lca.contracts.protocols import Tool
-from lca.contracts.protocols.memory.operational_skills import SkillImporter, SkillImportError
+from lca.contracts.protocols.assistant.skill_overlay import SkillSource
+from lca.contracts.protocols.memory.operational_skills import (
+    SkillImporter,
+    SkillImportError,
+    SkillPackage,
+)
 from lca.infrastructure.tools.contract.render.render import RenderContract, contract
 from lca.infrastructure.tools.contract.schema.schema import COMMON
 
@@ -39,11 +45,10 @@ class SkillImportTool(Tool):
     name = IMPORT_SKILL_TOOL
     namespace: ClassVar[str] = "skill"
     description = (
-        "从网络安装操作 skill 到本地技能库（与角色身份无关）。"
-        "支持：market identifier、lobehub.com/skills/…/skill.md、"
-        "GitHub 目录链接、ZIP URL、裸 SKILL.md URL。"
-        "为当前助理创建专属 skill 仅在助理绑定工具 create_assistant_skill 存在时可用"
-        "（写入助理 Home）；否则安装结果只进入全局技能库。"
+        "从网络安装操作 skill。"
+        "支持 market identifier、Market 下载地址、GitHub 目录、ZIP、裸 SKILL.md。"
+        "当前 run 绑定了助理时，安装进该助理 Home，然后用 activate_skill。"
+        "没有绑定助理时，安装进全局技能库。"
         "参数: identifier（Market ID，与 url 二选一）或 url + kind（auto/url/zip）。"
     )
     parameters: ClassVar[dict[str, Any]] = {
@@ -64,8 +69,14 @@ class SkillImportTool(Tool):
     is_idempotent = False
     default_timeout_s = DEFAULT_TOOL_TIMEOUT_S
 
-    def __init__(self, importer: SkillImporter) -> None:
+    def __init__(
+        self,
+        importer: SkillImporter,
+        *,
+        home: tuple[object, str] | None = None,
+    ) -> None:
         self._importer = importer
+        self._home = home
 
     def validate(self, args: dict[str, Any]) -> str | None:
         ident = str(args.get("identifier") or "").strip()
@@ -84,6 +95,8 @@ class SkillImportTool(Tool):
                 package = await self._importer.import_from_market(ident)
             else:
                 package = await self._importer.import_from_url(url, kind=kind)
+            if self._home is not None:
+                package = await self._publish_home(package, ident=ident, url=url)
         except (SkillImportError, ValueError) as exc:
             latency_ms = int((time.monotonic() - start) * 1000)
             from lca.infrastructure.observability.meta_event_emit import emit_skill_install_failed
@@ -105,8 +118,9 @@ class SkillImportTool(Tool):
             content_hash=package.content_hash,
             invocation="tool:import_skill",
         )
+        where = "当前助理" if self._home is not None else "全局技能库"
         text = (
-            f"已安装 skill「{package.name}」({package.skill_id})，"
+            f"已安装 skill「{package.name}」({package.skill_id}) 到{where}，"
             f"资源 {len(package.resource_paths)} 个。"
             f"请调用 activate_skill 加载操作指南。"
         )
@@ -117,3 +131,31 @@ class SkillImportTool(Tool):
             content_type=ContentType.TEXT,
             latency_ms=latency_ms,
         )
+
+    async def _publish_home(
+        self,
+        package: SkillPackage,
+        *,
+        ident: str,
+        url: str,
+    ) -> SkillPackage:
+        """把已拉下的包交到助理 Home。activate 只读这一份。"""
+        overlay, assistant_id = self._home or (None, "")
+        install = getattr(overlay, "install", None)
+        if not callable(install) or not assistant_id:
+            return package
+        root = getattr(getattr(self._importer, "store", None), "root", None)
+        pkg_dir = Path(root) / package.skill_id if root is not None else None
+        if pkg_dir is not None and (pkg_dir / "SKILL.md").is_file():
+            source = SkillSource(local_path=str(pkg_dir.resolve()))
+        elif url.startswith(("http://", "https://")):
+            source = SkillSource(url=url)
+        elif ident:
+            from lca.infrastructure.skills.settings.settings import get_skill_settings
+
+            base = get_skill_settings().market_base_url.rstrip("/")
+            source = SkillSource(url=f"{base}/api/v1/skills/{ident}/download")
+        else:
+            return package
+        await install(assistant_id, source, actor="agent")
+        return package

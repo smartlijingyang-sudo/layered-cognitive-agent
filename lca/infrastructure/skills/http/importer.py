@@ -98,12 +98,15 @@ class HttpSkillImporter(SkillImporter):
         resource_paths = list_resource_paths(files, skill_key)
         resources = {rel: files[rel] for rel in resource_paths}
         version = str(detail.get("version") or "")
+        # 社区包没有 LCA 的 references 字段。空索引由安装方记录，
+        # 不把缺字段报成作者错误。
         return self._store.install_package(
             skill_id=sanitize_skill_id(ident),
             skill_md_text=skill_text,
             resource_files=resources,
             source_url=self._market.download_url(ident),
             version=version,
+            assume_empty_references=True,
         )
 
     async def import_from_url(self, url: str, *, kind: str = "auto") -> SkillPackage:
@@ -126,6 +129,7 @@ class HttpSkillImporter(SkillImporter):
                 skill_md_text=skill_text,
                 resource_files=resources,
                 source_url=parsed.url,
+                assume_empty_references=True,
             )
         if parsed.kind == "github_dir":
             return await self._import_github_dir(parsed)
@@ -155,6 +159,7 @@ class HttpSkillImporter(SkillImporter):
                 skill_md_text=text,
                 resource_files={},
                 source_url=parsed.url,
+                assume_empty_references=True,
             )
         raise SkillImportError(last_error or "GitHub 目录中未找到 SKILL.md")
 
@@ -166,7 +171,7 @@ class HttpSkillImporter(SkillImporter):
         # RA-077: 不再用字节手术补 ``references: []``（pulled bytes 保持原样）。
         # ADR-0214 §7 要求 frontmatter 声明 references（可空）；裸 SKILL.md 来源
         # 常缺省该字段，缺字段的声明责任显式交给 install_package
-        #（assume_empty_references=True），并记录在 manifest 的
+        # （assume_empty_references=True），并记录在 manifest 的
         # references_assumed_empty；本地安装路径仍默认 fail-loud。
         return self._store.install_package(
             skill_id=skill_id,
@@ -189,6 +194,10 @@ class HttpSkillImporter(SkillImporter):
 
     async def _fetch_text(self, url: str) -> str:
         data = await self._fetch_bytes(url)
+        if data.startswith(b"PK\x03\x04") or data.startswith(b"PK\x05\x06"):
+            raise SkillImportError(
+                "下载内容是 ZIP，不能当作 SKILL.md 保存。使用 market identifier，或 kind=zip。"
+            )
         return data.decode("utf-8", errors="replace")
 
     def _search_local(self, query: str) -> tuple[SkillIndexEntry, ...]:

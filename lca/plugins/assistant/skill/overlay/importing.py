@@ -59,4 +59,5 @@ def _import_local_path(staging_root: Path, local_path: str) -> SkillPackage:
         skill_md_text=text,
         resource_files=resources,
         source_url=str(src),
+        assume_empty_references=True,
     )

@@ -14,6 +14,11 @@ _LOBEHUB_SKILL_PAGE_RE = re.compile(
     r"^https?://(?:www\.)?(?:market\.)?lobehub\.com/s/skills/([^/]+)/?$",
     re.IGNORECASE,
 )
+# Market 的 zip 端点。调用方传 kind=url 也不能把它当成 markdown。
+_MARKET_DOWNLOAD_RE = re.compile(
+    r"^https?://(?:www\.)?(?:market\.)?lobehub\.com/api/v1/skills/([^/]+)/download/?$",
+    re.IGNORECASE,
+)
 _GITHUB_TREE_RE = re.compile(
     r"^https?://(?:www\.)?github\.com/([^/]+)/([^/]+)/tree/([^/]+)(?:/(.*))?$",
     re.IGNORECASE,
@@ -49,6 +54,14 @@ def parse_skill_url(url: str, *, kind: str = "auto") -> ParsedSkillUrl:
         )
 
     match = _LOBEHUB_SKILL_PAGE_RE.match(text)
+    if match:
+        return ParsedSkillUrl(
+            kind="market",
+            url=text,
+            market_identifier=match.group(1),
+        )
+
+    match = _MARKET_DOWNLOAD_RE.match(text)
     if match:
         return ParsedSkillUrl(
             kind="market",

@@ -405,6 +405,60 @@ class TestDefaultTools(unittest.TestCase):
         self.assertEqual(sanitize_skill_id("foo/bar"), "foo-bar")
 
 
+class TestImportPublishesAssistantHome(unittest.IsolatedAsyncioTestCase):
+    async def test_bound_assistant_import_hands_the_package_to_overlay(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            global_store = DiskSkillPackageStore(SkillSettings(cache_dir=root / "global"))
+            package = global_store.install_package(
+                skill_id="openclaw-skills-ai-news-feed",
+                skill_md_text="---\nname: ai-news-feed\ndescription: news\n---\n# body\n",
+                resource_files={},
+                source_url="https://market.example/skill",
+                assume_empty_references=True,
+            )
+
+            class _Overlay:
+                def __init__(self) -> None:
+                    self.calls: list[tuple[str, str, str]] = []
+
+                def list_installed(self, assistant_id: str) -> tuple[object, ...]:
+                    del assistant_id
+                    return ()
+
+                async def install(
+                    self, assistant_id: str, source: object, *, actor: str = "system"
+                ) -> None:
+                    self.calls.append((assistant_id, str(getattr(source, "local_path", "")), actor))
+
+            overlay = _Overlay()
+            merged = AssistantMergedSkillStore(
+                global_store=global_store,
+                overlay=overlay,  # type: ignore[arg-type]
+                assistant_id="asst_news",
+            )
+            importer = _StubSkillImporter(package)
+            importer.store = global_store  # type: ignore[attr-defined]
+            tool = next(
+                item
+                for item in build_operational_skill_tools(importer=importer, store=merged)
+                if item.name == "import_skill"
+            )
+            obs = await tool.execute({"identifier": "openclaw-skills-ai-news-feed"})
+            self.assertTrue(obs.success)
+            self.assertIn("当前助理", str(obs.payload))
+            self.assertEqual(overlay.calls[0][0], "asst_news")
+            self.assertTrue(overlay.calls[0][1].endswith("openclaw-skills-ai-news-feed"))
+            self.assertEqual(overlay.calls[0][2], "agent")
+            stored = global_store.get("openclaw-skills-ai-news-feed")
+            activate = next(
+                item
+                for item in build_operational_skill_tools(importer=importer, store=global_store)
+                if item.name == "activate_skill"
+            )
+            self.assertEqual(activate._resolve_package(stored.skill_id).skill_id, stored.skill_id)
+
+
 class TestOperationalSkillToolAssembly(unittest.TestCase):
     """import_skill 必须走 installer 接缝，绝不写穿只读的 merged 视图。"""
 

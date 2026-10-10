@@ -41,6 +41,14 @@ class AssistantMergedSkillStore(SkillPackageStore):
         self._assistant_id = assistant_id
         self._assistant_store: DiskSkillPackageStore | None = None
 
+    @property
+    def overlay(self) -> AssistantSkillOverlay:
+        return self._overlay
+
+    @property
+    def assistant_id(self) -> str:
+        return self._assistant_id
+
     def _assistant_disk_store(self) -> DiskSkillPackageStore | None:
         if self._assistant_store is not None:
             return self._assistant_store

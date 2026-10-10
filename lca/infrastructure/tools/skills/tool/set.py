@@ -22,6 +22,20 @@ from lca.infrastructure.tools.skills.retire.tool import SkillRetireTool, SkillUn
 from lca.infrastructure.tools.skills.search.tool import SkillSearchTool
 
 
+def _home_publish_target(store: SkillPackageStore | None) -> tuple[object, str] | None:
+    """助理绑定的合并库要把 import 结果交到 overlay.install。
+
+    activate 只读 Home。写全局库再让 activate 去读，会得到「已安装」之后的「未找到」。
+    """
+    if store is None:
+        return None
+    overlay = getattr(store, "overlay", None)
+    assistant_id = str(getattr(store, "assistant_id", "") or "").strip()
+    if overlay is None or not assistant_id or not callable(getattr(overlay, "install", None)):
+        return None
+    return overlay, assistant_id
+
+
 def build_operational_skill_tools(
     *,
     importer: SkillImporter | None = None,
@@ -48,7 +62,7 @@ def build_operational_skill_tools(
         raise ValueError("自定义 SkillImporter 必须同时注入 SkillPackageInstaller")
     tools: list[Tool] = [
         SkillSearchTool(resolved_importer, resolved_store),
-        SkillImportTool(resolved_importer),
+        SkillImportTool(resolved_importer, home=_home_publish_target(store)),
         SkillActivateTool(resolved_store),
         SkillDeactivateTool(resolved_store),
         SkillRetireTool(resolved_store),
