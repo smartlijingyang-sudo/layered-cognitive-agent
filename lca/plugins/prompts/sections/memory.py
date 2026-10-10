@@ -17,6 +17,10 @@ if TYPE_CHECKING:
     from pydantic import BaseModel
 
 from lca.contracts.models.cognition.prompt_assembly import SectionOutput
+from lca.contracts.models.cognition.prompt_leak_markers import (
+    MEMORY_WRITE_RULES_HEADER,
+    UNRETRIEVED_LABEL,
+)
 from lca.contracts.models.core.perceive.perception import ContextManifest
 from lca.contracts.models.core.workspace.activation import ActivatedSkill
 from lca.contracts.models.team.role.team import RoleProfile
@@ -28,9 +32,9 @@ _RETRIEVAL_DUTY = (
     "- 实质请求先 memory_search（多角度，首个 query 贴近用户原话）；命中则 memory_explain 精读，未命中扫常驻文件兜底。\n"
     "- 易变事实复验（价格/档期/状态）行动前工具重验，记忆只给线索不给结论。\n"
     "- 检索落空：承认缺失并标注不确定性，绝不编造。\n"
-    '- 未检索标注: 本次未执行任何检索时，涉及记忆/事实的断言必须标注"未经检索"的不确定性，绝不编造。\n'
+    f'- {UNRETRIEVED_LABEL}: 本次未执行任何检索时，涉及记忆/事实的断言必须标注"未经检索"的不确定性，绝不编造。\n'
     "- 自省投影防幻觉: 自我认知以注入实体文件为准，不盲目探测。\n\n"
-    "## 记忆写入与写盘铁律\n"
+    f"{MEMORY_WRITE_RULES_HEADER}\n"
     '- 落笔前写盘: 收到写盘回执后，才可回复"记下了"；\n'
     "- 冲突原地修正（保留 provenance），不双写矛盾条目。\n"
     "- 凭证红线: 密码/Token/API Key 只记位置不记原文。\n\n"
@@ -53,7 +57,7 @@ _PRIVACY_FIREWALL = (
 _RETRIEVAL_DUTY_UNBOUND = (
     "## 记忆检索义务与决策树\n"
     "- 本次会话无持久记忆可用（未绑定 assistant home），不存在可检索的记忆源。\n"
-    '- 未检索标注: 涉及记忆/事实的断言必须标注"未经检索"的不确定性，绝不编造。\n'
+    f'- {UNRETRIEVED_LABEL}: 涉及记忆/事实的断言必须标注"未经检索"的不确定性，绝不编造。\n'
 )
 
 

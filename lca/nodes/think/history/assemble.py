@@ -49,6 +49,7 @@ from lca.contracts.harness.composition.plugin_contract import (
     PluginIdentity,
 )
 from lca.contracts.models.cognition.boundary import ForkedTools
+from lca.contracts.models.cognition.prompt_leak_markers import DEFER_CATALOG_HEADER
 from lca.contracts.protocols import Tool
 from lca.contracts.protocols.declarative.declarative_1.node_executor import (
     NodeContext,
@@ -187,9 +188,10 @@ class HistoryDeriveExecutor:
         )
 
 
-_DEFER_CATALOG_HEADER = "Deferred tool namespaces (not yet loaded):"
+# RA-116: the header literal lives in the prompt_leak_markers seam;
+# this module reads it from there (single producing literal).
 _DEFER_CATALOG_PATTERN = re.compile(
-    r"\n*" + re.escape(_DEFER_CATALOG_HEADER) + r"(?:\n[^\n]+)*\n*",
+    r"\n*" + re.escape(DEFER_CATALOG_HEADER) + r"(?:\n[^\n]+)*\n*",
 )
 _DEFER_SENTINEL_PATTERN = re.compile(
     r"\n*<!-- BEGIN DEFERRED TOOL CATALOG -->.*?<!-- END DEFERRED TOOL CATALOG -->\n*",
@@ -208,7 +210,7 @@ def _strip_defer_catalog(system: str) -> str:
         return ""
     if "<!-- BEGIN DEFERRED TOOL CATALOG -->" in system:
         system = _DEFER_SENTINEL_PATTERN.sub("\n\n", system)
-    if _DEFER_CATALOG_HEADER in system:
+    if DEFER_CATALOG_HEADER in system:
         system = _DEFER_CATALOG_PATTERN.sub("\n\n", system)
     return system.strip()
 

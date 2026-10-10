@@ -2775,3 +2775,36 @@ Learnings for future iterations:
     from the node's claimed gates — do not touch it when fixing the node narrative.
     ``tests/architecture/test_envelope_gate_order.py`` guards that concept.
 ---
+
+## 2026-10-10 13:22 CST - RA-116
+
+- What was implemented: new single registry seam
+  ``lca/contracts/models/cognition/prompt_leak_markers.py`` holding the canonical
+  leak-prone markers (``DEFER_CATALOG_HEADER`` — the single producing literal;
+  ``MEMORY_WRITE_RULES_HEADER``; ``UNRETRIEVED_LABEL``; ``LEAK_MARKER_PATTERNS``).
+  ``tool_defer/session.py`` and ``think/history/assemble.py`` now read the defer
+  header from the seam; ``think/decision/parse.py`` builds ``_LEAK_CUTOFF_REGEX``
+  from the seam (3 dead markers removed); ``plugins/prompts/sections/memory.py``
+  producers read their headers from the seam (f-strings, byte-identical render).
+  Guard test rewritten to derive leak inputs + pattern assertions from the seam.
+- Files changed:
+  - lca/contracts/models/cognition/prompt_leak_markers.py (new)
+  - lca/infrastructure/tool_defer/session.py
+  - lca/nodes/think/history/assemble.py
+  - lca/nodes/think/decision/parse.py
+  - lca/plugins/prompts/sections/memory.py
+  - tests/nodes/test_decision_parse_prompt_leak_guard.py
+  - raphy/prd.json
+- **Learnings for future iterations:**
+  - Patterns discovered: seam location is forced by the import-direction rule —
+    ``session.py`` carries "infrastructure must not import L2 nodes", so the seam
+    cannot live under ``lca/nodes/``; ``lca/contracts/`` is the only layer all four
+    consumers (infra/nodes/plugin/tests) already import. f-strings count as literals
+    for implicit tuple concatenation — safe way to inject a constant into prompt
+    template tuples without restructuring.
+  - Gotchas encountered: the guard's defer fragment is the PREFIX "Deferred tool
+    namespaces" (not the full header) — deriving it via ``re.escape`` of the full
+    literal would silently narrow the guard. Keep pattern fragments explicit in the
+    seam with a comment mapping each to its producer literal; verify byte-identity
+    of the compiled pattern in the test run, not by eye.
+---

@@ -1677,7 +1677,7 @@
         "ruff check clean on touched files."
       ],
       "priority": 2,
-      "passes": false,
+      "passes": true,
       "branchName": "raphy/arch-20261010-1245-b",
       "notes": "Source: friction walk Area B (decision parse). Strength: Worth exploring. Locality: the invariant 'these strings are prompt internals the model must not regurgitate' currently has no home — consumer and producers drift independently. Deletion test: deleting the seam just re-scatters the literals; the seam earns existence by making the producer/guard contract explicit. Constraint: the strip behavior in assemble.py (catalog removed on history re-assembly) must keep working byte-identically; guard fallback semantics (_SAFE_FALLBACK_RESPONSE) unchanged."
     },

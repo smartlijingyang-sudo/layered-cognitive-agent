@@ -18,6 +18,7 @@ from collections.abc import Sequence
 from contextvars import ContextVar, Token
 from typing import TYPE_CHECKING, Any
 
+from lca.contracts.models.cognition.prompt_leak_markers import DEFER_CATALOG_HEADER
 from lca.contracts.models.cognition.tool_defer import DeferMode, ToolNamespace
 from lca.infrastructure.tool_defer.policy import DeferPolicy
 
@@ -307,7 +308,7 @@ class ToolDeferSession:
         catalog = ""
         if catalog_lines:
             catalog = (
-                "Deferred tool namespaces (not yet loaded):\n"
+                DEFER_CATALOG_HEADER + "\n"
                 + "\n".join(catalog_lines)
                 + f"\n{self._policy.discovery_rule}"
             )
