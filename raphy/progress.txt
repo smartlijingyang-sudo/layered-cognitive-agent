@@ -1,5 +1,26 @@
 ## Codebase Patterns
 
+- **"5-gate" 叙事与实现对不上时先数 gate 再信 verdict（RA-115）：**
+  `pre_dispatch_envelope_check` 的 module docstring/yaml 自称 5-gate atomic check，
+  `_ALL_REF_ORDER` 含 `safe-boundary:valid`，但 `execute()` 只实现 4 个 gate——
+  safe-boundary 从 PR-2 抽取（39fa69654）起就没在该 node 跑过，真正的 safe-boundary
+  在 dispatch 时由 `ControlSlot.ACT_SAFE_BOUNDARY` 插件执行。修法二选一：实现 gate
+  或删 verdict + 改叙事（"删掉承诺也是诚实解"，RA-039 同款）；验收必须钉
+  "verdict 集合 == 实际跑的 gate 集合"。
+- **prompt 内部标记要有单一注册 seam（RA-116）：** leak guard 的 markers 写在消费侧
+  （parse.py regex），生产侧散在 3+ 处（assemble.py 常量 / tool_defer/session.py
+  行内字面量 / prompts/sections/memory.py）；"Deferred tool namespaces" 有两个独立
+  生产者；guard 里 "## 认知闭集/## 核心不变量/## 系统指令" 在 prompt 生产代码里根本
+  不存在（只在 parse.py 自身出现）——drift 已发生过一次。改 section 名必须只改一处。
+- **provider wire shape 的防御必须对称（RA-117）：** 8d1fe6f44 给 OpenAI 加了
+  hanging-tool-call 闭合 sanitizer，anthropic 路径没有，且
+  `tests/infrastructure/llm_adapter/` 下零 anthropic history 测试；两个 projection
+  消费同一份 journal-derived history，不对称就是 400 形状的坑。
+- **并发 lane 在同一 checkout 写未提交文件时 assess 停手（2026-10-10）：**
+  raphy/arch-20261010-1245 评估中途 skills/* 等 10 文件变脏——按 driver 指令停手、
+  不写 raphy/、不 commit，deliverable 以内容形式交回 coordinator。长评估里读文件
+  继续用 marker/版本锁定；写动作只在树干净时做。
+
 - **Phase-alias 词汇用真实 bundle 语料钉住，跨 phase region 进 keep-list（RA-109）：**
   收集节点语料只认 ``nodes:`` list 里的 ``id``（裸 grep ``id:`` 会混入
   plugin/provider 注册 id）。无 phase 前缀分两类：think 内层节点
@@ -244,6 +265,44 @@
   `git show <sha>:` 锁定版本；子任务误报写树时先查 reflog 再定论。
 
 ---
+
+
+## Round — assess (2026-10-10 12:45, branch raphy/arch-20261010-1245)
+
+- 按硬化版 `raphy-assess.md` 执行：读 SKILL.md / CONTEXT.md / `git log -40` /
+  progress.txt `## Codebase Patterns` 全量 / prd.json（`userStories` 键，RA-104~114
+  字段格式）；friction walk 精读三区（effect 执行 seam 4 文件 / decision parse +
+  3 生产者 / history sanitization + anthropic 路径，5 问必答）；duplication 副扫描；
+  self-grilling 写进 assessment.md；diversity quota 满足（3 friction + 1 duplication）。
+- 热点来源：parallel tool execution & run stability wave（plan lift、fanout_ntom 边、
+  batch envelopes、tool result attribution、history sanitization、decision output
+  hygiene guard）。
+- 产出 4 个 stories（`passes: false`），续号 RA-115~118：
+  - RA-115（P1, Strong）：pre_dispatch_envelope_check 自称 5-gate、只跑 4 个，
+    `safe-boundary:valid` verdict 从 PR-2 起从未被 earn；实现 gate 或删 verdict。
+  - RA-116（P2, Worth exploring）：prompt-leak markers 消费侧定义、生产侧 3+ 处，
+    两处独立生产同一 defer header，guard 含已死 markers（drift 实证）。
+  - RA-117（P2, Worth exploring）：hanging-tool_use 闭合 invariant 只在 OpenAI
+    路径，anthropic 路径无等价物、无测试。
+  - RA-118（P3, Worth exploring）：两处 `_resolve_writer` 双形 probe 收敛进
+    `lca/nodes/_resolve.py`（two adapters = real seam）。
+- 丢弃（有证据）：`_ToolResultRow` 助手函数群（deletion test 通过，earns existence）；
+  `_guard_acknowledgement` 单行 adapter（one adapter = hypothetical seam）；
+  `_derive_outcome`/`_extract_observation` unwrap 重复（2 处，未达收敛 bar）；
+  ModelVisibleHook 占位（ADR-0185 PR-3 显式计划，不重审）。
+- Runtime verification：scripted LLM 全量 run——basic→COMPLETED、同 agent 双
+  run→COMPLETED/COMPLETED、tool-call（bash）→INPUT_REQUIRED（approval era 设计路径）；
+  pytest 17 passed（leak-guard 6 + history-guard…/batch-attribution+envelope-check 8 +
+  run_with_tool_use e2e 3，含完整 CognitiveAgent.run()）。
+- 发现 pre-existing 失败（main 上已存在，非本轮）：test_think_llm_journal e2e 断言
+  COMPLETED，approval era 下得 INPUT_REQUIRED（a1c20526d, 2026-10-01）——stale
+  assertion，转 iter-tests lane，不开 story。
+- **Coordinator 收尾（13:05）**：评估中途主 checkout 被并发 lane 写脏（10 文件，
+  未动），按指令评估员停手未写盘。coordinator 在隔离 worktree
+  `~/.lca-worktrees/raphy-20261010-1245`（分支 `raphy/arch-20261010-1245-b`，起于
+  `48bf2d6a3`）写盘三文件并 commit `chore: [raphy] assess - 4 architecture candidates`。
+  名义分支 `raphy/arch-20261010-1245` 的 checkout 仍被外来 lane 占用，保持不动；
+  story 的 `branchName` 字段记为实际工作分支 `-b`。主 checkout 的 10 个脏文件全程未碰。
 
 ## Round 6 — assess (2026-10-07 23:15, branch raphy/arch-20261007-2315)
 
@@ -2686,3 +2745,127 @@ Files:
 Learnings for future iterations:
 - `scripts/check_package_contracts.py` 要求 L1 README.md 第 9 段必须用反引号包裹每一个符号名，且必须与 `__init__.py` 的 `__all__` 双向完全一致。
 - 函数内 import 可以通过多顺序实测（direct, reverse, consumer-first）验证是否存在真实循环，绝大多数早期留存的函数级 import 可以安全提升或收敛。
+## 2026-10-10 13:14 CST - RA-115
+
+- What was implemented: dropped the unearned ``effect.pre_dispatch.safe-boundary:valid``
+  verdict from ``_ALL_REF_ORDER`` in ``lca/nodes/effect/pre_dispatch_envelope_check.py``
+  (no safe-boundary gate ever ran in ``execute()`` — the pre-PR-2 executor's
+  "safe-boundary validation" was only a plan_ref/scope_ref non-empty check, already
+  subsumed by the envelope-shape gate; real enforcement is at dispatch time via
+  ControlSlot.ACT_SAFE_BOUNDARY plugins). Corrected the "5-gate" narrative to 4 gates
+  in the module docstring, the class docstring, ``bundles/act/act_subgraph.yaml``
+  comments, and the ``PipelineSafeExecutor`` delegation docstrings.
+- Files changed:
+  - lca/nodes/effect/pre_dispatch_envelope_check.py
+  - lca/cognition/body/executor/pipeline_safe_executor.py (docstrings only)
+  - bundles/act/act_subgraph.yaml (comments only)
+  - tests/effect/test_pre_dispatch_envelope_check.py (pins verdict set == implemented gates)
+  - tests/harness/test_tool_pipeline_plugins.py (expected verdict list 5 -> 4)
+  - raphy/prd.json
+- **Learnings for future iterations:**
+  - Patterns discovered: when a "gate" narrative is suspect, check the pre-extraction
+    code (``git show <extract>^``) for what the old check actually validated — here the
+    "safe-boundary" name was aspirational labeling of a plan/scope binding check, not
+    a real boundary predicate. Also: two verdict vocabularies coexist
+    (``effect.pre_dispatch.*`` node verdicts vs ``act.*:allow`` PR-7 envelope facts);
+    confirm which vocabulary a downstream consumer (``envelope_is_authorized``) reads
+    before assuming removal breaks gating.
+  - Gotchas encountered: the envelope contract's "5 闸单调聚合" (ADR-0074 §3.5,
+    authorize→budget→constrain→execute→safe-boundary) is a DIFFERENT 5-gate concept
+    from the node's claimed gates — do not touch it when fixing the node narrative.
+    ``tests/architecture/test_envelope_gate_order.py`` guards that concept.
+---
+
+## 2026-10-10 13:22 CST - RA-116
+
+- What was implemented: new single registry seam
+  ``lca/contracts/models/cognition/prompt_leak_markers.py`` holding the canonical
+  leak-prone markers (``DEFER_CATALOG_HEADER`` — the single producing literal;
+  ``MEMORY_WRITE_RULES_HEADER``; ``UNRETRIEVED_LABEL``; ``LEAK_MARKER_PATTERNS``).
+  ``tool_defer/session.py`` and ``think/history/assemble.py`` now read the defer
+  header from the seam; ``think/decision/parse.py`` builds ``_LEAK_CUTOFF_REGEX``
+  from the seam (3 dead markers removed); ``plugins/prompts/sections/memory.py``
+  producers read their headers from the seam (f-strings, byte-identical render).
+  Guard test rewritten to derive leak inputs + pattern assertions from the seam.
+- Files changed:
+  - lca/contracts/models/cognition/prompt_leak_markers.py (new)
+  - lca/infrastructure/tool_defer/session.py
+  - lca/nodes/think/history/assemble.py
+  - lca/nodes/think/decision/parse.py
+  - lca/plugins/prompts/sections/memory.py
+  - tests/nodes/test_decision_parse_prompt_leak_guard.py
+  - raphy/prd.json
+- **Learnings for future iterations:**
+  - Patterns discovered: seam location is forced by the import-direction rule —
+    ``session.py`` carries "infrastructure must not import L2 nodes", so the seam
+    cannot live under ``lca/nodes/``; ``lca/contracts/`` is the only layer all four
+    consumers (infra/nodes/plugin/tests) already import. f-strings count as literals
+    for implicit tuple concatenation — safe way to inject a constant into prompt
+    template tuples without restructuring.
+  - Gotchas encountered: the guard's defer fragment is the PREFIX "Deferred tool
+    namespaces" (not the full header) — deriving it via ``re.escape`` of the full
+    literal would silently narrow the guard. Keep pattern fragments explicit in the
+    seam with a comment mapping each to its producer literal; verify byte-identity
+    of the compiled pattern in the test run, not by eye.
+---
+
+## 2026-10-10 13:25 CST - RA-117
+
+- What was implemented: ported the hanging-tool-call closure invariant to the
+  Anthropic history projection. ``anthropic_messages_with_history`` now runs
+  ``_sanitize_hanging_tool_use`` (new, in
+  ``lca/infrastructure/llm_adapter/openai_compat/history/_history.py``) on its
+  final wire shape: every assistant ``tool_use`` id must be answered by a
+  ``tool_result`` block before a user text message / another assistant message /
+  end of list. Documented choice: SYNTHESIZE missing ``tool_result`` blocks
+  (same "[system: tool execution not completed in session]" marker as the OpenAI
+  path) rather than dropping the hanging ``tool_use``. OpenAI path untouched.
+- Files changed:
+  - lca/infrastructure/llm_adapter/openai_compat/history/_history.py
+  - tests/infrastructure/llm_adapter/test_anthropic_history_hanging_tool_use_guard.py (new)
+  - raphy/prd.json
+- **Learnings for future iterations:**
+  - Patterns discovered: the two projections live in ONE module (``_history.py``)
+    with the sanitizer applied at each projection's return — the symmetric place
+    for provider wire-shape defenses. The OpenAI sanitizer's scan/close loop
+    structure ports directly; only the "answer carrier" predicate changes
+    (``role=tool`` messages vs user messages carrying ``tool_result`` blocks).
+  - Gotchas encountered: Anthropic tool results arrive as ``role=user`` messages
+    whose content is a BLOCK LIST, while user text turns are ``role=user`` with
+    STRING content — the carrier predicate must distinguish by content shape,
+    not role alone. A mixed text+tool_result user message never occurs from this
+    projection; treat it as text (fail-closed: triggers closure).
+---
+
+## 2026-10-10 13:30 CST - RA-118
+
+- What was implemented: converged the runtime-writer two-shape probe into
+  ``lca/nodes/_resolve.py::resolve_writer(*, context, node, required: bool)``.
+  ``think/llm/persist.py`` now calls it with ``required=True`` (fail-loud,
+  byte-identical TypeError message); ``concept/effect/execute.py`` with
+  ``required=False`` (fail-soft None + debug log for legacy harnesses, branch
+  preserved). Both local ``_resolve_writer`` copies deleted; probe order
+  (attribute first, then ``.get``) unchanged.
+- Files changed:
+  - lca/nodes/_resolve.py
+  - lca/nodes/think/llm/persist.py
+  - lca/nodes/concept/effect/execute.py
+  - raphy/prd.json
+- **Learnings for future iterations:**
+  - Patterns discovered: ``lca/nodes/_resolve.py`` is the established home for
+    node resolve rituals (module docstring: "One Module, one Interface") — new
+    resolve-shaped duplications should land there with the differing semantics
+    as an explicit parameter, not as a second copy.
+  - Gotchas encountered: when a wrapper's TypeError message is part of the
+    contract (tests / fail-loud tracebacks), keep it byte-identical by
+    interpolating the same ``node`` prefix convention the module already uses.
+    Verify via ``git show HEAD:<file>`` string comparison, not just "it raises".
+---
+
+## Round close — deferred (2026-10-10 13:35, branch raphy/arch-20261010-1245-b)
+
+- 4 stories 全 passes（0 open）：34b3e1e25 assess + 390405065 RA-115 + 61083e29d RA-116 + d1cf9a77e RA-117 + 5d1bf7863 RA-118。
+- 合 main 条件不满足：主 checkout（~/layered-cognitive-agent，名义分支 raphy/arch-20261010-1245）仍有并发 lane 的 10 个未提交文件（lca/infrastructure/skills/*、lca/loop/commit/tool_journal.py、tests/ 下），按规则跳过合并、分支保留，本轮结束。
+- 合并前已核验：main tip 48bf2d6a3 未动；名义分支 tip 仍为 48bf2d6a3（无外来提交）。
+- 下轮 close：只合 -b 分支（git checkout main && git merge --no-ff raphy/arch-20261010-1245-b）；合前重验 main tip 与 -b tip（-b 应为 5d1bf7863 起）；名义分支确认无独有 commits 后 git branch -D；删 worktree ~/.lca-worktrees/raphy-20261010-1245。
+- 风险提示：若并发 lane 在名义分支的 checkout 上 commit 了它的 10 个文件，名义分支将含有外来提交——下轮也只合 -b，名义分支交由其作者自行处理，绝不代合、代删。

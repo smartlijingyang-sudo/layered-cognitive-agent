@@ -1,11 +1,13 @@
 """Tests for phase.concept.effect.pre_dispatch_envelope_check (PR-2 / ADR-0234).
 
-Verifies the 5-gate atomic envelope check extracted from
+Verifies the 4-gate atomic envelope check extracted from
 ``PipelineSafeExecutor.execute`` into a typed-port graph node.
 
-5 闸 (envelope-shape / permission / grant / budget / safe-boundary) must run
-as one atomic check; happy path returns all 5 verdict_refs; any failed gate
+4 闸 (envelope-shape / permission / grant / budget) must run as one
+atomic check; happy path returns all 4 verdict_refs; any failed gate
 raises so the outer edge predicate routes to ``terminal.commit`` (fail-loud).
+Safe-boundary is NOT an envelope-time verdict: it is enforced at dispatch
+time by ControlSlot.ACT_SAFE_BOUNDARY plugins (RA-115).
 
 Per AGENTS.md §3 C13, the node exposes typed-port ``(envelope, tool) →
 (envelope, verdict_refs)`` and must not write the envelope or mutate state.
@@ -31,6 +33,7 @@ from lca.contracts.protocols.declarative.declarative_1.node_executor import (
     NodeOutput,
 )
 from lca.nodes.effect.pre_dispatch_envelope_check import (
+    _ALL_REF_ORDER,
     EffectPreDispatchEnvelopeCheckExecutor,
 )
 
@@ -69,7 +72,13 @@ def _envelope_for_tool(tool_name: str) -> CommandEnvelope:
 
 @pytest.mark.asyncio
 async def test_pre_dispatch_envelope_check_all_gates_pass() -> None:
-    """Happy path — all 5 gates emit verdict_refs; envelope passes through."""
+    """Happy path — all 4 gates emit verdict_refs; envelope passes through.
+
+    RA-115 pin: emitted verdict_refs must equal exactly the gates
+    execute() runs. The explicit 4-tuple below fails if a future change
+    adds an unearned verdict (e.g. re-introducing safe-boundary:valid
+    without a gate that establishes it).
+    """
     tool = _StubTool(name="read_file")
     envelope = _envelope_for_tool("read_file")
     node = EffectPreDispatchEnvelopeCheckExecutor(
@@ -85,12 +94,14 @@ async def test_pre_dispatch_envelope_check_all_gates_pass() -> None:
     assert out.port_values["envelope"] == envelope
     verdict_refs = out.port_values["verdict_refs"]
     assert isinstance(verdict_refs, tuple)
-    assert len(verdict_refs) == 5
-    assert "effect.pre_dispatch.permission:allow" in verdict_refs
-    assert "effect.pre_dispatch.grant:valid" in verdict_refs
-    assert "effect.pre_dispatch.budget:valid" in verdict_refs
-    assert "effect.pre_dispatch.safe-boundary:valid" in verdict_refs
-    assert "effect.pre_dispatch.envelope-shape:valid" in verdict_refs
+    assert verdict_refs == _ALL_REF_ORDER
+    assert _ALL_REF_ORDER == (
+        "effect.pre_dispatch.envelope-shape:valid",
+        "effect.pre_dispatch.permission:allow",
+        "effect.pre_dispatch.grant:valid",
+        "effect.pre_dispatch.budget:valid",
+    )
+    assert not any("safe-boundary" in v for v in verdict_refs)
 
 
 @pytest.mark.asyncio
@@ -175,7 +186,7 @@ async def test_pre_dispatch_envelope_check_envelope_shape_incomplete_raises() ->
 
 @pytest.mark.asyncio
 async def test_pre_dispatch_envelope_check_batch_envelopes_all_pass() -> None:
-    """Batch envelopes: all envelopes pass 5 gates atomically, outputting envelope, envelopes and verdict_refs."""
+    """Batch envelopes: all envelopes pass 4 gates atomically, outputting envelope, envelopes and verdict_refs."""
     env1 = _envelope_for_tool("list_role_cards")
     env2 = _envelope_for_tool("read_file")
     node = EffectPreDispatchEnvelopeCheckExecutor(
@@ -195,7 +206,6 @@ async def test_pre_dispatch_envelope_check_batch_envelopes_all_pass() -> None:
         "effect.pre_dispatch.permission:allow",
         "effect.pre_dispatch.grant:valid",
         "effect.pre_dispatch.budget:valid",
-        "effect.pre_dispatch.safe-boundary:valid",
     )
 
 

@@ -1,11 +1,19 @@
-"""phase.concept.effect.pre_dispatch_envelope_check — typed-port 5-gate atomic check.
+"""phase.concept.effect.pre_dispatch_envelope_check — typed-port 4-gate atomic check.
 
-ADR-0234 (PR-2 of act-subgraph-tightening plan): the 5 gates that
-``PipelineSafeExecutor.execute`` used to internalise (envelope-shape /
-permission / grant / budget / safe-boundary) move to a graph node so
-the graph kernel can see them. ``PipelineSafeExecutor`` then shrinks
-to a thin shell that mints the envelope, calls this node, and wraps
-the result as an ``Observation``.
+ADR-0234 (PR-2 of act-subgraph-tightening plan) moved the envelope gates
+that ``PipelineSafeExecutor.execute`` internalised into a graph node so
+the graph kernel can see them: envelope-shape / permission / grant /
+budget. The extraction kept emitting a fifth verdict,
+``effect.pre_dispatch.safe-boundary:valid``, but no safe-boundary gate
+ever ran in this node -- the executor's old "safe-boundary validation"
+was only a plan_ref/scope_ref non-empty check, which the envelope-shape
+gate already covers. Emitting a verdict for a gate that never runs is
+unearned evidence (RA-115), so the verdict is gone: 4 gates run,
+4 verdicts emitted. Real safe-boundary enforcement lives at dispatch
+time via ``ControlSlot.ACT_SAFE_BOUNDARY`` plugins
+(tool_guards_service, guard_tool_result_spill, guard_tool_timeout,
+safe_executor), not at envelope time (``execution_space_ref`` stays
+empty until PR-7, so no envelope-time predicate exists to check).
 
 Inputs: envelope (CommandEnvelope)
 Outputs: envelope (CommandEnvelope), verdict_refs (tuple[str, ...])
@@ -54,14 +62,19 @@ _VERDICT_ENVELOPE_SHAPE = "effect.pre_dispatch.envelope-shape:valid"
 _VERDICT_PERMISSION = "effect.pre_dispatch.permission:allow"
 _VERDICT_GRANT = "effect.pre_dispatch.grant:valid"
 _VERDICT_BUDGET = "effect.pre_dispatch.budget:valid"
-_VERDICT_SAFE_BOUNDARY = "effect.pre_dispatch.safe-boundary:valid"
+
+# NOTE (RA-115): no _VERDICT_SAFE_BOUNDARY. A safe-boundary verdict was
+# emitted from the PR-2 extraction (39fa69654) until this fix, but no
+# safe-boundary gate ever ran in execute() -- the old executor's
+# "safe-boundary validation" was a plan_ref/scope_ref non-empty check,
+# subsumed by the envelope-shape gate. Real safe-boundary enforcement
+# is at dispatch time via ControlSlot.ACT_SAFE_BOUNDARY plugins.
 
 _ALL_REF_ORDER = (
     _VERDICT_ENVELOPE_SHAPE,
     _VERDICT_PERMISSION,
     _VERDICT_GRANT,
     _VERDICT_BUDGET,
-    _VERDICT_SAFE_BOUNDARY,
 )
 
 
@@ -69,7 +82,10 @@ _ALL_REF_ORDER = (
 class EffectPreDispatchEnvelopeCheckExecutor(NodeExecutor):
     """``effect.pre_dispatch.envelope_check`` 节点执行器。
 
-    5 闸一次性 atomic check:任意闸失败 → raise ValueError,verdict_refs 不 emit。
+    4 闸一次性 atomic check:任意闸失败 → raise ValueError,verdict_refs 不 emit。
+    safe-boundary 不在此检查（dispatch 时由 ControlSlot.ACT_SAFE_BOUNDARY
+    插件执行）；此处曾 emit 的 safe-boundary:valid 是未兑现的 verdict
+    (RA-115)，已删除。
     """
 
     semantic_name: str = "effect.pre_dispatch.envelope_check"

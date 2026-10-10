@@ -1,6 +1,6 @@
 {
   "project": "LCA Raphy Architecture Optimization",
-  "branchName": "raphy/deslop-100",
+  "branchName": "raphy/arch-20261010-1245-b",
   "description": "Continuous architecture deepening for the LCA cognitive-agent codebase via the raphy fresh-session loop. Round 1 (2026-10-06, old prompt): RA-001/RA-002 converged, RA-003 dropped with evidence. Round 2 (2026-10-06, hardened prompt): RA-004..RA-009 all done (merged to main 2026-10-07, merge 1b1526a94). Round 3 (2026-10-07, hardened prompt): friction walk over session plugins, loop_cursor, delegation/body executor; RA-010..RA-013 below. Out of scope: ralph Round 2 areas (DecisionGates, Ingest, ContextFiles shims, Read Runs micro-dirs, MemoryTools directory seam), lca/cognition/memory/ (frozen per Round 2 AP-01), CLI surface must not import contracts (deliberate rule), gate_chain_strategy.py (hands-off: another party's uncommitted work + pre-existing red test). Round 10 (2026-10-08 12:06, branch raphy/arch-20261008-1206): RA-033..RA-041 below (3 Strong + 5 Worth exploring + 1 Speculative; all from friction walk, none duplication-class). Round 11 (2026-10-08 15:05, branch raphy/arch-20261008-1505): RA-042..RA-047 all done (merged to main 2026-10-08, merge 0ab9d67cd). Round 12 (2026-10-08 22:05, branch raphy/arch-20261008-2205): RA-048..RA-050 below (1 Strong + 2 Worth exploring; all from friction walk, none duplication-class). Round DESLOP-100 (2026-10-10, branch raphy/deslop-100, batch-wave Plan A): new wave of architecture deepening + de-slop stories, continuing RA-104+. Focus: remove AI/change-narration slop from current-state prose and code comments, plus real architecture optimizations (deep modules, locality, deletion test) per improve-codebase-architecture. Waves of 5-10 stories, each story one commit with tests.",
   "userStories": [
     {
@@ -1651,6 +1651,63 @@
       ],
       "passes": true,
       "notes": "Verified forward/reverse/agent-first acyclic imports, ruff clean, git diff clean, full suite 9 passed."
+    },
+    {
+      "id": "RA-115",
+      "title": "Close the unearned safe-boundary verdict in pre_dispatch_envelope_check (4 gates run, 5 claimed)",
+      "description": "As an LCA maintainer, I want the envelope pre-dispatch node's verdicts to match the gates it actually runs, so no consumer of verdict_refs ever reads a fact that was never established. EffectPreDispatchEnvelopeCheckExecutor.execute() implements 4 gates (envelope-shape, permission, grant, budget) but _ALL_REF_ORDER emits 5 verdicts including 'effect.pre_dispatch.safe-boundary:valid'; the module docstring and bundles/act/act_subgraph.yaml claim a '5-gate atomic check'. No safe-boundary check has ever run in this node since the PR-2 extraction (39fa69654); ADR-0234 claimed all 5 gates move to the node. Real safe-boundary enforcement lives at dispatch time via ControlSlot.ACT_SAFE_BOUNDARY plugins (tool_guards_service, guard_tool_result_spill, guard_tool_timeout, safe_executor), not in this node.",
+      "acceptanceCriteria": [
+        "Either a real safe-boundary predicate checkable at envelope time is implemented in execute() (keeping 5 verdicts), or _VERDICT_SAFE_BOUNDARY is removed from _ALL_REF_ORDER and the '5-gate' narrative is corrected to the implemented gate count in the module docstring and bundles/act/act_subgraph.yaml comments.",
+        "tests/effect/test_pre_dispatch_envelope_check.py pins the verdict set to exactly the implemented gates (assert emitted verdict_refs == the gates execute() runs, so a future unearned verdict fails the test).",
+        "pytest tests/effect/ passes 100%; ruff check clean on touched files."
+      ],
+      "priority": 1,
+      "passes": true,
+      "branchName": "raphy/arch-20261010-1245-b",
+      "notes": "Source: friction walk Area A (effect execution seam). Strength: Strong. Leaky seam: declared interface ('5 闸一次性 atomic check') vs implementation (4 gates). Deletion test: removing the unearned verdict concentrates honesty — the emitted fact set then equals the established fact set. Constraint: verdict_refs flows to act.join typed port; do not silently change the port shape without updating bundles/act/act_subgraph.yaml. If a genuine envelope-time safe-boundary predicate exists (e.g. execution_space_ref constraint), implementing it is preferred over dropping the verdict."
+    },
+    {
+      "id": "RA-116",
+      "title": "Converge prompt-leak markers into a single registry seam shared by producers and the guard",
+      "description": "As an LCA maintainer, I want the prompt-leak markers to live in one named seam that both prompt producers and the leak guard read, so renaming a prompt section cannot silently disable the guard. Today markers are defined at the consumer: _LEAK_CUTOFF_REGEX in lca/nodes/think/decision/parse.py, while producers sit at 3+ distant sites — lca/nodes/think/history/assemble.py (_DEFER_CATALOG_HEADER), lca/infrastructure/tool_defer/session.py:310 (inline 'Deferred tool namespaces (not yet loaded):' literal), lca/plugins/prompts/sections/memory.py ('## 记忆写入与写盘铁律', '未检索标注'). Two independent producers emit the same defer header. The guard references dead markers '## 认知闭集' / '## 核心不变量' / '## 系统指令', which grep finds nowhere in prompt-producing code (lca/plugins/prompts/, lca/nodes/think/, bundles/) — drift has already happened once.",
+      "acceptanceCriteria": [
+        "A single named seam holds the canonical leak-prone header list; tool_defer/session.py and think/history/assemble.py both read the defer header from it (exactly one producing literal of 'Deferred tool namespaces (not yet loaded)' remains).",
+        "think.decision.parse's guard builds its pattern from the seam; the three dead markers are removed.",
+        "tests/nodes/test_decision_parse_prompt_leak_guard.py derives markers from the seam instead of hardcoding copies; pytest tests/nodes/test_decision_parse_prompt_leak_guard.py passes 100%.",
+        "ruff check clean on touched files."
+      ],
+      "priority": 2,
+      "passes": true,
+      "branchName": "raphy/arch-20261010-1245-b",
+      "notes": "Source: friction walk Area B (decision parse). Strength: Worth exploring. Locality: the invariant 'these strings are prompt internals the model must not regurgitate' currently has no home — consumer and producers drift independently. Deletion test: deleting the seam just re-scatters the literals; the seam earns existence by making the producer/guard contract explicit. Constraint: the strip behavior in assemble.py (catalog removed on history re-assembly) must keep working byte-identically; guard fallback semantics (_SAFE_FALLBACK_RESPONSE) unchanged."
+    },
+    {
+      "id": "RA-117",
+      "title": "Port the hanging-tool_use closure invariant to the Anthropic history projection",
+      "description": "As an LCA maintainer, I want the Anthropic wire path to enforce the same hanging-tool-call closure invariant the OpenAI path got in 8d1fe6f44, so a journal-derived history with an unanswered tool_use cannot reach Anthropic as a 400. _sanitize_hanging_tool_calls exists only for openai_messages_with_history; anthropic_messages_with_history has no equivalent, yet lca/infrastructure/llm_adapter/openai_compat/anthropic/_anthropic_messages.py:140 feeds it the same journal-derived history. A hanging tool_use (assistant declares tool_use blocks, no tool_result follows — the exact shape that broke OpenAI runs) is a hard Anthropic API error. There are zero anthropic history tests under tests/infrastructure/llm_adapter/.",
+      "acceptanceCriteria": [
+        "anthropic_messages_with_history enforces the closure invariant on its wire shape: unanswered tool_use ids get synthesized tool_result blocks (or the hanging tool_use is dropped per Anthropic's rules) — the choice is documented in the function docstring.",
+        "New test file tests/infrastructure/llm_adapter/test_anthropic_history_hanging_tool_use_guard.py mirrors the OpenAI guard tests (hanging tool_use at end / before user message / answered normally); passes 100%.",
+        "Existing OpenAI-path tests (test_history_hanging_tool_calls_guard.py) stay green; ruff check clean."
+      ],
+      "priority": 2,
+      "passes": true,
+      "branchName": "raphy/arch-20261010-1245-b",
+      "notes": "Source: friction walk Area C (history sanitization). Strength: Worth exploring. Asymmetric invariant across the provider seam: the OpenAI shape is defended, the Anthropic shape is not, although both consume the same history. Deletion test: a shared 'close hanging tool calls' step behind the provider-specific projection would concentrate the invariant; at minimum the Anthropic shape needs its own enforcement plus tests. Constraint: do not change the OpenAI projection's behavior or its '[system: tool execution not completed in session]' synthesis text."
+    },
+    {
+      "id": "RA-118",
+      "title": "Converge the runtime-writer two-shape probe into lca/nodes/_resolve.py",
+      "description": "As an LCA maintainer, I want one named seam for resolving the run-scoped writer off context.runtime, so the two-shape probe (getattr 'writer' attribute, then runtime.get('writer')) is not maintained in two places. _resolve_writer exists twice: lca/nodes/think/llm/persist.py:126 (fail-loud: raises TypeError when unbound) and lca/nodes/concept/effect/execute.py:135 (fail-soft: returns None + debug log for legacy harnesses). Two adapters = real seam; lca/nodes/_resolve.py already hosts resolve_typed_port_or_runtime and is the natural home.",
+      "acceptanceCriteria": [
+        "lca/nodes/_resolve.py gains resolve_writer(*, context, node, required: bool); both call sites use it with behavior preserved (persist raises TypeError when unbound, execute returns None).",
+        "No other behavior change: writer resolution order (attribute first, then .get) unchanged.",
+        "Tests covering both nodes pass; ruff check clean on touched files."
+      ],
+      "priority": 3,
+      "passes": true,
+      "branchName": "raphy/arch-20261010-1245-b",
+      "notes": "Source: duplication scan. Strength: Worth exploring. Deletion test: deleting one copy concentrates the probe ritual in the shared seam; the differing fail-loud/fail-soft semantics become an explicit 'required' parameter instead of two subtly different copies. Constraint: execute.py's fail-soft path is load-bearing for legacy harnesses without a bound writer (debug-log branch must survive)."
     }
   ]
 }

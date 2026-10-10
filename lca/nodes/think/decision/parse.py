@@ -46,6 +46,7 @@ from lca.contracts.harness.composition.plugin_contract import (
     PluginContract,
     PluginIdentity,
 )
+from lca.contracts.models.cognition.prompt_leak_markers import LEAK_MARKER_PATTERNS
 from lca.contracts.models.core.execution.decision import (
     Decision,
     DelegationSpec,
@@ -114,8 +115,12 @@ class DecisionParseExecutor:
         )
 
 
+# RA-116: the cutoff pattern is built from the canonical marker seam
+# (lca.contracts.models.cognition.prompt_leak_markers). The three dead
+# markers (## 认知闭集 / ## 核心不变量 / ## 系统指令) were removed:
+# grep proved they appear in no prompt-producing code.
 _LEAK_CUTOFF_REGEX = re.compile(
-    r"(\n*\s*(?:（?未检索标注[：:]|Deferred tool namespaces|##\s*记忆写入与写盘铁律|##\s*认知闭集|##\s*核心不变量|##\s*系统指令).*)$",
+    r"(\n*\s*(?:" + "|".join(LEAK_MARKER_PATTERNS) + r").*)$",
     re.DOTALL | re.IGNORECASE,
 )
 
