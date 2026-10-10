@@ -1708,6 +1708,75 @@
       "passes": true,
       "branchName": "raphy/arch-20261010-1245-b",
       "notes": "Source: duplication scan. Strength: Worth exploring. Deletion test: deleting one copy concentrates the probe ritual in the shared seam; the differing fail-loud/fail-soft semantics become an explicit 'required' parameter instead of two subtly different copies. Constraint: execute.py's fail-soft path is load-bearing for legacy harnesses without a bound writer (debug-log branch must survive)."
+    },
+    {
+      "id": "RA-119",
+      "title": "Converge the two getattr(context.runtime, 'state') probes in execute.py onto lca/nodes/_resolve.py",
+      "description": "As an LCA maintainer, I want the runtime-state two-shape probe to live in exactly one module, so the two fail-soft copies in lca/nodes/concept/effect/execute.py (node_execute line ~125 and _append_tool_result_surface line ~295) stop hand-rolling getattr(context.runtime, 'state', None). RA-118 converged the writer probe into resolve_writer(*, context, node, required: bool) but left resolve_runtime_state raise-only, so the two fail-soft probes in execute.py still cannot use the seam — and both miss the mapping-style runtime.get('state') fallback the seam implements.",
+      "acceptanceCriteria": [
+        "lca/nodes/_resolve.py: resolve_runtime_state gains required: bool (default True, mirroring resolve_writer); with required=False it returns None instead of raising TypeError.",
+        "execute.py node_execute (~125) and _append_tool_result_surface (~295) use resolve_runtime_state(context=context, node='effect.execute', required=False); the isinstance(AgentState) acceptance gate at the node_execute call site is preserved; the _append_tool_result_surface fail-soft None path is preserved.",
+        "Two-shape resolution order (attribute first, then mapping .get) is the same ritual resolve_writer uses.",
+        "No behavior change on real runs; tests covering effect.execute attribution pass; ruff check clean on touched files."
+      ],
+      "priority": 2,
+      "passes": false,
+      "branchName": "raphy/arch-20261010-2345",
+      "notes": "Source: friction walk Area B. Strength: Strong. Deletion test: deleting one probe concentrates the ritual in the seam — earns existence. Constraint: the isinstance(AgentState) gate is load-bearing for legacy fixtures on the fail-loud path. Test survival: tests/nodes/test_effect_execute_batch_attribution.py (172 lines); add a mapping-style runtime ({'state': ...}) resolution case — currently silently None.",
+      "implemented": false,
+      "dropped": false
+    },
+    {
+      "id": "RA-120",
+      "title": "Converge the [source:<id>] marker format into a single producer/consumer seam",
+      "description": "As an LCA maintainer, I want the [source:<id>] marker wire format defined in exactly one place, so the ProvenanceGuard citation path cannot silently break when one side of the format changes. Today the producer (lca/infrastructure/source_verify/registry.py:97 source_marker, f-string) and the consumer (lca/infrastructure/source_verify/claims.py:21 _EXPLICIT_MARKER regex) each define the format independently — the same drift class as RA-116's prompt markers, where drift already happened once in practice.",
+      "acceptanceCriteria": [
+        "One module (registry.py is the natural owner) exposes the marker format plus a parse/match function; claims.py imports the parser instead of its own regex.",
+        "Wire text unchanged: '[source:<id>]' stays model-visible exactly as pinned by tests/infrastructure/source_verify/test_source_verify.py:43.",
+        "Tests: existing test_source_verify.py cases keep passing; add a round-trip test (source_marker(...) -> extract_citations -> same source_id).",
+        "ruff check clean on touched files."
+      ],
+      "priority": 2,
+      "passes": false,
+      "branchName": "raphy/arch-20261010-2345",
+      "notes": "Source: friction walk Area B (leaky seam). Strength: Strong. Deletion test: deleting the duplicate regex concentrates format knowledge — earns existence. Constraint: wire format is model-visible and pinned by tests; ProvenanceGuard/ADR-0292 honesty semantics unchanged. test_source_verify.py pins format text and extract_citations behavior.",
+      "implemented": false,
+      "dropped": false
+    },
+    {
+      "id": "RA-121",
+      "title": "Converge resume-bundle validation into the load seam (fail-loud on corrupt bundles)",
+      "description": "As an LCA maintainer, I want corrupt resume bundles rejected at the load seam, so a partial bundle can never build a zombie WAITING_INPUT session. Today write_resume_bundle guards its inputs (locator / approval_request dict / approval_id, all fail-silent skip) but load_resume_bundle only checks data.get('run_id') != run_id; then _restore_from_bundle fills every missing field with silent str(... or '') defaults and _seed_recovery_facts no-ops on empty approval_id — a corrupt bundle yields a session that fails later with confusing errors.",
+      "acceptanceCriteria": [
+        "A shared validate_bundle(data) -> dict | None seam in lca/plugins/transport/webserver/carrier/runs/recovery.py, used by load_resume_bundle (and optionally as pre-write guard by write_resume_bundle).",
+        "Rejects: non-dict JSON, missing/ill-typed approval_request, missing/empty approval_id, missing/unparseable resume_point; corrupt bundle -> load returns None, which keeps mapping to the handler's existing 'run not found' 404 path via _run_is_recoverable.",
+        "Write side stays best-effort: the pause path must never raise; schema lca.run.resume_bundle/1 unchanged.",
+        "Tests: existing tests/plugins/transport/webserver/test_run_restart_recovery.py cases keep passing; add corrupt-bundle cases (bad approval_request type, missing approval_id, non-dict JSON) asserting None.",
+        "ruff check clean on touched files."
+      ],
+      "priority": 3,
+      "passes": false,
+      "branchName": "raphy/arch-20261010-2345",
+      "notes": "Source: friction walk Area A (testability/validation gap). Strength: Worth exploring. Deletion test: concentrates the scattered str(... or '') defaults into one explicit contract — earns existence. Real silent-degradation path; no observed failure yet, hence not Strong.",
+      "implemented": false,
+      "dropped": false
+    },
+    {
+      "id": "RA-122",
+      "title": "Converge the two _with_connection+to_thread+log wrappers in chat_projection.py",
+      "description": "As an LCA maintainer, I want the 'run sync SQL on a thread, log-and-continue on failure' ritual in one seam, so persist_waiting_projection and persist_terminal_projection in lca/infrastructure/observability/chat_projection.py stop copy-pasting the asyncio.to_thread(_with_connection, _write) + try/except log wrapper. Exactly two occurrences = a real seam by this repo's own rule ('one adapter = hypothetical seam, two = real').",
+      "acceptanceCriteria": [
+        "A _project_in_thread(fn, *, run_id, log_event) seam in chat_projection.py; both persist_* functions use it.",
+        "Log event names (chat_projection_wait_failed / chat_projection_terminal_failed) preserved as parameters — they are observable.",
+        "Best-effort semantics preserved (log-and-continue, never raise to the run path).",
+        "tests/infrastructure/test_chat_projection.py keeps passing; ruff check clean."
+      ],
+      "priority": 4,
+      "passes": false,
+      "branchName": "raphy/arch-20261010-2345",
+      "notes": "Source: duplication scan (secondary). Strength: Worth exploring. Small, honest two-occurrence seam; diversity quota already satisfied by RA-119/120/121 (friction-walk findings), so this is the one duplication-class story.",
+      "implemented": false,
+      "dropped": false
     }
   ]
 }

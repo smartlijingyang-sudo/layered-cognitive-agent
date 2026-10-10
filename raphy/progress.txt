@@ -1,5 +1,23 @@
 ## Codebase Patterns
 
+- **验证环境必须用干净树（2026-10-10 23:45 轮教训）：** 运行时验证的 prompt
+  字面写 `cd ~/layered-cognitive-agent`，但主树脏（agy/grok 未提交改动在干活）
+  时必须改在干净 worktree（本轮 main tip）跑——只读执行不算"碰"，但读脏树
+  的结果不可信；报告里写明实际验证环境。
+- **marker 双定义是 drift 已证的类（RA-120 认领）：** `source_marker()` f-string
+  生产 `[source:<id>]`，`claims.py::_EXPLICIT_MARKER` regex 独立消费——与
+  RA-116 的 prompt markers 同类；格式字面量只许存在一处，parse 由生产侧 seam
+  导出，test_source_verify.py:43 的文本钉住线不可动。
+- **bundle 读写校验必须对称（RA-121 认领）：** write 侧 best-effort 守卫
+  （locator/approval_request/approval_id）不能只存在写侧；load 侧只校验
+  `run_id` 就让 `_restore_from_bundle` 的 `str(... or "")` 沉默默认值拼出
+  zombie session。校验 seam 必须读写共享，坏 bundle 在 load 返回 None
+  （走既有 404 路径），绝不往后漏。
+- **_resolve.py 的 required 旗语要一次给全（RA-119 认领）：** RA-118 给
+  `resolve_writer` 加了 `required` 却没给 `resolve_runtime_state`，导致
+  execute.py 两个 fail-soft 探针继续手写 getattr 且丢掉 mapping `.get` 回退。
+  新 seam 落子时把 fail-loud/fail-soft 两种语义一次收完，别留半截。
+
 - **"5-gate" 叙事与实现对不上时先数 gate 再信 verdict（RA-115）：**
   `pre_dispatch_envelope_check` 的 module docstring/yaml 自称 5-gate atomic check，
   `_ALL_REF_ORDER` 含 `safe-boundary:valid`，但 `execute()` 只实现 4 个 gate——
@@ -263,6 +281,39 @@
 - **流程（本轮教训）：** 并发 lane 直接在 raphy 分支主 checkout 提交
   （f21cd0af2，12:11:45），评估中途 HEAD 移动——长评估里读文件用
   `git show <sha>:` 锁定版本；子任务误报写树时先查 reflog 再定论。
+
+---
+
+## Round — assess (2026-10-10 23:45, branch raphy/arch-20261010-2345)
+
+- 按硬化版 `raphy-assess.md` 执行：读 SKILL 深ening 词汇 / CONTEXT.md /
+  `git log -45`（热点：HITL restart recovery `f07a82f01`、并行工具执行簇
+  ab2383495/45d714991/e07666ef5/8d1fe6f44、RA-115~118 merge、seam read-side
+  accessors）/ progress.txt 顶部 Patterns（禁区 + learnings）。
+- friction walk 读透 3 区：A) `carrier/runs/recovery.py`（365 行全读）+
+  lifecycle pause hook + command_endpoints 恢复 handler + seam note；B)
+  `nodes/concept/effect/execute.py`（514 行全读）+ `_resolve.py` +
+  `source_verify/registry.py` + `claims.py` + `think/llm/persist.py` turn/step
+  对照；C) `observability/chat_projection.py`（446 行全读）。
+- 运行时验证（必做，已执行；环境=本轮干净 worktree main tip，非脏主树）：
+  MockLLMAdapter + `LLM_API_KEY=dummy`，(a) basic run completed、(b) 带 tool
+  call run completed、(c) 同一 agent 双 run completed/completed；无 crash/hang/
+  静默失败，无新 P0/P1。RA-023 非收敛路径未重跑（10-08 已确认）。
+- duplication scan（friction walk 之后）：热区文件机械扫描无字面簇，
+  仅 chat_projection 两处 `_with_connection`+to_thread+log（RA-122）。
+- 写 4 个 story（RA-119~122，`passes: false`，`branchName:
+  raphy/arch-20261010-2345`）：RA-119 Strong（execute.py 两个
+  getattr(context.runtime,"state") 收进 `_resolve.py`，给
+  `resolve_runtime_state` 补 `required` 旗，RA-118 的半截收尾）；RA-120
+  Strong（`[source:<id>]` marker 生产/消费双定义收进单一 seam，RA-116 同类）；
+  RA-121 Worth exploring（resume bundle 读写校验不对称，坏 bundle 建
+  zombie WAITING_INPUT session）；RA-122 Worth exploring（chat_projection
+  两处 thread+log 仪式收敛）。diversity quota 满足（3 个 friction-walk 来源）。
+- 考虑过但未立案：`turn=step`（刻意约定，RA-029 拥有 turn seam）；
+  `resolve_identity` 的 messages 表回填（刻意，无失败证据）；
+  ProactiveScheduler `js` 四 key（speculative）；psycopg 双 import / `.env`
+  手工解析（单处，无失败证据）。
+- ONE commit：`chore: [raphy] assess - 4 architecture candidates`。
 
 ---
 
