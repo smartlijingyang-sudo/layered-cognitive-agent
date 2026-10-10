@@ -35,6 +35,10 @@ from lca.cognition.team.modes_catalog import resolve_profile_mode
 from lca.contracts.models.core.conversation.conversation import ConversationTurn
 from lca.contracts.protocols.assistant.ownership import AssistantOwnership
 from lca.infrastructure.file.store import LocalFileStore
+from lca.plugins.transport.webserver.carrier.runs.recovery import (
+    load_resume_bundle,
+    restore_waiting_run,
+)
 from lca.plugins.transport.webserver.handlers.cors.cors import cors_headers
 from lca.plugins.transport.webserver.handlers.runs.ingest import (
     LobeHubRunInput,
@@ -451,6 +455,9 @@ async def _validate_run_ownership(request: Request, run_id: str) -> tuple[JSONRe
     """Validate run exists and caller owns it in non-dev mode.
 
     Returns (None, session) if authorized, or (JSONResponse, None) if rejected.
+    A paused run whose session was lost to a kernel restart is recoverable:
+    validation then returns ``(None, None)`` so the answer handler can
+    rebuild it lazily instead of answering 404.
     """
     registry = getattr(request.app.state, "registry", None)
     get_run = getattr(registry, "get", None) if registry is not None else None
@@ -461,6 +468,8 @@ async def _validate_run_ownership(request: Request, run_id: str) -> tuple[JSONRe
     _, dev_mode = auth_config_of(request)
     if dev_mode:
         if session is None:
+            if _run_is_recoverable(request, run_id):
+                return None, None
             return JSONResponse(
                 {"error": "run not found"}, status_code=404, headers=cors_headers()
             ), None
@@ -486,6 +495,10 @@ async def _validate_run_ownership(request: Request, run_id: str) -> tuple[JSONRe
             owner_user_id = (init_event.get("data") or {}).get("userId") or ""
 
     if session is None and not owner_user_id:
+        # A paused run may be recoverable from its durable resume bundle even
+        # when the stream manager lost the init event across a restart.
+        if _run_is_recoverable(request, run_id):
+            return None, None
         return JSONResponse(
             {"error": "run not found"}, status_code=404, headers=cors_headers()
         ), None
@@ -498,6 +511,38 @@ async def _validate_run_ownership(request: Request, run_id: str) -> tuple[JSONRe
         ), None
 
     return None, session
+
+
+def _run_is_recoverable(request: Request, run_id: str) -> bool:
+    """Return whether a paused run has a durable bundle for lazy recovery."""
+    from lca.plugins.transport.webserver.handlers.runs.api.query_endpoints import (
+        _run_locator_of,
+    )
+
+    locator = _run_locator_of(request)
+    if locator is None:
+        return False
+    return load_resume_bundle(run_id, locator) is not None
+
+
+async def _ensure_recovered_session(request: Request, run_id: str) -> Any:
+    """Return the live run session, lazily rebuilding it after a restart."""
+    registry = getattr(request.app.state, "registry", None)
+    if registry is None:
+        return None
+    session = registry.get(run_id)
+    if session is not None:
+        return session
+    ctx = getattr(request.app.state, "ctx", None)
+    if ctx is None:
+        return None
+    machine_resolver = getattr(request.app.state, "machine_resolver", None)
+    return await restore_waiting_run(
+        registry,
+        ctx,
+        run_id,
+        machine_resolver=machine_resolver,
+    )
 
 
 async def create_run(request: Request) -> JSONResponse:
@@ -636,6 +681,15 @@ async def _dispatch_resume(
     if err is not None:
         return err
 
+    # Same lazy restart recovery as ``answer_run``: the session may only exist
+    # on disk after a kernel restart. Only attempt when a registry exists;
+    # port-only test doubles skip recovery and route straight to the port.
+    registry = getattr(request.app.state, "registry", None)
+    if registry is not None:
+        session = await _ensure_recovered_session(request, run_id)
+        if session is None:
+            return _err("run not found", status_code=404, code="run_not_found")
+
     approval_id = str(payload_dict.get("tool_call_id") or payload_dict.get("approval_id") or "")
     if not approval_id:
         return _err(
@@ -726,6 +780,11 @@ async def answer_run(request: Request) -> JSONResponse:
     err, _ = await _validate_run_ownership(request, run_id)
     if err is not None:
         return err
+    # A kernel restart drops the in-memory session; rebuild it from the
+    # durable resume bundle before rejecting with run_not_found.
+    session = await _ensure_recovered_session(request, run_id)
+    if session is None:
+        return _err("run not found", status_code=404, code="run_not_found")
     try:
         body = await request.json()
     except json.JSONDecodeError:

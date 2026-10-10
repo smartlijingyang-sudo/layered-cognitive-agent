@@ -20,6 +20,7 @@ import { getLcaGatewayUrl } from './client';
 import { createLcaDeliverables, type LcaDeliverables } from './deliverables';
 import { createLcaGatewayEventHandler } from './event_handler';
 import { ensureLcaAssistantId, lcaStartRun, type LcaStartRunResult } from './execute';
+import { startLcaRunReconcile } from './reconcileRun';
 import { lcaRefreshWsToken } from './reconnect';
 
 type MessageLike = { id?: string; parentId?: string; role?: string };
@@ -448,6 +449,13 @@ export async function lcaExecuteGatewayRun(
     topicId: topicId || undefined,
   });
 
+  startLcaRunReconcile(get, {
+    context,
+    operationId: gatewayOpId,
+    runId: receipt.runId,
+    topicId,
+  });
+
   return { model: params.model, provider: 'openai' };
 }
 
@@ -555,5 +563,12 @@ export async function lcaResumeGatewayRun(
     token,
     topicId: topicId || undefined,
     lastEventId,
+  });
+
+  startLcaRunReconcile(get, {
+    context,
+    operationId: gatewayOpId,
+    runId,
+    topicId,
   });
 }

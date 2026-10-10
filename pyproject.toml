@@ -24,6 +24,7 @@ dependencies = [
     "ulid-py>=1.0.0",
     "redis>=8.1.0",
     "cryptography>=50.0.1",
+    "psycopg[binary]>=3.3.6",
 ]
 
 # Health deriver entry-point group (PR-1 / Task 1.2). Discovery goes

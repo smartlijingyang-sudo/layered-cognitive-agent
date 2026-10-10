@@ -100,22 +100,44 @@ class RunSessionBuilder:
         self._registry = registry
         self._ctx = ctx
 
-    def build(self, request: RunSessionRequest) -> RunSession:
+    def build(
+        self,
+        request: RunSessionRequest,
+        *,
+        restore: dict[str, Any] | None = None,
+    ) -> RunSession:
         """Build a journal-enabled session without publishing it to the registry.
+
+        ``restore`` carries the stable identity of an existing paused run
+        (``run_id`` / ``trace_id`` / ``started_at`` / ``plan_ref``) so the
+        session can be rebuilt from a durable resume bundle after a kernel
+        restart.  When ``restore`` is ``None`` a fresh identity is allocated.
 
         ADR-0167 D11 / ADR-0186 PR-3g: 在 builder 阶段构造 ``StepCoordinator``
         + 装配 per-run ``StepTreeFoldDeriver``。flush 时从 Session 快照或
         SpineReader fold → journal.json / narrative.md。
         """
-        run_id = new_id("run")
-        trace_id = new_id("trace")
-        started_at = time.time()
+        if restore is not None:
+            run_id = str(restore.get("run_id") or "")
+            trace_id = str(restore.get("trace_id") or "")
+            started_at = float(restore.get("started_at") or 0) or time.time()
+            if not run_id or not trace_id:
+                raise ValueError("restore requires run_id and trace_id")
+        else:
+            run_id = new_id("run")
+            trace_id = new_id("trace")
+            started_at = time.time()
         agent = request.agent if request.agent is not None else default_agent_ref()
         cleaned_attachment_ids = _clean_attachment_ids(request.attachment_ids)
 
         # ADR-0068 §决策二:session.plan_ref 必须在 build 阶段就确定,
         # 是后续 manifest / profile_snapshot / deriver 的 SSOT。
-        plan_ref = _compute_plan_ref(self._ctx, request)
+        # 恢复路径直接沿用暂停时已确定的 plan_ref，不重新派生。
+        plan_ref = (
+            str(restore.get("plan_ref") or "")
+            if restore is not None
+            else _compute_plan_ref(self._ctx, request)
+        )
 
         journal_factory = cast(
             "RunJournalFactory", require_capability(self._ctx, "run_ledger_factory")

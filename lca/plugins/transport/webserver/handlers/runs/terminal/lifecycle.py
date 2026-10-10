@@ -208,6 +208,11 @@ class RunTerminalCoordinator:
                     self._registry.prune()
                 _maybe_append_conversation_log(session, success)
                 self._materializer(session)
+                from lca.infrastructure.observability.chat_projection import (
+                    persist_terminal_projection,
+                )
+
+                await persist_terminal_projection(session, success=success)
                 if session.hub is not None:
                     await _dispose_export(session.hub)
                 try:

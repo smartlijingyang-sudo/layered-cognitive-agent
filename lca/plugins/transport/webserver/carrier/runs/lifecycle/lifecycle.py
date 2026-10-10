@@ -292,16 +292,21 @@ class RunLifecycleCoordinator:
             # bind_resume_capabilities CM; the with-block guarantees reset.
             with (
                 bind_resume_capabilities(session, bindings),
-                    bind_run_ambit(ambit) if ambit is not None else nullcontext(),
-                    run_identity_scopes(
-                        session.run_id,
-                        session.attachment_ids or (),
-                        getattr(session, "assistant_id", "") or "",
-                    ),
-                    run_workspace_scope(session.run_id),
-                    plane_bindings_scope(bindings) if bindings is not None else nullcontext(),
+                bind_run_ambit(ambit) if ambit is not None else nullcontext(),
+                run_identity_scopes(
+                    session.run_id,
+                    session.attachment_ids or (),
+                    getattr(session, "assistant_id", "") or "",
+                ),
+                run_workspace_scope(session.run_id),
+                plane_bindings_scope(bindings) if bindings is not None else nullcontext(),
             ):
-                    result = await session.runnable.resume(session.snapshot, input=answer)
+                result = await session.runnable.resume(session.snapshot, input=answer)
+            # Persist the conclusion text on the session (same as the
+            # execute driver) so terminal projection can publish the reply
+            # even when the resumed run has no step-tree fold machinery
+            # (e.g. a restart-recovered session).
+            session.output = getattr(result, "output", "") or ""
             if self._outcomes.apply_resume(session, result):
                 self._registry.mark_paused(session)
                 return
@@ -420,6 +425,17 @@ class RunLifecycleCoordinator:
         """
 
         if session.status == RunLifecycleStatus.WAITING_INPUT:
+            from lca.infrastructure.observability.chat_projection import (
+                persist_waiting_projection,
+            )
+            from lca.plugins.transport.webserver.carrier.runs.recovery import (
+                write_resume_bundle,
+            )
+
+            await persist_waiting_projection(session)
+            # Durable HIL recovery: persist the resume bundle so a kernel
+            # restart can rebuild this paused session on the next answer.
+            write_resume_bundle(session)
             flush_errors = flush_step_tree_artifacts(session, outcome="paused")
             if flush_errors:
                 _log.warning(

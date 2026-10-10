@@ -58,6 +58,14 @@ _NEW_FETCHER = """    /* LCA-P1: read from lca_running_operations via plain HTTP
         topicId,
         token,
       });
+
+      const { startLcaRunReconcile } = await import(
+        '@/store/chat/agents/transports/lcaGateway/reconcileRun'
+      );
+      startLcaRunReconcile(() => useChatStore.getState(), {
+        runId: op.operationId,
+        topicId,
+      });
     },"""
 
 
@@ -89,17 +97,18 @@ meta = PatchMeta(
 
 def apply(ctx: PatchContext) -> bool:
     text = ctx.read(_REL)
-    if _MARKER in text:
-        return False  # already applied
+    if "startLcaRunReconcile" in text and _MARKER in text:
+        return False
 
-    if _OLD_FETCHER not in text:
+    if _OLD_FETCHER in text:
+        text = text.replace(_OLD_FETCHER, _NEW_FETCHER, 1)
+    elif "startLcaRunReconcile" not in text:
         raise SystemExit(
             "[lca_runtime_use_gateway_reconnect] fetcher anchor not found; "
             "the upstream shape likely drifted. Update _OLD_FETCHER."
         )
 
-    new_text = text.replace(_OLD_FETCHER, _NEW_FETCHER, 1)
-    # Append the marker at end-of-file so a re-apply detects it.
-    new_text = new_text.rstrip() + "\n\n" + _MARKER + "\n"
-    ctx.write(_REL, new_text)
+    if _MARKER not in text:
+        text = text.rstrip() + "\n\n" + _MARKER + "\n"
+    ctx.write(_REL, text)
     return True

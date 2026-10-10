@@ -386,6 +386,16 @@ class CognitiveRuntime(Runtime):
         await self._capture_resume_memory(state, resume_input)
 
         session_reader = resolve_session_reader()
+        # A recovered run gets a fresh runtime without the per-run writer that
+        # ``_seed_run_session`` layers into the phase capabilities during
+        # ``run``. Bind it here too so think subgraph node executors
+        # (``memory.derive``, ``llm.call``) can read ``context.runtime.writer``
+        # on resume; the ``capabilities.get("writer") is None`` guard keeps a
+        # normal in-process resume from re-binding the same writer.
+        if session_reader is not None:
+            run_writer = RunSessionWriter(session=cast("SessionProtocol", session_reader))
+            if self._bindings.capabilities.get("writer") is None:
+                self._bindings = self._bindings.with_writer(run_writer)
         if session_reader is not None and resume_input.turn is not None:
             obs = resume_input.turn.observation
             if obs is not None and (obs.extra or {}).get("source") == "human_answer":

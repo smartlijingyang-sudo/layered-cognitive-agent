@@ -143,6 +143,7 @@ def install_bootstrap_state(
     app.state.device_settings = boot.device_settings
     app.state.file_store = file_store
     app.state.device_hub = boot.device_hub
+    app.state.machine_resolver = boot.machine_resolver
 
     from lca.infrastructure.file.store import _is_previewable
     from lca.infrastructure.observability.running_operation_store import (

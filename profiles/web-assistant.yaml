@@ -108,6 +108,14 @@ patch:
       # which loses a payment/account-modification safety constraint that exists
       # in no semantic record. See the Config docstring in the plugin.
       enabled: false
+  # HITL 重启恢复依赖 durable StateStore：waiting_input 暂停的 AgentState
+  # 必须落盘，kernel 重启后 lazy recovery 才能重建会话（与
+  # web-standard-continuous.yaml 的 sqlite 基线一致）。
+  - id: lca-state-store-provider
+    config:
+      providers: [memory, sqlite]
+      active_provider: sqlite
+      sqlite_database_path: .lca/agent-state.db
   - id: lca-composio-provider
     config:
       api_key:
