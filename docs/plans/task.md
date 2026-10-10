@@ -627,4 +627,10 @@
 | BRAINSTORM-DESLOP-100-APPROACHES | 提出 2-3 种大规模去冗与深度优化实施方案及权衡对比 | Completed | 用户明确确认选定方案 A（波次渐进 Raphy 循环，Batch-Wave Loop，每波 5~10 stories 动态评估与落地） |
 | BRAINSTORM-DESLOP-100-DESIGN-SECTIONS | 逐步呈现分节架构规范（边界/治理清单/执行流水线/测试不变量）并呈批 | Completed | §1 边界与自治、§2 核心架构模型与流水线时序、§3 不变量断言与测试矩阵全部获用户批准通过 |
 | BRAINSTORM-DESLOP-100-DESIGN-DOC | 沉淀去冗与架构优化设计文档至 docs/plans/ 并提交 git | Completed | 成功落盘 docs/plans/2026-10-10-raphy-100-deslop-and-optimization-design.md 并提交 git |
-| BRAINSTORM-DESLOP-100-TRANSITION | 转换至实施计划制定（调用 writing-plans 规划单流落地） | In_Progress | 正在调用 writing-plans 编写详细实施方案 docs/plans/2026-10-10-raphy-100-deslop-and-optimization-plan.md |
+| BRAINSTORM-DESLOP-100-TRANSITION | 转换至实施计划制定（调用 writing-plans 规划单流落地） | Completed | 成功落盘实施方案 docs/plans/2026-10-10-raphy-100-deslop-and-optimization-plan.md 并完成 Wave 1 任务分解 |
+| RAPHY-WAVE1-HARNESS | 波次驱动与状态机接缝初始化 (`scripts/run_raphy_wave.py`) | Pending | 待执行 |
+| RA-104-HOST-PROBING | [RA-104] 收敛 host_probing.py 显式路径解析，消除 16 处 S603/S607/S110 linter 坏味道 | Pending | 待执行 |
+| RA-105-CONTRACTS-ALIGNMENT | [RA-105] 治理 lca.contracts.mechanisms 导出与 L1/L2 声明偏差 | Pending | 待执行 |
+| RA-106-OBSERVABILITY-EXPORTS | [RA-106] 治理 lca.infrastructure.observability 契约接口与 README 导出偏差 | Pending | 待执行 |
+| RA-107-FAIL-LOUD-SEAM | [RA-107] 接缝显式 Fail-Loud 加固与隐式 None/降级清除 | Pending | 待执行 |
+| RA-108-DELETION-TEST-VERIFY | [RA-108] 真实删除测试与双向循环导入体检，全链路回归与 Wave 1 归档 | Pending | 待执行 |
