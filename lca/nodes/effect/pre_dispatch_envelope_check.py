@@ -74,71 +74,93 @@ class EffectPreDispatchEnvelopeCheckExecutor(NodeExecutor):
 
     semantic_name: str = "effect.pre_dispatch.envelope_check"
     region: str = "effect"
-    declared_inputs: tuple[PortName, ...] = (PortName("envelope"),)
-    declared_outputs: tuple[PortName, ...] = (PortName("envelope"), PortName("verdict_refs"))
+    declared_inputs: tuple[PortName, ...] = (
+        PortName("envelope"),
+        PortName("envelopes"),
+    )
+    declared_outputs: tuple[PortName, ...] = (
+        PortName("envelope"),
+        PortName("envelopes"),
+        PortName("verdict_refs"),
+    )
     permission_manifest: ToolPermissionManifest | None = None
 
     async def execute(self, context: NodeContext, input: NodeInput) -> NodeOutput:
         port_values = input.port_values
-        envelope = port_values.get(PortName("envelope"))
+        envelope_in = port_values.get(PortName("envelope"))
+        envelopes_in = port_values.get(PortName("envelopes"))
 
-        if not isinstance(envelope, CommandEnvelope):
+        if envelopes_in is not None:
+            if isinstance(envelopes_in, (list, tuple)):
+                candidates = list(envelopes_in)
+            else:
+                raise TypeError(
+                    "effect.pre_dispatch.envelope_check: 'envelopes' must be tuple or list of CommandEnvelope"
+                )
+        elif envelope_in is not None:
+            candidates = [envelope_in]
+        else:
             raise TypeError(
-                "effect.pre_dispatch.envelope_check: 'envelope' must be CommandEnvelope"
+                "effect.pre_dispatch.envelope_check: neither 'envelope' nor 'envelopes' port provided"
             )
 
-        # Tool identity is the grant capability the envelope was minted with.
-        tool_name: str = envelope.grant.capability
-
-        # envelope-shape
-        if not (
-            envelope.plan_ref and envelope.scope_ref and envelope.decision_ref and envelope.provider
-        ):
-            raise ValueError(
-                "effect.pre_dispatch.envelope_check: envelope-shape incomplete "
-                f"(plan_ref={envelope.plan_ref!r}, scope_ref={envelope.scope_ref!r}, "
-                f"decision_ref={envelope.decision_ref!r}, provider={envelope.provider!r})"
-            )
+        if not candidates:
+            raise ValueError("effect.pre_dispatch.envelope_check: batch of envelopes is empty")
 
         # permission (ADR-0220 PR-A typed-port read; profile-resolved
         # manifest is published onto the kernel runtime carrier so the
         # node reads the active policy at visit time, not the boot-time
         # snapshot bound on the executor instance).
         runtime = getattr(context, "runtime", None)
-        manifest = (
-            getattr(runtime, "permission_manifest", None)
-            if runtime is not None
-            else None
-        )
+        manifest = getattr(runtime, "permission_manifest", None) if runtime is not None else None
         if manifest is None:
             manifest = self.permission_manifest
-        allowed = (
-            manifest.allowed_tools if manifest is not None else None
-        )
-        if allowed is None or tool_name not in allowed:
-            raise ValueError(
-                f"effect.pre_dispatch.envelope_check: permission denied for tool {tool_name!r}"
-            )
+        allowed = manifest.allowed_tools if manifest is not None else None
 
-        # grant
-        grant = envelope.grant
-        if grant.effect_class != "tools":
-            raise ValueError(
-                "effect.pre_dispatch.envelope_check: grant mismatch "
-                f"(capability={grant.capability!r}, tool={tool_name!r}, "
-                f"effect_class={grant.effect_class!r})"
-            )
+        for idx, env in enumerate(candidates):
+            if not isinstance(env, CommandEnvelope):
+                raise TypeError(
+                    f"effect.pre_dispatch.envelope_check: envelope #{idx} must be CommandEnvelope, got {type(env).__name__}"
+                )
 
-        # budget
-        res = envelope.budget_reservation
-        if min(res.tokens, res.cost_cents, res.wall_clock_ms, res.tool_calls) < 0:
-            raise ValueError(
-                f"effect.pre_dispatch.envelope_check: budget reservation negative ({res!r})"
-            )
+            # Tool identity is the grant capability the envelope was minted with.
+            tool_name: str = env.grant.capability
 
+            # envelope-shape
+            if not (env.plan_ref and env.scope_ref and env.decision_ref and env.provider):
+                raise ValueError(
+                    "effect.pre_dispatch.envelope_check: envelope-shape incomplete "
+                    f"(plan_ref={env.plan_ref!r}, scope_ref={env.scope_ref!r}, "
+                    f"decision_ref={env.decision_ref!r}, provider={env.provider!r})"
+                )
+
+            # permission
+            if allowed is None or tool_name not in allowed:
+                raise ValueError(
+                    f"effect.pre_dispatch.envelope_check: permission denied for tool {tool_name!r}"
+                )
+
+            # grant
+            grant = env.grant
+            if grant.effect_class != "tools":
+                raise ValueError(
+                    "effect.pre_dispatch.envelope_check: grant mismatch "
+                    f"(capability={grant.capability!r}, tool={tool_name!r}, "
+                    f"effect_class={grant.effect_class!r})"
+                )
+
+            # budget
+            res = env.budget_reservation
+            if min(res.tokens, res.cost_cents, res.wall_clock_ms, res.tool_calls) < 0:
+                raise ValueError(
+                    f"effect.pre_dispatch.envelope_check: budget reservation negative ({res!r})"
+                )
+
+        primary_envelope = candidates[0]
         return NodeOutput(
             port_values={
-                PortName("envelope"): envelope,
+                PortName("envelope"): primary_envelope,
+                PortName("envelopes"): tuple(candidates),
                 PortName("verdict_refs"): _ALL_REF_ORDER,
             }
         )

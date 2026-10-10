@@ -171,3 +171,45 @@ async def test_pre_dispatch_envelope_check_envelope_shape_incomplete_raises() ->
             _ctx(),
             NodeInput(port_values={"envelope": envelope, "tool": tool}),
         )
+
+
+@pytest.mark.asyncio
+async def test_pre_dispatch_envelope_check_batch_envelopes_all_pass() -> None:
+    """Batch envelopes: all envelopes pass 5 gates atomically, outputting envelope, envelopes and verdict_refs."""
+    env1 = _envelope_for_tool("list_role_cards")
+    env2 = _envelope_for_tool("read_file")
+    node = EffectPreDispatchEnvelopeCheckExecutor(
+        permission_manifest=ToolPermissionManifest(allowed_tools=["list_role_cards", "read_file"]),
+    )
+
+    out = await node.execute(
+        _ctx(),
+        NodeInput(port_values={"envelopes": [env1, env2]}),
+    )
+
+    assert isinstance(out, NodeOutput)
+    assert out.port_values["envelope"] == env1
+    assert tuple(out.port_values["envelopes"]) == (env1, env2)
+    assert out.port_values["verdict_refs"] == (
+        "effect.pre_dispatch.envelope-shape:valid",
+        "effect.pre_dispatch.permission:allow",
+        "effect.pre_dispatch.grant:valid",
+        "effect.pre_dispatch.budget:valid",
+        "effect.pre_dispatch.safe-boundary:valid",
+    )
+
+
+@pytest.mark.asyncio
+async def test_pre_dispatch_envelope_check_batch_envelopes_one_denied_raises_atomically() -> None:
+    """Batch envelopes: if 1 of the envelopes fails permission, fails loud atomically."""
+    env1 = _envelope_for_tool("list_role_cards")
+    env2 = _envelope_for_tool("rm_rf_root")
+    node = EffectPreDispatchEnvelopeCheckExecutor(
+        permission_manifest=ToolPermissionManifest(allowed_tools=["list_role_cards"]),
+    )
+
+    with pytest.raises(ValueError, match="permission denied"):
+        await node.execute(
+            _ctx(),
+            NodeInput(port_values={"envelopes": [env1, env2]}),
+        )

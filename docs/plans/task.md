@@ -642,8 +642,8 @@
 | BRAINSTORM-RUN-STABILITY-DESIGN-DOC | 沉淀设计文档至 docs/plans/ 并提交 git | Completed | 成功落盘 docs/plans/2026-10-10-parallel-tool-execution-and-run-stability-design.md 并已提交 git |
 | BRAINSTORM-RUN-STABILITY-TRANSITION | 转换至实施计划制定（writing-plans） | Completed | 成功落盘 docs/plans/2026-10-10-parallel-tool-execution-and-run-stability-plan.md 并分解为 6 大单流任务 |
 | RUN-STAB-TASK-1-TOPOLOGY | [拓扑接通] `bundles/act/act_subgraph.yaml` 闭环 `fanout_ntom` 出边 | Completed | 已落地 `[fanout_1to1, fanout_ntom]` 谓词，通过 INV-PARALLEL-01 测试，8 passed |
-| RUN-STAB-TASK-2-ENVELOPE-CHECK | [原子校验] `pre_dispatch_envelope_check` 升级多 Envelopes 批量原子校验 | In_Progress | 编写 INV-PARALLEL-01 多 envelope 原子体检测试与实现 |
-| RUN-STAB-TASK-3-EXECUTE-ATTRIBUTION | [事实闭环] `effect.execute` 确保并发工具调用每个 `call_id` 均有对应回执落盘 | Pending | 待执行 |
+| RUN-STAB-TASK-2-ENVELOPE-CHECK | [原子校验] `pre_dispatch_envelope_check` 升级多 Envelopes 批量原子校验 | Completed | 支持单/多 envelopes 输入，原子执行 5 闸体检，6/6 测试通过 |
+| RUN-STAB-TASK-3-EXECUTE-ATTRIBUTION | [事实闭环] `effect.execute` 确保并发工具调用每个 `call_id` 均有对应回执落盘 | In_Progress | 编写 INV-PARALLEL-02 事实落盘完整性测试与加固 |
 | RUN-STAB-TASK-4-HISTORY-HYGIENE | [协议合规] `_history.py` 悬挂 tool_calls 协议自愈与合规守护 | Pending | 待执行 |
 | RUN-STAB-TASK-5-OUTPUT-GUARD | [声带净化] `decision/parse.py` Prompt 泄露与反刍条文净化门禁 | Pending | 待执行 |
 | RUN-STAB-TASK-6-INTEGRATION-E2E | [回归验收] 服务重启与真实端到端并发与创建助理复测 | Pending | 待执行 |
