@@ -37,7 +37,9 @@ log:emit
 模块导入失败 → ImportError；类实例化失败 → TypeError / ValueError；运行时错误以 L1 protocol 中定义的异常类型抛出。
 
 ## 9. 公共入口
-（无显式 __all__；通过模块导入即可）
+
+- **能力与接缝 (Capability & Seam)**: `CapabilityContext`, `CapabilityKey`, `MissingCapabilityError`, `REQUIRED_CAPABILITY_KEYS`, `provider_current`, `require_capability`, `consume`
+- **组合与装配 (Composition & Mounting)**: `CapabilityGrantExceeded`, `Composer`, `ComposerError`, `ComposerErrorCode`, `InspectEntry`, `InspectResult`, `InvariantChecker`, `InvariantViolation`, `MountResult`, `NameConflict`, `NotMounted`, `PluginFactory`, `PluginMetaMissing`, `UnmountResult`
 
 **模块清单**:
 
