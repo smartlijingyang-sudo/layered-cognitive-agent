@@ -184,8 +184,7 @@ async def test_legacy_safe_executor_uses_provider_pipeline_contract() -> None:
         "effect.pre_dispatch.permission:allow",
         "effect.pre_dispatch.grant:valid",
         "effect.pre_dispatch.budget:valid",
-        "effect.pre_dispatch.safe-boundary:valid",
-    ]
+    ]  # RA-115: safe-boundary:valid was unearned -- no gate emits it
     envelope = result.extra["command_envelope"]
     assert envelope["plan_ref"] == "test_plan_ref_for_pipeline_test"
     assert envelope["provider"] == "legacy-safe-executor"

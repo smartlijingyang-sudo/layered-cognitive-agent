@@ -138,7 +138,7 @@ nodes:
       emit_on_enter: []
       emit_on_exit: []
 
-  # ADR-0234 / PR-2: 5-gate atomic envelope check extracted from
+  # ADR-0234 / PR-2: 4-gate atomic envelope check extracted from
   # PipelineSafeExecutor into a typed-port graph node. Sits between
   # act.fanout and act.dispatch; emits ``verdict_refs`` typed-port
   # consumed by act.dispatch and (transitively) by effect.execute.
@@ -262,7 +262,7 @@ edges:
       value: [fanout_1to1, fanout_ntom]
 
   # PR-2 / ADR-0234: envelope_check → dispatch passes verdict_refs typed-port.
-  # On any 5-gate failure the node raises and emits no verdict_refs; the
+  # On any gate failure the node raises and emits no verdict_refs; the
   # kernel's select_edge returns None and the subgraph dispatch routes to
   # terminal.commit (fail-loud).
   - from: effect.pre_dispatch.envelope_check

@@ -254,11 +254,13 @@ class PipelineSafeExecutor(SafeExecutor):
 
         PR-7 V4 hard constraint：mint_envelope() 在 stack trace
         (architecture test 守护，scripts/check_command_envelope_required.py)。
-        The 5 gates (envelope-shape / permission / grant / budget /
-        safe-boundary) live in the graph node
-        ``effect.pre_dispatch.envelope_check``; this executor calls the
-        node, wraps the pipeline result as an Observation, and records
-        the Journal evidence. No local ``executor.*`` verdict vocabulary.
+        The 4 gates (envelope-shape / permission / grant / budget) live
+        in the graph node ``effect.pre_dispatch.envelope_check``; this
+        executor calls the node, wraps the pipeline result as an
+        Observation, and records the Journal evidence. No local
+        ``executor.*`` verdict vocabulary. (Safe-boundary is enforced
+        at dispatch time by ControlSlot.ACT_SAFE_BOUNDARY plugins,
+        not by this node -- RA-115.)
         """
         invocation_id = invocation_id.strip() or new_id("inv")
         envelope = self._legacy_envelope(tool, invocation_id)
@@ -332,7 +334,8 @@ class PipelineSafeExecutor(SafeExecutor):
         )
 
     async def _run_pre_dispatch_gates(self, envelope: CommandEnvelope) -> CommandEnvelope:
-        """ADR-0234 / PR-2: delegate 5 gates to ``effect.pre_dispatch.envelope_check``.
+        """ADR-0234 / PR-2: delegate the 4 envelope gates to
+        ``effect.pre_dispatch.envelope_check``.
 
         Returns the envelope with ``policy_verdict_refs`` set from the
         graph node output (no local ``executor.*`` vocabulary).

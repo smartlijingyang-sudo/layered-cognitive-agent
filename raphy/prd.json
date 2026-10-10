@@ -1662,7 +1662,7 @@
         "pytest tests/effect/ passes 100%; ruff check clean on touched files."
       ],
       "priority": 1,
-      "passes": false,
+      "passes": true,
       "branchName": "raphy/arch-20261010-1245-b",
       "notes": "Source: friction walk Area A (effect execution seam). Strength: Strong. Leaky seam: declared interface ('5 闸一次性 atomic check') vs implementation (4 gates). Deletion test: removing the unearned verdict concentrates honesty — the emitted fact set then equals the established fact set. Constraint: verdict_refs flows to act.join typed port; do not silently change the port shape without updating bundles/act/act_subgraph.yaml. If a genuine envelope-time safe-boundary predicate exists (e.g. execution_space_ref constraint), implementing it is preferred over dropping the verdict."
     },

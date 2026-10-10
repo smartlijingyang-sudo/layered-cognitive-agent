@@ -2745,3 +2745,33 @@ Files:
 Learnings for future iterations:
 - `scripts/check_package_contracts.py` 要求 L1 README.md 第 9 段必须用反引号包裹每一个符号名，且必须与 `__init__.py` 的 `__all__` 双向完全一致。
 - 函数内 import 可以通过多顺序实测（direct, reverse, consumer-first）验证是否存在真实循环，绝大多数早期留存的函数级 import 可以安全提升或收敛。
+## 2026-10-10 13:14 CST - RA-115
+
+- What was implemented: dropped the unearned ``effect.pre_dispatch.safe-boundary:valid``
+  verdict from ``_ALL_REF_ORDER`` in ``lca/nodes/effect/pre_dispatch_envelope_check.py``
+  (no safe-boundary gate ever ran in ``execute()`` — the pre-PR-2 executor's
+  "safe-boundary validation" was only a plan_ref/scope_ref non-empty check, already
+  subsumed by the envelope-shape gate; real enforcement is at dispatch time via
+  ControlSlot.ACT_SAFE_BOUNDARY plugins). Corrected the "5-gate" narrative to 4 gates
+  in the module docstring, the class docstring, ``bundles/act/act_subgraph.yaml``
+  comments, and the ``PipelineSafeExecutor`` delegation docstrings.
+- Files changed:
+  - lca/nodes/effect/pre_dispatch_envelope_check.py
+  - lca/cognition/body/executor/pipeline_safe_executor.py (docstrings only)
+  - bundles/act/act_subgraph.yaml (comments only)
+  - tests/effect/test_pre_dispatch_envelope_check.py (pins verdict set == implemented gates)
+  - tests/harness/test_tool_pipeline_plugins.py (expected verdict list 5 -> 4)
+  - raphy/prd.json
+- **Learnings for future iterations:**
+  - Patterns discovered: when a "gate" narrative is suspect, check the pre-extraction
+    code (``git show <extract>^``) for what the old check actually validated — here the
+    "safe-boundary" name was aspirational labeling of a plan/scope binding check, not
+    a real boundary predicate. Also: two verdict vocabularies coexist
+    (``effect.pre_dispatch.*`` node verdicts vs ``act.*:allow`` PR-7 envelope facts);
+    confirm which vocabulary a downstream consumer (``envelope_is_authorized``) reads
+    before assuming removal breaks gating.
+  - Gotchas encountered: the envelope contract's "5 闸单调聚合" (ADR-0074 §3.5,
+    authorize→budget→constrain→execute→safe-boundary) is a DIFFERENT 5-gate concept
+    from the node's claimed gates — do not touch it when fixing the node narrative.
+    ``tests/architecture/test_envelope_gate_order.py`` guards that concept.
+---
