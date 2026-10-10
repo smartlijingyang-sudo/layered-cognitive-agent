@@ -137,6 +137,15 @@ def anthropic_messages_with_history(
     Anthropic's native wire shape uses a top-level ``system`` field, but it
     also accepts ``role=system`` as the first in-messages entry. Keeping a
     single wire path with OpenAI: ``system`` lives in messages[0] when set.
+
+    RA-117 closure invariant: like the OpenAI path, every assistant
+    ``tool_use`` id must be answered by a ``tool_result`` block before
+    the conversation moves on — Anthropic rejects unanswered tool_use
+    as a 400. Unanswered ids get SYNTHESIZED ``tool_result`` blocks
+    (same ``[system: tool execution not completed in session]`` marker
+    as the OpenAI path) rather than dropping the hanging ``tool_use``:
+    the journal record of the attempted call is preserved and the wire
+    shape stays a valid Anthropic conversation.
     """
     messages: list[dict[str, Any]] = []
     if system:
@@ -188,4 +197,86 @@ def anthropic_messages_with_history(
                 messages.append({"role": "user", "content": content})
     if prompt and prompt.strip():
         messages.append({"role": "user", "content": prompt})
-    return messages
+    return _sanitize_hanging_tool_use(messages)
+
+
+def _is_tool_result_message(msg: dict[str, Any]) -> bool:
+    """True when msg is a user message carrying only tool_result blocks."""
+    if msg.get("role") != "user":
+        return False
+    content = msg.get("content")
+    return (
+        isinstance(content, list)
+        and bool(content)
+        and all(isinstance(b, dict) and b.get("type") == "tool_result" for b in content)
+    )
+
+
+def _sanitize_hanging_tool_use(messages: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Enforce Anthropic wire protocol on the final message sequence.
+
+    Any assistant message whose content blocks include ``type="tool_use"``
+    must be followed by ``role="user"`` messages carrying ``type="tool_result"``
+    blocks for each declared ``id`` before a user text message, before
+    another assistant message, or before the end of the message list.
+    Anthropic rejects an unanswered tool_use as a 400
+    ("tool_use ids were found without tool_result blocks"), so the
+    invariant is enforced here — the same closure the OpenAI path got
+    in 8d1fe6f44 (RA-117).
+
+    Choice (documented): unanswered ids get SYNTHESIZED tool_result
+    blocks rather than dropping the hanging tool_use. The synthetic
+    marker text matches the OpenAI path
+    ("[system: tool execution not completed in session]") so both
+    providers share one vocabulary for synthetic closure; the journal
+    record of the attempted call is preserved.
+    """
+    if not messages:
+        return messages
+
+    sanitized: list[dict[str, Any]] = []
+    i = 0
+    n = len(messages)
+
+    while i < n:
+        msg = messages[i]
+        sanitized.append(msg)
+        if msg.get("role") == "assistant":
+            expected_ids = [
+                b.get("id")
+                for b in msg.get("content") or []
+                if isinstance(b, dict) and b.get("type") == "tool_use" and b.get("id")
+            ]
+            if expected_ids:
+                j = i + 1
+                answered_ids: set[str] = set()
+                while j < n and _is_tool_result_message(messages[j]):
+                    sanitized.append(messages[j])
+                    for b in messages[j]["content"]:
+                        if isinstance(b, dict) and b.get("type") == "tool_result" and b.get("tool_use_id"):
+                            answered_ids.add(b["tool_use_id"])
+                    j += 1
+
+                missing_ids = [e for e in expected_ids if e not in answered_ids]
+                # j now points past the consecutive tool_result carriers:
+                # end of list, a user text message, or another assistant
+                # message all end the answer window, so closure is always
+                # enforced here when ids are missing.
+                if missing_ids:
+                    for mid in missing_ids:
+                        sanitized.append(
+                            {
+                                "role": "user",
+                                "content": [
+                                    {
+                                        "type": "tool_result",
+                                        "tool_use_id": mid,
+                                        "content": "[system: tool execution not completed in session]",
+                                    }
+                                ],
+                            }
+                        )
+                i = j - 1
+        i += 1
+
+    return sanitized

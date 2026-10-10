@@ -2808,3 +2808,31 @@ Learnings for future iterations:
     seam with a comment mapping each to its producer literal; verify byte-identity
     of the compiled pattern in the test run, not by eye.
 ---
+
+## 2026-10-10 13:25 CST - RA-117
+
+- What was implemented: ported the hanging-tool-call closure invariant to the
+  Anthropic history projection. ``anthropic_messages_with_history`` now runs
+  ``_sanitize_hanging_tool_use`` (new, in
+  ``lca/infrastructure/llm_adapter/openai_compat/history/_history.py``) on its
+  final wire shape: every assistant ``tool_use`` id must be answered by a
+  ``tool_result`` block before a user text message / another assistant message /
+  end of list. Documented choice: SYNTHESIZE missing ``tool_result`` blocks
+  (same "[system: tool execution not completed in session]" marker as the OpenAI
+  path) rather than dropping the hanging ``tool_use``. OpenAI path untouched.
+- Files changed:
+  - lca/infrastructure/llm_adapter/openai_compat/history/_history.py
+  - tests/infrastructure/llm_adapter/test_anthropic_history_hanging_tool_use_guard.py (new)
+  - raphy/prd.json
+- **Learnings for future iterations:**
+  - Patterns discovered: the two projections live in ONE module (``_history.py``)
+    with the sanitizer applied at each projection's return — the symmetric place
+    for provider wire-shape defenses. The OpenAI sanitizer's scan/close loop
+    structure ports directly; only the "answer carrier" predicate changes
+    (``role=tool`` messages vs user messages carrying ``tool_result`` blocks).
+  - Gotchas encountered: Anthropic tool results arrive as ``role=user`` messages
+    whose content is a BLOCK LIST, while user text turns are ``role=user`` with
+    STRING content — the carrier predicate must distinguish by content shape,
+    not role alone. A mixed text+tool_result user message never occurs from this
+    projection; treat it as text (fail-closed: triggers closure).
+---

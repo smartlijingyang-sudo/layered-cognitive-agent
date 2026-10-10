@@ -1691,7 +1691,7 @@
         "Existing OpenAI-path tests (test_history_hanging_tool_calls_guard.py) stay green; ruff check clean."
       ],
       "priority": 2,
-      "passes": false,
+      "passes": true,
       "branchName": "raphy/arch-20261010-1245-b",
       "notes": "Source: friction walk Area C (history sanitization). Strength: Worth exploring. Asymmetric invariant across the provider seam: the OpenAI shape is defended, the Anthropic shape is not, although both consume the same history. Deletion test: a shared 'close hanging tool calls' step behind the provider-specific projection would concentrate the invariant; at minimum the Anthropic shape needs its own enforcement plus tests. Constraint: do not change the OpenAI projection's behavior or its '[system: tool execution not completed in session]' synthesis text."
     },
