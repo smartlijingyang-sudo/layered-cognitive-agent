@@ -62,10 +62,6 @@ entries:
   name: gate_progress_loop_detector
   $module: lca.plugins.cognitive.gate.progress_loop_detector.plugin
   config: {}
-- id: convergence.policy.default
-  name: convergence_policy_default
-  $module: lca.plugins.cognitive.convergence.policy.plugin
-  config: {}
 - id: gate.delivery-satisfied
   name: gate_delivery_satisfied
   $module: lca.plugins.cognitive.gate.delivery_satisfied.plugin

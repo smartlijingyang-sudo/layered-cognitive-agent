@@ -478,7 +478,7 @@ async def _dispatch(
     id="phase.concept.effect_execute.effect_execute",
     Config=None,
     provides=("concept::effect.execute",),
-    requires=(),
+    requires=("source_registry",),
     layer="L2",
     kind=PluginKind.PRIMITIVE,
     effects="tools",

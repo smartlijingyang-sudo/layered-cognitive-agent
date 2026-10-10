@@ -49,7 +49,9 @@ async def test_delivery_satisfied_rewrites_producer_tool_to_respond() -> None:
         action_type=ActionType.USE_TOOL,
         rationale="again",
         confidence=0.9,
-        tool_calls=[ToolCall(call_id="c1", tool_name="executeCode", arguments={"code": "print(1)"})],
+        tool_calls=[
+            ToolCall(call_id="c1", tool_name="executeCode", arguments={"code": "print(1)"})
+        ],
     )
     forced = await gate.enforce(state, decision)
     assert forced.action_type == ActionType.RESPOND
@@ -86,7 +88,9 @@ async def test_delivery_satisfied_with_stdout_only() -> None:
             action_type=ActionType.USE_TOOL,
             rationale="again",
             confidence=0.9,
-            tool_calls=[ToolCall(call_id="c1", tool_name="executeCode", arguments={"code": "print(1)"})],
+            tool_calls=[
+                ToolCall(call_id="c1", tool_name="executeCode", arguments={"code": "print(1)"})
+            ],
         )
         forced = await gate.enforce(state, decision)
         assert forced.action_type == ActionType.RESPOND
@@ -106,7 +110,9 @@ async def test_delivery_not_satisfied_allows_producer() -> None:
         action_type=ActionType.USE_TOOL,
         rationale="run",
         confidence=0.9,
-        tool_calls=[ToolCall(call_id="c1", tool_name="executeCode", arguments={"code": "print(1)"})],
+        tool_calls=[
+            ToolCall(call_id="c1", tool_name="executeCode", arguments={"code": "print(1)"})
+        ],
     )
     result = await gate.enforce(state, decision)
     assert result.action_type == ActionType.USE_TOOL
@@ -131,7 +137,9 @@ async def test_delivery_satisfied_rewrites_listfiles_repeat_to_respond() -> None
                     rationale="list",
                     confidence=0.9,
                     tool_calls=[
-                        ToolCall(call_id="c0", tool_name="listFiles", arguments={"directoryPath": "."})
+                        ToolCall(
+                            call_id="c0", tool_name="listFiles", arguments={"directoryPath": "."}
+                        )
                     ],
                 ),
                 observation=Observation(
@@ -148,9 +156,51 @@ async def test_delivery_satisfied_rewrites_listfiles_repeat_to_respond() -> None
             rationale="list again",
             confidence=0.9,
             tool_calls=[
-                ToolCall(call_id="c1", tool_name="listFiles", arguments={"directoryPath": "/mnt/data"})
+                ToolCall(
+                    call_id="c1", tool_name="listFiles", arguments={"directoryPath": "/mnt/data"}
+                )
             ],
         )
         forced = await gate.enforce(state, decision)
         assert forced.action_type == ActionType.RESPOND
         assert file_list.strip() in (forced.response_text or "")
+
+
+@pytest.mark.asyncio
+async def test_final_respond_warns_for_unknown_source_without_rewriting(caplog) -> None:
+    from lca.cognition.convergence.policy import DefaultConvergencePolicy
+    from lca.cognition.convergence.runtime import ConvergenceRuntime
+    from lca.contracts.models.cognition.source_verify import ClaimVerdict
+    from lca.infrastructure.source_verify.registry import SourceRegistry
+
+    state = AgentState(
+        trace_id="source-final",
+        task="检查来源",
+        budget=Budget(),
+        extra={"keep": "reducer-owned"},
+    )
+    runtime = ConvergenceRuntime(
+        policy=DefaultConvergencePolicy(),
+        source_registry=SourceRegistry(),
+    )
+    registry = runtime.source_registry
+    registry.register_tool_result(
+        call_id="call_known",
+        tool_name="readFile",
+        content="账单编号 inv_1234。",
+    )
+    decision = Decision(
+        decision_id="final-source",
+        action_type=ActionType.RESPOND,
+        rationale="final answer",
+        confidence=0.9,
+        response_text="账单编号见 [source:tool:call_missing]。",
+    )
+
+    with bound_session("final-source-warn"):
+        result = await DeliverySatisfiedGate(runtime).enforce(state, decision)
+
+    assert result is decision
+    assert "source_verify:" in caplog.text
+    assert ClaimVerdict.UNRESOLVABLE.value in caplog.text
+    assert state.extra == {"keep": "reducer-owned"}

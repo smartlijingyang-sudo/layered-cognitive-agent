@@ -36,6 +36,13 @@ def from_runtime_graph(
     permission_manifest: ToolPermissionManifest | None = None,
 ) -> ProductionRuntimeDeps:
     """Adapt graph facts to the dependency value at the binding seam."""
+    phase_capabilities = dict(graph.phase_capabilities)
+    existing_registry = phase_capabilities.get("source_registry")
+    if existing_registry is not None and existing_registry is not capabilities.source_registry:
+        raise ValueError(
+            "source_registry phase capability must match the plan-resolved runtime provider"
+        )
+    phase_capabilities["source_registry"] = capabilities.source_registry
     return ProductionRuntimeDeps(
         brain=graph.brain,
         body=graph.body,
@@ -48,7 +55,7 @@ def from_runtime_graph(
         reducer=capabilities.reducer,
         compiled_plan=compiled_plan,
         node_executors=node_executors,
-        phase_capabilities=graph.phase_capabilities,
+        phase_capabilities=phase_capabilities,
         effect_handler_registry=capabilities.effect_handler_registry,
         delta_handler_registry=capabilities.delta_handler_registry,
         artifact_closure=capabilities.artifact_closure,

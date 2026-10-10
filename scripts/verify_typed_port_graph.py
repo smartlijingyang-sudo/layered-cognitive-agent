@@ -76,13 +76,13 @@ def record(name: str, ok: bool, detail: str = "") -> None:
 
 
 # ---------------------------------------------------------------------------
-# AC1 — bundles/phase_main_outer.yaml lifts without error
+# AC1 — bundles/outer/phase_main.yaml lifts without error
 # ---------------------------------------------------------------------------
 
 
 def ac1_phase_main_outer_lifts() -> None:
-    name = "AC1: bundles/phase_main_outer.yaml lifts without error"
-    path = BUNDLES_DIR / "phase_main_outer.yaml"
+    name = "AC1: bundles/outer/phase_main.yaml lifts without error"
+    path = BUNDLES_DIR / "outer" / "phase_main.yaml"
     if not path.exists():
         record(name, False, f"missing file: {path}")
         return
@@ -277,7 +277,7 @@ def ac4_phase_main_outer_lift_test() -> None:
 def ac5_known_broken_predicates_lift_fail() -> None:
     name = "AC5: three known-broken predicates become lift-time failures"
 
-    # If phase_main_outer.yaml still contains the broken predicate text, lift
+    # If phase_main.yaml still contains the broken predicate text, lift
     # MUST reject. If the predicate was already migrated to a typed Predicate,
     # lift succeeds (which is also acceptable — the bug was the silent False).
     try:
@@ -291,11 +291,11 @@ def ac5_known_broken_predicates_lift_fail() -> None:
 
     findings: list[str] = []
     # Probe each known-broken predicate by inserting it into the existing
-    # phase_main_outer.yaml as an extra edge. If lift raises PlanLiftError,
+    # phase_main.yaml as an extra edge. If lift raises PlanLiftError,
     # that predicate is now caught at lift time.
-    base_text = (BUNDLES_DIR / "phase_main_outer.yaml").read_text(encoding="utf-8")
+    base_text = (BUNDLES_DIR / "outer" / "phase_main.yaml").read_text(encoding="utf-8")
     if "<<<<<<<" in base_text or ">>>>>>>" in base_text:
-        record(name, False, "phase_main_outer.yaml contains unresolved merge markers")
+        record(name, False, "outer/phase_main.yaml contains unresolved merge markers")
         return
     # Used only to validate base_text parses; per-probe specs are constructed below.
     yaml.safe_load(base_text)
@@ -373,13 +373,8 @@ def ac6_no_getattr_fallback() -> None:
             body_start = idx + 1
             body_end = min(body_start + 25, len(lines))
             body = "\n".join(lines[body_start:body_end])
-            if (
-                "return None" in body
-                and "AttributeError" not in body
-            ):
-                offenders.append(
-                    f"  {py.relative_to(REPO)}:{idx + 1}: {stripped}"
-                )
+            if "return None" in body and "AttributeError" not in body:
+                offenders.append(f"  {py.relative_to(REPO)}:{idx + 1}: {stripped}")
 
     if offenders:
         record(name, False, "silent-None __getattr__ fallback:\n" + "\n".join(offenders))
@@ -456,7 +451,7 @@ def ac8_no_result_payload() -> None:
     # contracts, bundles, and the plugin output paths the cutover
     # modified. Anything else (transport, profile CLI, phase
     # context) is a separate domain with its own ``payload`` field.
-    GRAPH_SURFACE = (
+    graph_surface = (
         REPO / "lca" / "framework" / "graph",
         REPO / "lca" / "contracts" / "protocols" / "graph",
         REPO / "lca" / "plugins" / "loop",
@@ -467,7 +462,7 @@ def ac8_no_result_payload() -> None:
         BUNDLES_DIR,
     )
     offenders: list[str] = []
-    for root in GRAPH_SURFACE:
+    for root in graph_surface:
         if not root.exists():
             continue
         for py in root.rglob("*.py"):
@@ -497,7 +492,7 @@ def ac8_no_result_payload() -> None:
         )
         return
 
-    record(name, True, f"scanned typed-port-graph surface ({len(GRAPH_SURFACE)} roots)")
+    record(name, True, f"scanned typed-port-graph surface ({len(graph_surface)} roots)")
 
 
 # ---------------------------------------------------------------------------

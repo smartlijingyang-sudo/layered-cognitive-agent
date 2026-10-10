@@ -1,0 +1,53 @@
+{
+  "version": 1,
+  "waivers": {
+    "filename-boundaries": {
+      "owner": "smartlijingyang-sudo",
+      "expires": "2026-11-07",
+      "reason": "Remediate the 21 currently unlisted blacklist matches or move them through an explicitly reviewed naming exception before expiry.",
+      "output_sha256": "fd11c77a660e1da4d45aef19370c7f09cd3b3b5ae7810225c85e8e007ebdc06c"
+    },
+    "package-size": {
+      "owner": "smartlijingyang-sudo",
+      "expires": "2026-11-07",
+      "reason": "Refactor the 41 existing oversized packages or document narrowly scoped exemptions before expiry.",
+      "output_sha256": "6b447f4cf3cbd15a4fed8d06bdd3d21504c9c68c3ba545c5e7ed2ae5b41958fc"
+    },
+    "no-barrel-glob": {
+      "owner": "smartlijingyang-sudo",
+      "expires": "2026-11-07",
+      "reason": "Replace the 4 existing wildcard package imports with explicit exports before expiry.",
+      "output_sha256": "d712ac83c9e147f62959babfc852bcf6a02ec15dd3501a0e847c29005c7152fd"
+    },
+    "no-utility-modules": {
+      "owner": "smartlijingyang-sudo",
+      "expires": "2026-11-07",
+      "reason": "Rename or explicitly review the 11 existing generic-named modules before expiry.",
+      "output_sha256": "1ed7442fd26883a9f1fdc7332dd0a99a8542e1fd3e83c658a7e9e1fa5c1966aa"
+    },
+    "package-noun": {
+      "owner": "smartlijingyang-sudo",
+      "expires": "2026-11-07",
+      "reason": "Resolve the 4 existing package directory naming violations before expiry.",
+      "output_sha256": "4ac19ecdd47deb078c4022c28647ace1b8b50b24248f4c12b76b9a95acdff35c"
+    },
+    "known-abbrev": {
+      "owner": "smartlijingyang-sudo",
+      "expires": "2026-11-07",
+      "reason": "Review the 72 existing abbreviation findings through the naming ADR process before expiry.",
+      "output_sha256": "6138e0f0a3eac5d4951559cd0a4427e9139bfe641c036ef0d5a20d874e601415"
+    },
+    "package-integrity": {
+      "owner": "smartlijingyang-sudo",
+      "expires": "2026-11-07",
+      "reason": "Repair or explicitly review the 210 existing missing __init__/__all__ package integrity findings before expiry.",
+      "output_sha256": "09e9ce2b02b9db367d191b007097d8a76102c0b896f24d515761eddf938d96e3"
+    },
+    "tests-layout": {
+      "owner": "smartlijingyang-sudo",
+      "expires": "2026-11-07",
+      "reason": "Reconcile the 48 existing orphan test directories with the production package layout before expiry.",
+      "output_sha256": "4b23cbc684a8658ded8fcb643ae1c040471e9f98455e9f00cf7db62f9de6736b"
+    }
+  }
+}

@@ -123,6 +123,7 @@ def test_runtime_binding_adapter_owns_runtime_graph_mapping() -> None:
 def test_runtime_binding_adapter_maps_one_complete_graph_to_bindings() -> None:
     """Graph-to-binding field mapping stays local to the internal adapter seam."""
 
+    source_registry = object()
     closure = RuntimeCapabilityClosure(
         reducer=object(),
         effect_handler_registry=object(),
@@ -139,6 +140,7 @@ def test_runtime_binding_adapter_maps_one_complete_graph_to_bindings() -> None:
         result_finalizer_factory=object(),
         runtime_factory=object(),
         lifecycle_publisher=object(),
+        source_registry=source_registry,
     )
     graph = SimpleNamespace(
         brain=object(),
@@ -184,6 +186,7 @@ def test_runtime_binding_adapter_maps_one_complete_graph_to_bindings() -> None:
         "permission_manifest": None,
         "assistant_bootstrap": None,
         "assistant_id": "",
+        "source_registry": source_registry,
         "stop_policy": graph.phase_capabilities["stop_policy"],
         "custom": graph.phase_capabilities["custom"],
     }

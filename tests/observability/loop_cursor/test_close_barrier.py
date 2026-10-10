@@ -198,6 +198,35 @@ def test_close_report_fields_correct_on_persistence_failure() -> None:
     assert report.close_emitted is True
 
 
+def test_file_sink_fsync_failure_reaches_close_report(tmp_path, monkeypatch) -> None:
+    """A disk fsync failure must cross the sink/coordinator/barrier seam."""
+    import os
+
+    from lca.infrastructure.observability.loop_cursor.persistence.coordinator import (
+        FilePersistenceCoordinator,
+    )
+    from lca.infrastructure.observability.spine.sinks.file_sink import FileSink
+
+    sink = FileSink(tmp_path, run_id="run-fsync-failure", write_exception_index=False)
+    barrier = StdCloseBarrier(
+        persistence=FilePersistenceCoordinator(sink=sink),
+        host=_HostStub(),
+        close_emitter=_EmitterStub(),
+    )
+
+    def fail_fsync(_fd: int) -> None:
+        raise OSError("disk full")
+
+    with monkeypatch.context() as patch:
+        patch.setattr(os, "fsync", fail_fsync)
+        report = barrier.close("error")
+
+    sink.close()
+    assert report.persistence_flushed is False
+    assert isinstance(report.persistence_error, OSError)
+    assert str(report.persistence_error) == "disk full"
+
+
 def test_close_report_fields_correct_on_close_emit_failure() -> None:
     persistence = _Recorder()
     host = _HostStub()

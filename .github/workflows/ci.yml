@@ -30,12 +30,12 @@ jobs:
         run: uv run lint-imports
       - name: 包契约一致性（L1↔L2↔L3↔actual import + L1↔__all__）
         run: uv run python scripts/check_package_contracts.py
-      - name: 文件名边界（filename linter，warning）
-        run: uv run python scripts/check_filename_boundaries.py || echo "::warning::filename violations found"
+      - name: 文件名边界（严格门禁；既存基线为限时精确豁免）
+        run: uv run python scripts/check_filename_boundaries.py
       - name: Typed port graph acceptance (spec §8)
-        run: uv run python scripts/verify_typed_port_graph.py || echo "::warning::typed-port-graph acceptance failed"
-      - name: Package organization gates (Phase D — advisory)
-        run: uv run python -m lca.infrastructure.cli.cli diagnose-package-organization --verbose || echo "::warning::package-organization gates reported issues"
+        run: uv run python scripts/verify_typed_port_graph.py
+      - name: Package organization gates (Phase D — strict; expiring exact-baseline waivers)
+        run: uv run python -m lca.infrastructure.cli.cli diagnose-package-organization --verbose
       - name: Doctor CI gate (ADR-0199 §11 HPC-L5 + §17 #3)
         run: uv run pytest tests/architecture/test_0199_doctor_golden.py tests/architecture/test_0199_doctor_ci_gate.py tests/infrastructure/cli/test_doctor_ci_integration.py -v --no-cov --noconftest
       - name: mypy
@@ -50,5 +50,4 @@ jobs:
         run: |
           # Verify patch registry consistency (no lobehub-ui/ needed)
           uv run python deploy/lobehub/patch_lobehub.py list
-
 

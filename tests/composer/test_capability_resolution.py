@@ -187,6 +187,36 @@ def test_runtime_assembly_uses_the_shared_scope_adapter_for_all_plan_reads() -> 
     assert 'getattr(scope, "inject"' not in runtime_capabilities
 
 
+def test_runtime_capability_closure_resolves_plan_declared_source_registry() -> None:
+    """The effect executor's plan binding closes the shared run registry."""
+    from types import SimpleNamespace
+
+    from lca.infrastructure.source_verify.registry import SourceRegistry
+    from lca.plugins.composer.runtime.runtime.capabilities import (
+        _RUNTIME_CAPABILITY_KEYS,
+        resolve_runtime_capabilities,
+    )
+
+    source_registry = SourceRegistry()
+    values = {key: object() for key in _RUNTIME_CAPABILITY_KEYS}
+    values["source_registry"] = source_registry
+    bindings = tuple(
+        ProviderBinding(
+            capability=key,
+            resolution_key=key,
+            owner_plugin=f"provider:{key}",
+        )
+        for key in _RUNTIME_CAPABILITY_KEYS
+    )
+    plan = SimpleNamespace(capability=SimpleNamespace(provider_bindings=bindings))
+    scope = _RecordingScope(values)
+
+    closure = resolve_runtime_capabilities(plan, scope)  # type: ignore[arg-type]
+
+    assert closure.source_registry is source_registry
+    assert scope.lookups == sorted(_RUNTIME_CAPABILITY_KEYS)
+
+
 def test_scope_without_inject_is_rejected_at_the_adapter_seam() -> None:
     """计划绑定只接受已启动且提供注入操作的 scope。"""
 

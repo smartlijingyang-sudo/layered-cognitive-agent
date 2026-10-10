@@ -622,6 +622,7 @@
 | ARCH-R10-INFRA-FILE-STORE | Round 10 - Infrastructure File / Attachment / Storage Roots 单向依赖与无用抽象清理 | Pending | 待执行 |
 | ARCH-R11-HARNESS-PROFILE | Round 11 - Harness Activation & Profile Resolution 声明式解析与 DAG 验证深度聚合 | Pending | 待执行 |
 | ARCH-R12-CONVERGENCE-AUDIT | Round 12 - 全系统架构不变量终审、契约门禁全量回归与架构基准对齐 | Pending | 待执行 |
+<<<<<<< HEAD
 | BRAINSTORM-DESLOP-100-CONTEXT | 深度梳理代码库与文档 Slop 现状、Raphy 100 轮历史与架构优化热点 | Completed | 已深度梳理 ADR-0293 raphy 100 stories (RA-001~RA-100 已达标，worktree 拓展至 RA-103)、88 处 verify_doc_slop 命中、check_package_contracts 62 项偏差及 ruff/contracts 边界 |
 | BRAINSTORM-DESLOP-100-QUESTIONS | 澄清「100次真实优化与去冗」的具体目标、执行载体与边界（单步提问） | Completed | 用户明确选定：基于 ADR-0293 与 improve-codebase-architecture 开启全新一轮 Raphy 架构加深与去冗循环，派生高质量真实优化故事集并单流交付 |
 | BRAINSTORM-DESLOP-100-APPROACHES | 提出 2-3 种大规模去冗与深度优化实施方案及权衡对比 | Completed | 用户明确确认选定方案 A（波次渐进 Raphy 循环，Batch-Wave Loop，每波 5~10 stories 动态评估与落地） |
@@ -647,3 +648,4 @@
 | RUN-STAB-TASK-4-HISTORY-HYGIENE | [协议合规] `_history.py` 悬挂 tool_calls 协议自愈与合规守护 | Completed | 自动闭环悬挂 tool_calls，保持合法轮次交替，8/8 协议测试全绿 |
 | RUN-STAB-TASK-5-OUTPUT-GUARD | [声带净化] `decision/parse.py` Prompt 泄露与反刍条文净化门禁 | Completed | 成功拦截与净化反刍系统提示词/条文泄露，3/3 测试全绿 |
 | RUN-STAB-TASK-6-INTEGRATION-E2E | [回归验收] 服务重启与真实端到端并发与创建助理复测 | Completed | 服务重启全健康；真实 run_1c9a1e257cd9 743 事实事件全绿，并发工具与 Defer 机制完美协作，向导交互无缝推进且 0 泄露 |
+| LCA-2026-10-08-RELIABILITY | 修复刷盘报告、账本恢复、CI基线门禁与来源校验接入；仅改这四项及必要测试/豁免配置，不改无关基线和非LCA资产 | Completed | 聚焦回归 149/149 通过；profile closure、capability snapshot 与 plan_ref 3/3 通过；文件名、typed-port、package-organization 和 README 严格门禁全通过（既存失败使用 2026-11-07 到期的责任人/精确指纹豁免）。全量 pytest：12,330 passed、192 failed、160 skipped、13 deselected、8 xfailed、13 errors；相较修复前全量结果无新增失败节点、6 项失败已消除；干净 HEAD 复跑的 19 个相关失败节点均可重现，因此不宣称全量测试全绿。 |

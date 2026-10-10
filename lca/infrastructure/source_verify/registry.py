@@ -6,6 +6,7 @@ ProvenanceGuard 的第一原则: 绝不把证据塌缩成一个匿名上下文.
 
 from __future__ import annotations
 
+from collections.abc import MutableMapping
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any
@@ -96,39 +97,55 @@ def source_marker(source_id: str) -> str:
     return f"[source:{source_id}]"
 
 
-_REGISTRY_ATTR = "_lca_source_registry"
+_SOURCE_REGISTRY_CAPABILITY = "source_registry"
 
 
 def get_registry(runtime: Any | None) -> SourceRegistry | None:
-    """从 run-scoped runtime 上取回 SourceRegistry；没有返回 None."""
+    """从 runtime 的显式 ``source_registry`` capability 取回登记表.
+
+    ``AgentState`` 是 reducer-owned 数据投影, 不承载可变运行时服务. 生产图的
+    ``NodeRuntimeView`` 与 ``RuntimePhaseCapabilities`` 均通过 ``get`` 暴露该
+    capability; 普通映射/legacy runtime 属性只用于轻量测试与兼容 harness.
+    """
+    if isinstance(runtime, SourceRegistry):
+        return runtime
     if runtime is None:
         return None
-    try:
-        if isinstance(runtime, dict):
-            v = runtime.get(_REGISTRY_ATTR)
-        else:
-            v = getattr(runtime, _REGISTRY_ATTR, None)
-    except Exception:
-        return None
-    return v if isinstance(v, SourceRegistry) else None
+
+    getter = getattr(runtime, "get", None)
+    if callable(getter):
+        try:
+            value = getter(_SOURCE_REGISTRY_CAPABILITY)
+        except (KeyError, AttributeError, TypeError):
+            value = None
+        if isinstance(value, SourceRegistry):
+            return value
+
+    value = getattr(runtime, _SOURCE_REGISTRY_CAPABILITY, None)
+    return value if isinstance(value, SourceRegistry) else None
 
 
 def ensure_registry(runtime: Any | None) -> SourceRegistry:
-    """取回或创建挂在 runtime 上的 SourceRegistry.
+    """取回或在可写 legacy runtime 上创建 registry, 从不修改 AgentState.
 
-    runtime 为 None（legacy harness）或不可写时，返回一个临时的、
-    挂不上去的 registry —— 调用方仍可正常登记，本轮校验只是取不到它。
+    正式运行时由 run-scoped ``source_registry`` capability 提供同一实例, 供
+    effect 节点登记和最终答案校验共用。没有该 capability 的 legacy harness
+    会得到一个临时 registry; 只读 runtime view 不会被写入。
     """
-    reg = get_registry(runtime)
-    if reg is not None:
-        return reg
-    reg = SourceRegistry()
-    if runtime is not None:
-        try:
-            if isinstance(runtime, dict):
-                runtime[_REGISTRY_ATTR] = reg
-            else:
-                setattr(runtime, _REGISTRY_ATTR, reg)
-        except Exception:  # noqa: S110 -- best-effort registry attach; runtime may be immutable
-            pass
-    return reg
+    registry = get_registry(runtime)
+    if registry is not None:
+        return registry
+
+    registry = SourceRegistry()
+    if runtime is None:
+        return registry
+    try:
+        if isinstance(runtime, MutableMapping):
+            runtime[_SOURCE_REGISTRY_CAPABILITY] = registry
+        else:
+            setattr(runtime, _SOURCE_REGISTRY_CAPABILITY, registry)
+    except (AttributeError, TypeError):
+        # NodeRuntimeView is deliberately read-only. Production wiring must
+        # provide the registry through RuntimePhaseCapabilities instead.
+        pass
+    return registry

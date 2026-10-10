@@ -14,8 +14,8 @@ This test boots the canonical web-standard profile and asserts:
 * A sample of canonical seam/provider pairs both resolve, share a
   domain dir, and are not silently disabled.
 * The resolved capability set is identical to the drift-pin snapshot at
-  ``docs/notes/baselines/capability-set-web-standard-2026-10-02.json``
-  (regenerated 2026-10-02, round-0354; the pre-PR-10 file is kept as history).
+  ``docs/notes/baselines/capability-set-web-standard-2026-10-08.json``
+  (263 enabled plugins / 138 edges).
 
 Reference:
     docs/notes/proposed/seam/2026-09-04-plugin-universe-single-entry.md
@@ -105,10 +105,7 @@ def test_every_resolved_plugin_lives_under_a_domain(resolved) -> None:
         domain = _domain_of_module(module)
         if domain in {"seams", "providers"}:
             bad.append(f"{plugin.id} -> {module}")
-    assert not bad, (
-        "plugins still under legacy seams/providers tree:\n  "
-        + "\n  ".join(bad)
-    )
+    assert not bad, "plugins still under legacy seams/providers tree:\n  " + "\n  ".join(bad)
 
 
 def test_sample_pairs_share_domain_and_resolve(resolved) -> None:
@@ -143,9 +140,7 @@ def test_sample_pairs_share_domain_and_resolve(resolved) -> None:
             f"provider plugin {provider_id!r} missing from resolved profile"
         )
         assert not seam_node.disabled, f"seam {seam_id} disabled after migration"
-        assert not provider_node.disabled, (
-            f"provider {provider_id} disabled after migration"
-        )
+        assert not provider_node.disabled, f"provider {provider_id} disabled after migration"
         seam_domain = _domain_of_module(seam_node.module)
         provider_domain = _domain_of_module(provider_node.module)
         assert seam_domain == expected_domain, (
@@ -160,8 +155,8 @@ def test_sample_pairs_share_domain_and_resolve(resolved) -> None:
 def test_baseline_capability_set_matches(resolved) -> None:
     """The set of resolved plugin ids + their (provides, requires, kind, layer)
     tuples must equal the drift-pin snapshot at
-    ``docs/notes/baselines/capability-set-web-standard-2026-10-02.json``
-    (regenerated 2026-10-02, round-0354; 262 enabled plugins / 137 edges).
+    ``docs/notes/baselines/capability-set-web-standard-2026-10-08.json``
+    (263 enabled plugins / 138 edges).
 
     This is a stronger guarantee than the per-pair check above: it catches
     silent capability-string renames, missed migrations, and accidental
@@ -169,15 +164,11 @@ def test_baseline_capability_set_matches(resolved) -> None:
     """
     profile, _ = resolved
     baseline_path = (
-        ROOT
-        / "docs"
-        / "notes"
-        / "baselines"
-        / "capability-set-web-standard-2026-10-02.json"
+        ROOT / "docs" / "notes" / "baselines" / "capability-set-web-standard-2026-10-08.json"
     )
     assert baseline_path.exists(), (
         f"baseline missing at {baseline_path} — capture it via "
-        f"`lca-ops inspect-tree profiles/web-standard.yaml` BEFORE merging PR-10"
+        f"`lca-ops inspect-tree profiles/web-standard.yaml` to refresh the current graph"
     )
     baseline = json.loads(baseline_path.read_text())
     baseline_ids = sorted(n["id"] for n in baseline["nodes"])

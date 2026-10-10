@@ -20,6 +20,8 @@ journal store 的 bootstrap 只看新 spine 路径。
 from __future__ import annotations
 
 import json
+import logging
+import os
 from collections.abc import Sequence
 from pathlib import Path
 from typing import Any
@@ -38,6 +40,8 @@ from lca.infrastructure.observability.spine.sinks.naming import (
 )
 from lca.infrastructure.persistence.jsonl_sink import JsonlFileSink
 from lca.infrastructure.persistence.write_behind import WriteBehindBuffer
+
+log = logging.getLogger(__name__)
 
 
 class FilesystemJournalStore(JournalStoreBackend):
@@ -89,33 +93,51 @@ class FilesystemJournalStore(JournalStoreBackend):
 
     def _load_existing_at(self, path: Path) -> None:
         try:
-            text = path.read_text(encoding="utf-8")
-        except OSError:
-            return
-        for _line_no, line in enumerate(text.splitlines(), start=1):
-            stripped = line.strip()
-            if not stripped:
-                continue
+            raw = path.read_bytes()
+        except OSError as exc:
+            raise JournalFormatError(f"{path}: failed to read journal: {exc}") from exc
+
+        lines = raw.splitlines(keepends=True)
+        offset = 0
+        for line_no, raw_line in enumerate(lines, start=1):
+            line_offset = offset
+            offset += len(raw_line)
+            is_last = line_no == len(lines)
+            terminated = raw_line.endswith(b"\n")
+            content = raw_line[:-1] if terminated else raw_line
+            if content.endswith(b"\r"):
+                content = content[:-1]
             try:
-                payload = json.loads(stripped)
-            except json.JSONDecodeError:
-                # 部分行损坏 —— 跳过(append-only 文件不应损坏)
-                continue
+                text = content.decode("utf-8")
+                payload = json.loads(text)
+            except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+                if is_last and not terminated and self._is_confirmed_incomplete_tail(content, exc):
+                    self._truncate_partial_tail(path, line_offset, line_no, exc)
+                    return
+                reason = "invalid UTF-8" if isinstance(exc, UnicodeDecodeError) else "invalid JSON"
+                raise JournalFormatError(f"{path}: line {line_no}: {reason}: {exc}") from exc
             if not isinstance(payload, dict):
-                # 非对象行(纯标量) —— 跳过,与损坏行同类
-                continue
+                raise JournalFormatError(
+                    f"{path}: line {line_no}: expected a JSON object, got {type(payload).__name__}"
+                )
+            if not text.strip():
+                raise JournalFormatError(f"{path}: line {line_no}: empty journal record")
+
             # L15: schema_version 必带;缺则按缺失处理(此处默认 v2 兼容)
             raw_version = payload.get("schema_version", SCHEMA_VERSION)
             try:
                 version_int = int(raw_version)
-            except (TypeError, ValueError):
-                # 无法解析为整数 —— 视为格式损坏,跳过(非 schema 拒绝)
-                continue
+            except (TypeError, ValueError) as exc:
+                raise JournalFormatError(
+                    f"{path}: line {line_no}: invalid schema_version {raw_version!r}"
+                ) from exc
             # 方向感知 schema 校验(VersionTooOldError / VersionTooNewError 必抛)
             check_schema_version(version_int)
             # L15: event_type 必须在已知词表,除非显式 ignorable
             event_type = str(payload.get("event_type", "UnknownEvent"))
-            data = payload.get("data", {}) or {}
+            data = payload.get("data", {})
+            if not isinstance(data, dict):
+                raise JournalFormatError(f"{path}: line {line_no}: expected data to be an object")
             ignorable = bool(data.get("ignorable", False))
             if event_type not in JOURNAL_EVENT_CLASSES and not ignorable:
                 from lca.contracts.observability.journal.format_errors import (
@@ -131,11 +153,22 @@ class FilesystemJournalStore(JournalStoreBackend):
             )
 
             try:
-                seq = int(payload.get("seq", len(self._events) + 1))
+                expected_seq = len(self._events) + 1
+                seq = int(payload.get("seq", expected_seq))
+                if seq != expected_seq:
+                    raise JournalFormatError(
+                        f"{path}: line {line_no}: expected seq={expected_seq}, got seq={seq}"
+                    )
                 ts = float(payload.get("ts", 0.0))
+                scope_data = payload.get("scope", {})
+                if not isinstance(scope_data, dict):
+                    raise JournalFormatError(
+                        f"{path}: line {line_no}: failed to reconstruct journal event: "
+                        "expected scope to be an object"
+                    )
                 scope = RunScope(
-                    trace_id=TraceId(str(payload.get("scope", {}).get("trace_id", ""))),
-                    run_id=RunId(str(payload.get("scope", {}).get("run_id", ""))),
+                    trace_id=TraceId(str(scope_data.get("trace_id", ""))),
+                    run_id=RunId(str(scope_data.get("run_id", ""))),
                 )
                 event = JournalEvent()  # 占位;测试/Inspector 不深入 payload
                 stamped = StampedEvent(
@@ -146,12 +179,65 @@ class FilesystemJournalStore(JournalStoreBackend):
                     event_type=event_type,
                     data=data,
                 )
-                self._events.append(stamped)
             except JournalFormatError:
                 raise
-            except Exception:  # noqa: S112 -- per-line skip: one bad journal line must not abort the read (see comment above)
-                # 其他字段级异常 —— 跳过单行,不影响其他行
-                continue
+            except Exception as exc:
+                raise JournalFormatError(
+                    f"{path}: line {line_no}: failed to reconstruct journal event: {exc}"
+                ) from exc
+
+            if is_last and not terminated:
+                self._terminate_valid_tail(path, offset, line_no)
+            self._events.append(stamped)
+
+    @staticmethod
+    def _is_confirmed_incomplete_tail(content: bytes, error: Exception) -> bool:
+        """Recognize only an EOF-truncated JSON token or UTF-8 code point."""
+        if not content.strip():
+            return False
+        if isinstance(error, UnicodeDecodeError):
+            return error.reason == "unexpected end of data" and error.end == len(content)
+        if isinstance(error, json.JSONDecodeError):
+            return error.pos >= len(error.doc) or error.msg.startswith("Unterminated string")
+        return False
+
+    @staticmethod
+    def _truncate_partial_tail(path: Path, offset: int, line_no: int, cause: Exception) -> None:
+        """Discard only a malformed, unterminated final record after a crash."""
+        try:
+            with path.open("r+b") as stream:
+                stream.truncate(offset)
+                stream.flush()
+                os.fsync(stream.fileno())
+        except OSError as exc:
+            raise JournalFormatError(
+                f"{path}: line {line_no}: could not repair trailing partial record: {exc}"
+            ) from exc
+        log.warning(
+            "repaired trailing partial journal record path=%s line=%d reason=%s",
+            path,
+            line_no,
+            cause,
+        )
+
+    @staticmethod
+    def _terminate_valid_tail(path: Path, offset: int, line_no: int) -> None:
+        """Add the JSONL delimiter to a valid final record before future appends."""
+        try:
+            with path.open("ab") as stream:
+                stream.write(b"\n")
+                stream.flush()
+                os.fsync(stream.fileno())
+        except OSError as exc:
+            raise JournalFormatError(
+                f"{path}: line {line_no}: could not terminate valid journal record: {exc}"
+            ) from exc
+        log.warning(
+            "completed missing trailing journal delimiter path=%s line=%d offset=%d",
+            path,
+            line_no,
+            offset,
+        )
 
     # ── JournalStoreBackend 契约 ──────────────────────────────
 
