@@ -9,20 +9,18 @@ Housekeeper calls on /v1 are not agents and do not get an AgentRef.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 from typing import Any
 
 from lca.cognition.team.modes_catalog import SOLO_ROLE
+from lca.plugins.transport.webserver.agent_identity import (
+    DEFAULT_AGENT_ID,
+    AgentRef,
+)
 
-DEFAULT_AGENT_ID = "solo"
-
-
-@dataclass(frozen=True)
-class AgentRef:
-    """Stable principal: id is the isolation key, name is the display role."""
-
-    agent_id: str
-    name: str
+# AgentRef / DEFAULT_AGENT_ID now live in the neutral
+# lca.plugins.transport.webserver.agent_identity module (importable from
+# both carrier/ and read/ without tripping ADR-0195 P-L3); re-exported
+# here so existing importers keep working.
 
 
 def default_agent_ref() -> AgentRef:

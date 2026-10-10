@@ -197,8 +197,7 @@ def _balance_braces(raw: str) -> str | None:
     if opens < 0 or closes < 0:
         return None
 
-    repaired = stripped + ("}" * opens) + ("]" * closes)
-    return repaired
+    return stripped + ("}" * opens) + ("]" * closes)
 
 
 def _with_arguments(call: ToolCall, args: Mapping[str, Any]) -> ToolCall:
