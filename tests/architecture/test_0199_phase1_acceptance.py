@@ -423,15 +423,26 @@ class TestCrossSurfacePlanRefParity:
         assert activation.compiled_plan is stub_plan
 
     def test_trust_envelope_starts_empty(self) -> None:
-        """#9: facade activation.trust_envelope == EMPTY_TRUST_ENVELOPE
-        until P3 enriches it.
+        """#9: facade activation.trust_envelope carries the P3 grant set.
+
+        P3 enrichment landed in grant-absence PR-1 (6289eb490): the
+        facade now builds a real envelope from the assistant's
+        ``grants.yaml`` merged with ``RULE_DEFAULTS`` instead of binding
+        the empty sentinel.
         """
         service = _make_stub_service()
         facade = DefaultRuntimeFacade(service, _StubDispatcher())
 
         activation = facade.resolve_activation(_make_intent())
+        envelope = activation.trust_envelope
 
-        assert activation.trust_envelope is EMPTY_TRUST_ENVELOPE
+        assert envelope is not EMPTY_TRUST_ENVELOPE
+        assert {"hitl.interact", "platform.basic"}.issubset(envelope.granted_privileges)
+        # The stub plan carries no plugin specs, so the facade falls back
+        # to a single profile origin audited against the resolved profile.
+        assert [o.enabled_by for o in envelope.origins] == [
+            "tests/golden/profiles/standard-solo.yaml"
+        ]
 
     def test_different_profile_yields_different_plan_ref(self) -> None:
         """#10: switching ``profile_path`` flips ``plan_ref`` (the ref
@@ -718,7 +729,12 @@ class TestAcceptanceCriteria:
         # And the activation actually populates each one.
         for name in expected_string_refs:
             assert getattr(activation, name), f"{name} must be non-empty"
-        assert activation.trust_envelope is EMPTY_TRUST_ENVELOPE
+        envelope = activation.trust_envelope
+        assert envelope is not EMPTY_TRUST_ENVELOPE
+        assert {"hitl.interact", "platform.basic"}.issubset(envelope.granted_privileges)
+        assert [o.enabled_by for o in envelope.origins] == [
+            "tests/golden/profiles/standard-solo.yaml"
+        ]
         assert activation.compiled_plan is not None
 
     def test_run_intent_to_activation_pipeline_is_deterministic(self) -> None:
