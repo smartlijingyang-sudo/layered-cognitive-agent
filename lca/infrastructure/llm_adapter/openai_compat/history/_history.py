@@ -68,7 +68,63 @@ def openai_messages_with_history(
                 messages.append({"role": "user", "content": content})
     if prompt and prompt.strip():
         messages.append({"role": "user", "content": prompt})
-    return messages
+    return _sanitize_hanging_tool_calls(messages)
+
+
+def _sanitize_hanging_tool_calls(messages: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Enforce OpenAI wire protocol on the final message sequence.
+
+    Any assistant message that has `tool_calls` must be followed by `role='tool'`
+    messages for each declared `id` before a user message, before another
+    tool-calling assistant message, or before the end of the message list.
+    """
+    if not messages:
+        return messages
+
+    sanitized: list[dict[str, Any]] = []
+    i = 0
+    n = len(messages)
+
+    while i < n:
+        msg = messages[i]
+        sanitized.append(msg)
+        if msg.get("role") == "assistant" and msg.get("tool_calls"):
+            expected_ids = [
+                c.get("id") for c in msg["tool_calls"] if isinstance(c, dict) and c.get("id")
+            ]
+            if expected_ids:
+                j = i + 1
+                answered_ids = set()
+                while j < n and messages[j].get("role") == "tool":
+                    sanitized.append(messages[j])
+                    t_id = messages[j].get("tool_call_id")
+                    if t_id:
+                        answered_ids.add(t_id)
+                    j += 1
+
+                missing_ids = [exp_id for exp_id in expected_ids if exp_id not in answered_ids]
+                # Enforce closure if followed by user, another tool-calling assistant, or end of list
+                should_close = False
+                if (
+                    j >= n
+                    or messages[j].get("role") == "user"
+                    or (messages[j].get("role") == "assistant" and messages[j].get("tool_calls"))
+                ):
+                    should_close = True
+
+                if should_close and missing_ids:
+                    for exp_id in missing_ids:
+                        sanitized.append(
+                            {
+                                "role": "tool",
+                                "tool_call_id": exp_id,
+                                "content": "[system: tool execution not completed in session]",
+                            }
+                        )
+                i = j - 1
+        i += 1
+
+    return sanitized
 
 
 def anthropic_messages_with_history(
