@@ -2861,3 +2861,11 @@ Learnings for future iterations:
     interpolating the same ``node`` prefix convention the module already uses.
     Verify via ``git show HEAD:<file>`` string comparison, not just "it raises".
 ---
+
+## Round close — deferred (2026-10-10 13:35, branch raphy/arch-20261010-1245-b)
+
+- 4 stories 全 passes（0 open）：34b3e1e25 assess + 390405065 RA-115 + 61083e29d RA-116 + d1cf9a77e RA-117 + 5d1bf7863 RA-118。
+- 合 main 条件不满足：主 checkout（~/layered-cognitive-agent，名义分支 raphy/arch-20261010-1245）仍有并发 lane 的 10 个未提交文件（lca/infrastructure/skills/*、lca/loop/commit/tool_journal.py、tests/ 下），按规则跳过合并、分支保留，本轮结束。
+- 合并前已核验：main tip 48bf2d6a3 未动；名义分支 tip 仍为 48bf2d6a3（无外来提交）。
+- 下轮 close：只合 -b 分支（git checkout main && git merge --no-ff raphy/arch-20261010-1245-b）；合前重验 main tip 与 -b tip（-b 应为 5d1bf7863 起）；名义分支确认无独有 commits 后 git branch -D；删 worktree ~/.lca-worktrees/raphy-20261010-1245。
+- 风险提示：若并发 lane 在名义分支的 checkout 上 commit 了它的 10 个文件，名义分支将含有外来提交——下轮也只合 -b，名义分支交由其作者自行处理，绝不代合、代删。
