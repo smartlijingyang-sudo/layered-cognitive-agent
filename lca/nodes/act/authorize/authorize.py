@@ -150,7 +150,6 @@ class ActAuthorizeExecutor:
     declared_inputs: tuple[PortName, ...] = (
         PortName("decision"),
         PortName("state"),
-        PortName("tools"),
     )
     # ADR-0237 / PR-1b: typed ``approval_required: bool`` port replaces
     # the previous ``decision.extra["needs_approval"]`` metadata grep.
@@ -174,8 +173,7 @@ class ActAuthorizeExecutor:
     ) -> NodeOutput:
         """act.authorize 入口。
 
-        inputs 端口(yaml): decision (Decision), state (AgentState),
-                            tools (ToolsService)
+        inputs 端口(yaml): decision (Decision), state (AgentState)
         outputs 端口(yaml): decision (Decision), state (AgentState),
                             approval_required (bool),
                             approval_requirement (ApprovalRequirement),
@@ -185,6 +183,12 @@ class ActAuthorizeExecutor:
         decision = input.port_values.get(PortName("decision"))
         state = input.port_values.get(PortName("state"))
         tools = input.port_values.get(PortName("tools"))
+        if tools is None:
+            from lca.infrastructure.runtime_plane.capability_bindings import (
+                current_tools_service,
+            )
+
+            tools = current_tools_service()
         if not isinstance(decision, Decision):
             raise TypeError(
                 "act.authorize: 'decision' port must be a Decision "

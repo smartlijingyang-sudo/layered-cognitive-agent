@@ -68,9 +68,8 @@ nodes:
     # (per ActValidateExecutor.declared_inputs). The kernel-wide
     # port registry exposes ``decision`` (the typed-port D4 boundary
     # carried from think.subgraph via the registry) so act subgraph
-    # receives it. ``tools`` 是 kernel-owned 端口（per-turn ToolsService），
-    # 供 ``act.authorize`` 的运行时授权检查读取。
-    declared_inputs: [decision, tools]
+    # receives it.
+    declared_inputs: [decision]
     # Inner act.subgraph emits ``should_terminate`` (via act.observe)
     # and the ``decision`` carried through validate/authorize/envelope.
     # ``approval_routing`` is the typed ``RoutingDecision`` written by

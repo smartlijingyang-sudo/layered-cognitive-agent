@@ -56,9 +56,9 @@ nodes:
     # previous ``decision.extra["needs_approval"]`` metadata grep; this is
     # the only consumer of the port within the subgraph, so the dead-port
     # risk is bounded.
-    # ADR-0292 §10 P3: ``tools`` 是 kernel-owned 端口（per-turn ToolsService），
-    # 用于运行时授权检查；``grant_routing`` 携带授权拒绝路由信号。
-    inputs: [decision, state, tools]
+    # ADR-0292 §10 P3: 授权检查读取 ambient TrustEnvelope 与 ToolsService；
+    # ``grant_routing`` 携带授权拒绝路由信号。
+    inputs: [decision, state]
     outputs: [decision, state, approval_required, approval_requirement, grant_routing]
     config:
       emit_on_enter: [think.gate.start]
