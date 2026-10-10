@@ -1772,10 +1772,10 @@
         "tests/infrastructure/test_chat_projection.py keeps passing; ruff check clean."
       ],
       "priority": 4,
-      "passes": false,
+      "passes": true,
       "branchName": "raphy/arch-20261010-2345",
-      "notes": "Source: duplication scan (secondary). Strength: Worth exploring. Small, honest two-occurrence seam; diversity quota already satisfied by RA-119/120/121 (friction-walk findings), so this is the one duplication-class story.",
-      "implemented": false,
+      "notes": "Source: duplication scan (secondary). Strength: Worth exploring. Small, honest two-occurrence seam; diversity quota already satisfied by RA-119/120/121 (friction-walk findings), so this is the one duplication-class story. [done 2026-10-11] chat_projection.py 新增 async _project_in_thread(fn, *, run_id, log_event) seam; persist_waiting_projection 与 persist_terminal_projection 改走该 seam, 日志事件名 chat_projection_wait_failed / chat_projection_terminal_failed 逐字保留为参数; best-effort 语义不变(log-and-continue, 永不抛到 run 路径); tests/infrastructure/observability/test_chat_projection.py 8 passed, ruff clean.",
+      "implemented": true,
       "dropped": false
     }
   ]

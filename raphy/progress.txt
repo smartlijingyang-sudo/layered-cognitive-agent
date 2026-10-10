@@ -3016,3 +3016,34 @@ Learnings for future iterations:
     validation primitive: wrap it in try/except and you get the "unparseable"
     rejection for free, no hand-rolled field checks.
 ---
+## 2026-10-11 00:43 (Asia/Shanghai) - RA-122
+- What was implemented: new `async _project_in_thread(fn, *, run_id, log_event)`
+  seam in `lca/infrastructure/observability/chat_projection.py`, placed right
+  after `_with_connection`. Both `persist_waiting_projection` and
+  `persist_terminal_projection` now call it; their distinct `_write` closures
+  stay at the call sites. The old inline ritual
+  (`try: await asyncio.to_thread(_with_connection, _write) / except Exception:
+  _log.warning(<event>, run_id=identity.run_id, exc_info=True)`) moved verbatim
+  into the seam -- the only difference is the log event name is a parameter.
+  Best-effort semantics byte-preserved: log-and-continue, never raises into the
+  run path; `chat_projection_wait_failed` /
+  `chat_projection_terminal_failed` passed as string literals exactly as before
+  (they are observable downstream, per the assessment's constraint).
+- Files changed:
+  - `lca/infrastructure/observability/chat_projection.py`
+    (+13-line seam, two call sites slimmed from 4 lines to 3)
+  - `raphy/prd.json` (RA-122 passes=true / implemented=true + done note)
+- Tests: `tests/infrastructure/observability/test_chat_projection.py` 8 passed;
+  `ruff check` clean; plus a behavioral smoke check: failure path logs the
+  verbatim event name with `run_id=` and `exc_info=True` and does not raise,
+  success path runs `fn` through `_with_connection` via `asyncio.to_thread`
+  and logs nothing.
+- **Learnings for future iterations:**
+  - Two-occurrence rituals with one varying token (here the log event name)
+    converge cleanly when the token becomes a keyword parameter -- the seam
+    reads as "the ritual, minus its one honest variation".
+  - `tests/` for this module only covered the sync helpers, not the async
+    persist wrappers; the behavioral smoke check above was the evidence that
+    the refactor was behavior-preserving. When tests don't cover the refactored
+    seam, write the throwaway check rather than claiming equivalence by eye.
+---
