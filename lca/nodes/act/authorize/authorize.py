@@ -71,7 +71,8 @@ def _route_refusal_to_evidence(
 ) -> None:
     """ADR-0292 §10 审计：把授权拒绝写入 run-trace evidence ledger。
 
-    与授权门原 §10 实现的 payload 形态一致，gate 名改为 ``act.authorize``。
+    gate/prepared_by 改为 ``act.authorize``；payload 在原 §10 形态基础上精简：
+    去掉 ``envelope_bound`` 与 ``content_origin`` 字段。
     observability 未绑定时静默跳过（no-ref 路径）。
     """
     try:
