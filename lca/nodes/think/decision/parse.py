@@ -28,6 +28,7 @@ Canonical shape: hand-written ``@dataclass(frozen=True, slots=True)`` +
 from __future__ import annotations
 
 import logging
+import re
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
@@ -85,19 +86,24 @@ class DecisionParseExecutor:
         input: NodeInput,
     ) -> NodeOutput:
         """Project an :class:`LLMResponse` into a :class:`Decision`."""
-        resolve_typed_port_or_runtime(PortName("state"), input=input, context=context, node="decision.parse")
-        llm_response = resolve_typed_port_or_runtime(PortName("llm_response"), input=input, context=context, node="decision.parse")
+        resolve_typed_port_or_runtime(
+            PortName("state"), input=input, context=context, node="decision.parse"
+        )
+        llm_response = resolve_typed_port_or_runtime(
+            PortName("llm_response"), input=input, context=context, node="decision.parse"
+        )
         tool_calls, delegations, intent = _project_response(llm_response)
         action_type = _infer_action_type(tool_calls=tool_calls, delegations=delegations)
         decision_id = new_id("decision")
-        response_text = intent if action_type == "respond" else None
+        clean_intent = _guard_prompt_leak(intent) or ""
+        response_text = clean_intent if action_type == "respond" else None
         response_text = _guard_acknowledgement(context=context, text=response_text)
         return NodeOutput(
             port_values={
                 PortName("decision"): Decision(
                     decision_id=decision_id,
                     action_type=action_type,
-                    rationale=intent,
+                    rationale=clean_intent,
                     confidence=1.0,
                     tool_calls=list(tool_calls),
                     delegations=list(delegations),
@@ -106,6 +112,35 @@ class DecisionParseExecutor:
                 )
             }
         )
+
+
+_LEAK_CUTOFF_REGEX = re.compile(
+    r"(\n*\s*(?:（?未检索标注[：:]|Deferred tool namespaces|##\s*记忆写入与写盘铁律|##\s*认知闭集|##\s*核心不变量|##\s*系统指令).*)$",
+    re.DOTALL | re.IGNORECASE,
+)
+
+_SAFE_FALLBACK_RESPONSE = "好的，我正在为您处理该请求，请稍候。"
+
+
+def _guard_prompt_leak(text: str | None) -> str | None:
+    """Guard against model regurgitating internal prompt directives.
+
+    Strips leaked trailing instructions (Deferred tool namespaces, 记忆写入与写盘铁律, etc.)
+    and replaces pure-leak regurgitation with a polite fallback message.
+    """
+    if not text:
+        return text
+
+    # Strip any trailing leaked prompt block
+    cleaned = _LEAK_CUTOFF_REGEX.sub("", text).strip()
+    if cleaned:
+        return cleaned
+
+    # If nothing remains after stripping the leaked section, check if leak was present
+    if _LEAK_CUTOFF_REGEX.search(text):
+        return _SAFE_FALLBACK_RESPONSE
+
+    return text
 
 
 def _guard_acknowledgement(*, context: NodeContext, text: str | None) -> str | None:

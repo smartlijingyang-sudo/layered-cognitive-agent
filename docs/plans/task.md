@@ -645,5 +645,5 @@
 | RUN-STAB-TASK-2-ENVELOPE-CHECK | [原子校验] `pre_dispatch_envelope_check` 升级多 Envelopes 批量原子校验 | Completed | 支持单/多 envelopes 输入，原子执行 5 闸体检，6/6 测试通过 |
 | RUN-STAB-TASK-3-EXECUTE-ATTRIBUTION | [事实闭环] `effect.execute` 确保并发工具调用每个 `call_id` 均有对应回执落盘 | Completed | 保证并发/异常/部分批次下每个 call_id 100% 写入回执，11/11 测试全绿 |
 | RUN-STAB-TASK-4-HISTORY-HYGIENE | [协议合规] `_history.py` 悬挂 tool_calls 协议自愈与合规守护 | Completed | 自动闭环悬挂 tool_calls，保持合法轮次交替，8/8 协议测试全绿 |
-| RUN-STAB-TASK-5-OUTPUT-GUARD | [声带净化] `decision/parse.py` Prompt 泄露与反刍条文净化门禁 | In_Progress | 编写 INV-OUTPUT-01 提示词泄露净化门禁测试与拦截实现 |
-| RUN-STAB-TASK-6-INTEGRATION-E2E | [回归验收] 服务重启与真实端到端并发与创建助理复测 | Pending | 待执行 |
+| RUN-STAB-TASK-5-OUTPUT-GUARD | [声带净化] `decision/parse.py` Prompt 泄露与反刍条文净化门禁 | Completed | 成功拦截与净化反刍系统提示词/条文泄露，3/3 测试全绿 |
+| RUN-STAB-TASK-6-INTEGRATION-E2E | [回归验收] 服务重启与真实端到端并发与创建助理复测 | In_Progress | 服务平滑重启与端到端回归验收 |
