@@ -50,7 +50,7 @@ class RuntimeLifecycleEvent:
     The payload excludes task input, prompts, working memory, artifacts, tool
     arguments, model output, error details, and approval payloads.  Consumers
     may correlate progress through ``trace_id`` / ``plan_ref`` and use durable
-    references only through values already standardized by     terminal projection. Phase events additionally expose only the declared node,
+    references only through values already standardized by     terminal projection. Phase events also expose only the declared node,
     semantic phase, and normalized result kind; they never contain executor payload,
     exception details, state, artifacts, prompts, or tool arguments.
     """

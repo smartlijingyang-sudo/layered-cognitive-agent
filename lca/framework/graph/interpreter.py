@@ -63,7 +63,7 @@ from lca.contracts.protocols.graph.errors import (
     UnknownFieldError,
     UnsetPortError,
 )
-from lca.contracts.protocols.graph.node_io import NodeOutput
+from lca.contracts.protocols.graph.node_io import NodeInput, NodeOutput
 from lca.contracts.protocols.graph.plan import Plan, PlanEdge, PlanNode
 from lca.contracts.protocols.graph.ports import PortName
 from lca.contracts.protocols.graph.routing import RoutingDecision
@@ -292,34 +292,18 @@ class PlanInterpreter:
             if paused is not None:
                 traversal.terminal = True
                 traversal.terminal_reason = ("should_terminate", node.id, 0, 0)
-                self.observer.observe(
-                    _visit_end_of(
-                        node,
-                        plan.id,
-                        traversal.visit_counts.get(node.id, 1),
-                        depth,
-                        outcome="success",
-                        error="",
-                        elapsed_ms=self.clock() - visit_started,
-                        inputs=_str_keyed(inputs.port_values),
-                        outputs=_str_keyed(output.port_values),
-                        dispatch="terminal",
-                        occurred_at_ms=self.clock(),
-                    )
-                )
-                self.latency.record(node.id, self.clock() - visit_started)
-                visit = VisitRecord(
-                    plan_ref=plan.id,
-                    node_id=node.id,
-                    binding_kind=node.binding,
-                    inputs=dict(inputs.port_values),
-                    outputs=dict(output.port_values),
+                self._record_visit_end(
+                    node=node,
+                    plan_id=plan.id,
+                    traversal=traversal,
+                    depth=depth,
+                    visit_started=visit_started,
+                    inputs=inputs,
+                    output=output,
                     dispatch=DispatchDecision(kind="terminal"),
-                    error=None,
+                    visits=visits,
+                    facts=facts,
                 )
-                self.recorder.record(visit)
-                visits.append(visit)
-                facts.extend(output.port_values.get(PortName("facts"), ()) or ())
                 terminal_node = node.id
                 break
 
@@ -334,34 +318,18 @@ class PlanInterpreter:
                     if evaluate_predicate(schema.terminal_predicate, reader=reader):
                         traversal.terminal = True
                         traversal.terminal_reason = ("terminal_predicate", node.id, 0, 0)
-                        self.observer.observe(
-                            _visit_end_of(
-                                node,
-                                plan.id,
-                                traversal.visit_counts.get(node.id, 1),
-                                depth,
-                                outcome="success",
-                                error="",
-                                elapsed_ms=self.clock() - visit_started,
-                                inputs=_str_keyed(inputs.port_values),
-                                outputs=_str_keyed(output.port_values),
-                                dispatch="terminal",
-                                occurred_at_ms=self.clock(),
-                            )
-                        )
-                        self.latency.record(node.id, self.clock() - visit_started)
-                        visit = VisitRecord(
-                            plan_ref=plan.id,
-                            node_id=node.id,
-                            binding_kind=node.binding,
-                            inputs=dict(inputs.port_values),
-                            outputs=dict(output.port_values),
+                        self._record_visit_end(
+                            node=node,
+                            plan_id=plan.id,
+                            traversal=traversal,
+                            depth=depth,
+                            visit_started=visit_started,
+                            inputs=inputs,
+                            output=output,
                             dispatch=DispatchDecision(kind="terminal"),
-                            error=None,
+                            visits=visits,
+                            facts=facts,
                         )
-                        self.recorder.record(visit)
-                        visits.append(visit)
-                        facts.extend(output.port_values.get(PortName("facts"), ()) or ())
                         terminal_node = node.id
                         break
 
@@ -395,36 +363,20 @@ class PlanInterpreter:
                         taken=taken,
                     )
             dispatch = self._classify(edge, output)
-            self.observer.observe(
-                _visit_end_of(
-                    node,
-                    plan.id,
-                    traversal.visit_counts.get(node.id, 1),
-                    depth,
-                    outcome="success",
-                    error="",
-                    elapsed_ms=self.clock() - visit_started,
-                    inputs=_str_keyed(inputs.port_values),
-                    outputs=_str_keyed(output.port_values),
-                    dispatch=dispatch.kind,
-                    occurred_at_ms=self.clock(),
-                )
+            self._record_visit_end(
+                node=node,
+                plan_id=plan.id,
+                traversal=traversal,
+                depth=depth,
+                visit_started=visit_started,
+                inputs=inputs,
+                output=output,
+                dispatch=dispatch,
+                visits=visits,
+                facts=facts,
             )
-            self.latency.record(node.id, self.clock() - visit_started)
             if edge is not None:
                 self.observer.observe(_edge_of(plan.id, node.id, edge, depth, self.clock()))
-            visit = VisitRecord(
-                plan_ref=plan.id,
-                node_id=node.id,
-                binding_kind=node.binding,
-                inputs=dict(inputs.port_values),
-                outputs=dict(output.port_values),
-                dispatch=dispatch,
-                error=None,
-            )
-            self.recorder.record(visit)
-            visits.append(visit)
-            facts.extend(output.port_values.get(PortName("facts"), ()) or ())
             terminal_node = node.id
             traversal.advance(edge=edge, dispatch_kind=dispatch.kind)
         return InterpretationResult(
@@ -440,6 +392,57 @@ class PlanInterpreter:
         if edge is None:
             return DispatchDecision(kind="terminal")
         return DispatchDecision(kind="next", next_node=getattr(edge, "target", None))
+
+    def _record_visit_end(
+        self,
+        *,
+        node: PlanNode,
+        plan_id: str,
+        traversal: PlanTraversal,
+        depth: int,
+        visit_started: int,
+        inputs: NodeInput,
+        output: NodeOutput,
+        dispatch: DispatchDecision,
+        visits: list,
+        facts: list,
+    ) -> None:
+        """Run the six-step visit-end ceremony shared by all ``run()`` exit paths.
+
+        observe (visit-end) → record node latency → build the
+        :class:`VisitRecord` → recorder.record → append to ``visits`` →
+        extend ``facts``. The ``dispatch`` kind ("terminal" / "next") is the
+        only per-path difference; callers keep their own ``terminal_reason``
+        assignment and ``terminal_node`` bookkeeping.
+        """
+        self.observer.observe(
+            _visit_end_of(
+                node,
+                plan_id,
+                traversal.visit_counts.get(node.id, 1),
+                depth,
+                outcome="success",
+                error="",
+                elapsed_ms=self.clock() - visit_started,
+                inputs=_str_keyed(inputs.port_values),
+                outputs=_str_keyed(output.port_values),
+                dispatch=dispatch.kind,
+                occurred_at_ms=self.clock(),
+            )
+        )
+        self.latency.record(node.id, self.clock() - visit_started)
+        visit = VisitRecord(
+            plan_ref=plan_id,
+            node_id=node.id,
+            binding_kind=node.binding,
+            inputs=dict(inputs.port_values),
+            outputs=dict(output.port_values),
+            dispatch=dispatch,
+            error=None,
+        )
+        self.recorder.record(visit)
+        visits.append(visit)
+        facts.extend(output.port_values.get(PortName("facts"), ()) or ())
 
 
 @dataclass

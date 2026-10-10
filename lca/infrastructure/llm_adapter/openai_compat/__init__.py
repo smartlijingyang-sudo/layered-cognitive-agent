@@ -52,6 +52,11 @@ class OpenAICompatAdapter(LLMAdapter):
 
     name = "openai-compat"
 
+    @property
+    def model_name(self) -> str:
+        """配置的模型 id（``llm.call.start/end`` 的 ``model=`` 标签）。"""
+        return self._model
+
     def __init__(
         self,
         model: str | None = None,

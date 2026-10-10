@@ -443,7 +443,9 @@ def test_anomaly_detector_class_constants_are_well_named() -> None:
     from lca.plugins.observability.spine.derivers.anomaly import AnomalyDetector
 
     assert pytest.approx(0.94) == AnomalyDetector.NEAR_TIMEOUT_RATIO
-    assert AnomalyDetector.CYCLE_WINDOW == 100
+    # RA-103: CYCLE_WINDOW deleted with the vestigial rolling-window state;
+    # cycle detection is consecutive-count + per-EP baselines only.
+    assert not hasattr(AnomalyDetector, "CYCLE_WINDOW")
     assert AnomalyDetector.STUCK_THRESHOLD_S == 60
     assert pytest.approx(0.94) == AnomalyDetector.NEAR_BUDGET_RATIO
     # RA-030: retuned thresholds stay public/named.

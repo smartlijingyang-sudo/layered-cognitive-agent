@@ -23,7 +23,7 @@ Tests that exercise the rewrite's new field shape write a spine
 with a ``kernel.run.stop`` event AND patch the trace root so the
 function can find it; the live-SOP tail loop exits on seeing
 ``kernel.run.stop`` (no hang). The shape-presence tests below
-additionally pre-stub ``_live_sop_run`` (when it exists) to keep
+also pre-stub ``_live_sop_run`` (when it exists) to keep
 the red-phase test fast.
 """
 
@@ -34,9 +34,6 @@ import json
 import tempfile
 from pathlib import Path
 from unittest.mock import patch
-
-import pytest
-
 
 _RUNS_MODULE = "lca.infrastructure.cli.commands.runs.runs"
 
@@ -112,9 +109,7 @@ def test_post_create_report_has_health_summary() -> None:
         with patch.object(runs, "_DEFAULT_TRACES_ROOT", td_path):
             report = runs._build_post_create_report(run_id, "http://x")
 
-    assert "health_summary" in report, (
-        f"expected 'health_summary' key, got {list(report.keys())}"
-    )
+    assert "health_summary" in report, f"expected 'health_summary' key, got {list(report.keys())}"
     summary = report["health_summary"]
     assert isinstance(summary, dict)
     assert "overall" in summary
@@ -157,9 +152,7 @@ def test_live_sop_run_function_removed() -> None:
     exists, the rewrite did not delete it.
     """
     runs = _runs_module()
-    assert not hasattr(runs, "_live_sop_run"), (
-        "_live_sop_run should be deleted per spec §15 G-3"
-    )
+    assert not hasattr(runs, "_live_sop_run"), "_live_sop_run should be deleted per spec §15 G-3"
 
 
 def test_format_spine_event_function_removed() -> None:

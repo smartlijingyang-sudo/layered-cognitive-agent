@@ -84,7 +84,7 @@ class Reducer(Protocol):
     ) -> TerminalOutcome:
         """Fold terminal state into the sole ``TerminalOutcome`` (ADR-0077 §决策一).
 
-        The Stop phase supplies ``stop``. A paused declarative run additionally
+        The Stop phase supplies ``stop``. A paused declarative run also
         supplies its already-declared durable ``resume_cursor``. Reducer remains
         the only entity allowed to construct terminal truth; callers provide
         facts, never a pre-built TerminalOutcome (ADR-0077 §决策二).

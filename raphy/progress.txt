@@ -1,5 +1,41 @@
 ## Codebase Patterns
 
+- **Phase-alias 词汇用真实 bundle 语料钉住，跨 phase region 进 keep-list（RA-109）：**
+  收集节点语料只认 ``nodes:`` list 里的 ``id``（裸 grep ``id:`` 会混入
+  plugin/provider 注册 id）。无 phase 前缀分两类：think 内层节点
+  （``reason/context/prompt/shortcut/capability``，经 sub_spec_ref 挂在
+  ``bundles/agent/reasoning_turn.yaml`` 下）→ 用真实 YAML 证据扩展
+  ``_PHASE_ALIAS_OF``；ADR-0228 的跨 phase region（``plan/intervene/
+  delegate``）与 Layer 1 原语（``primitive``）→ 进测试 keep-list，
+  ``phase_of`` 返回 "" 是文档化正确语义，不伪造 phase。
+
+- **重叠 CLI 命令先按输出格式分类再决定 merge vs cross-reference（RA-108）：**
+  ``journal step --step N``（单步原始事实纯文本）与 ``journal steps --step N``
+  （StepNarrativeWriter narrative markdown）输出本质不同且都被 docs/ADR 引用 →
+  选 (b) 保留双命令、共享 ``read_step_document`` + ``JournalDocument.step_by_index``
+  typed seam，帮助文本互相交叉引用。收敛 raw-dict 读取前用
+  ``dataclasses.asdict(JournalStep)`` 对比渲染：key 顺序与 journal.json 原始
+  dict 完全一致，human 与 ``--json`` 输出字节等价，可放心删私有
+  ``_load_journal``/``_select_step``。
+
+- **模型身份是 LLMAdapter 契约成员，不是私有字段（RA-106）：** telemetry 的
+  ``model=`` 标签必须来自协议声明的 ``model_name`` accessor，不能 getattr 私有
+  ``_model``。协议默认实现返回 ``None``（而非 raise NotImplementedError）——
+  因为已有 ``getattr(adapter, "model_name", None)`` 消费者（model_visible
+  adapter 的 ``_resolve_model_config``），默认 raise 会炸掉它。生产适配器
+  （openai_compat/anthropic 策略/mock/model_override）覆写返回真实模型 id。
+  同类私有探针残留：``think/reasoner/credentials.py:131`` 与
+  ``cli/commands/runs/driver_debug.py:190`` 仍读 ``_model``，可后续顺手收敛。
+
+- **Package contract enforcement must scan actual imports（RA-107）：**
+  `check_package_contracts.py` 的 L1↔L2 cross-check 只验证 README *提到* 了
+  forbidden dep，从不扫描真实 import——`lca.application` 契约禁
+  `lca.harness` 而 `runtime/` 一直在 import，静默违规。全仓 actual-import
+  扫描揭示 142 处既有 forbidden-dep 违规：package contract 普遍是理想声明。
+  修法：组合根的契约按真实 wiring 更新（允许 harness+plugins，只禁
+  gateway），再把 `check_actual_forbidden_imports` 接进脚本 main() 做强制。
+  验证时用 `--package <pkg>` 聚焦本 story 包，其余违规记为基线。
+
 - **环境输入（cwd）绝不能冒充诊断输入（RA-060）：** `run(profile_path)` 接受参数又
   `del` 掉、转去读 `Path.cwd()`，是典型的环境泄漏进纯诊断域。修法：repo root
   必须从 profile_path 派生（walk-up 找 repo marker）或显式传入；找不到 marker
@@ -2347,3 +2383,277 @@ Tests:
 Learnings:
 - `isinstance(MagicMock(), HasHooks)` is False even though `hasattr(mock, "hooks")` is True — runtime-checkable protocol isinstance does not see through MagicMock's dynamic attribute creation. The positive test needs a real stub with a concrete `hooks` attribute. Worth remembering whenever pinning protocol-gated branches: stub the attribute for real.
 - Verified no production caller of `CognitiveAgent.register_hook` exists in lca/ (only audit tooling mentions the name), so the previously silent branch was dead in prod paths — the raise cannot break a working flow, only surface a misconfiguration earlier.
+
+## 2026-10-09 21:20 CST - RA-101
+
+Implemented:
+- `PortReader.port_has_value(name: str)` 委托给 `self.registry.has_port(PortName(name))`，
+  不再走 `name in self.registry.snapshot()` 的全量复制路径；签名不变，`snapshot()` 语义不变。
+- `tests/framework/graph/test_port_reader.py` 新增 3 个三态测试：
+  从未写入→False、已写入→True、被清空（None 值）→与 `has_port` 一致为 True。
+
+Files:
+- lca/framework/graph/port_reader.py
+- tests/framework/graph/test_port_reader.py
+
+Tests:
+- tests/framework/graph/test_port_reader.py + test_predicate_evaluator.py + tests/cognition/wire/test_close_out_adapter.py: 24 passed
+- tests/framework/graph/ 全目录：115 passed, 1 failed（`test_gate_chain_annotations_resolve::test_every_strategy_module_annotation_resolves`，经 git stash 验证是基线 7ce6becc0 上已有的红，与本改动无关）
+- ruff check: clean
+
+Learnings:
+- `PortName` 是 `str` 的 NewType，`PortName(name)` 转换只为取悦类型检查器，运行时零成本——seam 侧的类型收紧不增加运行时负担时，直接转。
+- `read` 把 value=None 视为 Unset（抛错），而 `has_port`/`port_has_value` 只看 key 存在性——"存在"与"可读"是两个不同的问题，改 seam 前先确认三态语义一致，否则会把清空语义改错。
+---
+
+## 2026-10-09 21:35 CST - RA-102
+
+Implemented:
+- `PlanInterpreter` 新增私有 `_record_visit_end(...)` 方法，收敛三处 visit-end
+  仪式块（routing-terminate break / terminal_predicate break / 循环末尾正常路径）：
+  observe(visit-end) → latency.record → VisitRecord → recorder.record →
+  visits.append → facts.extend。dispatch kind 作为参数传入；
+  `terminal_reason` 赋值与 `terminal_node = node.id` 留在调用方。
+- 为 helper 签名补了 `NodeInput` import（原只 import 了 NodeOutput）。
+
+Files:
+- lca/framework/graph/interpreter.py
+
+Tests:
+- tests/framework/graph/ + tests/integration/test_run_with_consecutive_tool_calls.py + test_end_to_end_think_to_act.py：120 passed, 1 failed（基线已知红 test_gate_chain_annotations_resolve，与改动无关）
+- ruff check: clean
+
+Learnings:
+- 收敛"仪式块"时最容易踩的是**隐式顺序依赖**：原正常路径里 `_edge_of` 的 observe
+  夹在 visit-end observe 和 VisitRecord 构造之间——helper 只收"无副作用顺序"的
+  部分（observer 事件顺序 visit_end→edge 保持不变），`_edge_of` 留在调用方。
+  机械收敛前先列出每块的事件发射顺序，逐项对齐。
+---
+
+## 2026-10-09 21:50 CST - RA-103
+
+Implemented:
+- `AnomalyDetector` 删掉 ghost state：`_recent_points` deque、`CYCLE_WINDOW`
+  类属性、`_check_cycle` 返回值里的 `and point in self._recent_points` 恒真条件；
+  `_check_cycle` docstring 与 `__init__` 注释改写为 consecutive-count 语义；
+  无他用的 `deque` import 一并删除。
+- `test_anomaly_detector_class_constants_are_well_named` 曾把 CYCLE_WINDOW==100
+  当 review guard pin——按 story 意图改成断言该属性已删除（其余阈值断言保留）。
+
+Files:
+- lca/plugins/observability/spine/derivers/anomaly.py
+- tests/lca_plugins/observability/spine/test_anomaly_detector.py
+
+Tests:
+- test_anomaly_detector.py + test_cycle_detector_fingerprint.py + test_spine_anomaly_observer.py: 37 passed
+- ruff check: clean
+
+Learnings:
+- 删"恒真条件"前先证明它是恒真：`point in self._recent_points` 之所以恒真，
+  是因为同一函数里刚 `append(point)`——证据在代码里，不在直觉里。
+  写进 story AC 时把这条证据链写清楚，implementer 就不用重新证明一遍。
+- Review guard 测试（"constants must be class-level and well named"）pin 的是
+  旧语义时，改测试不是"破坏 pin"，而是 story 的一部分——但要在 commit body
+  里点名，否则后人以为测试被悄悄放水。
+---
+
+## DESLOP-100 wave 1 — assess (2026-10-10 01:40, branch raphy/deslop-100)
+
+- 首轮 DESLOP-100：双焦点 = (1) deslop（current-state docs/comments 的
+  change-narration 残留、filler、与本地风格不一致的多余注释）+ (2) 真实架构深化
+  （deep modules / locality / deletion test / seams）。续号 RA-104 起，passes:false。
+- 运行时验证（实跑，LLM_API_KEY=dummy，PYTHONPATH=worktree）：
+  (a) basic run completed；(b) 自研 marker 工具 tool-call run completed 且
+  marker 真写出；(c) 同一 agent 双 run completed。无新 P0/P1。
+  注意：raphy-assess.md 的 Agent 调用片段已过时（Agent 现需 role/goal/backstory，
+  ensure_default_ctx 是 coroutine）——用当前公共 API 三场景全过。
+- 产出 6 个 stories（RA-104~RA-109）：RA-104 docs 散文 deslop（Strong）、
+  RA-105 代码注释 change-narration deslop（Strong）、RA-106 LLMAdapter 缺
+  model_name 接缝 + `_model` getattr 探针（Worth exploring）、RA-107
+  lca.application→lca.harness 未强制 forbidden dependency（Strong）、
+  RA-108 journal step 双命令重叠（Worth exploring，唯一 duplication 类）、
+  RA-109 phase_of 别名词表无测试覆盖（Worth exploring）。
+- deslop 分类：verify_doc_slop.py 123 hits 大部分是 docs/plans 时间胶囊
+  （keep，并扩展脚本排除）、port 分类表（keep）、glossary（keep，勿删）、
+  可解析 commit-hash 引用（keep，勿删）；真正 fix 的只有 observability
+  overview/platform-readme 的"已退役"表 + phase-graph guide 的"旧名已退役"。
+- 禁区全部遵守（memory / webserver / gate_chain_strategy.py / preamble.py）。
+- 提交：`chore: [raphy] assess - DESLOP-100 wave 1 candidates`（未 push）。
+
+## [2026-10-10] - RA-104
+- Deslopped current-state docs: rewrote change-narration residue in the P1 agent-gateway bridge spec, architecture.md, and 0199-delete-when-inventory to present tense ('this PR'/'now'/'no longer'/'the old' removed).
+- Files: docs/specs/2026-09-07-lca-p1-agent-gateway-bridge.md, docs/specs/architecture.md, docs/specs/0199-delete-when-inventory.md.
+- verify_doc_slop.py: 123 -> 105 hits; the 105 remaining are sanctioned keeps (plan docs, glossary retire entries, resolvable commit anchors, present-truth retirement references).
+- Learnings: the slop script is a probe, not a definition; most hits in docs/plans and glossary are legitimate and must not be rewritten.
+---
+
+## [2026-10-10] - RA-105
+- Deslopped code prose: replaced 'additionally'/'most notably'/'in order to'/'effectively frozen'/'notably:' with plainer wording in 10 lca/ modules and 5 test files.
+- Files: lca/application/routine/tick.py, lca/infrastructure/mcp/routing.py, lca/plugins/observability/spine/derivers/anomaly.py, lca/nodes/think/decision_repair/repair.py, lca/contracts/protocols/{act/tool/batch_execution,runtime/runtime/lifecycle,state/reducer}.py, lca/nodes/fast_path.py, lca/runtime/support/runtime_bindings.py, lca/nodes/intervene/approve_gate.py, 5 test files.
+- 145 related tests pass; ruff clean on touched files.
+- Learnings: Chinese comments legitimately use '——' as punctuation; the unslop em-dash rule applies to English AI-tell prose only. 'Leverage' is a defined architecture term in this repo (improve-codebase-architecture vocabulary), not slop.
+---
+
+## [2026-10-10] - RA-107
+- SPIKE：枚举全部 `lca.application -> lca.harness` import（`default_facade.py`
+  → `lca.harness.runtime.activation_ref.compute_activation_ref`；
+  `plan_resolution.py` → `lca.harness.plan.compiled_run_plan_ref` /
+  `declarative_plan_hash` + `lca.harness.profile.resolve.resolve.resolve_profile` /
+  `ResolvedProfile` + `lca.harness.profile.validate.errors.ProfileResolveError`）。
+  选 option (b)：组合根合法依赖 harness（ADR-0199 P1-06 把 activation_ref
+  hashing 放在 harness；P1-07 经 harness K1/K2 解析 profile）。移动
+  `compute_activation_ref` 会违背 ADR 归属；`compiled_run_plan_ref` /
+  `declarative_plan_hash` 深缠在 `lca/harness/plan.py`（移动 = 搬半个模块），
+  都不是"小纯函数"。把 `lca.application` 契约更新为允许 `lca.harness` +
+  `lca.plugins`（组合根也装配插件：spawn / dream_scheduler / adapters），
+  只禁 `gateway`。
+- Enforcement：`scripts/check_package_contracts.py` 新增
+  `check_actual_forbidden_imports(root, packages)`——扫描每个包所有模块对
+  `forbidden_dependencies` 的实际 import（regex
+  `^\s*(?:import|from)\s+<dep>(?:\s|\.|import)`），接入 `main()`。
+  `--package lca.application` 现 exit 0（无 gateway import）。全量跑 198
+  issues：62 条既有 L1/L2/__all__ + 136 条 actual 层既有违规（基线，非本轮引入）。
+- `default_facade.py`：删掉 "soft-layering deviation / P1 cleanup backlog" 注记，
+  换成决议说明（契约允许 harness/plugins、只禁 gateway、由
+  `check_actual_forbidden_imports` 强制）。
+- Files changed: `pyproject.toml`、`lca/application/README.md`、
+  `lca/application/runtime/default_facade.py`、`scripts/check_package_contracts.py`、
+  `tests/scripts/test_check_package_contracts.py`（+2 个新 checker 测试；顺手修正
+  过期的 `gateway in pkgs` 断言——`gateway/` 已按 ADR-0119 物理删除）。
+- Tests：142 passed（`tests/application/runtime/` +
+  `tests/scripts/test_check_package_contracts.py` +
+  `tests/architecture/test_0199_phase1_acceptance.py`）；ruff check + format
+  clean；`git diff --check` clean。
+- **Learnings for future iterations:**
+  - option (a) 并不最小：`compiled_run_plan_ref` / `declarative_plan_hash`
+    依赖 `lca/harness/plan.py` 半模块（`canonical_json` / `_canonicalize` /
+    `_unwrap_v2` / `_declarative_payload`…），"移动小纯函数"实为"搬迁模块"。
+    ADR-0199 P1-06 显式把 activation_ref hashing 放在 harness——移动即违背 ADR。
+  - 全仓 actual-import 扫描暴露 142 处既有 forbidden-dep 违规：package
+    contract 普遍是理想声明。扩展 checker 后聚焦验证本 story 包
+    （`--package lca.application`），其余记为基线。
+  - `gateway` 包已物理删除（ADR-0119）；断言
+    `"gateway" in discover_packages(...)` 的测试过期，应断言缺席。
+---
+
+## 2026-10-10 02:28 - RA-106
+
+- 实现：`LLMAdapter` 协议新增 `model_name` property（默认返回 `None`，纯委托
+  wrapper 可不覆写）；`OpenAICompatAdapter`（含 Anthropic Messages 策略）、
+  `MockLLMAdapter`、`ModelOverridingLLMAdapter` 覆写返回各自模型 id。
+  `_model_label` 从 `getattr(inner, "_model", None)` 改为读声明的
+  `getattr(inner, "model_name", None)`——私有字段探针删除，模型身份成为契约。
+- 关键决策：协议默认实现返回 `None` 而非 `raise NotImplementedError`——因为
+  `model_visible/adapter.py::_resolve_model_config` 已有
+  `getattr(cur, "model_name", None)` 消费者，默认 raise 会让它炸掉；
+  返回 None 保持其行为不变（RA-059 的 raise 默认模式在这里不适用）。
+- 行为保持：OpenAICompatAdapter 的 `model_name` 返回 `self._model`（含 anthropic
+  策略），Mock 返回 `self.name`（"mock-llm"），ModelOverride 返回
+  assistant 模型；wrapper（Retrying/Failover/LlmService/Telemetry）不覆写，
+  `_model_label` 回退到 `name`/类型名——与改动前逐字一致。
+- Files changed:
+  - `lca/contracts/protocols/runtime/infra/infra.py`（协议新增 `model_name`）
+  - `lca/infrastructure/llm_adapter/openai_compat/__init__.py`
+  - `lca/infrastructure/llm_adapter/mock/llm.py`
+  - `lca/infrastructure/llm_adapter/model_override.py`
+  - `lca/infrastructure/observability/adapters/adapters.py`（`_model_label`）
+  - `tests/unit/observability/adapters/test_model_label.py`（新增 5 测试）
+  - `raphy/prd.json`（RA-106 passes=true）、`raphy/progress.txt`
+- 测试：`tests/unit/observability/adapters/` + `tests/scenario/telemetry/` +
+  `test_runnable_assembly.py` + `test_contracts.py` + `test_spawn_bind_plan.py`
+  53 passed（LLM_API_KEY=dummy；缺 env 时 spawn_bind_plan 环境性失败，与本次
+  改动无关）；ruff check 全过；`ruff format --check` 仅 infra.py/adapters.py
+  的 HEAD 遗留行 dirty（已验证 HEAD 版本同样 dirty，本次未触碰）。
+- **Learnings for future iterations:**
+  - 给 runtime_checkable Protocol 加新成员会影响 `isinstance(x, LLMAdapter)`
+    的结构检查——所有显式子类都继承默认 property（hasattr True），但鸭子类型
+    对象若没有 `model_name` 会从 isinstance 落选；本次仓库内所有 adapter 都是
+    子类，零波及。
+  - 协议成员加默认实现前，先 grep `getattr(<obj>, "<member>", <default>)`
+    消费者：默认值必须与该消费者期望的缺省值一致（这里 `getattr(cur,
+    "model_name", None)` 期望 None），否则默认 raise 会把无关路径炸掉。
+  - 仓库还有两处 `getattr(adapter, "_model", None)`（`think/reasoner/
+    credentials.py:131`、`cli/commands/runs/driver_debug.py:190`）——同类
+    私有探针，但不属于 RA-106 的 `_model_label` 范围，未动；后续可顺手收敛。
+  - 评估称"production adapters (openai_compat, anthropic, mock)"：anthropic
+    不是独立 adapter 类，是 openai_compat 内部 Strategy——`OpenAICompatAdapter.
+    model_name` 一处实现即覆盖 anthropic 风格。
+---
+
+## 2026-10-10 02:44 - RA-108
+
+- **SPIKE 结论（决定 (b) cross-reference）**：对比 `journal step --step N` 与
+  `journal steps --step N` 在真实 journal.json 上的行为与输出。`journal step`
+  输出单步原始事实纯文本块（step_id/phase/thinking/tool_call/tool_result），
+  `journal steps --step N` 输出 StepNarrativeWriter 渲染的整份 narrative markdown
+  （含 Summary 表/因果链/Steps 详述）。两者都被 docs/ADR 引用且输出格式本质不同
+  （原始事实 vs narrative），合并会丢一种视图 → 保留双命令，共享 journal 读取 seam。
+- **实现**：`journal step` 删除私有 `_load_journal`（raw dict JSON 解析）与
+  `_select_step`（dict 扫描），改走 `journal steps` 同款 typed seam——
+  `read_step_document` + `JournalDocument.step_by_index`；渲染用
+  `dataclasses.asdict(step)` 喂给既有 `_format_step_human`（key 顺序与
+  journal.json 原始 dict 完全一致，human/`--json` 输出字节等价，改动前已用
+  golden 对比验证）。`--json` 输出 `asdict(step)`；model-visible 分支改用
+  `step.step_id`。帮助文本双向交叉引用：`journal step --help` 指向
+  `journal steps --step N`（narrative markdown），`journal steps --help` 指向
+  `journal step --step N`（单步原始事实）。
+- Files changed:
+  - `lca/infrastructure/cli/commands/journal/step.py`（删私有读取/选择，走 typed seam）
+  - `lca/infrastructure/cli/commands/journal_extra/journal_steps.py`（帮助文本交叉引用）
+  - `tests/infrastructure/cli/test_journal_step_load.py`（改测 `_load_journal_document`，
+    新增非 step-tree schema 判损用例）
+  - `tests/scenario/cli/test_cli_journal_steps.py`（新增 `journal step` 单步输出 +
+    双向帮助交叉引用 pin）
+  - `raphy/prd.json`（RA-108 passes=true）、`raphy/progress.txt`
+- 测试：`tests/infrastructure/cli/` + `tests/scenario/cli/` 320 passed（1 既有
+  skip）；`ruff check` + `ruff format --check` 触及 4 文件全过；SPIKE 脚本重跑
+  输出与改动前逐字一致。
+- **Learnings for future iterations:**
+  - 双命令重叠的收敛决策先问"输出格式是否本质不同 + 是否都被外部引用"：
+    是 → (b) 共享读取 seam + 帮助文本交叉引用，别强行合并丢视图。
+  - `dataclasses.asdict(frozen_dataclass)` 的 key 顺序与 `JournalDocumentWriter`
+    写出的 journal.json 原始 dict 完全一致（字段声明序 == 写盘序），可用它把
+    raw-dict 渲染安全收敛到 typed reader；但收敛前必须跑 golden 对比验证
+    字节等价（human + `--json` 都要比）。
+  - `read_step_document` 要求完整 JournalDocument 形状（schema/metadata 等）：
+    `_load_journal` 旧测试的 `{"steps": [...]}` 极简 fixture 不再是合法输入，
+    测试 fixture 要跟着 seam 升级。
+---
+## 2026-10-10 03:05 - RA-109
+
+- 实现：`lca/framework/graph/observation.py::_PHASE_ALIAS_OF` 依据真实 bundle
+  证据扩展 5 个 alias：`reason` / `context` / `prompt` / `shortcut` /
+  `capability` → think。它们全是 think 阶段业务图
+  （`bundles/agent/reasoning_turn.yaml`，ADR §0.4 N9 的 `reason.*` 认知流）经
+  sub_spec_ref 挂载的内层概念图/原语节点，缺 `think.` 前缀。
+- 新增 `tests/framework/graph/test_phase_of_vocabulary.py`：走查
+  `bundles/**/*.yaml` 全部 90 个 `nodes:` 节点 id，断言每个非空 node id 映射到
+  顶层 phase / alias，或头段落入文档化 keep-list。
+- Keep-list（合法无 phase，`phase_of` 返回 "" 是正确语义）：`plan` /
+  `intervene` / `delegate`（ADR-0228 明确 "not added to the six-phase closed
+  set… cross-phase subgraphs"）+ `primitive`（Layer 1 phase 无关原语）。
+  未强塞 alias —— 遵守评估约束 "do not change phase_of semantics without
+  evidence"。
+- 混合头段证据：`capability.role.*` 在 think turn（reason.prepare.role 内层），
+  `capability.fork.dispatch` 是 boot-time 原语未挂 phase 图 —— 按 phase 图内
+  实际用法归 think，注释记录 caveat（若将来落入 act 再拆）。
+- Files changed:
+  - `lca/framework/graph/observation.py`（alias 表 +5，注释带 bundle 证据）
+  - `tests/framework/graph/test_phase_of_vocabulary.py`（新增，6 测试）
+  - `raphy/prd.json`（RA-109 passes=true）、`raphy/progress.txt`
+- 测试：新测试 6 passed；观察面回归（test_graph_observer +
+  test_runtime_graph_observer_wiring + test_spine_graph_events_e2e）16 passed；
+  ruff check + ruff format clean。`test_gate_chain_annotations_resolve` 红为
+  RA-023 已记录的干净树基线（NameError: PortRegistry forward-ref，与本轮
+  无关，未动）。
+- **Learnings for future iterations:**
+  - 收集 bundle 节点语料必须走 `nodes:` list 语义，不能裸 grep `id:` ——
+    `id:` 还出现在 plugin/provider 注册（base.yaml 的 `lca-*` 服务 id 等），
+    会把非节点 id 混进语料。
+  - 跨 phase region（plan/intervene/delegate）不是 alias 候选：ADR-0228 已
+    明确它们不属于六 phase 闭集，`phase_of` 返回 "" 是文档化语义；强塞 alias
+    等于伪造 phase。
+  - 混合头段（capability：role 在 think、fork 是 boot-time）按 phase 图内的
+    实际用法定 alias，并把 caveat 写进注释；若另一用法将来落入其它 phase，
+    需要拆分命名而非继续共享头段。
+---

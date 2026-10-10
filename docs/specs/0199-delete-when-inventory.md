@@ -45,7 +45,7 @@ When a COMPAT block is deleted:
 
 1. Remove the COMPAT comment from the source file.
 2. Update this file: mark the row as "deleted YYYY-MM-DD" or remove the row entirely.
-3. Update `tests/architecture/test_0199_compat_gates.py` to remove the now-obsolete exemption if any.
+3. Update `tests/architecture/test_0199_compat_gates.py` to remove the obsolete exemption if any.
 4. Open a PR whose body cites the delete_when condition met.
 
 ## 4. Cross-references

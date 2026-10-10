@@ -312,7 +312,7 @@ def test_audit_run_evidence_refs_come_from_spine(run_id: str) -> None:
     """Every ``EvidenceRef`` points to a real event in the same spine.
 
     Spec §10.5 property 4 — ``evidence_refs[*].execution_point ∈
-    SPINE_EXECUTION_POINTS``. We additionally check that the seq
+    SPINE_EXECUTION_POINTS``. We also check that the seq
     matches the in-file event (proves the parsing helpers are wired
     correctly end-to-end).
     """

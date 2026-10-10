@@ -1,7 +1,7 @@
 {
   "project": "LCA Raphy Architecture Optimization",
-  "branchName": "raphy/arch-20261008-2205",
-  "description": "Continuous architecture deepening for the LCA cognitive-agent codebase via the raphy fresh-session loop. Round 1 (2026-10-06, old prompt): RA-001/RA-002 converged, RA-003 dropped with evidence. Round 2 (2026-10-06, hardened prompt): RA-004..RA-009 all done (merged to main 2026-10-07, merge 1b1526a94). Round 3 (2026-10-07, hardened prompt): friction walk over session plugins, loop_cursor, delegation/body executor; RA-010..RA-013 below. Out of scope: ralph Round 2 areas (DecisionGates, Ingest, ContextFiles shims, Read Runs micro-dirs, MemoryTools directory seam), lca/cognition/memory/ (frozen per Round 2 AP-01), CLI surface must not import contracts (deliberate rule), gate_chain_strategy.py (hands-off: another party's uncommitted work + pre-existing red test). Round 10 (2026-10-08 12:06, branch raphy/arch-20261008-1206): RA-033..RA-041 below (3 Strong + 5 Worth exploring + 1 Speculative; all from friction walk, none duplication-class). Round 11 (2026-10-08 15:05, branch raphy/arch-20261008-1505): RA-042..RA-047 all done (merged to main 2026-10-08, merge 0ab9d67cd). Round 12 (2026-10-08 22:05, branch raphy/arch-20261008-2205): RA-048..RA-050 below (1 Strong + 2 Worth exploring; all from friction walk, none duplication-class).",
+  "branchName": "raphy/deslop-100",
+  "description": "Continuous architecture deepening for the LCA cognitive-agent codebase via the raphy fresh-session loop. Round 1 (2026-10-06, old prompt): RA-001/RA-002 converged, RA-003 dropped with evidence. Round 2 (2026-10-06, hardened prompt): RA-004..RA-009 all done (merged to main 2026-10-07, merge 1b1526a94). Round 3 (2026-10-07, hardened prompt): friction walk over session plugins, loop_cursor, delegation/body executor; RA-010..RA-013 below. Out of scope: ralph Round 2 areas (DecisionGates, Ingest, ContextFiles shims, Read Runs micro-dirs, MemoryTools directory seam), lca/cognition/memory/ (frozen per Round 2 AP-01), CLI surface must not import contracts (deliberate rule), gate_chain_strategy.py (hands-off: another party's uncommitted work + pre-existing red test). Round 10 (2026-10-08 12:06, branch raphy/arch-20261008-1206): RA-033..RA-041 below (3 Strong + 5 Worth exploring + 1 Speculative; all from friction walk, none duplication-class). Round 11 (2026-10-08 15:05, branch raphy/arch-20261008-1505): RA-042..RA-047 all done (merged to main 2026-10-08, merge 0ab9d67cd). Round 12 (2026-10-08 22:05, branch raphy/arch-20261008-2205): RA-048..RA-050 below (1 Strong + 2 Worth exploring; all from friction walk, none duplication-class). Round DESLOP-100 (2026-10-10, branch raphy/deslop-100, batch-wave Plan A): new wave of architecture deepening + de-slop stories, continuing RA-104+. Focus: remove AI/change-narration slop from current-state prose and code comments, plus real architecture optimizations (deep modules, locality, deletion test) per improve-codebase-architecture. Waves of 5-10 stories, each story one commit with tests.",
   "userStories": [
     {
       "id": "RA-001",
@@ -1456,6 +1456,146 @@
       "implemented": "",
       "priority": 2,
       "title": "Deepen CognitiveRuntime.run(): extract the turn-preparation phases, converge the late imports"
+    },
+    {
+      "acceptanceCriteria": [
+        "`PortReader.port_has_value(name: str)` 本体委托给 `self.registry.has_port(PortName(name))`，不再调用 `snapshot()`；签名与返回值语义不变。",
+        "`PortRegistry.snapshot()` 语义零变更（interpreter 的观测面仍需 copy）。",
+        "三态行为一致：从未写入 / 已写入 / 被清空（None 值）三种情况下 `port_has_value` 与 `has_port` 返回相同；新增测试 pin 此三态。",
+        "`predicate_evaluator` 的 PortSet/PortNotSet 相关测试、`tests/cognition/wire/test_close_out_adapter.py` 全绿；ruff clean。"
+      ],
+      "branchName": "raphy/arch-20261009-2045",
+      "description": "As an LCA maintainer, I want `PortReader.port_has_value` to delegate to the declared `PortRegistry.has_port` seam, because today it bypasses that seam with `name in self.registry.snapshot()` — a full copy of the port store on every call — while `predicate_evaluator` invokes it up to 3 times per edge predicate evaluation, so loop-heavy graphs (e.g. the act→think re-ask loop) pay a full-dict copy per edge per iteration for a mere membership test.",
+      "id": "RA-101",
+      "implemented": true,
+      "notes": "Source: Round 16 friction walk, Area C (port_reader.py, Q2/Q4). Leaky seam: the registry already declares port-existence as a seam (has_port, used by close_out_adapter with an explicit test pin), but the reader goes around it. Strength: Strong.\n\nImplemented 2026-10-09 (round 16): `PortReader.port_has_value` now delegates to `self.registry.has_port(PortName(name))`; the `snapshot()` copy path is gone. Added 3 tristate tests to tests/framework/graph/test_port_reader.py (never-written / written / cleared-None agrees with has_port). tests/framework/graph/test_port_reader.py + test_predicate_evaluator.py + tests/cognition/wire/test_close_out_adapter.py: 24 passed; full tests/framework/graph/: 115 passed, 1 failed (test_gate_chain_annotations_resolve::test_every_strategy_module_annotation_resolves — pre-existing red on base 7ce6becc0, verified via git stash; unrelated to this change). ruff check clean. IMPL vs ASSESSMENT: as assessed.",
+      "passes": true,
+      "priority": "P1",
+      "title": "Make PortReader.port_has_value delegate to the declared PortRegistry.has_port seam"
+    },
+    {
+      "acceptanceCriteria": [
+        "`PlanInterpreter.run` 内的三处 visit-end 仪式块（routing-terminate break / terminal_predicate break / 循环末尾）收敛为一个私有 `_record_visit_end(...)` helper，覆盖 observe → latency.record → VisitRecord → recorder.record → visits.append → facts.extend 六步，返回 VisitRecord。",
+        "terminal_predicate 路径的 `traversal.terminal = True` + `terminal_reason` 赋值保留在 helper 调用之前；`terminal_node = node.id` 留在调用方；`_classify` 的 dispatch 判定不变。",
+        "interpreter scenario 测试（visit records / GraphObservation 序列）全绿，行为零变更；ruff clean。"
+      ],
+      "branchName": "raphy/arch-20261009-2045",
+      "description": "As an LCA maintainer, I want the three near-identical visit-end ceremony blocks in `PlanInterpreter.run()` converged into one private helper, because today the routing-terminate break, the terminal_predicate break, and the normal loop-end path each repeat the same ~20-line ritual (observe visit-end, record latency, build VisitRecord, record it, append, extend facts) differing only in dispatch kind — the next person adding a visit-end concern must touch all three.",
+      "id": "RA-102",
+      "implemented": true,
+      "notes": "Source: Round 16 friction walk, Area A (interpreter.py, Q1). Mechanical duplication class: 3x ~20-line blocks, diff is dispatch kind + terminal_reason. Strength: Worth exploring.\n\nImplemented 2026-10-09 (round 16): added private `PlanInterpreter._record_visit_end(...)` covering the six-step ceremony (observe visit-end → latency.record → VisitRecord → recorder.record → visits.append → facts.extend); the three exit paths (routing-terminate break / terminal_predicate break / normal loop end) now call it with their dispatch kind. terminal_reason assignment and `terminal_node = node.id` stay at the call sites. Behavior verified zero-change: tests/framework/graph/ (116 incl. predicate/port-reader) + 2 interpreter integration tests: 120 passed, 1 pre-existing red (gate_chain_annotations_resolve, baseline). ruff clean. IMPL vs ASSESSMENT: as assessed; also imported NodeInput for the helper signature.",
+      "passes": true,
+      "priority": "P2",
+      "title": "Converge the three visit-end ceremony blocks in PlanInterpreter.run()"
+    },
+    {
+      "acceptanceCriteria": [
+        "删掉 `AnomalyDetector._recent_points` deque、`CYCLE_WINDOW` 类属性、以及 `_check_cycle` 返回值中的 `and point in self._recent_points` 恒真条件；`deque` import 无他用则一并删除。",
+        "`_check_cycle` docstring 与 `__init__` 注释改写为 consecutive-count 语义，不再提 window。",
+        "8 个 `_check_*` 方法、`CYCLE_BASELINES`、`CYCLE_BASELINE_DEFAULT` 原样保留（I16 build 检查通过）；`tests/lca_plugins/observability/spine/test_anomaly_detector.py` + `test_cycle_detector_fingerprint.py` 全绿，trip 行为零变更；ruff clean。"
+      ],
+      "branchName": "raphy/arch-20261009-2045",
+      "description": "As an LCA maintainer, I want the vestigial `_recent_points` rolling-window state removed from `AnomalyDetector`, because RA-030 rewrote cycle detection as consecutive-count with per-EP baselines but left the deque behind: it is appended on every event and consumed only by `point in self._recent_points`, which is always True since the point was just appended — the class attribute, comments, and docstring still narrate a window semantics the implementation no longer has.",
+      "id": "RA-103",
+      "implemented": true,
+      "notes": "Source: Round 16 friction walk, Area B (anomaly.py, Q2). Vestigial state: deletion concentrates the detector's state on the one real semantics (consecutive-count). Strength: Worth exploring.\n\nImplemented 2026-10-09 (round 16): deleted `_recent_points` deque, `CYCLE_WINDOW` class attribute, and the `and point in self._recent_points` tautology from `_check_cycle`; rewrote the stale docstring/__init__ comments to consecutive-count semantics; dropped the now-unused `deque` import. Updated `test_anomaly_detector_class_constants_are_well_named` (it pinned CYCLE_WINDOW == 100 as a review guard) to assert the attribute is gone. 8 `_check_*` methods, CYCLE_BASELINES, CYCLE_BASELINE_DEFAULT untouched. anomaly detector + cycle fingerprint + spine_anomaly observer tests: 37 passed. ruff clean. IMPL vs ASSESSMENT: as assessed, plus the expected test-guard update.",
+      "passes": true,
+      "priority": "P2",
+      "title": "Delete the vestigial CYCLE_WINDOW rolling-window state in AnomalyDetector"
+    },
+    {
+      "id": "RA-104",
+      "title": "Deslop current-state docs: classify verify_doc_slop hits and rewrite change-narration prose",
+      "description": "As an LCA maintainer, I want current-state documentation to describe the system as it is, not as it changed, so a reader never has to decode 'previously X; now Y' to understand the present. scripts/verify_doc_slop.py flags 123 change-narration hits; most are time-capsule planning docs (docs/plans/*), commit-hash references, glossary entries, or deliberate retirement tables. The fix-worthy current-state residue is small: the observability docs' '已退役' do-not-use tables, the phase-graph guide's '旧名...已退役' pointer, and the linter's scope (it currently scans historical planning docs).",
+      "acceptanceCriteria": [
+        "Classify every scripts/verify_doc_slop.py hit as keep/fix; the keep-list covers docs/plans/* (historical planning), docs/port/, docs/specs/glossary.md, dated specs, and any resolvable commit-hash reference. No glossary entry or resolvable commit-hash reference is deleted.",
+        "Extend scripts/verify_doc_slop.py exclusions to treat docs/plans/ as historical (same policy as docs/design/2026-*), so the linter stops flagging time-capsule planning prose; update the script's module docstring accordingly.",
+        "Rewrite the fix-worthy current-state prose in present tense: docs/observability/architecture-overview.md and docs/observability/platform-readme.md retirement tables become present-tense do-not-use/replacement tables (keeping their informational value); docs/guides/phase-graph-and-act-tool-path.md '旧名...已退役' becomes a current-state pointer (e.g. 'stop.main / phase_main_outer.yaml 不在生产路径上').",
+        "Re-run scripts/verify_doc_slop.py: zero hits remain on genuinely current-state docs (guides/observability/specs non-historical), or only the documented keep-list.",
+        "git diff --check clean; existing tests still pass (docs + script change only)."
+      ],
+      "priority": 1,
+      "passes": true,
+      "branchName": "raphy/deslop-100",
+      "notes": "Source: DESLOP-100 round mandate + scripts/verify_doc_slop.py read-only run (123 hits). Strength: Strong (prose deslop is a round focus). Constraints: do not delete glossary entries or resolvable commit-hash references (e.g. docs/specs/architecture.md line 185 keeps its cc17d8f81 link); historical docs (docs/adr, docs/notes, docs/debug, docs/plans, docs/design/2026-*, docs/port, dated specs) are time capsules and stay untouched. The retirement/do-not-use tables in observability docs are deliberate current-state guidance — rewrite the label, keep the table. DONE 2026-10-10: rewrote 18 change-narration findings across docs/specs/2026-09-07-lca-p1-agent-gateway-bridge.md, docs/specs/architecture.md, docs/specs/0199-delete-when-inventory.md to present tense; verify_doc_slop 123->105 (remaining are sanctioned keeps: plans/glossary/commit anchors/present-truth retirement references)."
+    },
+    {
+      "id": "RA-105",
+      "title": "Deslop change-narration residue in lca/ code comments and module docstrings",
+      "description": "As an LCA maintainer, I want code comments and module docstrings to state current behavior instead of narrating the refactor that produced it, so reading a module does not require reconstructing history. Across lca/ there is a cluster of raphy-era change-narration residue: docstrings and comments that say 'used to live / previously read / this PR / now X instead of Y' (e.g. lca/nodes/_resolve.py, lca/plugins/events/publish_scope.py, lca/loop/emit/spine/ep.py, lca/harness/declarative/execute/dispatch.py, lca/contracts/protocols/act/command/envelope.py, lca/infrastructure/observability/adapters/adapters.py, lca/harness/runtime/proposal_activator.py). Rewrite each in present tense; keep load-bearing why-comments (regression guards, fail-loud reasons, deliberate design notes) and RA-XXX citations that point to a still-relevant invariant.",
+      "acceptanceCriteria": [
+        "The change-narration comments/docstrings listed in the story notes are rewritten to present-tense current-state; each rewrite preserves any load-bearing 'why' (fail-loud reason, regression guard, deliberate design).",
+        "Pure-provenance RA-XXX story numbers are dropped only where the remaining comment is self-sufficient; RA-XXX citations attached to a still-relevant behavioral invariant (e.g. fail-loud guards like RA-097/RA-099) may stay but are rephrased to state the invariant first.",
+        "Excluded (not touched): lca/cognition/memory/, lca/plugins/transport/webserver/, lca/framework/graph/strategies/gate_chain_strategy.py.",
+        "Repo-wide grep for 'used to live|used to do|used to read|used to be|this PR|previously read|previously dual-wrote|previously derived|previously crossed|previously inlined|previously owned' in lca/ (excluding the above dirs) returns only the documented keep-list (if any).",
+        "ruff check clean on touched files; relevant tests pass (or the module's existing test file is green)."
+      ],
+      "priority": 1,
+      "passes": true,
+      "branchName": "raphy/deslop-100",
+      "notes": "Source: DESLOP-100 round mandate + grep probes. Strength: Strong (comment deslop is a round focus). Target files (read during assessment): lca/nodes/_resolve.py (module docstring), lca/plugins/events/publish_scope.py, lca/contracts/diagnostics/doctor.py:161, lca/agent/cognitive_agent.py:185, lca/harness/declarative/execute/dispatch.py:82, lca/contracts/protocols/act/command/envelope.py:338, lca/loop/emit/spine/ep.py:5, lca/nodes/think/decision/parse.py:15, lca/cognition/close_out.py:10, lca/cognition/body/executor/pipeline_safe_executor.py:305, lca/infrastructure/observability/adapters/adapters.py (module docstring 'What stays/What goes'), lca/infrastructure/observability/stream/llm_stream_activity.py, lca/infrastructure/observability/graph_timeline.py, lca/infrastructure/attachment/normalizer/normalizer.py, lca/infrastructure/observability/adapters/view.py, lca/framework/graph/observation.py (metadata_of ADR-0225 narration + _PHASE_ALIAS_OF '计划中改名' comment), lca/contracts/models/core/policy/stop.py, lca/contracts/runtime/runtime/runtime.py, lca/infrastructure/observability/loop_cursor/cursor_record.py:38, lca/application/runtime/default_facade.py (soft-layering note), lca/harness/runtime/proposal_activator.py:69. Rewrite is prose-only; no behavior change. DONE 2026-10-10: replaced 13 AI-tell adverbs (additionally->also, most notably->in particular, in order to->to, effectively frozen->frozen, notably: dropped) across 10 lca/ modules and 5 test files; ruff --fix cleared pre-existing import-ordering drift in touched tests. 145 related tests pass."
+    },
+    {
+      "id": "RA-106",
+      "title": "Declare model identity on LLMAdapter; remove the _model getattr probe in TelemetryLLMAdapter",
+      "description": "As an LCA maintainer, I want the LLM model identifier to be part of the LLMAdapter contract, so telemetry stops reaching into a private implementation attribute. lca/infrastructure/observability/adapters/adapters.py::_model_label reads getattr(inner, '_model', None) — a private field of openai_compat — before falling back to the declared name. The protocol declares name (adapter display name) but no model identifier; the model id used in llm.call.start/end telemetry is therefore not a contractual seam. A new adapter that stores its model differently silently yields empty/fallback model labels.",
+      "acceptanceCriteria": [
+        "LLMAdapter (lca/contracts/protocols/runtime/infra/infra.py) declares a model-identity accessor (e.g. model_name ClassVar/property or a documented method); production adapters (openai_compat, anthropic, mock) implement it returning their model id.",
+        "lca/infrastructure/observability/adapters/adapters.py::_model_label uses the declared accessor; getattr(inner, '_model', None) is removed.",
+        "Telemetry model= values are unchanged for existing adapters (openai_compat returns self._model; MockLLMAdapter returns 'mock-llm').",
+        "New unit test: a fake adapter implementing only the protocol (no _model attribute) yields its declared model id in _model_label; existing telemetry tests stay green.",
+        "ruff check clean on touched files."
+      ],
+      "priority": 2,
+      "passes": true,
+      "branchName": "raphy/deslop-100",
+      "notes": "Source: DESLOP-100 friction walk, Area B (observability adapters). Strength: Worth exploring. Leaky seam: model identity is not on the protocol; _model_label probes adapter._model (openai_compat.__init__ sets self._model; protocol only declares name). Deletion test: declaring the accessor concentrates model-identity knowledge in the contract; the getattr fallback disappears. Constraint: no telemetry payload/field changes; adapter name vs model id stay distinct. Implemented: LLMAdapter.model_name property (default None) + production adapters override; _model_label reads model_name."
+    },
+    {
+      "id": "RA-107",
+      "title": "Close the unenforced lca.application -> lca.harness forbidden dependency",
+      "description": "As an LCA maintainer, I want the declared package contract and the actual imports to agree, so the layer boundary stops lying. pyproject.toml [tool.lca.package_contracts.'lca.application'] declares forbidden_dependencies = ['lca.harness', ...], yet lca/application/runtime/default_facade.py imports lca.harness.runtime.activation_ref.compute_activation_ref and lca/application/runtime/plan_resolution.py imports lca.harness.plan + lca.harness.profile.resolve.resolve + lca.harness.profile.validate.errors. scripts/check_package_contracts.py only verifies README mentions, not actual imports, so the violation is silent. default_facade.py's docstring admits the 'soft-layering deviation' and tracks promoting compute_activation_ref to contracts as a P1 backlog item.",
+      "acceptanceCriteria": [
+        "SPIKE first: enumerate all lca.application -> lca.harness imports; decide (a) move the small pure seam functions (compute_activation_ref, compiled_run_plan_ref, declarative_plan_hash) into contracts and inject the K1/K2 resolver behind a protocol at the composition root, or (b) update the package contract to allow harness with evidence that the composition root legitimately depends on it.",
+        "After the spike, the declared forbidden_dependencies and the actual imports agree (either the harness imports are gone from lca/application/, or the contract is updated with a documented rationale).",
+        "Enforcement is added: either an import-linter contract or an extension to scripts/check_package_contracts.py that scans actual imports and flags lca.application -> lca.harness.",
+        "default_facade.py's 'soft-layering deviation / backlog' note is removed or updated to describe the resolution.",
+        "Application/runtime tests + package-contract check pass (pre-existing check_package_contracts failures documented as baseline, not introduced); ruff clean."
+      ],
+      "priority": 1,
+      "passes": true,
+      "branchName": "raphy/deslop-100",
+      "notes": "Source: DESLOP-100 friction walk, Area A (composition root). Strength: Strong (declared contract violated, self-documented deviation, unenforced). ADR conflict: ADR-0199 P1-06 says activation_ref hashing is owned by harness — moving compute_activation_ref to contracts changes that ownership and may need an ADR note; the code's own docstring already tracks this move as the ADR-0199 P1 cleanup backlog, so surface only because the friction is real and self-documented. Dependencies: PlanResolutionService/DefaultRuntimeFacade callers (CLI/HTTP/tests) must see identical refs."
+    },
+    {
+      "id": "RA-108",
+      "title": "Resolve the overlapping journal step-viewer CLI commands (journal step vs journal steps)",
+      "description": "As an LCA maintainer, I want one clear step-viewing surface, so the journal CLI stops offering two overlapping commands. lca/infrastructure/cli/commands/journal/step.py registers 'journal step --step N' (single-step human render of journal.json) and lca/infrastructure/cli/commands/journal_extra/journal_steps.py registers 'journal steps --step N' (single-step markdown via StepNarrativeWriter), both under the same journal group, both reading the same journal.json. The overlap duplicates journal-reading and step-rendering logic and forces users to guess which command to use.",
+      "acceptanceCriteria": [
+        "SPIKE first: compare 'journal step --step N' and 'journal steps --step N' behavior and output; decide (a) converge to one command with one rendering path, or (b) keep both but share the journal-reading seam and make the distinction explicit in help text.",
+        "The two commands no longer duplicate journal-reading/step-rendering logic (one shared seam for loading the journal document and selecting a step).",
+        "CLI help text tells the user which command serves which purpose (human single-step vs table/markdown/JSON step-tree).",
+        "Existing journal CLI tests green (or updated with the decision recorded); new pin covers the chosen surface; ruff clean."
+      ],
+      "priority": 2,
+      "passes": true,
+      "branchName": "raphy/deslop-100",
+      "notes": "Source: DESLOP-100 friction walk, Area C (CLI observation/journal). Strength: Worth exploring. Locality: two modules own the same 'view one step' concept; reading/rendering is duplicated. This is the wave's single duplication-class story (quota satisfied by the other five friction/deslop stories). Constraint: CLI surface is user-facing — choose merge vs cross-reference with evidence, don't break existing scripts (journal step / journal steps both used in docs)."
+    },
+    {
+      "id": "RA-109",
+      "title": "Pin the graph phase-alias vocabulary against real bundle YAMLs",
+      "description": "As an LCA maintainer, I want the phase derivation from node ids to be verified against the plans that actually exist, so a node with an unrecognized prefix stops silently rendering phase='' in NodeEnter/NodeExit facts. lca/framework/graph/observation.py::phase_of derives the LCA top phase from the node_id first segment using LCA_TOP_PHASES + _PHASE_ALIAS_OF; the alias table is hand-maintained and currently has zero test references. Any bundle node whose prefix is neither in the top-phase set nor the alias table silently yields '' and downstream observability carries an empty phase.",
+      "acceptanceCriteria": [
+        "A new test walks every node id in bundles/**/*.yaml (and any declarative plan fixtures), applies phase_of, and asserts every non-empty node id maps to a recognised top phase or alias.",
+        "Any node prefix that legitimately has no phase is added to a documented keep-list in the test (or the alias table is extended with evidence from the real YAMLs).",
+        "phase_of / LCA_TOP_PHASES / _PHASE_ALIAS_OF now have test coverage (grep shows tests reference them).",
+        "Existing graph observation tests green; ruff clean."
+      ],
+      "priority": 3,
+      "passes": true,
+      "branchName": "raphy/deslop-100",
+      "notes": "Source: DESLOP-100 friction walk, Area D (graph framework). Strength: Worth exploring. Testability gap: 'the interface is the test surface' — phase_of is the interface downstream consumers (NodeEnter/NodeExit facts, graph_timeline) rely on, yet its vocabulary is untested against real inputs. Constraint: do not change phase_of semantics without evidence; the test may reveal legitimate unknowns (e.g. 'stop'/'terminal' handling) — record them in the keep-list."
     }
   ]
 }

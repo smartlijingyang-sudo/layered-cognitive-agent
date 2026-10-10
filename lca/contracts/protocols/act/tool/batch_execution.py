@@ -2,7 +2,7 @@
 
 A model may emit several tool calls in one decision. The Body remains the only
 execution boundary, while a profile-selected policy decides whether calls are
-safe to overlap or must retain their declared order. A policy may additionally
+safe to overlap or must retain their declared order. A policy may also
 expose a segmented plan: the Body executes its contiguous segments in order,
 while only each safe segment overlaps. This is a Body strategy seam, not a new
 cognitive phase or action type.

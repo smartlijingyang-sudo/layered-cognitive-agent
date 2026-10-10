@@ -20,7 +20,7 @@ class ModelOverridingLLMAdapter(LLMAdapter):
     """Thin ``LLMAdapter`` wrapper that defaults ``model`` to a Home value.
 
     Delegates ``complete`` / ``stream`` to the wrapped adapter after
-    ``kwargs.setdefault("model", self._model)``. Exposes ``_model`` so
+    ``kwargs.setdefault("model", self._model)``. Exposes ``model_name`` so
     ``TelemetryLLMAdapter._model_label`` can label assistant-selected models
     instead of the boot default.
     """
@@ -30,6 +30,11 @@ class ModelOverridingLLMAdapter(LLMAdapter):
             raise ValueError("model 必须为非空字符串")
         self._inner = inner
         self._model = model
+
+    @property
+    def model_name(self) -> str:
+        """Assistant-selected model id（``model=`` 标签用）。"""
+        return self._model
 
     async def complete(self, prompt: str, **kwargs: Any) -> LLMResponse:
         kwargs.setdefault("model", self._model)

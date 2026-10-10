@@ -47,6 +47,15 @@ class LLMAdapter(Protocol):
         """
         ...
 
+    @property
+    def model_name(self) -> str | None:
+        """模型标识 —— ``llm.call.start/end`` 的 ``model=`` 标签。
+
+        拥有具体模型 id 的适配器返回它；纯委托 wrapper 可不覆写（默认
+        ``None``，:func:`_model_label` 回退到 ``name`` / 类型名）。
+        """
+        return None
+
 
 @runtime_checkable
 class Tool(Protocol):

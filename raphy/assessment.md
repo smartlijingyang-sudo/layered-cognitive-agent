@@ -1,229 +1,165 @@
-# Raphy Round 15 Assessment — raphy/arch-20261009-1643（基线 ba65436bb）
+# DESLOP-100 Wave 1 — Assessment
 
-评估时间：2026-10-09 16:43–17:15 CST。新鲜会话，零记忆，全部状态来自仓库文件。
-上一轮 raphy/arch-20261009-1008 已合 main（merge 1cc01a1ac），RA-001~RA-096 全 done（无 dropped）。
-禁区遵守：未读未碰 `lca/infrastructure/computer/guest/preamble.py` 的 emit/resolve 路径映射。
+Branch: `raphy/deslop-100` (worktree `/home/lichao/.lca-worktrees/raphy-deslop-100`)
+Date: 2026-10-10
+Mode: ASSESS ONLY (no code changes outside `raphy/`)
 
-## Phase 1 — Explore
+## Scope
 
-### 1.1 Scope via YAGNI
+This wave combines the two round mandates:
+1. **deslop** — remove AI-generated slop: change-narration residue in current-state docs/comments, filler words, unnecessary comments inconsistent with local style.
+2. **real architecture deepening** per `skills/improve-codebase-architecture` (deep modules, locality, deletion test, seams).
 
-`git log --oneline` 回溯 45 commits：热点区 = raphy/ 自身（mechanical）、docs/notes 账本、
-以及本次 assess 锁定的三区（最近两轮 raphy 改动最密集）：
+Stories continue from RA-104 (`passes: false`, `branchName: raphy/deslop-100`). Prior RA-001..RA-103 are all `passes=true` or dropped.
 
-- `lca/agent/cognitive_agent.py`（RA-082 包络收敛、RA-096 dataclasses.replace）
-- `lca/cognition/body/tools/tool_batch_executor.py`（RA-086 effects 收敛）
-- `lca/runtime/loop/runtime_loop.py`（近期 2 次改动，run() 方法 150+ 行）
-- `lca/contracts/protocols/runtime/infra/infra.py`（LLMAdapter Protocol —— 运行时验证炸出来的）
+## 禁区 compliance
 
-### 1.2 Organic friction walk（5 问必答，精读非 grep）
+Respected: `lca/cognition/memory/` (frozen), `lca/plugins/transport/webserver/` (lca-1000 territory), `gate_chain_strategy.py` (hands-off), `preamble.py` (user iterating), ralph Round 2 areas. The comment-deslop story explicitly excludes the frozen dirs.
 
-**Area A — `lca/agent/cognitive_agent.py`（426 行，已全读）**
+## Hot spots (git log)
 
-1. 理解一个概念要跨多少小模块？`run()` → `_run_lifecycle` → `_run_lifecycle_body` →
-   `run_envelope`（`lca/agent/run_envelope.py`，RA-082）：四层嵌套但职责清晰（entry
-   → scope → envelope spec → cascade），不算 sprawl。真正刺痛的是 `run()` 与
-   `resume()` 各自末尾那段 `if self._plan_ref: with plan_ref_scope(...)` 的**逐字重复**
-   （各 12 行，唯一区别是 `_run_lifecycle` 的参数）。
-2. 浅模块？模块顶层的四个 `_agent_translate_*` 函数（RA-082 留下）：每个 8–10 行，
-   interface = 一种异常类型 + 上下文。deletion test：删掉它们并不能把复杂度"集中"
-   到一处——outcome 翻译规则（status/output/error/outcome/disposition 五元组）本来就
-   是四种异常各自的翻译表；但四函数之间有**机械对称性**（FAILED+`drain_run_partial()`+`steps=0`
-   出现 3 次）， Worth exploring：收敛成一张 outcome 翻译表而非四个函数。本轮不做
-   （RA-082 刚落地，收敛它等于重写上轮决策，先记观察）。
-3. 为 testability 抽出的纯函数？`_enrich_run_context`（RA-096 已收敛为 replace）。
-   `_task_as_text` 2 行分支——真 bug 藏在调用方（RA-046 已修 None 入口）。无 locality 问题。
-4. Leaky seam？**有**：`register_hook` 末尾 `if isinstance(runtime, HasHooks):` ——
-   Protocol 已声明 `HasHooks`（`lca.contracts.protocols.perceive.capabilities`），
-   调用方却用 isinstance 嗅探而不是让 interface 成为 test surface。else 分支是**静默
-   丢弃**（hook 注册无声失败）。→ 候选 RA-099。
-5. 未测试/只能穿透 interface 测试？四个 translator 有 RA-023 的 pin。`register_hook`
-   的静默丢弃分支无测试（穿透 `runtime` 具体类型才能触发）。同 RA-099。
+The last ~40 commits are dominated by raphy rounds (RA-097..RA-103), iter merges, and ADR/doc commits — the codebase's own raphy loop is the recent "hot spot". The production files touched recently outside raphy are `lca/framework/graph/` (port_reader, interpreter), `lca/agent/`, `lca/runtime/loop/`. The deslop lens is new for this round: `scripts/verify_doc_slop.py` exists and is read-only runnable.
 
-**Area B — `lca/runtime/loop/runtime_loop.py`（595 行，`run()` 全读）**
+## Runtime verification (mandatory, executed)
 
-1. 跨模块理解成本：`run()` 单方法 ~150 行，串起 8 组**函数内 import**
-   （`lca.infrastructure.session.bindings`、`...emit.lifecycle_emit`、
-   `lca.infrastructure.skills.activation.bridge`、`lca.runtime.session.run_session_writer`、
-   `lca.application.vocal.runtime_wiring`、`lca.contracts.models.vocal.models`、
-   `lca.infrastructure.runtime_plane.capability_bindings`、
-   `lca.infrastructure.vocal.settle_guard`、`lca.contracts.models.auto_review.models`、
-   `lca.infrastructure.auto_review.gate`、`lca.infrastructure.computer.box_accessor`）。
-   每个 import 注释都在解释"为什么不能放顶层"（循环 import / PR-E 桥接语义）。
-   理解"一次 run 做了什么"要在 6 个关注点之间跳：bridge 安装→turn 开始→session writer
-   播种→vocal 解析→auto-review 门→capability bindings token。**sprawl 的不是模块数，
-   是单个方法的阶段数**。
-2. 浅模块？`_publish_terminal_event`（3 行，docstring 承认是 "Compatibility seam"）
-   委托给 `self._lifecycle.publish_terminal` —— interface 与实现几乎同构。deletion test：
-   删掉它只是把一次调用搬到调用方，复杂度不集中。**它是 RA-083/084 时代的兼容垫片，
-   留给调用方迁移**——记观察，不入 story（删它需要先改全部调用方，属机械清理，
-   可作 hygiene，不占本轮名额）。
-3. 纯函数抽取？`_run_driver` 的 `outcome_holder` dict 是可变 holder 习语——
-   except 分支写、finally 分支读，真实 bug（outcome 丢失）只能藏在"哪个分支先跑"里，
-   纯函数抽不出来。这是 locality **正确**的例子（状态机就该待在一起）。
-4. Leaky seam？`cast("SessionProtocol", session_reader)` + 长注释论证
-   "resolve_raw_session isinstance-guaranteed"——seam 在用注释代替类型保证。
-   但 SPEC H 已声明这是 read face，属已声明契约，不算泄漏。
-5. 测试面？`_run_driver` 的 try/except/finally 包络只能通过整轮 run 集成测试覆盖；
-   细粒度行为（resume.end 只在 resume_envelope 时发）靠 scenario 测试。无穿透测试需求。
+Probe (`/tmp/raphy_probe_deslop100.py`, MockLLMAdapter + a scripted tool-call adapter, `LLM_API_KEY=dummy`, `PYTHONPATH=<worktree>`):
 
-→ 候选 RA-100：把 `run()` 的 turn 准备阶段抽成命名私有 helper
-（`_install_skill_bridge` / `_seed_run_session` / `_resolve_vocal_ctx` / `_apply_runtime_overrides`），
-函数内 import 收敛到模块顶层或一个 `_late_imports` 块，并验证循环 import 的真实边界。
+| Scenario | Result |
+|---|---|
+| (a) basic run | **completed** |
+| (b) run with a tool call (custom marker tool) | **completed**, marker file written → tool actually executed |
+| (c) two sequential runs on one agent | **completed** / **completed** |
 
-**Area C — `lca/cognition/body/tools/tool_batch_executor.py`（306 行，全读）+ `registry.py`（174 行，全读）**
+No crash, hang, or silent failure. The earlier inline `Agent(...)` attempt failed only because the raphy-assess prompt's API snippet is outdated (`Agent` now requires `role/goal/backstory`); with the current public API all three minimum scenarios pass. No new P0/P1. RA-023's non-convergence path was not re-run this wave (verified in prior rounds; basic scenarios pass).
 
-1. 跨模块？`execute` → `_resolve_tools` → `_select_mode_with_optional_audit` →
-   `_select_segments` → `_execute_segment` → `_execute_one` → `_as_tool_result` /
-   `_combine_observations`：调用链深但每一步是 pipeline 阶段，顺序读即可，不刺痛。
-2. 浅模块？`_as_tool_result`（7 行）与 `_combine_observations`（40 行）——
-   前者是后者的单元素特例（OBS_RESULT_KIND 标记）。deletion test：
-   删掉 `_as_tool_result`，把单元素走 `_combine_observations`？
-   不行——`_combine_observations` 会重建 Observation 丢掉原 extra（注释明确写了
-   "passes the tool's own extra through untouched"）。**不对称是故意的**，不碰。
-3. 纯函数？`_canonicalise_tool_name` + `_CAMEL_BOUNDARY_RE` 在模块底——
-   位置对（私有 helper 沉底），locality 好。
-4. Leaky seam？`_select_mode_with_optional_audit` 的
-   `isinstance(self._policy, AuditAwareToolBatchPolicy)` + `getattr(tool, "grant", None)`：
-   前者是已声明协议的能力探测（docstring 明确 fallback 语义，RA-086/087 已审计），
-   后者是 Body 权威 grant 的防御性读取（注释写了 safe-by-default）。**已收敛，不碰**。
-5. 测试面？`_combine_observations` 的 failure_kind fold 有 pin（RA-086 相关测试）。
-   无缺口。
+## Friction walk (5 questions per area)
 
-结论：Area C 本轮无 story（RA-085/086/087 已收敛干净）。
+### Area A — `lca/application/runtime/` (composition root)
 
-### 1.3 Runtime verification（实跑，LLM_API_KEY=dummy，scripted LLM stub）
+Read end-to-end: `plan_resolution.py`, `default_facade.py`, `runtime_coordinator.py`, `session_catalog_map.py`, `harness/runtime/proposal_activator.py`.
 
-按 prompt 要求实跑三项核心流程（web-standard profile，`CognitiveAgent.run()`）：
+- **Q1 shallow-module sprawl?** Low. Each module is single-purpose with a clear seam.
+- **Q2 shallow modules (deletion test)?** None obviously shallow.
+- **Q3 pure functions extracted for testability, bugs in call sites?** `plan_resolution.py` cache gating (`use_cache = bool(assistant_id and manifest_digest and plan_overlay is not None)`) is subtle but has no observed bug; the cache key ignores `plan_overlay`, which is safe only because the composition root always derives overlay from the same `assistant_id`. No story.
+- **Q4 leaky abstractions?** **Yes — the main finding.** `pyproject.toml` `[tool.lca.package_contracts."lca.application"]` declares `forbidden_dependencies = ["lca.harness", "lca.plugins", "gateway"]`, yet `default_facade.py` imports `lca.harness.runtime.activation_ref.compute_activation_ref` and `plan_resolution.py` imports `lca.harness.plan` + `lca.harness.profile.resolve.resolve` + `lca.harness.profile.validate.errors`. `scripts/check_package_contracts.py` only checks README mentions, not actual imports → the declared contract is silently violated. `default_facade.py`'s docstring admits the "soft-layering deviation" and tracks promoting `compute_activation_ref` to contracts as a P1 backlog. → **RA-107**.
+- **Q5 untested / hard to test through interface?** The application→harness boundary has no enforcement; nothing catches a new harness import in `lca/application/`.
 
-- (a) 基础 run → COMPLETED：**失败**
-- (b) 带 tool call 的 run → COMPLETED：**失败**
-- (c) 同一 agent 两次顺序 run：**失败**
+### Area B — `lca/infrastructure/observability/adapters/` + `stream/`
 
-根因链（逐层探针确认）：
+Read end-to-end: `adapters.py`, `policy.py`, `view.py`, `stream_event_manager.py`, `llm_stream_activity.py`, `response_text_stream.py`, `graph_timeline.py`, `loop/emit/spine/ep.py`.
 
-1. `llm.invoke` 节点**只**消费 `adapter.stream(...)`（PR-B cf155018d 拆分后），
-   `LLMAdapter` Protocol 的 `stream` 带一个**默认实现**：`yield LLMStreamEvent(type=COMPLETED)`
-   （`lca/contracts/protocols/runtime/infra/infra.py:41-44`，`# pragma: no cover`）。
-2. 只实现 `complete` 的 adapter（包括仓库自带的 e2e 脚本桩
-   `tests/integration/test_run_with_tool_use.py::_ScriptedEcho`）继承了这个
-   no-op 默认：stream 只吐一个无 `response` 的 COMPLETED 事件。
-3. `invoke.py:113` 只有 `event.type is COMPLETED and event.response is not None` 才赋值
-   → response 保持 `LLMResponse(text="")` 空响应 → `decision.parse` 产出
-   `action_type='respond'` 空文本 → outer `phase_main` 三条出边全不匹配
-   （use_tool/delegate？no；respond+非空文本？no；should_terminate？no）
-   → `RuntimeError('declarative run failed')`，**零证据**（error_fact 无 detail）。
-4. 仓库自带的 e2e `test_run_with_tool_use_succeeds_on_web_standard` 在 main 上
-   **同样失败**（4.68s，同签名 step=0 failed）——PR-B 之后从未更新过脚本桩。
+- **Q1 shallow-module sprawl?** Low; modules are focused.
+- **Q2 shallow modules?** None strong.
+- **Q3 pure functions for testability?** `_stream_observability_kwargs`, `_model_label` are pure and fine, but see Q4.
+- **Q4 leaky abstractions?** **Yes.** `_model_label` does `getattr(inner, "_model", None)` — a private field of `openai_compat` — before falling back to the declared `name`. The `LLMAdapter` protocol declares `name` (adapter display name) but **no model identifier**; the `model=` value in `llm.call.start/end` telemetry is therefore not contractual. A future adapter that stores its model differently silently yields fallback/empty labels. → **RA-106**.
+- **Q5 untested / hard to test?** `_model_label` is only indirectly tested through telemetry tests; a fake adapter with no `_model` is not covered.
 
-修好脚本桩的 `stream`（按 `LLMStreamEvent` 不变式：COMPLETED.response 与
-`complete()` 逐字段相等）后重跑：(a)(c) COMPLETED；(b) tool call 决策正确路由到
-`act.main`（gate 探针：`action_type='use_tool'`），但该轮 terminal fallback 报
-"未产生任何输出"——脚本桩只发一次 tool call 的人为限制，implementer 修 RA-097 时
-需用完整脚本复现确认（见 story AC）。
+### Area C — `lca/infrastructure/cli/commands/journal*` + `observation/`
 
-**这是 P0 级候选**：默认 `stream` 是教科书式的 "one adapter = hypothetical seam" 反例——
-为省一次 override 写出的默认实现，让所有不完整 adapter 在错误的地方静默失败，
-且失败点（`_runtime_failure_message` → "declarative run failed"）吞掉了全部证据。
+Read end-to-end: `journal/journal.py`, `journal/session.py`, `journal/step.py`, `journal_extra/journal_steps.py`, `observation/trace_show.py`, `observation/run_replay.py`.
 
-### 1.4 Duplication scan（次要）
+- **Q1 shallow-module sprawl?** **Yes.** Two step-viewer commands: `journal step --step N` (single-step human render of `journal.json`) and `journal steps --step N` (single-step markdown via `StepNarrativeWriter`), both under the `journal` group, both reading the same `journal.json`. Duplicated reading + rendering of the same document. → **RA-108**.
+- **Q2 shallow modules?** The commands are thin CLI shells; the overlap is the friction.
+- **Q3 pure functions for testability?** `_render_event`/`_format_step_human` etc. are fine.
+- **Q4 leaky abstractions?** Minor: `session.py`/`step.py` each re-derive `_spine_path` with function-level imports of `spine_filename_for_run`; folded into RA-108's shared-seam goal.
+- **Q5 untested?** CLI commands are mostly thin; `journal step` has tests. The overlap itself is unpinned.
 
-- `cognitive_agent.py`：`run()` / `resume()` 末尾 `if self._plan_ref: with plan_ref_scope(...)`
-  12 行逐字重复 ×2（Area A Q1）。→ RA-098。
-- 其余重复均为已收敛（run_envelope、registry 白名单、Observation 构造器）。
+### Area D — `lca/framework/graph/`
 
----
+Read: `observation.py`, `recorder.py`, plus context from RA-101/102 (port_reader, interpreter).
 
-## Phase 2 — Self-grilling
+- **Q1 shallow-module sprawl?** Low; `_PHASE_ALIAS_OF` is well-converged.
+- **Q2 shallow modules?** None.
+- **Q3 pure functions for testability?** `phase_of()` is a pure convention mapping but **has zero test references** (`grep phase_of|LCA_TOP_PHASES|_PHASE_ALIAS_OF tests/` → empty). Any bundle node whose first segment is neither a top phase nor an alias silently renders `phase=""` in NodeEnter/NodeExit facts. → **RA-109**.
+- **Q4 leaky abstractions?** None observed.
+- **Q5 untested?** Yes — the phase vocabulary is untested against real `bundles/**/*.yaml`.
 
-### RA-097（Strong / P0）
+## Duplication scan (secondary)
 
-- **Constraints**：`LLMResponse` 不变式（COMPLETED.response ≡ complete() 返回值）不能破；
-  所有生产 adapter（openai/anthropic/…）都已实现 `stream`，删默认实现不能影响它们；
-  `complete` 仍是有效入口（非流式调用方在用）。
-- **Dependencies**：`stream` 的调用方只有 `lca/nodes/think/llm/invoke.py`（grep 确认）；
-  实现方 = 全部 LLM adapter。改动 seam = Protocol 默认方法 + invoke 的空响应检查。
-  `complete` 的调用方不受影响。
-- **Shape**：方案 A（推荐）：删掉 Protocol 上的默认 `stream` 实现（变抽象），
-  不完整 adapter 在**构造/类型检查**时 fail-loud；同时 `llm.invoke` 在组装出
-  空响应（无 text、无 tool_calls、无 delegations）时 raise `LLMAdapterError`
-  点名 adapter 类名——"the interface is the test surface"。
-  方案 B：保留默认但让默认委托 `complete()`（`response = await self.complete(...)` 后
-  yield COMPLETED(response=response)）。A 更深（interface 即契约），B 更兼容。
-  二选一由 implementer 定，AC 覆盖两种可接受终态。
-- **Test survival**：`test_run_with_tool_use_succeeds_on_web_standard` 现状是红的
-  （本轮实测），修好后是它最强的 pin；新增：只实现 `complete` 的桩 adapter 跑
-  `llm.invoke` 必须 fail-loud（A）或产出与 complete 一致的响应（B）。
-- **Deletion test**：删掉默认 `stream` → 所有 adapter 必须显式声明流式能力，
-  复杂度从"运行时静默空响应"集中到"声明时显式契约"。Concentrates。✅
+- **RA-108** (`journal step` vs `journal steps`) is the wave's one duplication-class story.
+- Minor `_spine_path` re-derivation across CLI commands is folded into RA-108.
+- `AutoReviewWrappedTool.effect_kind` getattr probe: matches the recorded pattern "类型保证 vs 防御式读取...见到可直接按诚实化修，不必开 story" (progress.txt) — **not opened** as a standalone story.
 
-### RA-098（Worth exploring）
+## Deslop classification (`scripts/verify_doc_slop.py` — 123 hits, probe not definition)
 
-- **Constraints**：`plan_ref_scope` 的嵌套位置（bind_backends + run_scope 之内）不能变；
-  `run()` 传 objective=text、`resume()` 传 objective=f"resume:..." 的差异保留。
-- **Dependencies**：调用方只有 `run()` / `resume()` 本体。seam 移动影响为零。
-- **Shape**：私有 `_plan_scoped(self, **kwargs)` 上下文管理器（或一个
-  `_run_with_optional_plan_ref` helper），`run()`/`resume()` 各剩一行。
-- **Test survival**：现有 plan_ref 行为 pin（`tests/fixtures/plan_ref_golden.txt`
-  相关测试）在，改后必须 byte-identical。
-- **Deletion test**：删掉重复 → "plan ref 条件作用域"成为单一命名 seam。
-  Concentrates（小）。✅
+| Category | Hits | Verdict |
+|---|---|---|
+| `docs/plans/*` (dated planning docs) | ~90 | **keep** — time capsules; extend the linter to exclude `docs/plans/` like `docs/design/2026-*` |
+| `docs/port/main-classification.md` | 3 | **keep** — commit-hash / change-log table |
+| `docs/specs/glossary.md` | 10 | **keep** — glossary entries (explicitly not to be deleted) |
+| `docs/architecture/optimization-iterations.md` | 3 | **keep** — iteration log |
+| `docs/specs/0194-0195-implementation-plan.md`, `docs/specs/2026-09-07-lca-p1-agent-gateway-bridge.md`, `docs/specs/2026-09-10-nested-bundle-graph-spec.md`, `docs/specs/adr-0254-scenario-testing-specification.md` | many | **keep** — dated specs / implementation plans |
+| `docs/specs/0199-delete-when-inventory.md` | 1 | **keep** — legitimate checklist instruction ("now-obsolete exemption") |
+| `docs/specs/architecture.md` line 185 | 1 | **keep** — resolvable commit-hash reference (`cc17d8f81`); per instructions not deleted |
+| `docs/observability/architecture-overview.md` (lines 3/49/53/54) | 4 | **fix** — rewrite "不再走 / 已退役" as present-tense do-not-use tables |
+| `docs/observability/platform-readme.md` (lines 23/24) | 2 | **fix** — rewrite "遗留 / 退役 →" as present-tense replacement table |
+| `docs/guides/phase-graph-and-act-tool-path.md` line 28 | 1 | **fix** — rewrite "旧名...已退役" as current-state pointer |
 
-### RA-099（Worth exploring）
+Fix-worthy current-state prose is small and bounded → **RA-104**.
 
-- **Constraints**：`register_hook` 是 `AgentUnit` 的组合期 API；`runtime` 可能是
-  任意 `Runtime` 实现（测试替身常见）。不能把 hook 注册变成硬性要求。
-- **Dependencies**：调用方 = 组合根。`HasHooks` 已是声明式 Protocol。
-- **Shape**：方案 A：`Runtime` 协议侧声明可选 `hooks`（已有 `CognitiveRuntime.hooks`
-  property），`register_hook` 改为 `self.runtime.hooks.register(...)`，
-  无 hooks 的 runtime 在**组合期** fail-loud（`bind_agent_from_scope` 校验）。
-  方案 B（最小）：保留 isinstance 但 else 分支 raise 而非静默丢弃。
-  B 是 5 行改动，A 是 seam 迁移；AC 接受 B 为下限。
-- **Test survival**：无 hooks 的 runtime 调 `register_hook` 现状静默成功——
-  新测试 pin 其为显式失败。
-- **Deletion test**：静默丢弃分支的删除把"是否注册成功"变成可观测事实。Concentrates。✅
+## Candidate table
 
-### RA-100（Worth exploring）
+| # | Files | Problem | Solution | Benefits (locality + leverage) | Strength |
+|---|---|---|---|---|---|
+| RA-104 | `docs/observability/*`, `docs/guides/phase-graph-and-act-tool-path.md`, `scripts/verify_doc_slop.py` | 123 slop hits; linter scans time-capsule plans; current-state docs carry change narration | classify keep/fix, exclude `docs/plans/`, rewrite fix-worthy prose in present tense | current-state docs become honest without history archaeology; linter output becomes meaningful | **Strong** |
+| RA-105 | ~21 modules in `lca/` with change-narration comments | raphy-era docstrings/comments narrate "used to / previously / this PR" | rewrite to present-tense; keep load-bearing why + invariant RA refs | reading a module states current truth; future edits don't need history | **Strong** |
+| RA-106 | `observability/adapters/adapters.py`, `contracts/protocols/runtime/infra/infra.py`, `llm_adapter/openai_compat` | `_model_label` probes private `adapter._model`; model id not on protocol | declare `model_name` accessor on LLMAdapter; remove getattr | model identity becomes contractual; new adapters can't silently break telemetry | **Worth exploring** |
+| RA-107 | `pyproject.toml`, `application/runtime/default_facade.py`, `application/runtime/plan_resolution.py`, `scripts/check_package_contracts.py` | declared `forbidden_dependencies` violated by 2 files; unenforced | spike: move small seams to contracts / update contract with evidence; add enforcement | layer boundary stops lying; harness refactors can't silently break composition root | **Strong** |
+| RA-108 | `cli/commands/journal/step.py`, `journal_extra/journal_steps.py` | two overlapping step-viewer commands, duplicated reading/rendering | spike: converge or cross-reference with one shared seam | one clear step-viewing surface; single journal-read seam | **Worth exploring** |
+| RA-109 | `framework/graph/observation.py`, `tests/framework/graph/`, `bundles/**/*.yaml` | `phase_of` vocabulary untested; unrecognized prefixes silently yield `phase=""` | pin alias vocabulary against real bundle YAMLs with documented keep-list | observability phase facts verified against real plans; alias table earns its existence | **Worth exploring** |
 
-- **Constraints**：8 组函数内 import 各自注释了"为什么不能放顶层"（循环 import
-  为主）；`global_bridge.install/dispose` 的 try/finally 语义不能变；
-  `runtime_bindings_token` 的 token 作用域不能变。
-- **Dependencies**：`run()` 是 `CognitiveRuntime` 唯一大方法；helpers 全私有。
-- **Shape**：抽四个私有 helper：
-  `_install_skill_activation_bridge()`（PR-E 注释随它走）、
-  `_seed_run_session(...)`（writer 播种 + developer_seed/user 消息）、
-  `_resolve_vocal_context(...)`（vocal_mode/wake 解析 + gate 复用）、
-  `_apply_runtime_overrides(...)`（auto_review/box_accessor/origin + token）。
-  import 收敛：先实测哪些可回顶层（循环 import 的真实边界用 `python -c "import lca.runtime.loop.runtime_loop"` 验证），
-  剩下的收进一个 `_late` 块并注明原因。
-- **Test survival**：web-standard e2e（RA-097 修好后）+ 现有 runtime loop scenario
-  测试是行为 pin。
-- **Deletion test**：删掉 helpers 会把 6 个阶段重新揉回一个方法——
-  它们各自 earns existence（每个 helper 有独立注释/不变式）。✅
+## Top recommendation
 
----
+**RA-107** is the top architecture story: a declared package contract (`lca.application` must not depend on `lca.harness`) is violated in two files, nothing enforces it, and the violating module's own docstring documents the deviation plus the backlog. That is a "declared interface lying" shape — the same class as RA-031/RA-051/RA-059. It is the most load-bearing: it sits on the run-creation path (facade + plan resolution) and its fix (moving the small pure seam functions to contracts or correcting the contract with evidence) unlocks honest enforcement for every future application-layer change.
 
-## Phase 3 — Present and record
+For the deslop mandate, **RA-104** is the top prose story: it makes `verify_doc_slop.py` meaningful (exclude time-capsule plans) and fixes the small set of genuinely current-state change-narration lines.
 
-| ID | Files | Problem | Solution | Benefits | Strength |
-|----|-------|---------|----------|----------|----------|
-| RA-097 | `lca/contracts/protocols/runtime/infra/infra.py`（LLMAdapter.stream 默认实现）, `lca/nodes/think/llm/invoke.py`, `tests/integration/test_run_with_tool_use.py` | `LLMAdapter.stream` 的 Protocol 默认实现只 yield 一个无 response 的 COMPLETED；`llm.invoke`（PR-B 后）只走 stream，导致任何只实现 `complete` 的 adapter 产出空 `LLMResponse`，run 在 outer 图以无证据的 "declarative run failed" 死亡。仓库自带 e2e 因此在 main 上是红的。 | 删掉默认 `stream`（变抽象，声明时 fail-loud）+ `llm.invoke` 对空响应 raise 点名 adapter；或退而让默认 `stream` 委托 `complete()`。二选一，AC 覆盖两种终态。修 e2e 脚本桩 override `stream`（按 COMPLETED.response ≡ complete() 不变式）。 | locality：stream 契约回到 Protocol 声明处，不再靠下游"恰好有内容"隐式保证；leverage：所有未来 adapter（测试桩/新 provider）不再踩同一个静默坑；测试面：空流从"不可测试的远端失败"变成 seam 处可断言的 fail-loud。 | Strong |
-| RA-098 | `lca/agent/cognitive_agent.py` | `run()` / `resume()` 末尾 `if self._plan_ref: with plan_ref_scope(...)` 12 行逐字重复 ×2。 | 抽私有 `_plan_scoped` 上下文管理器（或等价 helper），两处各剩一行。 | locality：plan-ref 条件作用域成为单一命名 seam；改嵌套位置时只改一处。 | Worth exploring |
-| RA-099 | `lca/agent/cognitive_agent.py` | `register_hook` 用 `isinstance(runtime, HasHooks)` 嗅探，else 分支**静默丢弃** hook 注册——"调用方不信任已声明的协议"。 | 方案 A：组合期校验 hooks 能力；方案 B（下限）：else 分支 raise 代替静默丢弃。 | interface 即 test surface：注册成功与否成为可观测事实；未来 debug "hook 没生效"不再需要穿透 runtime 具体类型。 | Worth exploring |
-| RA-100 | `lca/runtime/loop/runtime_loop.py` | `CognitiveRuntime.run()` ~150 行串 6 个阶段 + 8 组函数内 import；理解一次 run 要在 bridge/session/vocal/auto-review/bindings 间跳跃。 | 抽四个私有 helper（bridge 安装 / session 播种 / vocal 解析 / runtime overrides），import 收敛回顶层（实测循环边界）。 | locality：每个阶段有自己的命名 seam 和不变式注释；leverage：下一次改 vocal/auto-review 不用读完整方法。 | Worth exploring |
+## Self-grilling (per candidate)
 
-**Top recommendation：RA-097**。它是本轮唯一的运行时实证 P0：静默失败 + 证据吞没 +
-自带 e2e 在 main 上变红，三者叠加。修法已在树内验证（脚本桩补 `stream` 后
-(a)(c) COMPLETED、(b) tool-call 正确路由到 act.main）。Runner-up：RA-100
-（`run()` 是每次 debug 都要读的方法，阅读税最高）。
+### RA-104 (docs deslop)
+- **Constraints**: no glossary entry or resolvable commit-hash reference may be deleted; historical docs (`docs/plans`, `docs/adr`, `docs/notes`, `docs/debug`, `docs/port`, dated specs, `docs/design/2026-*`) stay untouched; do-not-use tables keep their informational value.
+- **Dependencies**: `verify_doc_slop.py` is read-only lint; extending its exclusions changes only the scan scope, not any runtime behavior.
+- **Deepened module**: the linter's exclusion set + the current-state docs become the honest "how it is" surface.
+- **Test survival**: no tests pin doc prose; the script itself has no tests (add none — it's a lint script). Verification is re-running the script and `git diff --check`.
+- **Deletion test**: the fix concentrates — a reader no longer needs to reconstruct history to understand the present.
 
-依赖顺序：RA-097 先（它修好 e2e，后续 story 的行为 pin 才可信）；RA-098/099/100
-相互独立。RA-097 → RA-100（RA-100 的 AC 要求 e2e 绿）。
+### RA-105 (comment deslop)
+- **Constraints**: no behavior change; `lca/cognition/memory/`, `lca/plugins/transport/webserver/`, `gate_chain_strategy.py` excluded; load-bearing why-comments and invariant-carrying RA refs kept.
+- **Dependencies**: the comments are in modules with existing tests; prose-only edits cannot break them (verify with ruff + targeted tests).
+- **Deepened module**: each touched docstring/comment becomes a current-state statement.
+- **Test survival**: existing tests pin behavior, not prose; a grep-based acceptance documents the keep-list.
+- **Deletion test**: rewording is not deletion — the *concept* stays, the *narrative* goes.
 
-**Diversity quota**：4 个 stories 中 duplication 类 1 个（RA-098），其余 3 个来自
-friction walk（RA-099 leaky seam、RA-100 shallow-method sprawl）与运行时验证
-（RA-097 testability gap）。满足"至少一个来自 friction walk"。
+### RA-106 (model identity seam)
+- **Constraints**: `LLMAdapter` protocol change is additive (new declared member); production adapters already have the value (`_model`); telemetry `model=` values unchanged.
+- **Dependencies**: `TelemetryLLMAdapter` is the only `_model_label` caller; openai_compat/mock/anthropic adapters implement the new member.
+- **Deepened module**: `LLMAdapter` gains a shallow-but-real `model_name` member; `_model_label` becomes a thin adapter.
+- **Test survival**: existing telemetry tests pin `model=`; add a fake-adapter test (no `_model`) proving the declared accessor is used.
+- **Deletion test**: concentrates — model identity lives in the contract, not in a getattr probe.
 
----
+### RA-107 (application→harness)
+- **Constraints**: ADR-0199 P1-06 says activation_ref hashing is owned by harness; moving `compute_activation_ref` to contracts changes ownership and may need an ADR note (the code's own backlog already proposes this). `resolve_profile`/`compile_plan` are large harness functions — likely stay behind an injected protocol.
+- **Dependencies**: `PlanResolutionService`/`DefaultRuntimeFacade` are consumed by CLI/HTTP/tests; refs must remain byte-identical.
+- **Deepened module**: the seam between composition root and harness becomes either contracts-owned (small pure functions) or an injected resolver; enforcement makes the boundary real.
+- **Test survival**: `tests/application/runtime/` + package-contract check; add a pin that `lca/application/` has no harness imports.
+- **Deletion test**: concentrates — the declared contract stops being a lie.
 
-Assessment complete: 4 stories written, top is RA-097.
+### RA-108 (journal step CLI)
+- **Constraints**: CLI is user-facing; `journal step` and `journal steps` are both referenced in docs; choose merge vs cross-reference with evidence.
+- **Dependencies**: both commands read `journal.json` via different paths; docs/`lca-ops` help reference them.
+- **Deepened module**: one step-viewing command + one journal-read seam (or an explicit shared loader).
+- **Test survival**: existing journal CLI tests; add a pin for the chosen surface.
+- **Deletion test**: if merged, the duplicate rendering is deleted and complexity concentrates in one command.
+
+### RA-109 (phase alias vocabulary)
+- **Constraints**: `phase_of` semantics unchanged; legitimate unknowns recorded in a test keep-list, not forced into the alias table.
+- **Dependencies**: `phase_of` is consumed by observers/NodeEnter/NodeExit facts; the test only reads bundle YAMLs.
+- **Deepened module**: `phase_of` + `_PHASE_ALIAS_OF` gain a test surface (the interface is the test surface).
+- **Test survival**: existing graph observation tests; new corpus test walks all bundle node ids.
+- **Deletion test**: the alias table earns its existence by being pinned against real plans.
+
+## Learnings for future iterations
+
+- The runtime probe works in this worktree (`PYTHONPATH=<worktree>` + `python3 /tmp/...py`); the raphy-assess prompt's `Agent(tools=[], llm=...)` snippet is outdated — the public `Agent` requires `role`/`goal`/`backstory` and `ensure_default_ctx` is async.
+- `check_package_contracts.py` only checks README mentions, not imports — "declared forbidden dependency" stories must verify actual imports and the checker's capabilities before asserting enforcement.
+- `verify_doc_slop.py` hits are mostly time-capsule planning docs; a meaningful deslop story should first fix the linter's scope, then the small current-state residue.

@@ -42,7 +42,6 @@ References
 from __future__ import annotations
 
 import logging
-from collections import deque
 from datetime import UTC, datetime
 from typing import Any, ClassVar
 
@@ -101,7 +100,6 @@ class AnomalyDetector(Deriver):
 
     # ── public thresholds (named per design §7.5.4.1) ────────────────
     NEAR_TIMEOUT_RATIO: float = 0.94
-    CYCLE_WINDOW: int = 100
     STUCK_THRESHOLD_S: int = 60
     NEAR_BUDGET_RATIO: float = 0.94
     # RA-030: the spine is multi-producer and this deriver sees a filtered
@@ -127,13 +125,10 @@ class AnomalyDetector(Deriver):
     }
 
     def __init__(self) -> None:
-        # Rolling window of recent execution_points for cycle detection.
-        self._recent_points: deque[str] = deque(maxlen=self.CYCLE_WINDOW)
-        # Consecutive-count for the head of the window: how many times
-        # in a row the *same* ``execution_point`` has fired. Used by
-        # ``_check_cycle`` so a single spine event can answer "are we
-        # in a tight loop?" instead of just "did this EP repeat once
-        # in a 100-event window?".
+        # Consecutive-count of the same ``execution_point`` firing in a row.
+        # Used by ``_check_cycle`` so a single spine event can answer "are we
+        # in a tight loop?" (RA-103: the old CYCLE_WINDOW rolling window was
+        # deleted — its only consumer was a condition that was always True).
         self._consecutive_count: int = 0
         self._last_point: str | None = None
         # Last observed sequence number for stalled detection.
@@ -171,14 +166,13 @@ class AnomalyDetector(Deriver):
         return duration > timeout_ms * self.NEAR_TIMEOUT_RATIO
 
     def _check_cycle(self, event: EventRecord) -> bool:
-        """Trip when the same ``execution_point`` repeats within ``CYCLE_WINDOW``.
+        """Trip when the same ``execution_point`` fires consecutively past its baseline.
 
         Tracks a consecutive-count so a single spine event can answer
-        "we're in a tight loop on EP X" rather than just "EP X
-        appeared twice somewhere in the last 100 events". The 2026-09-16
-        act→think re-ask stalled with ``phase.act.fold.end`` repeating
-        879 times in a row; the old detector only logged a single
-        WARNING per repeat (and the diagnostic never explained *why*).
+        "we're in a tight loop on EP X". The 2026-09-16 act→think re-ask
+        stalled with ``phase.act.fold.end`` repeating 879 times in a row;
+        the old detector only logged a single WARNING per repeat (and the
+        diagnostic never explained *why*).
         """
         point = event.execution_point
         if self._last_point == point:
@@ -186,14 +180,13 @@ class AnomalyDetector(Deriver):
         else:
             self._last_point = point
             self._consecutive_count = 1
-        self._recent_points.append(point)
         # RA-030: per-EP baseline. EPs that repeat by construction
         # (llm.stream.token, runtime.reducer.apply, ...) only trip past
         # their own baseline; other EPs keep the tight default: the second
         # consecutive emission is the smallest evidence of a tight loop,
         # surfaced loud before the run burns more budget on it.
         baseline = self.CYCLE_BASELINES.get(point, self.CYCLE_BASELINE_DEFAULT)
-        return self._consecutive_count >= baseline and point in self._recent_points
+        return self._consecutive_count >= baseline
 
     def _check_stuck(self, event: EventRecord) -> bool:
         """Trip when an open span has aged past ``STUCK_THRESHOLD_S`` seconds.
@@ -224,7 +217,7 @@ class AnomalyDetector(Deriver):
         RA-030: the spine is multi-producer and this deriver observes a
         filtered stream, so small gaps are legitimate (healthy max 69).
         A non-positive jump means a new sequence domain -- re-baseline,
-        don't trip (run changes are additionally normalized by the
+        don't trip (run changes are also normalized by the
         ``on_event`` run reset).
         """
         last = self._last_sequence

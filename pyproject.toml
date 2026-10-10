@@ -463,10 +463,12 @@ allowed_dependencies = [
     "lca.runtime",
     "lca.agent",
     "lca.application",
-]
-forbidden_dependencies = [
+    # 组合根按 ADR-0199 P1-06/P1-07 依赖 harness 的 K1/K2 与 activation_ref
+    # hashing，并装配插件实现（spawn / dream_scheduler / adapters）。
     "lca.harness",
     "lca.plugins",
+]
+forbidden_dependencies = [
     "gateway",
 ]
 side_effects = [
