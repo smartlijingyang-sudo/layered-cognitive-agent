@@ -206,13 +206,13 @@ async def _restore_from_bundle(
         deserialize_resume_point,
         resume_point_to_state_snapshot,
     )
+    from lca.plugins.transport.webserver.agent_identity import AgentRef
     from lca.plugins.transport.webserver.handlers.runs.session.builder.builder import (
         RunSessionBuilder,
     )
     from lca.plugins.transport.webserver.handlers.runs.session.setup.types import (
         RunSessionRequest,
     )
-    from lca.plugins.transport.webserver.read.runs.identity import AgentRef
 
     resume_point = deserialize_resume_point(bundle.get("resume_point") or {})
     snapshot = resume_point_to_state_snapshot(resume_point)
