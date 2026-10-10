@@ -57,6 +57,13 @@ class Config(BaseModel):
     ),
 )
 async def setup(ctx: PluginContext, config: Config) -> None:
+    from lca.contracts.observability.event.identity_registry import (
+        install_identity_provider,
+    )
+    from lca.contracts.observability.event.stable_ulid_identity import (
+        StableUlidIdentity,
+    )
     from lca.infrastructure.observability import NamedRegistry
 
+    install_identity_provider(StableUlidIdentity())
     ctx.provide("event_identities", NamedRegistry())

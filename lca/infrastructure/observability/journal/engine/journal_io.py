@@ -39,12 +39,12 @@ from lca.contracts.models.observability.journal.journal import (
     StampedEvent,
 )
 from lca.contracts.observability.canonical_digest import canonical_digest
+from lca.contracts.observability.schemas.journal_schema_registry import (
+    resolve_journal_schema,
+)
 from lca.infrastructure.observability.journal.engine.serialization import (
     stamped_to_journal_record,
 )
-from lca.plugins.journal.journal.schema_v2_provider import EnvelopeV2Schema
-
-_DEFAULT_SCHEMA = EnvelopeV2Schema()
 
 # ── Schema 常量 ─────────────────────────────────────────────────────
 
@@ -140,7 +140,7 @@ def stamped_to_record(stamped: StampedEvent) -> dict[str, Any]:
     # ADR-0096 MVA-1: EnvelopeV2Schema is the serialize source of truth
     # (schema_version / payload). On-disk jsonl, SSE, and replay still
     # consume the ADR-0065 JournalRecord dict (schema / data / committed_at).
-    env = _DEFAULT_SCHEMA.serialize(record)
+    env = resolve_journal_schema().serialize(record)
     return _envelope_v2_to_disk_record(env, record)
 
 

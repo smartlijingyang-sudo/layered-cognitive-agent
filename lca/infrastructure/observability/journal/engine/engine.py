@@ -36,6 +36,7 @@ from lca.contracts.models.observability.journal.journal import (
 from lca.contracts.observability.core.ports import AttributePolicyBackend
 from lca.contracts.observability.event.descriptor_registry import EventDescriptorRegistry
 from lca.contracts.observability.event.identity import EventIdentityProvider
+from lca.contracts.observability.event.identity_registry import resolve_identity_provider
 from lca.contracts.observability.journal.ledger import (
     LedgerDurabilityError,
     LedgerSealedError,
@@ -52,7 +53,6 @@ from lca.infrastructure.observability.facade.projection.registry import (
 )
 from lca.infrastructure.observability.facade.run.context import get_current_run_scope
 from lca.infrastructure.observability.journal.backends.memory import InMemoryJournalStore
-from lca.plugins.observability.event.identity_stable_ulid_provider import StableUlidIdentity
 
 
 class UnregisteredJournalEventError(LedgerUnregisteredError):
@@ -105,7 +105,7 @@ class RunStore:
         self._descriptor_registry = descriptor_registry
         self._run_id = run_id
         self._identity_provider: EventIdentityProvider = (
-            identity_provider if identity_provider is not None else StableUlidIdentity()
+            identity_provider if identity_provider is not None else resolve_identity_provider()
         )
         self._lock = threading.Lock()
         self._sealed: bool = False
@@ -351,9 +351,7 @@ class RunStore:
                 continue
             if isinstance(event, RuntimeObserved) and item.name in {"attributes", "output"}:
                 if aggressive:
-                    redacted_map = {
-                        k: redact_restricted(str(v)) for k, v in dict(value).items()
-                    }
+                    redacted_map = {k: redact_restricted(str(v)) for k, v in dict(value).items()}
                     if redacted_map != dict(value):
                         updates[item.name] = redacted_map
                     continue

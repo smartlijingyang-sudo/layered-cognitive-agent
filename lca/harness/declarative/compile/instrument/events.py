@@ -24,8 +24,8 @@ from lca.contracts.observability import (
 from lca.contracts.observability import (
     Outcome as OutcomeT,
 )
+from lca.contracts.observability.spine_accessors import _resolve_pipeline
 from lca.contracts.protocols.loop.spine_publish import is_session_ssot_hook_active
-from lca.harness.declarative.compile.instrument.accessors import _resolve_pipeline
 
 log = logging.getLogger(__name__)
 

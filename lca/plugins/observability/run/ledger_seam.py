@@ -30,6 +30,7 @@ from lca.contracts.harness.composition.plugin_contract import (
     PluginContract,
     PluginIdentity,
 )
+from lca.contracts.observability.event.identity_registry import resolve_identity_provider
 from lca.contracts.observability.journal.ledger import RunLedger, RunLedgerFactory
 from lca.contracts.observability.journal.run_journal import (
     ProcessJournalProjection,
@@ -68,7 +69,14 @@ class FilesystemRunLedgerFactory(RunLedgerFactory, RunJournalFactory):
             self._root / safe_run_id,
             fsync_each_append=self._fsync_each_append,
         )
-        return cast("RunLedger", RunStore(backend=backend, run_id=safe_run_id))
+        return cast(
+            "RunLedger",
+            RunStore(
+                backend=backend,
+                run_id=safe_run_id,
+                identity_provider=resolve_identity_provider(),
+            ),
+        )
 
     def create_run_components(
         self,

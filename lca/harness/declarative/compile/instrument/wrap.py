@@ -54,7 +54,7 @@ from typing import Any, TypeVar, overload
 
 from lca.contracts.observability import SpineContext
 from lca.contracts.observability.canonical_digest import canonical_digest
-from lca.harness.declarative.compile.instrument.accessors import (
+from lca.contracts.observability.spine_accessors import (
     _resolve_spine,
     resolve_active_pipeline,
     resolve_active_spine,
