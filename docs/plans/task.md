@@ -635,3 +635,9 @@
 | RA-107-FAIL-LOUD-SEAM | [RA-107] 接缝显式 Fail-Loud 加固与隐式 None/降级清除 | Completed | 在 consume() 组合期接缝处断言 None provider 即刻抛出 ValueError，阻止静默空接缝，980 项契约测试全绿，commit a0f547f91 |
 | RA-108-DELETION-TEST-VERIFY | [RA-108] 真实删除测试与双向循环导入体检，全链路回归与 Wave 1 归档 | Completed | 验证三向动态导入 0 循环、ruff check 0 报错、git diff 干净，Wave 1 全部 5 个 Story (RA-104~RA-108) 100% 达成，progress.txt 经验沉淀闭环 |
 | MERGE-MAIN-CLEANUP-REGRESSION | 分支合流至 main、删除临时分支与 worktree、服务重启与全链路认知 Run 回归测试 | Completed | 1. 分支管理：所有活跃分支合流至 main，彻底清理 worktrees 并删除全部本地分支，只保留 `* main`；2. 架构修复：定位并消除 act.authorize 误声明 tools 导致的 plan lift 错误（commit b67bb82d3，kernel_check 13 plans 全绿）；3. 服务重启：前后端（kernel :8765 / lobehub :3010 / SPA :9876）平滑重启全量健康；4. Run 回归实测：触发真实 run_6c19d004987d，68 个图节点跨 5 大相（Perceive/Think/Act/Reflect/Remember）全流程 100% 跑通，成功调用 listEnvironments 工具并向用户准确汇报完整系统状态与 4 台设备全景 |
+| BRAINSTORM-RUN-STABILITY-CONTEXT | 深度梳理并发工具静默丢弃、历史悬挂污染、命名空间延迟与 Prompt 泄露第一性原理上下文 | Completed | 已基于 run_652ce60b7b51 端到端日志完成定位：act_subgraph 缺 fanout_ntom 边、history.assemble 脏历史堆叠、agent 命名空间 deferred 延迟与 Qwen prefill 注意力滑逸 |
+| BRAINSTORM-RUN-STABILITY-QUESTIONS | 澄清机制修复核心考量与架构演进策略（单步提问） | In_Progress | 准备发起澄清提问 |
+| BRAINSTORM-RUN-STABILITY-APPROACHES | 提炼 2-3 种具体架构修复与防御方案及权衡对比 | Pending | 待执行 |
+| BRAINSTORM-RUN-STABILITY-DESIGN-SECTIONS | 逐步呈现设计细节（Owns/Does NOT own/不变量测试）并获取审批 | Pending | 待执行 |
+| BRAINSTORM-RUN-STABILITY-DESIGN-DOC | 沉淀设计文档至 docs/plans/ 并提交 git | Pending | 待执行 |
+| BRAINSTORM-RUN-STABILITY-TRANSITION | 转换至实施计划制定（writing-plans） | Pending | 待执行 |
