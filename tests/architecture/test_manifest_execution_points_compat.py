@@ -1,18 +1,23 @@
-"""P1-18 — manifest.py EXECUTION_POINTS COMPAT freeze (ADR-0195 O1).
+"""P1-18 — manifest EXECUTION_POINTS COMPAT freeze (ADR-0195 O1).
 
-``lca/infrastructure/observability/spine/manifest.py`` must re-export yaml SSOT
+``lca/infrastructure/observability/spine/manifest/manifest.py`` must re-export yaml SSOT
 (``SPINE_EXECUTION_POINTS``) and must not grow an inline EP tuple.
+
+(``4a6b5e04a`` split the flat ``manifest.py`` into the ``manifest/`` package; the COMPAT
+module — and these pins — follow the new ``manifest/manifest.py`` path.)
 """
 
 from __future__ import annotations
 
+import importlib
 from pathlib import Path
 
-from lca.infrastructure.observability.spine import manifest as manifest_mod
 from lca.infrastructure.observability.spine.manifest.manifest import EXECUTION_POINTS
 
+manifest_mod = importlib.import_module("lca.infrastructure.observability.spine.manifest.manifest")
+
 _REPO_ROOT = Path(__file__).resolve().parents[2]
-_MANIFEST_PATH = _REPO_ROOT / "lca/infrastructure/observability/spine/manifest.py"
+_MANIFEST_PATH = _REPO_ROOT / "lca/infrastructure/observability/spine/manifest/manifest.py"
 
 
 def test_execution_points_reexports_yaml_ssot() -> None:
@@ -32,7 +37,7 @@ def test_manifest_module_has_no_inline_execution_points_tuple() -> None:
 
 
 def test_manifest_forbids_new_bare_ep_literals() -> None:
-    """New EP strings must not be added to manifest.py (yaml-only registration)."""
+    """New EP strings must not be added to manifest (yaml-only registration)."""
     source = _MANIFEST_PATH.read_text(encoding="utf-8")
     # Legacy inline tuple entries — must not reappear in COMPAT module.
     legacy_samples = (
@@ -42,7 +47,7 @@ def test_manifest_forbids_new_bare_ep_literals() -> None:
     )
     offenders = [sample for sample in legacy_samples if sample in source]
     assert offenders == [], (
-        "manifest.py must not contain bare EP literals; register in spine.yaml:\n"
+        "manifest must not contain bare EP literals; register in spine.yaml:\n"
         + "\n".join(f"  - {s}" for s in offenders)
     )
 
