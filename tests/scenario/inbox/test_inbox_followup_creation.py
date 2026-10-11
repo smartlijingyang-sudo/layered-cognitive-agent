@@ -22,7 +22,7 @@ class TestInboxFollowupCreation:
         with patch("lca.infrastructure.observability.meta_event_emit.emit_inbox_spliced") as emit_mock:
             emit_mock.return_value = None
             with patch(
-                "lca.infrastructure.session.lifecycle_emit.resolve_run_session_writer",
+                "lca.infrastructure.session.emit.lifecycle_emit.resolve_run_session_writer",
                 return_value=object(),
             ):
                 _record_inbox_followup(session=session, question=question, mode="solo")
@@ -45,7 +45,7 @@ class TestInboxFollowupCreation:
         with patch("lca.infrastructure.observability.meta_event_emit.emit_inbox_spliced") as emit_mock:
             emit_mock.return_value = None
             with patch(
-                "lca.infrastructure.session.lifecycle_emit.resolve_run_session_writer",
+                "lca.infrastructure.session.emit.lifecycle_emit.resolve_run_session_writer",
                 return_value=object(),
             ):
                 _record_inbox_followup(session=session, question=question, mode="solo")
