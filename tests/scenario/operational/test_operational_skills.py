@@ -128,7 +128,7 @@ class TestDiskSkillPackageStore(unittest.TestCase):
             source_url="https://example.com/skill.zip",
         )
         self.assertEqual(package.name, "demo")
-        self.assertEqual(package.resource_paths, ("REFERENCE.md",))
+        self.assertEqual(package.resource_paths, ("resources/REFERENCE.md",))  # intentional: store keeps resources/ prefix (see disk/store.py)
         loaded = self.store.get("demo-skill")
         self.assertIn("# Body", loaded.content)
         self.assertEqual(self.store.read_resource("demo-skill", "REFERENCE.md"), "ref text")
@@ -207,7 +207,7 @@ class TestSkillTools(unittest.IsolatedAsyncioTestCase):
         activate = SkillActivateTool(self.store)
         act_obs = await activate.execute({"skill_id": "demo"})
         self.assertTrue(act_obs.success)
-        self.assertTrue(act_obs.payload["text"].endswith("Do work"))
+        self.assertIn("Do work", act_obs.payload["text"])  # 45456f1e5 appends a <skill_references> block after the body; body must still surface
         self.assertIn("outputs/", act_obs.payload["text"])
         self.assertNotIn("/mnt/data", act_obs.payload["text"])
         # ADR-0102: payload is flattened — wire-shape fields live at the top,
@@ -216,7 +216,7 @@ class TestSkillTools(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(act_obs.payload["name"], "demo")
         self.assertEqual(act_obs.payload["title"], "demo")
         self.assertEqual(act_obs.payload["description"], "d")
-        self.assertEqual(act_obs.payload["resources"], ["tips.md"])
+        self.assertEqual(act_obs.payload["resources"], ["resources/tips.md"])  # intentional: payload mirrors resource_paths prefix (see disk/store.py)
         self.assertTrue(act_obs.payload["has_resources"])
         self.assertNotIn("可用资源", act_obs.payload["text"])
 
