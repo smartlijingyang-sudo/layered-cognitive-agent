@@ -10,7 +10,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-_FIXTURE_DIR = Path(__file__).resolve().parent / "fixtures" / "journal_v2_minimal"
+_FIXTURE_DIR = Path(__file__).resolve().parents[2] / "fixtures" / "journal_v2_minimal"  # shared fixtures moved by 4a6b5e04a test-layout split
 FIXTURE = _FIXTURE_DIR / "run_001.jsonl"
 EXPECTED = _FIXTURE_DIR / "expected_projection.json"
 
