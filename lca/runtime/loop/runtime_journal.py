@@ -24,7 +24,5 @@ class RuntimeJournal(FactCommitter, Protocol):
 class RuntimeJournalCommitter(SessionFactCommitter, RuntimeJournal):
     """Publish declarative facts through Session SSOT (ADR-0192)."""
 
-    pass
-
 
 __all__ = ["RuntimeJournal", "RuntimeJournalCommitter"]
