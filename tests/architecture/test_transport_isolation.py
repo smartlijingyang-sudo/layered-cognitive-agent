@@ -8,7 +8,9 @@ P-L3: ``lca/plugins/transport/carrier/`` 零 deriver/fold 实现 (读写分离).
 
 from __future__ import annotations
 
+import io
 import re
+import tokenize
 from pathlib import Path
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -51,6 +53,34 @@ def _code_line(line: str) -> str:
     return line.split("#", 1)[0]
 
 
+def _strip_comments_and_strings(source: str) -> str:
+    """Blank out COMMENT and STRING tokens, preserving line layout.
+
+    P-L2 盯的是 import/usage 依赖;注释与字符串字面量(含 docstring 里的散文
+    提及,如 ``(SSOT via ``Session.append``)``)不产生依赖,不计入——与本文件头
+    "注释/README 不计入"一致。字符串里的 ``Session.append`` 字面量不可能是
+    真实调用;代码区的真实 ``Session.append(...)`` 调用仍会被捕获(NAME/OP
+    token 不受影响)。tokenize 失败时回退原文(保守:宁误报,不漏报)。
+    """
+    try:
+        tokens = tokenize.generate_tokens(io.StringIO(source).readline)
+        lines = source.splitlines(keepends=True)
+        buf = [list(line) for line in lines]
+        for tok in tokens:
+            if tok.type in (tokenize.COMMENT, tokenize.STRING):
+                (srow, scol), (erow, ecol) = tok.start, tok.end
+                for r in range(srow, erow + 1):
+                    line = buf[r - 1]
+                    start = scol if r == srow else 0
+                    end = ecol if r == erow else len(line)
+                    for c in range(start, min(end, len(line))):
+                        if line[c] != "\n":
+                            line[c] = " "
+    except (tokenize.TokenError, IndentationError, SyntaxError):
+        return source
+    return "".join("".join(line) for line in buf)
+
+
 def _line_violates_pl2(code: str) -> bool:
     if not code.strip():
         return False
@@ -77,9 +107,10 @@ def _find_offenders(root: Path, *, checker) -> frozenset[str]:
         if "__pycache__" in py.parts:
             continue
         try:
-            lines = py.read_text(encoding="utf-8").splitlines()
+            text = py.read_text(encoding="utf-8")
         except (OSError, UnicodeDecodeError):
             continue
+        lines = _strip_comments_and_strings(text).splitlines()
         if any(checker(_code_line(line)) for line in lines):
             offenders.add(py.relative_to(_REPO_ROOT).as_posix())
     return frozenset(offenders)
