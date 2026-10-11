@@ -21,6 +21,22 @@ ACCEPTANCE_CRITERIA = (
 TEST_PATH_PATTERN = re.compile(r"tests/[A-Za-z0-9_./-]+\.py")
 RUNNER = CliRunner()
 
+# Paths renamed by the 2026-09-06 test-layout split (4a6b5e04a); the historical
+# sign-off matrix keeps the old spellings, so resolve them here.
+RENAMED_TEST_PATHS = {
+    "tests/test_adr_acceptance.py": "tests/scenario/adr/test_adr_acceptance.py",
+    "tests/test_capability_monotonicity.py": "tests/scenario/capability/test_capability_monotonicity.py",
+    "tests/test_check_adr_supervision.py": "tests/scenario/check/test_check_adr_supervision.py",
+    "tests/test_cordis_creator_e2e.py": "tests/scenario/cordis/test_cordis_creator_e2e.py",
+}
+# Intentionally retired with their features; the historical matrix is a 2026-08
+# snapshot and stays untouched, so the guard tolerates them here.
+RETIRED_TEST_PATHS = {
+    "tests/declarative/test_runtime_driver.py",  # 2b8a92b20: lca/framework/declarative deleted
+    "tests/harness/test_harness_spine_e2e.py",  # f8b7f0896: DSH unification retired the old plane
+    "tests/harness/test_plugin_optional_fields.py",  # a6ec2d135: ContributionRole validation cleanup
+}
+
 
 def test_creator_help_exposes_the_closed_four_face_vocabulary() -> None:
     """The V7 sign-off command must describe the only allowed Creator faces."""
@@ -51,7 +67,17 @@ def test_acceptance_criteria_references_existing_pytest_files() -> None:
     """Every pytest path published in the sign-off matrix must exist in-tree."""
     content = ACCEPTANCE_CRITERIA.read_text(encoding="utf-8")
     referenced_paths = sorted(set(TEST_PATH_PATTERN.findall(content)))
-    missing = [path for path in referenced_paths if not (REPOSITORY_ROOT / path).is_file()]
+
+    def _resolve(path: str) -> Path | None:
+        if path in RETIRED_TEST_PATHS:
+            return None
+        return REPOSITORY_ROOT / RENAMED_TEST_PATHS.get(path, path)
+
+    missing = [
+        path
+        for path in referenced_paths
+        if (resolved := _resolve(path)) is not None and not resolved.is_file()
+    ]
 
     assert referenced_paths, "ADR acceptance criteria must publish executable pytest evidence"
     assert not missing, f"acceptance criteria reference missing pytest files: {missing}"
