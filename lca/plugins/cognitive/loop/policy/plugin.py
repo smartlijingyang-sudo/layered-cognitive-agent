@@ -41,7 +41,7 @@ class Config(BaseModel):
     @field_validator("repeat_thresholds")
     @classmethod
     def _validate_repeat_thresholds(cls, values: list[int]) -> list[int]:
-        if len(values) < 1:
+        if not values:
             raise ValueError("repeat_thresholds must contain at least one entry")
         if len(values) != len(set(values)):
             raise ValueError("repeat_thresholds must not contain duplicates")
