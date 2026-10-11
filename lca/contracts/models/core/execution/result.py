@@ -102,8 +102,6 @@ class ApprovalPendingError(Exception):
 class BudgetExceededError(Exception):
     """Budget 超限（步数 / token / 费用 / 墙钟）时抛出。"""
 
-    pass
-
 
 class ToolExecutionError(Exception):
     """工具执行失败基类。
