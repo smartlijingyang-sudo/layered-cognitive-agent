@@ -207,10 +207,13 @@ class DynamicToolBridge:
         if tools_service is not None and hasattr(tools_service, "unregister"):
             tools_service.unregister(tool_name)
             _log.info("dynamic_tool.unregistered_service", tool_name=tool_name)
-        elif tools_service is not None and hasattr(tools_service, "_tools"):
-            if isinstance(tools_service._tools, dict):
-                tools_service._tools.pop(tool_name, None)
-                _log.info("dynamic_tool.unregistered_service", tool_name=tool_name)
+        elif (
+            tools_service is not None
+            and hasattr(tools_service, "_tools")
+            and isinstance(tools_service._tools, dict)
+        ):
+            tools_service._tools.pop(tool_name, None)
+            _log.info("dynamic_tool.unregistered_service", tool_name=tool_name)
 
         if safe_executor is not None and hasattr(safe_executor, "permission_manifest"):
             manifest = safe_executor.permission_manifest
