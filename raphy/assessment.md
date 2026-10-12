@@ -1,283 +1,244 @@
-# Raphy Assess — 2026-10-10 23:45 round
+# Raphy Assess — 2026-10-13 00:45 round
 
-Branch: `raphy/arch-20261010-2345` (worktree `/home/lichao/.lca-worktrees/raphy-20261010-2345`)
+Branch: `raphy/arch-20261013-0045` (worktree `/home/lichao/.lca-worktrees/raphy-20261013-0045`)
 Mode: ASSESS ONLY (no code changes outside `raphy/`). No `<promise>COMPLETE</promise>`.
 
 ## Scope
 
-Hot spots from `git log --oneline` (~40 commits back from `696e19f8f`):
+Hot spots from `git log --oneline` (~40 commits back from `40717b8f4`):
 
-1. **Durable HITL resume across kernel restart** (`f07a82f01`, 10-10 21:47) — new
-   `lca/plugins/transport/webserver/carrier/runs/recovery.py` (365 lines),
-   `lca/infrastructure/observability/chat_projection.py` (446 lines), plus
-   `lifecycle.py` pause hook, `command_endpoints.py` lazy-recovery handlers,
-   TS `reconcileRun` patch, seam note
-   `docs/notes/implemented/seam/2026-10-10-hitl-restart-lazy-recovery.md`.
-2. **Parallel tool execution cluster** — `ab2383495` (tool result attribution),
-   `45d714991` (batch envelopes atomic verification), `e07666ef5` (output
-   hygiene guard vs system prompt leakage), `8d1fe6f44` (hanging tool-call
-   sanitize).
-3. **RA-115~118 merge** (`49506dc8e`) + **seam read-side accessors** (`1d6a5924c`,
-   `520c70086`, iter lanes) + `f07a82f01`'s `f07a82f01` sibling work.
+1. **memory-extract response-code guard** (`19ee778ec`, 10-12) —
+   `lca/nodes/reflect/memory_extract/memory_extract.py`: prompt rule +
+   deterministic post-parse filter dropping `preference:response_code` candidates.
+2. **session observer mount idempotence + activated_skills re-wiring**
+   (`c5696c81e`, 10-12) — `lca/plugins/events/_session_observe.py`,
+   `lca/infrastructure/skills/activation/bridge.py` / `scope.py`,
+   `lca/nodes/concept/context_compose/skills.py`.
+3. **manifest/ package split follow-ups** (`4a6b5e04a`, `b71a73f2d`) —
+   `lca/infrastructure/observability/spine/manifest/`.
 
 Read: `CONTEXT.md` (domain vocabulary), `raphy/progress.txt` top
-`## Codebase Patterns` (禁区 + prior learnings), seam note above,
-`runtime-findings-20261007.md` (prior runtime baseline).
+`## Codebase Patterns` (禁区 + prior learnings),
+`~/workspace/goals/layered-cognitive-agent-agent/hidden_files/runtime-findings-20261007.md`
+(prior runtime baseline; still the newest file — nothing newer exists).
 
 ## 禁区 compliance
 
-Respected: `lca/cognition/memory/` (frozen), `ralph/` Round 2 areas,
+Respected: `lca/cognition/memory/` (frozen), ralph Round 2 areas,
 `gate_chain_strategy.py` (hands-off), `lca/infrastructure/computer/guest/preamble.py`
 (user iterating), `lca/plugins/transport/webserver/` retirement-stub work
-(lca-1000 territory). RA-106's `_model` private-probe residue noted but not
-re-litigated here. Nothing written outside `raphy/`.
+(lca-1000 territory), main worktree (dirty: `docs/plans/task.md` —
+not even read; everything executed inside the clean worktree).
+Nothing written outside `raphy/`.
 
 ## Runtime verification (mandatory, executed)
 
-Environment: the **worktree** checkout of main tip `696e19f8f` (NOT the dirty
-main tree — agy/grok uncommitted work lives there; verification must read a
-clean tree). `LLM_API_KEY=dummy`, MockLLMAdapter, real `Agent.run()` runs
-(script `/tmp/raphy-runtime-verify.py`).
+Environment: clean worktree `/home/lichao/.lca-worktrees/raphy-20261013-0045`
+at main tip `40717b8f4` (per progress.txt lesson — prompt's literal
+`cd ~/layered-cognitive-agent` would have read the dirty main tree).
+`LLM_API_KEY=<redacted>
 
 | Scenario | Result |
 |---|---|
-| (a) basic run reaches COMPLETED | **completed** |
-| (b) run with a tool call (calc tool, 2-turn mock) | **completed** |
+| (a) basic run reaches COMPLETED (MockLLMAdapter) | **completed** |
+| (b) run with a tool call (noop tool, 2-turn mock) | **completed** |
 | (c) two sequential runs on one agent | **completed / completed** |
+| (d) RA-023 regression: non-converging run (InfiniteMock, max_steps=5) | **no raise, status=failed** (framework log: `status=failed max_steps=5`) |
 
-No crash, hang, or silent failure. No new P0/P1. RA-023's non-convergence fix
-(not re-run this round; confirmed 10-08 05:15: non-convergent run returns a
-failed Result). Prior P2s (`run(None)` TypeError, `NativeToolCall.arguments`
-str error) remain deferred to iter-quality — not re-litigated.
+No crash, hang, or silent failure. RA-023's translation of
+`LoopObligationExceededError` into a failed Result holds on the current
+tip. No new P0/P1. Prior P2s (`run(None)` TypeError,
+`NativeToolCall.arguments` str error) remain deferred to iter-quality —
+not re-litigated.
 
 ## Friction walk (5 questions per area)
 
-### Area A — HITL restart recovery (`carrier/runs/recovery.py`)
+### Area A — reflect memory_extract (`lca/nodes/reflect/memory_extract/memory_extract.py`)
 
-Read end-to-end: `recovery.py` (all 365 lines), `lifecycle.py` pause hook
-(diff), `command_endpoints.py` `_validate_run_ownership`/`_run_is_recoverable`/
-`_ensure_recovered_session` (diff), seam note. Test:
-`tests/plugins/transport/webserver/test_run_restart_recovery.py`.
+Read end-to-end: full file (387 lines). Tests:
+`tests/reflect/test_memory_extract_distills_identity.py` (checked existence).
 
-1. **Shallow-module sprawl?** The concept (pause → bundle → lazy rebuild on
-   answer) forces bouncing between 4 modules: `lifecycle.py` (write hook),
-   `recovery.py` (bundle + restore), `command_endpoints.py` (validate → recover
-   → resume), `handlers/runs/session/builder/builder.py` (rebuild). Inside
-   `recovery.py` the 7 functions are each deep enough; the sprawl is the
-   **read/write validation asymmetry** (see Q5).
-2. **Shallow modules?** `_recovery_locks_guard`/`_recovery_lock`: module-level
-   asyncio-Lock dict — deletion test says it earns existence (concentrates the
-   double-checked-lock race; deleting it moves the race into callers).
-   `_pending_tools_calling`: ~15-line pure transform; deletion would move
-   approval-shape knowledge into `_seed_recovery_facts`. Both survive the
-   deletion test. `load_resume_bundle` is thin but it is the single read seam
-   for the bundle — its thinness is the point.
-3. **Pure functions hiding real bugs?** `_pending_tools_calling` is pure and
-   covered; the real risk is orchestration in `_restore_from_bundle` (builder
-   rebuild + status assignment + runnable re-assembly), which the happy-path
-   test covers but no failure-injection test pins (Q5).
-4. **Leaky seams?** `_restore_from_bundle` imports ~9 cross-seam modules via
-   deferred imports (session runtime resume point, transport builder,
-   harness memory events, emit, fact gateway, capability, execution env,
-   runnable assembler). The deferred imports honestly flag layering strain —
-   a god-orchestrator stitching plugin/runtime/contracts. Not actionable
-   without a redesign; the honest local fix is the validation seam (RA-121).
-5. **Untested / past-interface?** Tests pin happy path, missing bundle,
-   skip-without-snapshot, write-failure containment. **Gap**: no corrupt-bundle
-   test — and the code path for it is silent degradation: write side guards
-   (`locator`/`approval_request`/`approval_id` checks, all fail-silent skip),
-   but `load_resume_bundle` only checks `data.get("run_id") != run_id`, then
-   `_restore_from_bundle` fills every missing field with `str(... or "")`
-   silent defaults and `_seed_recovery_facts` no-ops on empty `approval_id`.
-   A corrupt bundle builds a zombie `WAITING_INPUT` session that fails later
-   with confusing errors. → **RA-121** (friction: testability gap / no
-   locality of validation).
+1. **Bouncing between modules to understand one concept?** No real sprawl —
+   one 387-line module carries the whole extraction concept (prompt template,
+   JSON parse, candidate filter, node executor, plugin setup). Imports are
+   declare-and-use, not concept-splitting. Does not apply; the module is
+   deep enough on its own.
+2. **Shallow modules?** The two policy layers — prompt-steering text
+   (`_EXTRACT_PROMPT`, "preference:response_code 不是合法维度") and the
+   deterministic enforcement (`_is_response_code_preference` +
+   `_RESPONSE_CODE_PREFERENCE_RE`) — form a *policy pair*, not a shallow
+   module. But the shared **identity literal** `preference:response_code`
+   appears in both the prompt text (line 78) and the filter (line 108): a
+   RA-120-class literal drift. → RA-125.
+3. **Pure functions extracted for testability hiding call-site bugs?** No.
+   `_parse_candidates` failure mode (fail-soft empty list) is exercised at
+   its call site in `node_execute`, and `_is_response_code_preference` is
+   only called inside `_parse_candidates` — call context is honest.
+4. **Leaky seams?** The three two-shape runtime probes (`agent_state`,
+   `memory`, `adapter`) each hand-roll the attribute-then-`.get` ritual.
+   `adapter` is the leftover half of RA-118/119: same ritual, two call
+   sites, divergent missing semantics (fail-loud in
+   `lca/nodes/think/llm/invoke.py::_resolve_adapter`, fail-soft passthrough
+   here) — never converged onto `lca/nodes/_resolve.py`. → RA-123.
+   (The `agent_state` vs `state` key naming divergence was noticed but is
+   out of scope — no failure evidence, speculative.)
+5. **Untestable through the interface?** No — the node is exercised via
+   `node_execute` in the existing test file; the probes degrade to
+   passthrough, which is the documented fail-soft contract (ADR-0246 §0.6).
 
-### Area B — effect attribution + source_verify marker
+### Area B — skill activation truth (`bridge.py`, `scope.py`, `context_compose/skills.py`, `_session_observe.py`)
 
-Read end-to-end: `lca/nodes/concept/effect/execute.py` (all 514 lines),
-`lca/nodes/_resolve.py`, `lca/infrastructure/source_verify/registry.py`,
-`lca/infrastructure/source_verify/claims.py`, `think/llm/persist.py` (turn/step
-comparison), `run_session_writer.py` impl, `simple_body.py`/`tool_journal.py`
-comparison callers.
+Read end-to-end: `bridge.py` (159 lines), `scope.py` (170 lines),
+`context_compose/skills.py` (first 120 lines + diff of c5696c81e),
+`_session_observe.py` (155 lines). Tests:
+`tests/infrastructure/skills/activation/test_resolve_skill_fallback.py`.
 
-1. **Shallow-module sprawl?** The attribution chain `_batch_rows` →
-   `_owed_rows` → `_row_surface` → `_append_tool_result_surface` lives in one
-   module; understanding "does the model see every call's result" requires
-   only this file + `tools_meta_of` + `OBS_TOOL_RESULTS`. No sprawl — RA-033/
-   ab2383495 left it well-localized.
-2. **Shallow modules?** `_batch_rows`/`_owed_rows` are small but each owns one
-   non-trivial rule (batch packaging read, fill-missing-calls). Deletion test:
-   deleting them moves the attribution rules into `_append_tool_result_surface`
-   — but the call chain is 4 deep for a ~100-line concern; not a finding.
-3. **Pure functions?** `_batch_rows`/`_owed_rows` are pure and pinned by
-   `tests/nodes/test_effect_execute_batch_attribution.py` (172 lines). The
-   real bugs lived at the call seam (writer binding, decision fill-in) and
-   the tests pin those. No gap.
-4. **Leaky seams?** Two findings:
-   - `execute.py:125` and `execute.py:295` each hand-roll
-     `getattr(context.runtime, "state", None)` — the exact two-shape probe
-     RA-118 converged into `lca/nodes/_resolve.py` as `resolve_runtime_state`.
-     RA-118 gave `resolve_writer` a `required` flag but left
-     `resolve_runtime_state` raise-only, so the two fail-soft probes in
-     `execute.py` still can't use it (and they miss the mapping-style `.get`
-     fallback the seam implements). → **RA-119** (shallow probe sprawl).
-   - `source_marker()` (`registry.py:97`) produces `[source:<id>]` via f-string
-     while `_EXPLICIT_MARKER` (`claims.py:21`) consumes it via an independent
-     regex — two independent definitions of one wire format. Same drift class
-     as RA-116 (prompt markers), where drift already happened once in
-     practice. `test_source_verify.py:43` pins the format text, but nothing
-     forces producer and consumer to stay in sync. → **RA-120** (leaky seam).
-5. **Untested / past-interface?** Attribution is well pinned. Marker
-   round-trip (`source_marker` → `extract_citations`) is tested at the text
-   level but through the interface of each half separately — the pairing is
-   not pinned. Covered by RA-120's acceptance criteria.
+1. **Bouncing between modules?** Moderate: the "activated skills" concept
+   is split across ContextVar (`scope.py`), reducer single-write
+   (`bridge.py`), prompt assembly (`context_compose/skills.py`), and the
+   exec-time resolver (`resolve_skill_for_exec`). Each owns a real concern,
+   but the *fallback knowledge* (reducer state is the single truth) leaks
+   back into `scope.py` twice.
+2. **Shallow modules?** `resolve_skill_for_exec` hand-rolls the same
+   "ContextVar miss → `bridge.current_state()` → scan
+   `state.activated_skills`" ritual **twice** (by-id lookup and empty-tail
+   lookup). The bridge already documents itself as the 真值 owner
+   (`current_state` docstring: "激活状态单一真值在 reducer state"), yet
+   the fallback ritual lives in the caller — the bridge is shallower than
+   it should be. → RA-124.
+3. **Pure functions hiding call-site bugs?** The `can_activate` idempotency
+   check and `unregister_activated`'s False-on-miss are honest. The real
+   recent bug (double observer mount from resume contexts) hid in *call
+   timing across asyncio contexts*, not in a pure function — fixed by
+   c5696c81e with the mount marker on the underlying Session. Not a story.
+4. **Leaky seams?** `_session_observe.py::_underlying_session` probes
+   attributes `("session", "inner")` then duck-checks `observe` — a
+   two-shape unwrap. One occurrence only ("one adapter = hypothetical
+   seam") → no story. `_session_observe.py`'s module-level
+   `__getattr__` `_current_session` shim is deliberate compat; not friction.
+5. **Untestable?** The fallback is pinned through the public interface by
+   `test_resolve_skill_fallback.py` — good. A deepened bridge seam would be
+   *more* testable (bridge-level unit test without the ContextVar), which
+   is part of RA-124's upside.
 
-### Area C — chat projection (`observability/chat_projection.py`)
+### Area C — spine manifest/ package
 
-Read end-to-end (all 446 lines) + `test_chat_projection.py` (188 lines).
-
-1. **Shallow-module sprawl?** No: one module owns Postgres row writes for the
-   chat UI; concepts are identity, ask card, final reply, card clearing.
-2. **Shallow modules?** The module is a set of ~12 functions each with a clear
-   SQL operation; interface (function per write) matches implementation
-   depth. `lobehub_database_url`'s hand-rolled `.env` line parser is a
-   mini-ritual but it exists once — deletion would move env-resolution
-   elsewhere, not concentrate it. Not a finding (no failure evidence).
-3. **Pure functions?** `_upsert_message`, `final_message_id`/`ask_message_id`
-   are pure helpers; real bugs hide in `resolve_identity`'s
-   read-modify-write against the messages table — but the docstring documents
-   the deliberate reason (session often knows only `solo`; the topic row is
-   the truth). Speculative without failure evidence → declined, noted below.
-4. **Leaky seams?** Raw SQL + `psycopg`/`psycopg2` dual import is honest
-   infrastructure; `_connect`'s adapter ritual is contained. The
-   `write_pending_question` row-shape (message row + message_plugins row)
-   must match what LobeHub's client renders — but the seam note + browser
-   e2e verification in `f07a82f01` cover it. Not a finding.
-5. **Untested?** `test_chat_projection.py` pins id functions and upsert
-   SQL against a fake cursor. **Gap (minor)**: the
-   `asyncio.to_thread(_with_connection, _write)` + try/except log wrapper is
-   copy-pasted in `persist_waiting_projection` and `persist_terminal_projection`
-   — exactly two occurrences, i.e. a real seam by this repo's own rule
-   ("one adapter = hypothetical seam, two = real"). → **RA-122**
-   (secondary duplication class).
-
-## Duplication scan (secondary, after the friction walk)
-
-Mechanical line-level scan of the hot files found no literal clusters beyond
-the chat_projection pair (RA-122). Checked and declined: `_PHASE_ALIAS_OF`
-(single cluster, RA-109 pinned), `CacheConfig(enabled=False)` (single site —
-prior idiom, no story), `_revision_of` two sites (needs a third — prior idiom,
-no story).
-
-## Self-grilling (per candidate)
-
-### RA-119 — converge two `getattr(context.runtime, "state")` probes onto `_resolve.py`
-- **Constraints**: `execute.py:125` fallback accepts only a real `AgentState`
-  (`isinstance` check is load-bearing for legacy fixtures on the fail-loud
-  path); `execute.py:295` (`_append_tool_result_surface`) uses fail-soft None.
-  Zero behavior change on real runs; keep the isinstance gate at the call site.
-- **Dependencies**: callers — none (module-private); callee — `_resolve.py`
-  (already imported for `resolve_writer`). `persist.py`/`invoke.py` already
-  use `resolve_runtime_state` fail-loud; adding `required` mirrors
-  `resolve_writer`'s existing flag.
-- **Shape of the deepened module**: `resolve_runtime_state(*, context, node,
-  required: bool = True)`; `execute.py` calls with `required=False` and keeps
-  its isinstance check. The mapping-style `.get` fallback comes free.
-- **Test survival**: `tests/nodes/test_effect_execute_batch_attribution.py`
-  (172 lines) pins attribution; the probes are exercised through the same
-  tests. New: a test that a mapping-style runtime (`{"state": ...}`) resolves
-  — currently silently None.
-- **Deletion test verdict**: deleting one probe concentrates the two-shape
-  ritual in the seam — earns existence. **Strength: Strong** (RA-118's own
-  seam, one round old, still incomplete).
-
-### RA-120 — single seam for the `[source:<id>]` marker format
-- **Constraints**: wire format `[source:<id>]` is model-visible and pinned by
-  `test_source_verify.py:43`; must not change the text. ProvenanceGuard
-  semantics (ADR-0292 honesty boundary) unchanged.
-- **Dependencies**: producer `registry.py::source_marker` (called from
-  `execute.py`); consumer `claims.py::_EXPLICIT_MARKER` (called from
-  `extract_citations`). Nothing else constructs/parses the literal.
-- **Shape of the deepened module**: one module (registry.py is the natural
-  owner) exposes `format` + `parse`/`match` — claims.py imports the parser
-  instead of its own regex. Producer and consumer can never drift.
-- **Test survival**: `test_source_verify.py` pins format text and
-  `extract_citations` behavior — both must keep passing; add a round-trip
-  test (format → extract → same source_id).
-- **Deletion test verdict**: deleting the duplicate regex concentrates the
-  format knowledge — earns existence. **Strength: Strong** (RA-116 proved
-  this exact drift class breaks in practice).
-
-### RA-121 — converge resume-bundle validation into the load seam
-- **Constraints**: write side stays best-effort (pause path must never raise);
-  read side returning `None` must keep mapping to the handler's existing 404
-  path (`_run_is_recoverable` → "run not found"). Schema version
-  `lca.run.resume_bundle/1` unchanged.
-- **Dependencies**: writers — `lifecycle.py` pause hook calls
-  `write_resume_bundle`; readers — `command_endpoints.py`
-  `_run_is_recoverable`/`_ensure_recovered_session` via `restore_waiting_run`.
-  `_BUNDLE_SCHEMA` check can ride along.
-- **Shape of the deepened module**: a `validate_bundle(data) -> dict | None`
-  seam in `recovery.py` shared by write (pre-write guard) and load; rejects
-  missing/ill-typed `approval_request`, missing `approval_id`,
-  missing/unparseable `resume_point` — fail-loud at the seam, never a zombie
-  `WAITING_INPUT` session with silent `""` defaults.
-- **Test survival**: `test_run_restart_recovery.py` pins happy path, missing
-  bundle, skip-without-snapshot, write-failure containment. New: corrupt-bundle
-  cases (bad `approval_request` type, missing `approval_id`, non-dict JSON)
-  must return `None`.
-- **Deletion test verdict**: concentrates the scattered `str(... or "")`
-  defaults into one explicit contract — earns existence.
-  **Strength: Worth exploring** (real silent-degradation path, no observed
-  failure yet).
-
-### RA-122 — converge the two `_with_connection`+thread+log wrappers
-- **Constraints**: both wrappers are best-effort (log-and-continue); the log
-  event names (`chat_projection_wait_failed` /
-  `chat_projection_terminal_failed`) are observable — keep them as parameters.
-- **Dependencies**: two callers inside the same module only.
-- **Shape of the deepened module**: `_project_in_thread(fn, *, run_id,
-  log_event)` — one seam for "run sync SQL on a thread, log failure".
-- **Test survival**: `test_chat_projection.py` (188 lines) — behavior
-  unchanged; keep both log-event names asserted.
-- **Deletion test verdict**: concentrates the ritual; the two call sites keep
-  their distinct payloads. **Strength: Worth exploring** (small, honest
-  two-occurrence seam).
+Read end-to-end: `manifest.py` (67 lines) + `__init__.py`. One intentional
+COMPAT re-export with `delete_when`/`forbidden_new_usage` annotations
+(ADR-0195 O1). The module-level `__getattr__` lazy-load ritual earns its
+existence: it breaks the
+`event_record → manifest → payloads_spine → events.persistence → …`
+import cycle, documented in the docstring. Deletion test: deleting it
+re-introduces the cycle. No friction; no story. (Question 1–5: N/A — read
+both files fully; the seam is documented and deliberate.)
 
 ## Candidate table
 
-| ID | Files | Problem | Solution | Benefits (locality+leverage) | Strength |
+| ID | Files | Problem | Solution | Benefits (locality + leverage) | Strength |
 |---|---|---|---|---|---|
-| RA-119 | `lca/nodes/concept/effect/execute.py`, `lca/nodes/_resolve.py` | Two hand-rolled `getattr(context.runtime, "state")` probes duplicate the two-shape ritual RA-118 converged; they miss the mapping-style `.get` fallback and can't use the seam (raise-only) | Add `required: bool` to `resolve_runtime_state` (mirror `resolve_writer`); both probes converge to it with `required=False` | Locality: the runtime-carrier probe ritual lives in exactly one module. Leverage: every future fail-soft runtime read reuses the flag instead of hand-rolling | Strong |
-| RA-120 | `lca/infrastructure/source_verify/registry.py`, `lca/infrastructure/source_verify/claims.py` | `[source:<id>]` format defined twice: producer f-string vs consumer regex — same drift class as RA-116 | One seam owns format + parse; consumer imports the parser | Locality: format knowledge in one place. Leverage: ProvenanceGuard citations can't silently break on a format edit | Strong |
-| RA-121 | `lca/plugins/transport/webserver/carrier/runs/recovery.py` | Write-side guards vs read-side only-checks-`run_id`; corrupt bundle → silent `""` defaults → zombie WAITING_INPUT session | Shared `validate_bundle` at the load seam; corrupt → `None` (fail-loud, existing 404 path) | Locality: validation contract in one seam. Leverage: recovery failures surface at restore time instead of confusing later errors | Worth exploring |
-| RA-122 | `lca/infrastructure/observability/chat_projection.py` | `_with_connection`+`to_thread`+log wrapper copy-pasted twice | `_project_in_thread(fn, *, run_id, log_event)` seam | Locality: the sync-SQL-on-thread ritual in one place | Worth exploring |
+| RA-123 | `lca/nodes/_resolve.py`, `lca/nodes/think/llm/invoke.py` (`_resolve_adapter`), `lca/nodes/reflect/memory_extract/memory_extract.py` | The `adapter` two-shape runtime probe is hand-rolled twice with divergent missing semantics — fail-loud `TypeError` (invoke.py) vs fail-soft `None` passthrough (memory_extract.py). RA-118/119 converged `writer` and `state` but left this half behind. | Add `resolve_runtime_adapter(*, context, node, required=True)` to `_resolve.py` in the exact RA-118/119 shape; invoke.py delegates with `required=True`, memory_extract with `required=False`. | Locality: lookup order + error wording fixed once, fixed everywhere. Leverage: the RA-119 "收完两种语义，别留半截" lesson finally closed; future resource probes have a third precedent. | Strong |
+| RA-124 | `lca/infrastructure/skills/activation/bridge.py`, `scope.py` (`resolve_skill_for_exec`) | `resolve_skill_for_exec` hand-rolls the "ContextVar miss → bridge.current_state() → scan state.activated_skills" fallback ritual twice (by-id and tail). The bridge owns the 真值 contract but the ritual lives in the caller — a leaky seam. | Deepen the bridge with `find_activated(skill_id: str \| None) -> ActivatedSkill \| None` encapsulating the reducer-state read + reversed id/name scan + tail fallback; `resolve_skill_for_exec` keeps the ContextVar fast path and delegates the fallback. | Locality: the fallback ritual collapses from 2 call sites into the module that already owns the single-write path. Leverage: future ContextVar-loss callers get the fallback free instead of copying it. Testability: the seam is unit-testable at bridge level. | Worth exploring |
+| RA-125 | `lca/nodes/reflect/memory_extract/memory_extract.py` | Same policy ("一次性回复格式要求不是偏好") stated twice in two languages: prompt-steering text and deterministic filter. The identity literal `preference:response_code` is hardcoded in both the prompt (line 78) and the filter (line 108) — RA-120-class drift. | Canonical `_RESPONSE_CODE_DEDUPE_KEY = "preference:response_code"` constant, used in the filter comparison and interpolated into the prompt build (the prompt already uses `{existing_memories}`/`{task}` replacement). | Locality: the key's identity exists once; renaming it no longer requires lockstep edits in prompt text and code. Leverage: RA-120 marker-class drift prevented at the policy's second enforcement point. | Worth exploring |
 
-**Top recommendation**: RA-119 first — it completes RA-118's own seam one
-round later (the pattern, the tests, and the `required` precedent all exist;
-risk is near zero and the mapping-fallback is a latent correctness fix).
-RA-120 is the highest-leverage correctness story (ProvenanceGuard citations are
-a trust seam; drift there is silent). RA-121 and RA-122 are hygiene with clear
-acceptance tests.
+**Top recommendation**: RA-123 first — it is the unfinished tail of
+RA-118/119 (the pattern, the `required` precedent, and the
+`{node}: 'x' must be supplied via context.runtime` message convention are
+all proven; risk is near zero). RA-124 is the deeper architectural move
+(bridge earns the 真值 contract it already claims in prose). RA-125 is
+small, honest literal convergence — the only duplication-class story.
 
-**Diversity quota**: satisfied — RA-119 (shallow probe sprawl), RA-120 (leaky
-marker seam), RA-121 (testability/validation gap) are all friction-walk
-findings; RA-122 is the only duplication-class story.
+**Diversity quota**: satisfied — RA-123 (shallow probe sprawl) and RA-124
+(leaky fallback seam) are friction-walk findings; RA-125 is the one
+duplication-class story.
+
+## Self-grilling
+
+### RA-123
+
+- **Constraints**: behavior must not change. invoke.py path stays fail-loud
+  (`TypeError` naming the node); memory_extract.py path stays fail-soft
+  (returns `None` → existing passthrough branch). Error wording follows the
+  proven convention `{node}: 'adapter' must be supplied via context.runtime`
+  (the `'state'` variant is pinned by
+  `tests/nodes/test_effect_execute_batch_attribution.py:200` — no wording
+  drift allowed).
+- **Dependencies**: callers are the think.llm.invoke plugin and the
+  reflect memory_extract node; the callee is the `context.runtime` carrier
+  (Mapping or attribute namespace — both shapes must keep working, incl.
+  `runtime is None`).
+- **Shape of the deepened module**: `resolve_runtime_adapter(*,
+  context: NodeContext, node: str, required: bool = True) -> Any` in
+  `lca/nodes/_resolve.py`, next to `resolve_writer`/`resolve_runtime_state`.
+  invoke.py's private `_resolve_adapter` becomes a thin delegate
+  (or call sites call the seam directly); memory_extract's probe block is
+  replaced by `resolve_runtime_adapter(..., node="phase.reflect.memory.extract", required=False)`.
+- **Test survival**: no existing test pins `_resolve_adapter`'s wording
+  (grep found none) — wording is pinned only by convention. Add a seam test
+  covering both `required` branches (fail-loud raises naming the node;
+  fail-soft returns None on empty carrier).
+- **Deletion test verdict**: concentrates — deleting it scatters the
+  attribute-then-`.get` ritual back into two call sites, exactly the
+  verdict that earned `resolve_writer`/`resolve_runtime_state` their
+  existence.
+
+### RA-124
+
+- **Constraints**: behavior must not change. ContextVar has priority;
+  reversed id/name scan order; tail semantics for `skill_id=None`;
+  `SkillNotFoundError` messages stay byte-identical (pinned by
+  `tests/infrastructure/skills/activation/test_resolve_skill_fallback.py`).
+  Bridge singleton lifecycle (`install`/`dispose`) unchanged.
+- **Dependencies**: `resolve_skill_for_exec` callers are the skill tool
+  exec path (`skills/exec/tool.py` etc.); the bridge reads reducer state
+  via the late-bound `state_getter`.
+- **Shape of the deepened module**: `SkillActivationReducerBridge.
+  find_activated(skill_id: str | None) -> ActivatedSkill | None` —
+  returns `None` when the bridge is not installed, no state, or no match.
+  `scope.py` keeps the ContextVar fast path; on miss/empty it delegates to
+  the bridge seam and raises `SkillNotFoundError` iff the seam returns
+  `None`.
+- **Test survival**: `test_resolve_skill_fallback.py` must pass unchanged
+  (behavior pinned through the public interface). Add a bridge-level test
+  for the new seam (installed/uninstalled, by-id, by-name, tail).
+- **Deletion test verdict**: concentrates — without it, every future
+  ContextVar-loss caller re-invents the "read reducer state, scan in
+  reverse" ritual; with it, the ritual lives next to the module that owns
+  the single-write path. Earns existence.
+
+### RA-125
+
+- **Constraints**: prompt wording must stay functionally identical (LLM
+  steering behavior); filter semantics unchanged (`_is_response_code_preference`
+  keeps its fail-open regex; explicit `memory_add` unaffected).
+- **Dependencies**: consumers are `_parse_candidates` and `node_execute`;
+  the prompt is built by string `.replace` of `{existing_memories}`/`{task}`.
+- **Shape of the deepened module**: module-level
+  `_RESPONSE_CODE_DEDUPE_KEY = "preference:response_code"`; the prompt
+  interpolates it (third `.replace`); the filter compares against the
+  constant. Steering prose and enforcement regex stay where they are —
+  only the *identity* is single-sourced.
+- **Test survival**: `tests/reflect/test_memory_extract_distills_identity.py`
+  must pass unchanged.
+- **Deletion test verdict**: concentrates the key's identity — a rename
+  otherwise requires lockstep edits in prompt text and code. RA-120 class;
+  small but honest.
 
 ## Considered and declined
 
-- `turn=step` in `execute.py`/`persist.py`: deliberate documented convention
-  ("the old single node used `state.step` for both writer rows"); the turn
-  seam itself is owned by RA-029. Not re-litigated.
-- `resolve_identity`'s messages-table backfill (session knows only `solo`):
-  documented deliberate; no failure evidence → speculative.
-- `ProactiveScheduler.js` four stringly keys (`last_run_ms`/`attempts`/
-  `next_retry_ms`/`last_error`): true friction, no failure evidence —
-  speculative, stays unfiled per prior round's call.
-- `_connect` psycopg/psycopg2 dual import, `.env` line parser in
-  `lobehub_database_url`: single-occurrence rituals, no failure evidence.
-- NativeToolCall wire getattr guards (prior round's note): type-guaranteed,
-  no story.
+- `agent_state` vs `state` carrier-key naming divergence (memory_extract
+  reads `agent_state`, `_resolve.py` reads `state`): noticed, but no
+  failure evidence and two keys may be load-bearing for different
+  harnesses → speculative.
+- `_underlying_session`'s `("session", "inner")` attribute unwrap in
+  `_session_observe.py`: one occurrence = hypothetical seam → not filed.
+- Wider `getattr(runtime, …)` probe generalization (`brain`, `reducer`,
+  `memory`, `hub`, `standing_refresher` across 10+ node modules): real
+  sprawl, but a single generic `resolve_runtime_attr` seam would change
+  many call sites at once — bigger than one honest story; note as a
+  follow-on direction after RA-123 lands.
+- The `_RESPONSE_CODE_PREFERENCE_RE` regex vs prompt rule text wording
+  drift (prompt says 「答完只回复一句」, regex only matches 代号/验证码/
+  口令/暗号): the filter is deliberately narrower (fail-open by design);
+  not drift until evidence.
 
-## Assessment complete: 4 stories written, top is RA-119.
+## Assessment complete: 3 stories written, top is RA-123.

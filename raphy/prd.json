@@ -1777,6 +1777,56 @@
       "notes": "Source: duplication scan (secondary). Strength: Worth exploring. Small, honest two-occurrence seam; diversity quota already satisfied by RA-119/120/121 (friction-walk findings), so this is the one duplication-class story. [done 2026-10-11] chat_projection.py 新增 async _project_in_thread(fn, *, run_id, log_event) seam; persist_waiting_projection 与 persist_terminal_projection 改走该 seam, 日志事件名 chat_projection_wait_failed / chat_projection_terminal_failed 逐字保留为参数; best-effort 语义不变(log-and-continue, 永不抛到 run 路径); tests/infrastructure/observability/test_chat_projection.py 8 passed, ruff clean.",
       "implemented": true,
       "dropped": false
+    },
+    {
+      "id": "RA-123",
+      "title": "Converge the adapter two-shape probe onto lca/nodes/_resolve.py (resolve_runtime_adapter)",
+      "description": "As an LCA maintainer, I want the LLM-adapter runtime-carrier probe in one seam, so the fail-loud `TypeError` probe in `lca/nodes/think/llm/invoke.py::_resolve_adapter` and the fail-soft `None` passthrough probe in `lca/nodes/reflect/memory_extract/memory_extract.py` stop hand-rolling the same attribute-then-`.get` ritual with divergent missing semantics. This is the leftover half of RA-118/119 (`writer`/`state` converged, `adapter` never was).",
+      "acceptanceCriteria": [
+        "A `resolve_runtime_adapter(*, context, node, required=True)` seam in `lca/nodes/_resolve.py`, following the exact RA-118/119 shape (two-shape probe; `{node}: 'adapter' must be supplied via context.runtime` fail-loud wording).",
+        "`think.llm.invoke`'s private `_resolve_adapter` delegates with `required=True` (fail-loud TypeError naming the node preserved); memory_extract's probe block delegates with `required=False` (`None` passthrough preserved, fail-soft ADR-0246 contract intact).",
+        "`runtime is None` and Mapping-vs-attribute carrier shapes keep working at both call sites.",
+        "A seam test covering both `required` branches; existing think/memory_extract test files keep passing; `ruff check` clean."
+      ],
+      "priority": 1,
+      "passes": false,
+      "branchName": "raphy/arch-20261013-0045",
+      "notes": "Source: friction walk Area A (shallow probe sprawl). Strength: Strong. Direct continuation of RA-118/119; `required` precedent and message convention proven; wording convention pinned by tests/nodes/test_effect_execute_batch_attribution.py:200 ('state' variant) — no drift allowed.",
+      "implemented": false,
+      "dropped": false
+    },
+    {
+      "id": "RA-124",
+      "title": "Deepen the activation-bridge fallback seam for resolve_skill_for_exec (find_activated)",
+      "description": "As an LCA maintainer, I want the 'ContextVar lost -> reducer-state truth' fallback ritual to live in the activation bridge, so `resolve_skill_for_exec` in `lca/infrastructure/skills/activation/scope.py` stops hand-rolling `bridge.current_state()` + reversed `state.activated_skills` scans twice (by-id lookup and empty-tail lookup). The bridge already documents itself as the single-truth owner; its interface should be as deep as its contract claims.",
+      "acceptanceCriteria": [
+        "A `SkillActivationReducerBridge.find_activated(skill_id: str | None) -> ActivatedSkill | None` seam encapsulating: bridge-installed/state-present checks, reversed scan of `state.activated_skills` matching skill_id or name, `None` skill_id -> tail; returns `None` when not installed / no state / no match.",
+        "`resolve_skill_for_exec` keeps the ContextVar fast path and delegates both fallback branches to the new seam; `SkillNotFoundError` messages stay byte-identical.",
+        "Bridge singleton lifecycle (`install`/`dispose`) unchanged.",
+        "`tests/infrastructure/skills/activation/test_resolve_skill_fallback.py` passes unchanged; new bridge-level test for the seam (installed/uninstalled, by-id, by-name, tail); `ruff check` clean."
+      ],
+      "priority": 2,
+      "passes": false,
+      "branchName": "raphy/arch-20261013-0045",
+      "notes": "Source: friction walk Area B (leaky fallback seam). Strength: Worth exploring. Two-occurrence ritual = real seam by repo rule; future ContextVar-loss callers get the fallback free instead of copying it.",
+      "implemented": false,
+      "dropped": false
+    },
+    {
+      "id": "RA-125",
+      "title": "Converge the `preference:response_code` policy literal into a single constant in memory_extract",
+      "description": "As an LCA maintainer, I want the `preference:response_code` dedupe-key identity to exist exactly once in `lca/nodes/reflect/memory_extract/memory_extract.py`, so the prompt-steering text (`_EXTRACT_PROMPT`: 'preference:response_code 不是合法维度') and the deterministic filter (`_is_response_code_preference` comparison) cannot drift apart on a lockstep-unaware rename. RA-120 marker class: one literal, two producers.",
+      "acceptanceCriteria": [
+        "A module-level `_RESPONSE_CODE_DEDUPE_KEY = 'preference:response_code'` constant; the filter compares against it and the prompt interpolates it (the prompt already builds via `{existing_memories}`/`{task}` `.replace`, extend with the key).",
+        "Prompt wording stays functionally identical (LLM steering behavior); filter semantics unchanged (fail-open regex; explicit `memory_add` unaffected).",
+        "`tests/reflect/test_memory_extract_distills_identity.py` passes unchanged; `ruff check` clean."
+      ],
+      "priority": 3,
+      "passes": false,
+      "branchName": "raphy/arch-20261013-0045",
+      "notes": "Source: duplication scan (secondary) + friction walk Area A. Strength: Worth exploring. Small honest two-producer literal seam; diversity quota already satisfied by RA-123/124 (friction-walk findings), so this is the one duplication-class story.",
+      "implemented": false,
+      "dropped": false
     }
   ]
 }

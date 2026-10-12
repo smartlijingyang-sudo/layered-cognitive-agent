@@ -1,5 +1,19 @@
 ## Codebase Patterns
 
+- **seam 收敛要按资源键全图 grep，别只收手头的两个（RA-123 教训）：**
+  RA-118/119 收了 `writer`/`state` 两-shape probe 就宣布 done，
+  同一仪式在 `adapter` 键下（think.llm.invoke fail-loud vs
+  memory_extract fail-soft）漏网。开故事前对 `getattr(runtime, "..."`
+  + `hasattr(runtime, "get")` 做键维度全图 grep；RA-119 的"两种语义
+  一次收完"教训适用于所有 resource key，不是只适用于开题的那两个。
+
+- **prompt steering + 确定性 filter 是纵深防御，不是重复——但共享的
+  identity 字面量必须 single-source（RA-125）：** 同一策略（"一次性
+  回复格式要求不是偏好"）用中文 prompt 引导和用代码强制执行是互补，
+  不删任何一边；但两者共用的 key（`preference:response_code`）
+  必须是一个常量插值进两边。RA-120 marker 类的 prompt 版。
+
+
 - **resume_point 校验复用 fail-closed 的 deserialize（RA-121 实证）：**
   `deserialize_resume_point` 对任何非法字段直接 raise，所以 bundle 校验
   不必手写字段检查——`validate_bundle` 只需 try/except 包一层即得"不可解析"
@@ -3047,3 +3061,35 @@ Learnings for future iterations:
     the refactor was behavior-preserving. When tests don't cover the refactored
     seam, write the throwaway check rather than claiming equivalence by eye.
 ---
+## 2026-10-13 00:45 CST - Round assess（branch raphy/arch-20261013-0045，基线 40717b8f4）
+
+基线 40717b8f4（merge: iter-tests-20261012-2243）。热点：19ee778ec
+(memory-extract response-code guard)、c5696c81e（session observer 挂载
+幂等 + activated_skills 回读 reducer state）、4a6b5e04a/b71a73f2d
+(spine manifest/ package split)。禁区全遵守：主工作树脏
+(docs/plans/task.md 他人未提交改动）——只在干净 worktree
+/home/lichao/.lca-worktrees/raphy-20261013-0045 内读和跑，主树一次没碰。
+
+Friction walk 三个区逐个端到端读完：
+- A: lca/nodes/reflect/memory_extract/memory_extract.py（387 行全）→
+  RA-123（adapter probe 是 RA-118/119 漏网的一半）+ RA-125
+ （`preference:response_code` prompt/filter 双生产者字面量）。
+- B: bridge.py/scope.py/context_compose/skills.py/_session_observe.py 全 →
+  RA-124（resolve_skill_for_exec 两处手写 bridge fallback ritual；
+  `_underlying_session` unwrap 只有一处 = hypothetical seam，不立案）。
+- C: spine manifest/ 包（manifest.py + __init__ 全）→ 意图明确的
+  COMPAT shim，import cycle 文档化，deletion test 通过，无故事。
+
+运行时验证（干净 worktree，LLM_API_KEY=dummy，MockLLMAdapter）：
+basic/completed、tool-call/completed、同一 agent 双 run/completed+completed、
+RA-023 回归：非收敛 run 不抛异常、返回 status=failed（日志
+`status=failed max_steps=5`）。无新 P0/P1。
+
+写出 RA-123（Strong，top 推荐：RA-118/119 续尾）/RA-124
+（Worth exploring，bridge 真值 seam 加深）/RA-125（Worth exploring，
+duplication 类唯一）。diversity quota 满足（123/124 friction walk）。
+
+遗留方向（未立案）：`getattr(runtime, ...)` 两-shape probe 全图还有
+brain/reducer/memory/hub/standing_refresher 等键，待 RA-123 落地后再评估
+通用 `resolve_runtime_attr` 是否值得；`agent_state` vs `state` 键命名分歧
+无故障证据，speculative。
