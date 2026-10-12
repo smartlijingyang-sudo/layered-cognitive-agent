@@ -19,19 +19,19 @@ from pathlib import Path
 
 # Allowlist: these files legitimately hold _emit / middleware_bag (own impl).
 _ALLOWLIST_BASENAMES: frozenset[str] = frozenset(
-    [
+    {
         "event_bus.py",
         "hook_registry.py",
-    ]
+    }
 )
 
 # Legacy hook-attach function names (flagged only when called).
 _LEGACY_HOOK_ATTACH_NAMES: frozenset[str] = frozenset(
-    [
+    {
         "register_hook",
         "attach_hook",
         "subscribe",
-    ]
+    }
 )
 
 
