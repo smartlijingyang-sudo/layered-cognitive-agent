@@ -3162,3 +3162,32 @@ brain/reducer/memory/hub/standing_refresher 等键，待 RA-123 落地后再评�
     RA-124 tail/empty-list edge being handled once inside, not at two
     call sites).
 ---
+
+## [2026-10-13 01:50 CST] - RA-125
+- Implemented: module-level `_RESPONSE_CODE_DEDUPE_KEY = "preference:response_code"`
+  in `lca/nodes/reflect/memory_extract/memory_extract.py` (single source for the
+  "一次性回复格式要求不是偏好" policy literal). `_is_response_code_preference`
+  compares `dedupe_key == _RESPONSE_CODE_DEDUPE_KEY`; `_EXTRACT_PROMPT` interpolates
+  via a `{response_code_dedupe_key}` placeholder through the existing
+  `.replace("{existing_memories}"/"{task}")` chain (constant slot replaced FIRST,
+  before the user-controlled inserts, so task/existing_memories text containing
+  the placeholder string is never interpreted).
+- Verification: rendered prompt text is byte-identical to the pre-change version
+  (compared against `git show HEAD:...`); filter semantics unchanged (fail-open
+  regex untouched; explicit `memory_add` never passes through this filter);
+  RA-123's `resolve_runtime_adapter` delegation untouched.
+- Files changed: `lca/nodes/reflect/memory_extract/memory_extract.py` (+10/-3),
+  `raphy/prd.json` (RA-125 passes:true).
+- Quality: 5 memory_extract test files → **24 passed**
+  (test_memory_extract_distills_identity.py + fast_path_no_llm +
+  with_prefilter + existing_memories + preference_without_pronoun);
+  `ruff check` and `ruff format --check` clean on the touched file.
+- **Learnings for future iterations:**
+  - 评估的插值建议要按实际代码形态落地（RA-125 实证）：assessment 说
+    "f-string 或改成 f-string 插值——读代码确认"，读代码发现 prompt 实际是
+    `.replace` 链而非 f-string（`{existing_memories}`/`{task}` 占位在定义时是
+    普通字符串），插值就走同一条链加一个占位。不要按评估假设写、按实际写。
+  - Placeholder 链里常量槽要排在用户可控输入之前：`existing_memories` 和
+    `task` 是用户文本，可能字面包含占位符串；先替换常量槽再插入用户文本，
+    避免用户文本被当成模板二次解释。
+---

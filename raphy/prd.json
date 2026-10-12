@@ -1822,10 +1822,10 @@
         "`tests/reflect/test_memory_extract_distills_identity.py` passes unchanged; `ruff check` clean."
       ],
       "priority": 3,
-      "passes": false,
+      "passes": true,
       "branchName": "raphy/arch-20261013-0045",
-      "notes": "Source: duplication scan (secondary) + friction walk Area A. Strength: Worth exploring. Small honest two-producer literal seam; diversity quota already satisfied by RA-123/124 (friction-walk findings), so this is the one duplication-class story.",
-      "implemented": false,
+      "notes": "Source: duplication scan (secondary) + friction walk Area A. Strength: Worth exploring. Small honest two-producer literal seam; diversity quota already satisfied by RA-123/124 (friction-walk findings), so this is the one duplication-class story. | Implemented 2026-10-13: single module-level constant `_RESPONSE_CODE_DEDUPE_KEY`; filter compares against it; prompt interpolates via `{response_code_dedupe_key}` .replace (not an f-string, confirmed at implementation time). Prompt render verified byte-identical to pre-change; 24 memory_extract tests green; ruff clean.",
+      "implemented": true,
       "dropped": false
     }
   ]

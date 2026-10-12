@@ -67,6 +67,11 @@ from lca.nodes.fast_path import FastPathCounter
 # LLM 小调用，可接受；漏报会丢记忆，不可接受。
 _SELF_REFERENCE_TOKENS: tuple[str, ...] = DEFAULT_MEMORY_TOKENS
 
+#: 「一次性回复格式要求不是偏好」策略的 dedupe_key 身份字面量：prompt
+#: 文案与 ``_is_response_code_preference`` 必须共享同一常量（RA-125：
+#: RA-120 类 marker 双定义 drift——一个字面量、两个生产者）。
+_RESPONSE_CODE_DEDUPE_KEY = "preference:response_code"
+
 _EXTRACT_PROMPT = """ROLE: memory_extract
 你是记忆提取器。从用户陈述中提取结构化记忆候选。
 
@@ -76,7 +81,7 @@ _EXTRACT_PROMPT = """ROLE: memory_extract
 - content 必须是第三人称结构化事实（如「用户身份：系统架构师」「用户偏好：不喜欢啰嗦」），禁止输出用户原文整句。
 - category 只能是 identity / preference / fact。
 - confidence 0.0-1.0：用户明确陈述 = 1.0，模型推断 = 0.6 以下。
-- dedupe_key 用于同维度幂等与覆盖更新（supersede），必须是稳定的抽象属性维度（格式为 category:topic，如 identity:role、identity:name、preference:tech_stack、preference:code_style、preference:database、preference:verbosity）。preference:response_code 不是合法维度（回复格式/代号要求不是偏好）。
+- dedupe_key 用于同维度幂等与覆盖更新（supersede），必须是稳定的抽象属性维度（格式为 category:topic，如 identity:role、identity:name、preference:tech_stack、preference:code_style、preference:database、preference:verbosity）。{response_code_dedupe_key} 不是合法维度（回复格式/代号要求不是偏好）。
   【铁律】dedupe_key 代表稳定的主题维度，严禁把具体的偏好值拼入 key（例如偏好 Python 必须是 preference:tech_stack，严禁 preference:tech_stack_python；身份是架构师必须是 identity:role，严禁 identity:architect）。
 - 如果用户陈述是在变更、替换或废弃某项已有偏好/身份，必须直接复用对应已有记忆的 dedupe_key 进行覆盖替换。
 - 没有候选时输出空数组 []。
@@ -106,7 +111,7 @@ def _is_response_code_preference(candidate: dict[str, Any]) -> bool:
     if str(candidate.get("category") or "").lower() != "preference":
         return False
     dedupe_key = str(candidate.get("dedupe_key") or "").strip().lower()
-    if dedupe_key == "preference:response_code":
+    if dedupe_key == _RESPONSE_CODE_DEDUPE_KEY:
         return True
     content = str(candidate.get("content") or "")
     return _RESPONSE_CODE_PREFERENCE_RE.search(content) is not None
@@ -253,8 +258,10 @@ class ReflectMemoryExtractExecutor(FastPathCounter):
             return self._passthrough(reflection)
 
         existing_memories = _format_existing_memories(runtime)
-        prompt = _EXTRACT_PROMPT.replace("{existing_memories}", existing_memories).replace(
-            "{task}", task
+        prompt = (
+            _EXTRACT_PROMPT.replace("{response_code_dedupe_key}", _RESPONSE_CODE_DEDUPE_KEY)
+            .replace("{existing_memories}", existing_memories)
+            .replace("{task}", task)
         )
         try:
             response = await adapter.complete(prompt)
