@@ -40,12 +40,12 @@ class TestRouteLegacyPatterns:
 
     def test_collect_violations_with_patched_audits(self) -> None:
         """Patch audit scan_* callables in their actual modules."""
-        from lca.harness.diagnostics import (
-            audit_control_surface,
-            audit_direct_commands,
-            audit_hook_attach,
-            audit_state_writers,
-        )
+        # Same canonical import path as scripts/route_legacy_patterns.py
+        # (lca.harness.diagnostics never re-exported these modules).
+        from lca.harness.diagnostics.audit import control_surface as audit_control_surface
+        from lca.harness.diagnostics.audit import direct_commands as audit_direct_commands
+        from lca.harness.diagnostics.audit import hook_attach as audit_hook_attach
+        from lca.harness.diagnostics.audit import state_writers as audit_state_writers
         from scripts import route_legacy_patterns as route
 
         fake_root = _REPO
@@ -74,6 +74,11 @@ class TestRouteLegacyPatterns:
                 audit_direct_commands, "scan_direct_commands", return_value=fake_direct
             ),
             mock.patch.object(audit_hook_attach, "scan_hook_attach", return_value=fake_hook),
+            # Keep the test hermetic: the two AST scans below are local to the
+            # script (not audit modules) and were added after this test; their
+            # real-repo findings are out of scope for this patched-audits test.
+            mock.patch.object(route, "_scan_facade_bypass", return_value=[]),
+            mock.patch.object(route, "_scan_intent_construction_outside_adapters", return_value=[]),
         ):
             violations = route.collect_violations()
 
