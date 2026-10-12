@@ -59,10 +59,8 @@ class ConnectorPermissionEngine:
         service_perms = perms.get(service.lower(), {})
         if action in service_perms:
             val = service_perms[action].upper()
-            try:
+            with contextlib.suppress(ValueError):
                 return ActionPermission(val)
-            except ValueError:
-                pass
 
         # Safe defaults if not explicitly set
         act_lower = action.lower()

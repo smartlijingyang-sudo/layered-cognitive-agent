@@ -199,11 +199,9 @@ class OtelTelemetryBackend:
     def _enqueue(self, record: TelemetryRecord) -> None:
         """入队；队满丢最旧（``dropped_count`` +1）后重试一次。"""
         with self._lock:
-            try:
+            with contextlib.suppress(queue.Full):
                 self._queue.put_nowait(record)
                 return
-            except queue.Full:
-                pass
             with contextlib.suppress(queue.Empty):
                 self._queue.get_nowait()
                 self._dropped_count += 1
