@@ -269,8 +269,7 @@ def build_manifest(
     供 skills 索引等非 ``CONFIG_FACE_FILES`` 的配置面条目进入
     manifest_digest 覆盖(digest SSOT 单点,ADR-0187 §3 D2)。
     """
-    digests = dict(extra_digests or {})
-    digests.update(compute_digests(home))
+    digests = {**(extra_digests or {}), **compute_digests(home)}
     manifest_digest = canonical_digest(digests, length=64, prefix="sha256:")
     return {
         "schema_version": SCHEMA_VERSION,

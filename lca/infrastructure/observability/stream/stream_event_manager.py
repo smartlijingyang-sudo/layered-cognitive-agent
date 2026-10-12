@@ -218,7 +218,7 @@ def _encode_sse_agent_event(event: dict) -> bytes:
     }
     body = json.dumps(envelope, ensure_ascii=False)
     event_id = event.get("id") or ""
-    return (f"id: {event_id}\nevent: agent_event\ndata: {body}\n\n").encode()
+    return f"id: {event_id}\nevent: agent_event\ndata: {body}\n\n".encode()
 
 
 __all__ = ("LcaStreamEventLog",)

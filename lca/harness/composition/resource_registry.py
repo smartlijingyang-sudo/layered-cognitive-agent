@@ -170,8 +170,7 @@ class ResourceRegistry:
         On duplicate refs, the caller's entry wins (deterministic; does
         not raise). Neither input is mutated.
         """
-        merged = dict(self._by_ref)
-        merged.update(other._by_ref)
+        merged = {**self._by_ref, **other._by_ref}
         out = ResourceRegistry()
         out._by_ref = merged
         return out

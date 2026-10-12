@@ -44,15 +44,13 @@ class ToolResultSpillGuard(ToolGuardContribution):
         if size <= self._max_inline_bytes:
             return observation
         preview = _preview_payload(observation.payload, limit=2048)
-        extra = dict(observation.extra or {})
-        extra.update(
-            {
-                "spill": True,
-                "spill_guard": self.id,
-                "original_bytes": size,
-                "inline_preview": preview,
-            }
-        )
+        extra = {
+            **(observation.extra or {}),
+            "spill": True,
+            "spill_guard": self.id,
+            "original_bytes": size,
+            "inline_preview": preview,
+        }
         return Observation(
             observation_id=observation.observation_id,
             success=observation.success,
