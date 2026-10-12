@@ -51,8 +51,7 @@ def _spawn(script: Path, extra_env: dict[str, str]) -> int:
     if not script.exists():
         typer.echo(f"[lca-ops e2e] script not found: {script}", err=True)
         return 2
-    env = os.environ.copy()
-    env.update(extra_env)
+    env = {**os.environ, **extra_env}
     # Inherit parent stdio so the agent/CI sees the same output as if it had
     # run the script directly. The returned exit code is the script's.
     result = subprocess.run(  # repo-local script, env-controlled.
