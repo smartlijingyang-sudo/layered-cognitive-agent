@@ -40,13 +40,13 @@ LEAD_CASTING_KINDS: frozenset[str] = frozenset(mandate.value for mandate in Lead
 """可选的有主导者治理词表 —— 即 LeadMandate 的取值（routing/consult/board）。"""
 
 COORDINATION_CASTING_KINDS: frozenset[str] = frozenset(
-    (
+    {
         STRATEGY_KEY_PIPELINE,
         STRATEGY_KEY_FAN_OUT,
         STRATEGY_KEY_PEER_RELAY,
         STRATEGY_KEY_PEER_SWARM,
         STRATEGY_KEY_DEBATE,
-    )
+    }
 )
 """可选的无主导者治理词表 —— Coordination 策略键（graph 暂未开放）。"""
 
