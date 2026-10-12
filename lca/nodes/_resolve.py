@@ -15,6 +15,10 @@ RA-118 also converged the ``_resolve_writer`` two-shape probe here:
 (fail-soft) shared the same attribute-then-``.get`` ritual with
 different missing-writer semantics; ``resolve_writer`` makes that
 difference an explicit ``required`` flag.
+
+RA-119 mirrored the ``required`` flag onto ``resolve_runtime_state`` so the
+fail-soft ``concept.effect.execute`` probes converge here too instead of
+hand-rolling the two-shape probe.
 """
 
 from __future__ import annotations
@@ -84,12 +88,23 @@ def resolve_writer(*, context: NodeContext, node: str, required: bool) -> Any:
     return writer
 
 
-def resolve_runtime_state(*, context: NodeContext, node: str) -> Any:
-    """Pull state from the whitelisted kernel runtime carrier."""
+def resolve_runtime_state(*, context: NodeContext, node: str, required: bool = True) -> Any:
+    """Pull state from the whitelisted kernel runtime carrier.
+
+    Two-shape probe (attribute first, then mapping-style ``.get``) — the
+    same ritual ``resolve_writer`` uses.
+
+    ``required=True`` (fail-loud, e.g. ``think.llm.persist``): a missing
+    state raises ``TypeError`` naming the node.
+    ``required=False`` (fail-soft, e.g. ``concept.effect.execute``): a
+    missing state returns ``None`` so the call site's own acceptance gate
+    (``isinstance(runtime_state, AgentState)`` / ``getattr(state, "step",
+    0)``) stays load-bearing.
+    """
     runtime = getattr(context, "runtime", None)
     state_obj = getattr(runtime, "state", None) if runtime is not None else None
     if state_obj is None and runtime is not None and hasattr(runtime, "get"):
         state_obj = runtime.get("state")
-    if state_obj is None:
+    if state_obj is None and required:
         raise TypeError(f"{node}: 'state' must be supplied via context.runtime")
     return state_obj

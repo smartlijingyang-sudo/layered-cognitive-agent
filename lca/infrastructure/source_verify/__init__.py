@@ -24,6 +24,7 @@ from lca.infrastructure.source_verify.policy import VerifyPolicy
 from lca.infrastructure.source_verify.registry import (
     SourceRegistry,
     ensure_registry,
+    extract_explicit_source_ids,
     get_registry,
     source_marker,
 )
@@ -48,6 +49,7 @@ __all__ = [
     "default_literal_extractor",
     "ensure_registry",
     "extract_citations",
+    "extract_explicit_source_ids",
     "get_registry",
     "source_marker",
     "split_claims",

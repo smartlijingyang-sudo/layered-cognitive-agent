@@ -1,5 +1,37 @@
 ## Codebase Patterns
 
+- **resume_point 校验复用 fail-closed 的 deserialize（RA-121 实证）：**
+  `deserialize_resume_point` 对任何非法字段直接 raise，所以 bundle 校验
+  不必手写字段检查——`validate_bundle` 只需 try/except 包一层即得"不可解析"
+  拒绝语义。共享 seam 选的是**落盘 dict 校验**而非 session 属性守卫
+  （write 侧既有 locator/approval_request/snapshot 属性守卫是另一类守卫），
+  write 侧用法是 post-build 最后把关（best-effort skip，不 raise）。
+
+
+- **mapping 式 runtime 是 NodeContext 的类型签名承诺（RA-119 实证）：**
+  `NodeContext.__init__` 把 `runtime` 声明为 `Mapping[str, Any]`，所以
+  attribute-then-`.get` 的 two-shape probe 不是方便写法而是类型契约的
+  履行——评估"手写 getattr 是否多余"时先读 carrier 类型的签名，签名是
+  Mapping 就说明 `.get` 回退本该存在。
+
+- **验证环境必须用干净树（2026-10-10 23:45 轮教训）：** 运行时验证的 prompt
+  字面写 `cd ~/layered-cognitive-agent`，但主树脏（agy/grok 未提交改动在干活）
+  时必须改在干净 worktree（本轮 main tip）跑——只读执行不算"碰"，但读脏树
+  的结果不可信；报告里写明实际验证环境。
+- **marker 双定义是 drift 已证的类（RA-120 认领）：** `source_marker()` f-string
+  生产 `[source:<id>]`，`claims.py::_EXPLICIT_MARKER` regex 独立消费——与
+  RA-116 的 prompt markers 同类；格式字面量只许存在一处，parse 由生产侧 seam
+  导出，test_source_verify.py:43 的文本钉住线不可动。
+- **bundle 读写校验必须对称（RA-121 认领）：** write 侧 best-effort 守卫
+  （locator/approval_request/approval_id）不能只存在写侧；load 侧只校验
+  `run_id` 就让 `_restore_from_bundle` 的 `str(... or "")` 沉默默认值拼出
+  zombie session。校验 seam 必须读写共享，坏 bundle 在 load 返回 None
+  （走既有 404 路径），绝不往后漏。
+- **_resolve.py 的 required 旗语要一次给全（RA-119 认领）：** RA-118 给
+  `resolve_writer` 加了 `required` 却没给 `resolve_runtime_state`，导致
+  execute.py 两个 fail-soft 探针继续手写 getattr 且丢掉 mapping `.get` 回退。
+  新 seam 落子时把 fail-loud/fail-soft 两种语义一次收完，别留半截。
+
 - **"5-gate" 叙事与实现对不上时先数 gate 再信 verdict（RA-115）：**
   `pre_dispatch_envelope_check` 的 module docstring/yaml 自称 5-gate atomic check，
   `_ALL_REF_ORDER` 含 `safe-boundary:valid`，但 `execute()` 只实现 4 个 gate——
@@ -263,6 +295,39 @@
 - **流程（本轮教训）：** 并发 lane 直接在 raphy 分支主 checkout 提交
   （f21cd0af2，12:11:45），评估中途 HEAD 移动——长评估里读文件用
   `git show <sha>:` 锁定版本；子任务误报写树时先查 reflog 再定论。
+
+---
+
+## Round — assess (2026-10-10 23:45, branch raphy/arch-20261010-2345)
+
+- 按硬化版 `raphy-assess.md` 执行：读 SKILL 深ening 词汇 / CONTEXT.md /
+  `git log -45`（热点：HITL restart recovery `f07a82f01`、并行工具执行簇
+  ab2383495/45d714991/e07666ef5/8d1fe6f44、RA-115~118 merge、seam read-side
+  accessors）/ progress.txt 顶部 Patterns（禁区 + learnings）。
+- friction walk 读透 3 区：A) `carrier/runs/recovery.py`（365 行全读）+
+  lifecycle pause hook + command_endpoints 恢复 handler + seam note；B)
+  `nodes/concept/effect/execute.py`（514 行全读）+ `_resolve.py` +
+  `source_verify/registry.py` + `claims.py` + `think/llm/persist.py` turn/step
+  对照；C) `observability/chat_projection.py`（446 行全读）。
+- 运行时验证（必做，已执行；环境=本轮干净 worktree main tip，非脏主树）：
+  MockLLMAdapter + `LLM_API_KEY=dummy`，(a) basic run completed、(b) 带 tool
+  call run completed、(c) 同一 agent 双 run completed/completed；无 crash/hang/
+  静默失败，无新 P0/P1。RA-023 非收敛路径未重跑（10-08 已确认）。
+- duplication scan（friction walk 之后）：热区文件机械扫描无字面簇，
+  仅 chat_projection 两处 `_with_connection`+to_thread+log（RA-122）。
+- 写 4 个 story（RA-119~122，`passes: false`，`branchName:
+  raphy/arch-20261010-2345`）：RA-119 Strong（execute.py 两个
+  getattr(context.runtime,"state") 收进 `_resolve.py`，给
+  `resolve_runtime_state` 补 `required` 旗，RA-118 的半截收尾）；RA-120
+  Strong（`[source:<id>]` marker 生产/消费双定义收进单一 seam，RA-116 同类）；
+  RA-121 Worth exploring（resume bundle 读写校验不对称，坏 bundle 建
+  zombie WAITING_INPUT session）；RA-122 Worth exploring（chat_projection
+  两处 thread+log 仪式收敛）。diversity quota 满足（3 个 friction-walk 来源）。
+- 考虑过但未立案：`turn=step`（刻意约定，RA-029 拥有 turn seam）；
+  `resolve_identity` 的 messages 表回填（刻意，无失败证据）；
+  ProactiveScheduler `js` 四 key（speculative）；psycopg 双 import / `.env`
+  手工解析（单处，无失败证据）。
+- ONE commit：`chore: [raphy] assess - 4 architecture candidates`。
 
 ---
 
@@ -2869,3 +2934,116 @@ Learnings for future iterations:
 - 合并前已核验：main tip 48bf2d6a3 未动；名义分支 tip 仍为 48bf2d6a3（无外来提交）。
 - 下轮 close：只合 -b 分支（git checkout main && git merge --no-ff raphy/arch-20261010-1245-b）；合前重验 main tip 与 -b tip（-b 应为 5d1bf7863 起）；名义分支确认无独有 commits 后 git branch -D；删 worktree ~/.lca-worktrees/raphy-20261010-1245。
 - 风险提示：若并发 lane 在名义分支的 checkout 上 commit 了它的 10 个文件，名义分支将含有外来提交——下轮也只合 -b，名义分支交由其作者自行处理，绝不代合、代删。
+## [2026-10-11 00:20 Asia/Shanghai] - RA-119
+- 实现了什么：`resolve_runtime_state` 加 `required: bool = True`（镜像
+  `resolve_writer`）；`concept/effect/execute.py` 的两处 fail-soft
+  `getattr(context.runtime, "state", None)` 探针（`node_execute` ~125 与
+  `_append_tool_result_surface` ~295）收敛到
+  `resolve_runtime_state(context=context, node="effect.execute", required=False)`；
+  `node_execute` 的 `isinstance(runtime_state, AgentState)` 门与
+  `_append_tool_result_surface` 的 `getattr(state, "step", 0) or 0` 原样保留。
+- 改动文件：`lca/nodes/_resolve.py`（seam + docstring）、
+  `lca/nodes/concept/effect/execute.py`（import + 两处探针）、
+  `tests/nodes/test_effect_execute_batch_attribution.py`（3 个新测试）、
+  `raphy/prd.json`（RA-119 passes=true）。
+- 测试：`tests/nodes/test_effect_execute_batch_attribution.py` +
+  `tests/think/llm/test_persist.py` + `tests/think/llm/test_invoke.py`
+  共 29 passed（`LLM_API_KEY=dummy --no-cov`）；`ruff check` 三文件全过。
+- **Learnings for future iterations:**
+  - `resolve_runtime_state` 的旧 docstring 只有一句话（"Pull state from
+    the whitelisted kernel runtime carrier"），把 fail-loud/fail-soft 的
+    语义写进 docstring 后，调用方不用再读实现就能选对 flag——seam 的
+    docstring 是契约的一部分，不是装饰。
+  - `_dispatch` 里的 `getattr(runtime, "effect_gateway", None)` 仍是
+    attribute-only（dict runtime 会走 RuntimeError），但它是 gateway 能力
+    查找、不是 state 探针，不在 RA-119 范围内——收敛时别顺手扩大 scope。
+  - ruff RUF043：`pytest.raises(..., match="...")` 的模式含元字符时用
+    `excinfo` + `in` 断言代替，更干净。
+---
+## 2026-10-11 00:21 CST - RA-120
+- 实现: `[source:<id>]` wire 格式收敛到单一 seam. `registry.py` 新增
+  `_SOURCE_MARKER_TAG = "source"` + `_SOURCE_MARKER_PATTERN`(从 tag 派生)
+  + `extract_explicit_source_ids(text)` 解析函数(保序、strip、tuple);
+  `source_marker` 改从 tag 生产, 文本输出与钉住的 `"[source:tool:c1]"`
+  逐字一致. `claims.py` 删除 `_EXPLICIT_MARKER` regex 与 TYPE_CHECKING
+  导入, 改为运行时 import 解析函数(无循环导入: registry 不依赖 claims);
+  `__init__.py` 导出新函数. 新增 round-trip 测试
+  `test_explicit_marker_round_trip_single_seam`(生产→解析→同一 source_id
+  + 宽容空白语义).
+- 改动文件: lca/infrastructure/source_verify/registry.py,
+  lca/infrastructure/source_verify/claims.py,
+  lca/infrastructure/source_verify/__init__.py,
+  tests/infrastructure/source_verify/test_source_verify.py
+- 测试: test_source_verify.py 19 passed(含新 round-trip);
+  tests/cognition/test_delivery_satisfied_gate.py +
+  tests/composer/test_capability_resolution.py 15 passed;
+  ruff check 全过(4 文件). 带 LLM_API_KEY=dummy + --no-cov 跑的.
+- **Learnings for future iterations:**
+  - seam 导出解析函数时, 消费者侧的归一化语义(strip/空值过滤/去重)要落在哪一层:
+    本次把 strip 收入 seam(parse 的一部分), 空值+去重留在 consumer(与 label
+    引用的共享去重逻辑在一起)——seam 只做"忠实解析", 不碰业务去重.
+  - f-string 生产 + regex 解析的配对 seam, regex 必须从字面量常量派生
+    (rf 模板里拼 tag 常量), 而不是再手写一遍 pattern——否则只是把两处字面量
+    搬成一处常量 + 一处 regex, drift 类没消.
+---
+## 2026-10-11 00:35 (Asia/Shanghai) - RA-121
+- What was implemented: shared `validate_bundle(data, run_id) -> dict | None`
+  seam in `lca/plugins/transport/webserver/carrier/runs/recovery.py`, used by
+  `load_resume_bundle` and as a best-effort pre-write guard by
+  `write_resume_bundle`. Rejects: non-dict JSON, missing/ill-typed
+  `approval_request`, missing/empty `approval_id`, missing/unparseable
+  `resume_point` (validated by reusing fail-closed `deserialize_resume_point`
+  instead of hand-checking fields). Corrupt bundle -> `load` returns `None`
+  with a `resume_bundle_rejected` warning -> handler's existing "run not found"
+  404 path (`_run_is_recoverable` / `restore_waiting_run`). Write side never
+  raises (`resume_bundle_invalid_skip` warning on the pause path).
+- Files changed:
+  - `lca/plugins/transport/webserver/carrier/runs/recovery.py`
+    (new `validate_bundle` seam, `__all__` updated)
+  - `tests/plugins/transport/webserver/test_run_restart_recovery.py`
+    (7 new parametrized corrupt-bundle cases; `test_restore_waiting_run_reuses_existing_session`
+    fixture now writes a real bundle via `write_resume_bundle` -- the old
+    hand-written `{schema, run_id}` dict is corrupt under the new contract)
+- Tests: `test_run_restart_recovery.py` 13 passed (6 existing + 7 new);
+  neighbors `test_resume_run_id_binding.py` + `tests/plugins/transport/webserver/carrier`
+  11 passed; `ruff check` clean on both touched files.
+- **Learnings for future iterations:**
+  - Existing test fixtures can encode the OLD contract: the reuse test's
+    minimal bundle passed the old `run_id`-only check but is corrupt under
+    the new load contract. Fixing the fixture to write a real bundle is more
+    honest than relaxing the new validation.
+  - A fail-closed deserializer (`deserialize_resume_point`) is itself a
+    validation primitive: wrap it in try/except and you get the "unparseable"
+    rejection for free, no hand-rolled field checks.
+---
+## 2026-10-11 00:43 (Asia/Shanghai) - RA-122
+- What was implemented: new `async _project_in_thread(fn, *, run_id, log_event)`
+  seam in `lca/infrastructure/observability/chat_projection.py`, placed right
+  after `_with_connection`. Both `persist_waiting_projection` and
+  `persist_terminal_projection` now call it; their distinct `_write` closures
+  stay at the call sites. The old inline ritual
+  (`try: await asyncio.to_thread(_with_connection, _write) / except Exception:
+  _log.warning(<event>, run_id=identity.run_id, exc_info=True)`) moved verbatim
+  into the seam -- the only difference is the log event name is a parameter.
+  Best-effort semantics byte-preserved: log-and-continue, never raises into the
+  run path; `chat_projection_wait_failed` /
+  `chat_projection_terminal_failed` passed as string literals exactly as before
+  (they are observable downstream, per the assessment's constraint).
+- Files changed:
+  - `lca/infrastructure/observability/chat_projection.py`
+    (+13-line seam, two call sites slimmed from 4 lines to 3)
+  - `raphy/prd.json` (RA-122 passes=true / implemented=true + done note)
+- Tests: `tests/infrastructure/observability/test_chat_projection.py` 8 passed;
+  `ruff check` clean; plus a behavioral smoke check: failure path logs the
+  verbatim event name with `run_id=` and `exc_info=True` and does not raise,
+  success path runs `fn` through `_with_connection` via `asyncio.to_thread`
+  and logs nothing.
+- **Learnings for future iterations:**
+  - Two-occurrence rituals with one varying token (here the log event name)
+    converge cleanly when the token becomes a keyword parameter -- the seam
+    reads as "the ritual, minus its one honest variation".
+  - `tests/` for this module only covered the sync helpers, not the async
+    persist wrappers; the behavioral smoke check above was the evidence that
+    the refactor was behavior-preserving. When tests don't cover the refactored
+    seam, write the throwaway check rather than claiming equivalence by eye.
+---

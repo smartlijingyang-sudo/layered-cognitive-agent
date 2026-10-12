@@ -12,13 +12,13 @@ LLM 语义级支持度判断（NLI）是预留的协议缝, 不在本文件实�
 from __future__ import annotations
 
 import re
-from typing import TYPE_CHECKING
 
-if TYPE_CHECKING:
-    from lca.infrastructure.source_verify.registry import SourceRegistry
+from lca.infrastructure.source_verify.registry import (
+    SourceRegistry,
+    extract_explicit_source_ids,
+)
 
 _SENTENCE_SPLIT = re.compile(r"(?<=[。！？!?])|[\n]+")
-_EXPLICIT_MARKER = re.compile(r"\[source:([^\]]+)\]")
 _LABEL_CITE = re.compile(r"(?:根据|来自|依据|按照|引自)([^，。！？,.;:：\s]{1,24})")
 
 
@@ -38,8 +38,8 @@ def split_claims(answer: str) -> tuple[str, ...]:
 def extract_citations(claim: str, registry: SourceRegistry) -> tuple[str, ...]:
     """从一条断言中提取它引用的 source_id（去重保序）."""
     found: list[str] = []
-    for m in _EXPLICIT_MARKER.finditer(claim):
-        sid = m.group(1).strip()
+    # 显式标记的解析由 registry 侧 seam 导出 (RA-120); 格式知识只存在一处.
+    for sid in extract_explicit_source_ids(claim):
         if sid and sid not in found:
             found.append(sid)
     for m in _LABEL_CITE.finditer(claim):

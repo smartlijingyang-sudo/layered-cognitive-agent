@@ -381,6 +381,19 @@ def _with_connection(fn: Any) -> None:
         conn.close()
 
 
+async def _project_in_thread(fn: Any, *, run_id: str, log_event: str) -> None:
+    """Run sync SQL on a thread; log-and-continue on failure, never raise.
+
+    Best-effort by design: a dead projection must never kill the run path.
+    ``log_event`` stays a parameter because the event name is observable
+    downstream (chat_projection_wait_failed vs chat_projection_terminal_failed).
+    """
+    try:
+        await asyncio.to_thread(_with_connection, fn)
+    except Exception:
+        _log.warning(log_event, run_id=run_id, exc_info=True)
+
+
 async def persist_waiting_projection(session: Any) -> None:
     """Write the ask card before the run is marked paused."""
     identity = identity_from_session(session)
@@ -397,10 +410,9 @@ async def persist_waiting_projection(session: Any) -> None:
             questions=questions,
         )
 
-    try:
-        await asyncio.to_thread(_with_connection, _write)
-    except Exception:
-        _log.warning("chat_projection_wait_failed", run_id=identity.run_id, exc_info=True)
+    await _project_in_thread(
+        _write, run_id=identity.run_id, log_event="chat_projection_wait_failed"
+    )
 
 
 def terminal_reply_text(session: Any) -> str:
@@ -440,7 +452,6 @@ async def persist_terminal_projection(session: Any, *, success: bool) -> None:
             write_final_reply(cur, identity, content)
         clear_pending_question(cur, identity, approved=success)
 
-    try:
-        await asyncio.to_thread(_with_connection, _write)
-    except Exception:
-        _log.warning("chat_projection_terminal_failed", run_id=identity.run_id, exc_info=True)
+    await _project_in_thread(
+        _write, run_id=identity.run_id, log_event="chat_projection_terminal_failed"
+    )

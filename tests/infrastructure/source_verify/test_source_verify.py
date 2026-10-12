@@ -13,6 +13,7 @@ from lca.infrastructure.source_verify import (
     SourceVerifier,
     VerifyPolicy,
     extract_citations,
+    extract_explicit_source_ids,
     source_marker,
     split_claims,
     verify_final_answer,
@@ -61,6 +62,19 @@ def test_extract_explicit_marker() -> None:
     r = _registry()
     claim = "退款窗口为 30 天 [source:tool:call_policy]。"
     assert extract_citations(claim, r) == ("tool:call_policy",)
+
+
+def test_explicit_marker_round_trip_single_seam() -> None:
+    # RA-120: 生产(source_marker)与解析(extract_explicit_source_ids)共用
+    # registry 侧的单一格式定义; 格式文本与行为都被旧测试钉住.
+    r = _registry()
+    ref = r.register_tool_result(call_id="c_rt", tool_name="t", content="x")
+    marker = source_marker(ref.source_id)
+    assert marker == "[source:tool:c_rt]"
+    assert extract_citations(f"结论是标准版 {marker}。", r) == (ref.source_id,)
+    assert extract_explicit_source_ids(f"[source:  {ref.source_id} ]") == (
+        ref.source_id,
+    )
 
 
 def test_extract_label_citation() -> None:

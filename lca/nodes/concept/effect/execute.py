@@ -52,7 +52,7 @@ from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import
     OwnershipDeclaration,
 )
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
-from lca.nodes._resolve import resolve_writer
+from lca.nodes._resolve import resolve_runtime_state, resolve_writer
 
 _log = logging.getLogger(__name__)
 
@@ -122,7 +122,9 @@ class EffectExecuteExecutor:
             # ``_append_tool_result_surface`` already reads for the step.
             # Only a real AgentState is accepted; anything else keeps the
             # previous None so legacy fixtures stay on the fail-loud path.
-            runtime_state = getattr(context.runtime, "state", None)
+            runtime_state = resolve_runtime_state(
+                context=context, node="effect.execute", required=False
+            )
             if isinstance(runtime_state, AgentState):
                 state = runtime_state
 
@@ -292,7 +294,7 @@ def _append_tool_result_surface(
             receipt.invocation_id,
         )
         return
-    state = getattr(context.runtime, "state", None)
+    state = resolve_runtime_state(context=context, node="effect.execute", required=False)
     step = getattr(state, "step", 0) or 0
     # Source-aware verification (ProvenanceGuard): mint a stable SourceRef for
     # every model-visible tool result so the source identity travels with the

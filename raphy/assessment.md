@@ -1,232 +1,283 @@
-# DESLOP-100 Wave 1 — Assessment
+# Raphy Assess — 2026-10-10 23:45 round
 
-Branch: `raphy/deslop-100` (worktree `/home/lichao/.lca-worktrees/raphy-deslop-100`)
-Date: 2026-10-10
-Mode: ASSESS ONLY (no code changes outside `raphy/`)
+Branch: `raphy/arch-20261010-2345` (worktree `/home/lichao/.lca-worktrees/raphy-20261010-2345`)
+Mode: ASSESS ONLY (no code changes outside `raphy/`). No `<promise>COMPLETE</promise>`.
 
 ## Scope
 
-This wave combines the two round mandates:
-1. **deslop** — remove AI-generated slop: change-narration residue in current-state docs/comments, filler words, unnecessary comments inconsistent with local style.
-2. **real architecture deepening** per `skills/improve-codebase-architecture` (deep modules, locality, deletion test, seams).
+Hot spots from `git log --oneline` (~40 commits back from `696e19f8f`):
 
-Stories continue from RA-104 (`passes: false`, `branchName: raphy/deslop-100`). Prior RA-001..RA-103 are all `passes=true` or dropped.
+1. **Durable HITL resume across kernel restart** (`f07a82f01`, 10-10 21:47) — new
+   `lca/plugins/transport/webserver/carrier/runs/recovery.py` (365 lines),
+   `lca/infrastructure/observability/chat_projection.py` (446 lines), plus
+   `lifecycle.py` pause hook, `command_endpoints.py` lazy-recovery handlers,
+   TS `reconcileRun` patch, seam note
+   `docs/notes/implemented/seam/2026-10-10-hitl-restart-lazy-recovery.md`.
+2. **Parallel tool execution cluster** — `ab2383495` (tool result attribution),
+   `45d714991` (batch envelopes atomic verification), `e07666ef5` (output
+   hygiene guard vs system prompt leakage), `8d1fe6f44` (hanging tool-call
+   sanitize).
+3. **RA-115~118 merge** (`49506dc8e`) + **seam read-side accessors** (`1d6a5924c`,
+   `520c70086`, iter lanes) + `f07a82f01`'s `f07a82f01` sibling work.
+
+Read: `CONTEXT.md` (domain vocabulary), `raphy/progress.txt` top
+`## Codebase Patterns` (禁区 + prior learnings), seam note above,
+`runtime-findings-20261007.md` (prior runtime baseline).
 
 ## 禁区 compliance
 
-Respected: `lca/cognition/memory/` (frozen), `lca/plugins/transport/webserver/` (lca-1000 territory), `gate_chain_strategy.py` (hands-off), `preamble.py` (user iterating), ralph Round 2 areas. The comment-deslop story explicitly excludes the frozen dirs.
-
-## Hot spots (git log)
-
-The last ~40 commits are dominated by raphy rounds (RA-097..RA-103), iter merges, and ADR/doc commits — the codebase's own raphy loop is the recent "hot spot". The production files touched recently outside raphy are `lca/framework/graph/` (port_reader, interpreter), `lca/agent/`, `lca/runtime/loop/`. The deslop lens is new for this round: `scripts/verify_doc_slop.py` exists and is read-only runnable.
+Respected: `lca/cognition/memory/` (frozen), `ralph/` Round 2 areas,
+`gate_chain_strategy.py` (hands-off), `lca/infrastructure/computer/guest/preamble.py`
+(user iterating), `lca/plugins/transport/webserver/` retirement-stub work
+(lca-1000 territory). RA-106's `_model` private-probe residue noted but not
+re-litigated here. Nothing written outside `raphy/`.
 
 ## Runtime verification (mandatory, executed)
 
-Probe (`/tmp/raphy_probe_deslop100.py`, MockLLMAdapter + a scripted tool-call adapter, `LLM_API_KEY=dummy`, `PYTHONPATH=<worktree>`):
+Environment: the **worktree** checkout of main tip `696e19f8f` (NOT the dirty
+main tree — agy/grok uncommitted work lives there; verification must read a
+clean tree). `LLM_API_KEY=dummy`, MockLLMAdapter, real `Agent.run()` runs
+(script `/tmp/raphy-runtime-verify.py`).
 
 | Scenario | Result |
 |---|---|
-| (a) basic run | **completed** |
-| (b) run with a tool call (custom marker tool) | **completed**, marker file written → tool actually executed |
-| (c) two sequential runs on one agent | **completed** / **completed** |
+| (a) basic run reaches COMPLETED | **completed** |
+| (b) run with a tool call (calc tool, 2-turn mock) | **completed** |
+| (c) two sequential runs on one agent | **completed / completed** |
 
-No crash, hang, or silent failure. The earlier inline `Agent(...)` attempt failed only because the raphy-assess prompt's API snippet is outdated (`Agent` now requires `role/goal/backstory`); with the current public API all three minimum scenarios pass. No new P0/P1. RA-023's non-convergence path was not re-run this wave (verified in prior rounds; basic scenarios pass).
+No crash, hang, or silent failure. No new P0/P1. RA-023's non-convergence fix
+(not re-run this round; confirmed 10-08 05:15: non-convergent run returns a
+failed Result). Prior P2s (`run(None)` TypeError, `NativeToolCall.arguments`
+str error) remain deferred to iter-quality — not re-litigated.
 
 ## Friction walk (5 questions per area)
 
-### Area A — `lca/application/runtime/` (composition root)
+### Area A — HITL restart recovery (`carrier/runs/recovery.py`)
 
-Read end-to-end: `plan_resolution.py`, `default_facade.py`, `runtime_coordinator.py`, `session_catalog_map.py`, `harness/runtime/proposal_activator.py`.
+Read end-to-end: `recovery.py` (all 365 lines), `lifecycle.py` pause hook
+(diff), `command_endpoints.py` `_validate_run_ownership`/`_run_is_recoverable`/
+`_ensure_recovered_session` (diff), seam note. Test:
+`tests/plugins/transport/webserver/test_run_restart_recovery.py`.
 
-- **Q1 shallow-module sprawl?** Low. Each module is single-purpose with a clear seam.
-- **Q2 shallow modules (deletion test)?** None obviously shallow.
-- **Q3 pure functions extracted for testability, bugs in call sites?** `plan_resolution.py` cache gating (`use_cache = bool(assistant_id and manifest_digest and plan_overlay is not None)`) is subtle but has no observed bug; the cache key ignores `plan_overlay`, which is safe only because the composition root always derives overlay from the same `assistant_id`. No story.
-- **Q4 leaky abstractions?** **Yes — the main finding.** `pyproject.toml` `[tool.lca.package_contracts."lca.application"]` declares `forbidden_dependencies = ["lca.harness", "lca.plugins", "gateway"]`, yet `default_facade.py` imports `lca.harness.runtime.activation_ref.compute_activation_ref` and `plan_resolution.py` imports `lca.harness.plan` + `lca.harness.profile.resolve.resolve` + `lca.harness.profile.validate.errors`. `scripts/check_package_contracts.py` only checks README mentions, not actual imports → the declared contract is silently violated. `default_facade.py`'s docstring admits the "soft-layering deviation" and tracks promoting `compute_activation_ref` to contracts as a P1 backlog. → **RA-107**.
-- **Q5 untested / hard to test through interface?** The application→harness boundary has no enforcement; nothing catches a new harness import in `lca/application/`.
+1. **Shallow-module sprawl?** The concept (pause → bundle → lazy rebuild on
+   answer) forces bouncing between 4 modules: `lifecycle.py` (write hook),
+   `recovery.py` (bundle + restore), `command_endpoints.py` (validate → recover
+   → resume), `handlers/runs/session/builder/builder.py` (rebuild). Inside
+   `recovery.py` the 7 functions are each deep enough; the sprawl is the
+   **read/write validation asymmetry** (see Q5).
+2. **Shallow modules?** `_recovery_locks_guard`/`_recovery_lock`: module-level
+   asyncio-Lock dict — deletion test says it earns existence (concentrates the
+   double-checked-lock race; deleting it moves the race into callers).
+   `_pending_tools_calling`: ~15-line pure transform; deletion would move
+   approval-shape knowledge into `_seed_recovery_facts`. Both survive the
+   deletion test. `load_resume_bundle` is thin but it is the single read seam
+   for the bundle — its thinness is the point.
+3. **Pure functions hiding real bugs?** `_pending_tools_calling` is pure and
+   covered; the real risk is orchestration in `_restore_from_bundle` (builder
+   rebuild + status assignment + runnable re-assembly), which the happy-path
+   test covers but no failure-injection test pins (Q5).
+4. **Leaky seams?** `_restore_from_bundle` imports ~9 cross-seam modules via
+   deferred imports (session runtime resume point, transport builder,
+   harness memory events, emit, fact gateway, capability, execution env,
+   runnable assembler). The deferred imports honestly flag layering strain —
+   a god-orchestrator stitching plugin/runtime/contracts. Not actionable
+   without a redesign; the honest local fix is the validation seam (RA-121).
+5. **Untested / past-interface?** Tests pin happy path, missing bundle,
+   skip-without-snapshot, write-failure containment. **Gap**: no corrupt-bundle
+   test — and the code path for it is silent degradation: write side guards
+   (`locator`/`approval_request`/`approval_id` checks, all fail-silent skip),
+   but `load_resume_bundle` only checks `data.get("run_id") != run_id`, then
+   `_restore_from_bundle` fills every missing field with `str(... or "")`
+   silent defaults and `_seed_recovery_facts` no-ops on empty `approval_id`.
+   A corrupt bundle builds a zombie `WAITING_INPUT` session that fails later
+   with confusing errors. → **RA-121** (friction: testability gap / no
+   locality of validation).
 
-### Area B — `lca/infrastructure/observability/adapters/` + `stream/`
+### Area B — effect attribution + source_verify marker
 
-Read end-to-end: `adapters.py`, `policy.py`, `view.py`, `stream_event_manager.py`, `llm_stream_activity.py`, `response_text_stream.py`, `graph_timeline.py`, `loop/emit/spine/ep.py`.
+Read end-to-end: `lca/nodes/concept/effect/execute.py` (all 514 lines),
+`lca/nodes/_resolve.py`, `lca/infrastructure/source_verify/registry.py`,
+`lca/infrastructure/source_verify/claims.py`, `think/llm/persist.py` (turn/step
+comparison), `run_session_writer.py` impl, `simple_body.py`/`tool_journal.py`
+comparison callers.
 
-- **Q1 shallow-module sprawl?** Low; modules are focused.
-- **Q2 shallow modules?** None strong.
-- **Q3 pure functions for testability?** `_stream_observability_kwargs`, `_model_label` are pure and fine, but see Q4.
-- **Q4 leaky abstractions?** **Yes.** `_model_label` does `getattr(inner, "_model", None)` — a private field of `openai_compat` — before falling back to the declared `name`. The `LLMAdapter` protocol declares `name` (adapter display name) but **no model identifier**; the `model=` value in `llm.call.start/end` telemetry is therefore not contractual. A future adapter that stores its model differently silently yields fallback/empty labels. → **RA-106**.
-- **Q5 untested / hard to test?** `_model_label` is only indirectly tested through telemetry tests; a fake adapter with no `_model` is not covered.
+1. **Shallow-module sprawl?** The attribution chain `_batch_rows` →
+   `_owed_rows` → `_row_surface` → `_append_tool_result_surface` lives in one
+   module; understanding "does the model see every call's result" requires
+   only this file + `tools_meta_of` + `OBS_TOOL_RESULTS`. No sprawl — RA-033/
+   ab2383495 left it well-localized.
+2. **Shallow modules?** `_batch_rows`/`_owed_rows` are small but each owns one
+   non-trivial rule (batch packaging read, fill-missing-calls). Deletion test:
+   deleting them moves the attribution rules into `_append_tool_result_surface`
+   — but the call chain is 4 deep for a ~100-line concern; not a finding.
+3. **Pure functions?** `_batch_rows`/`_owed_rows` are pure and pinned by
+   `tests/nodes/test_effect_execute_batch_attribution.py` (172 lines). The
+   real bugs lived at the call seam (writer binding, decision fill-in) and
+   the tests pin those. No gap.
+4. **Leaky seams?** Two findings:
+   - `execute.py:125` and `execute.py:295` each hand-roll
+     `getattr(context.runtime, "state", None)` — the exact two-shape probe
+     RA-118 converged into `lca/nodes/_resolve.py` as `resolve_runtime_state`.
+     RA-118 gave `resolve_writer` a `required` flag but left
+     `resolve_runtime_state` raise-only, so the two fail-soft probes in
+     `execute.py` still can't use it (and they miss the mapping-style `.get`
+     fallback the seam implements). → **RA-119** (shallow probe sprawl).
+   - `source_marker()` (`registry.py:97`) produces `[source:<id>]` via f-string
+     while `_EXPLICIT_MARKER` (`claims.py:21`) consumes it via an independent
+     regex — two independent definitions of one wire format. Same drift class
+     as RA-116 (prompt markers), where drift already happened once in
+     practice. `test_source_verify.py:43` pins the format text, but nothing
+     forces producer and consumer to stay in sync. → **RA-120** (leaky seam).
+5. **Untested / past-interface?** Attribution is well pinned. Marker
+   round-trip (`source_marker` → `extract_citations`) is tested at the text
+   level but through the interface of each half separately — the pairing is
+   not pinned. Covered by RA-120's acceptance criteria.
 
-### Area C — `lca/infrastructure/cli/commands/journal*` + `observation/`
+### Area C — chat projection (`observability/chat_projection.py`)
 
-Read end-to-end: `journal/journal.py`, `journal/session.py`, `journal/step.py`, `journal_extra/journal_steps.py`, `observation/trace_show.py`, `observation/run_replay.py`.
+Read end-to-end (all 446 lines) + `test_chat_projection.py` (188 lines).
 
-- **Q1 shallow-module sprawl?** **Yes.** Two step-viewer commands: `journal step --step N` (single-step human render of `journal.json`) and `journal steps --step N` (single-step markdown via `StepNarrativeWriter`), both under the `journal` group, both reading the same `journal.json`. Duplicated reading + rendering of the same document. → **RA-108**.
-- **Q2 shallow modules?** The commands are thin CLI shells; the overlap is the friction.
-- **Q3 pure functions for testability?** `_render_event`/`_format_step_human` etc. are fine.
-- **Q4 leaky abstractions?** Minor: `session.py`/`step.py` each re-derive `_spine_path` with function-level imports of `spine_filename_for_run`; folded into RA-108's shared-seam goal.
-- **Q5 untested?** CLI commands are mostly thin; `journal step` has tests. The overlap itself is unpinned.
+1. **Shallow-module sprawl?** No: one module owns Postgres row writes for the
+   chat UI; concepts are identity, ask card, final reply, card clearing.
+2. **Shallow modules?** The module is a set of ~12 functions each with a clear
+   SQL operation; interface (function per write) matches implementation
+   depth. `lobehub_database_url`'s hand-rolled `.env` line parser is a
+   mini-ritual but it exists once — deletion would move env-resolution
+   elsewhere, not concentrate it. Not a finding (no failure evidence).
+3. **Pure functions?** `_upsert_message`, `final_message_id`/`ask_message_id`
+   are pure helpers; real bugs hide in `resolve_identity`'s
+   read-modify-write against the messages table — but the docstring documents
+   the deliberate reason (session often knows only `solo`; the topic row is
+   the truth). Speculative without failure evidence → declined, noted below.
+4. **Leaky seams?** Raw SQL + `psycopg`/`psycopg2` dual import is honest
+   infrastructure; `_connect`'s adapter ritual is contained. The
+   `write_pending_question` row-shape (message row + message_plugins row)
+   must match what LobeHub's client renders — but the seam note + browser
+   e2e verification in `f07a82f01` cover it. Not a finding.
+5. **Untested?** `test_chat_projection.py` pins id functions and upsert
+   SQL against a fake cursor. **Gap (minor)**: the
+   `asyncio.to_thread(_with_connection, _write)` + try/except log wrapper is
+   copy-pasted in `persist_waiting_projection` and `persist_terminal_projection`
+   — exactly two occurrences, i.e. a real seam by this repo's own rule
+   ("one adapter = hypothetical seam, two = real"). → **RA-122**
+   (secondary duplication class).
 
-### Area D — `lca/framework/graph/`
+## Duplication scan (secondary, after the friction walk)
 
-Read: `observation.py`, `recorder.py`, plus context from RA-101/102 (port_reader, interpreter).
-
-- **Q1 shallow-module sprawl?** Low; `_PHASE_ALIAS_OF` is well-converged.
-- **Q2 shallow modules?** None.
-- **Q3 pure functions for testability?** `phase_of()` is a pure convention mapping but **has zero test references** (`grep phase_of|LCA_TOP_PHASES|_PHASE_ALIAS_OF tests/` → empty). Any bundle node whose first segment is neither a top phase nor an alias silently renders `phase=""` in NodeEnter/NodeExit facts. → **RA-109**.
-- **Q4 leaky abstractions?** None observed.
-- **Q5 untested?** Yes — the phase vocabulary is untested against real `bundles/**/*.yaml`.
-
-## Duplication scan (secondary)
-
-- **RA-108** (`journal step` vs `journal steps`) is the wave's one duplication-class story.
-- Minor `_spine_path` re-derivation across CLI commands is folded into RA-108.
-- `AutoReviewWrappedTool.effect_kind` getattr probe: matches the recorded pattern "类型保证 vs 防御式读取...见到可直接按诚实化修，不必开 story" (progress.txt) — **not opened** as a standalone story.
-
-## Deslop classification (`scripts/verify_doc_slop.py` — 123 hits, probe not definition)
-
-| Category | Hits | Verdict |
-|---|---|---|
-| `docs/plans/*` (dated planning docs) | ~90 | **keep** — time capsules; extend the linter to exclude `docs/plans/` like `docs/design/2026-*` |
-| `docs/port/main-classification.md` | 3 | **keep** — commit-hash / change-log table |
-| `docs/specs/glossary.md` | 10 | **keep** — glossary entries (explicitly not to be deleted) |
-| `docs/architecture/optimization-iterations.md` | 3 | **keep** — iteration log |
-| `docs/specs/0194-0195-implementation-plan.md`, `docs/specs/2026-09-07-lca-p1-agent-gateway-bridge.md`, `docs/specs/2026-09-10-nested-bundle-graph-spec.md`, `docs/specs/adr-0254-scenario-testing-specification.md` | many | **keep** — dated specs / implementation plans |
-| `docs/specs/0199-delete-when-inventory.md` | 1 | **keep** — legitimate checklist instruction ("now-obsolete exemption") |
-| `docs/specs/architecture.md` line 185 | 1 | **keep** — resolvable commit-hash reference (`cc17d8f81`); per instructions not deleted |
-| `docs/observability/architecture-overview.md` (lines 3/49/53/54) | 4 | **fix** — rewrite "不再走 / 已退役" as present-tense do-not-use tables |
-| `docs/observability/platform-readme.md` (lines 23/24) | 2 | **fix** — rewrite "遗留 / 退役 →" as present-tense replacement table |
-| `docs/guides/phase-graph-and-act-tool-path.md` line 28 | 1 | **fix** — rewrite "旧名...已退役" as current-state pointer |
-
-Fix-worthy current-state prose is small and bounded → **RA-104**.
-
-## Candidate table
-
-| # | Files | Problem | Solution | Benefits (locality + leverage) | Strength |
-|---|---|---|---|---|---|
-| RA-104 | `docs/observability/*`, `docs/guides/phase-graph-and-act-tool-path.md`, `scripts/verify_doc_slop.py` | 123 slop hits; linter scans time-capsule plans; current-state docs carry change narration | classify keep/fix, exclude `docs/plans/`, rewrite fix-worthy prose in present tense | current-state docs become honest without history archaeology; linter output becomes meaningful | **Strong** |
-| RA-105 | ~21 modules in `lca/` with change-narration comments | raphy-era docstrings/comments narrate "used to / previously / this PR" | rewrite to present-tense; keep load-bearing why + invariant RA refs | reading a module states current truth; future edits don't need history | **Strong** |
-| RA-106 | `observability/adapters/adapters.py`, `contracts/protocols/runtime/infra/infra.py`, `llm_adapter/openai_compat` | `_model_label` probes private `adapter._model`; model id not on protocol | declare `model_name` accessor on LLMAdapter; remove getattr | model identity becomes contractual; new adapters can't silently break telemetry | **Worth exploring** |
-| RA-107 | `pyproject.toml`, `application/runtime/default_facade.py`, `application/runtime/plan_resolution.py`, `scripts/check_package_contracts.py` | declared `forbidden_dependencies` violated by 2 files; unenforced | spike: move small seams to contracts / update contract with evidence; add enforcement | layer boundary stops lying; harness refactors can't silently break composition root | **Strong** |
-| RA-108 | `cli/commands/journal/step.py`, `journal_extra/journal_steps.py` | two overlapping step-viewer commands, duplicated reading/rendering | spike: converge or cross-reference with one shared seam | one clear step-viewing surface; single journal-read seam | **Worth exploring** |
-| RA-109 | `framework/graph/observation.py`, `tests/framework/graph/`, `bundles/**/*.yaml` | `phase_of` vocabulary untested; unrecognized prefixes silently yield `phase=""` | pin alias vocabulary against real bundle YAMLs with documented keep-list | observability phase facts verified against real plans; alias table earns its existence | **Worth exploring** |
-
-## Top recommendation
-
-**RA-107** is the top architecture story: a declared package contract (`lca.application` must not depend on `lca.harness`) is violated in two files, nothing enforces it, and the violating module's own docstring documents the deviation plus the backlog. That is a "declared interface lying" shape — the same class as RA-031/RA-051/RA-059. It is the most load-bearing: it sits on the run-creation path (facade + plan resolution) and its fix (moving the small pure seam functions to contracts or correcting the contract with evidence) unlocks honest enforcement for every future application-layer change.
-
-For the deslop mandate, **RA-104** is the top prose story: it makes `verify_doc_slop.py` meaningful (exclude time-capsule plans) and fixes the small set of genuinely current-state change-narration lines.
+Mechanical line-level scan of the hot files found no literal clusters beyond
+the chat_projection pair (RA-122). Checked and declined: `_PHASE_ALIAS_OF`
+(single cluster, RA-109 pinned), `CacheConfig(enabled=False)` (single site —
+prior idiom, no story), `_revision_of` two sites (needs a third — prior idiom,
+no story).
 
 ## Self-grilling (per candidate)
 
-### RA-104 (docs deslop)
-- **Constraints**: no glossary entry or resolvable commit-hash reference may be deleted; historical docs (`docs/plans`, `docs/adr`, `docs/notes`, `docs/debug`, `docs/port`, dated specs, `docs/design/2026-*`) stay untouched; do-not-use tables keep their informational value.
-- **Dependencies**: `verify_doc_slop.py` is read-only lint; extending its exclusions changes only the scan scope, not any runtime behavior.
-- **Deepened module**: the linter's exclusion set + the current-state docs become the honest "how it is" surface.
-- **Test survival**: no tests pin doc prose; the script itself has no tests (add none — it's a lint script). Verification is re-running the script and `git diff --check`.
-- **Deletion test**: the fix concentrates — a reader no longer needs to reconstruct history to understand the present.
+### RA-119 — converge two `getattr(context.runtime, "state")` probes onto `_resolve.py`
+- **Constraints**: `execute.py:125` fallback accepts only a real `AgentState`
+  (`isinstance` check is load-bearing for legacy fixtures on the fail-loud
+  path); `execute.py:295` (`_append_tool_result_surface`) uses fail-soft None.
+  Zero behavior change on real runs; keep the isinstance gate at the call site.
+- **Dependencies**: callers — none (module-private); callee — `_resolve.py`
+  (already imported for `resolve_writer`). `persist.py`/`invoke.py` already
+  use `resolve_runtime_state` fail-loud; adding `required` mirrors
+  `resolve_writer`'s existing flag.
+- **Shape of the deepened module**: `resolve_runtime_state(*, context, node,
+  required: bool = True)`; `execute.py` calls with `required=False` and keeps
+  its isinstance check. The mapping-style `.get` fallback comes free.
+- **Test survival**: `tests/nodes/test_effect_execute_batch_attribution.py`
+  (172 lines) pins attribution; the probes are exercised through the same
+  tests. New: a test that a mapping-style runtime (`{"state": ...}`) resolves
+  — currently silently None.
+- **Deletion test verdict**: deleting one probe concentrates the two-shape
+  ritual in the seam — earns existence. **Strength: Strong** (RA-118's own
+  seam, one round old, still incomplete).
 
-### RA-105 (comment deslop)
-- **Constraints**: no behavior change; `lca/cognition/memory/`, `lca/plugins/transport/webserver/`, `gate_chain_strategy.py` excluded; load-bearing why-comments and invariant-carrying RA refs kept.
-- **Dependencies**: the comments are in modules with existing tests; prose-only edits cannot break them (verify with ruff + targeted tests).
-- **Deepened module**: each touched docstring/comment becomes a current-state statement.
-- **Test survival**: existing tests pin behavior, not prose; a grep-based acceptance documents the keep-list.
-- **Deletion test**: rewording is not deletion — the *concept* stays, the *narrative* goes.
+### RA-120 — single seam for the `[source:<id>]` marker format
+- **Constraints**: wire format `[source:<id>]` is model-visible and pinned by
+  `test_source_verify.py:43`; must not change the text. ProvenanceGuard
+  semantics (ADR-0292 honesty boundary) unchanged.
+- **Dependencies**: producer `registry.py::source_marker` (called from
+  `execute.py`); consumer `claims.py::_EXPLICIT_MARKER` (called from
+  `extract_citations`). Nothing else constructs/parses the literal.
+- **Shape of the deepened module**: one module (registry.py is the natural
+  owner) exposes `format` + `parse`/`match` — claims.py imports the parser
+  instead of its own regex. Producer and consumer can never drift.
+- **Test survival**: `test_source_verify.py` pins format text and
+  `extract_citations` behavior — both must keep passing; add a round-trip
+  test (format → extract → same source_id).
+- **Deletion test verdict**: deleting the duplicate regex concentrates the
+  format knowledge — earns existence. **Strength: Strong** (RA-116 proved
+  this exact drift class breaks in practice).
 
-### RA-106 (model identity seam)
-- **Constraints**: `LLMAdapter` protocol change is additive (new declared member); production adapters already have the value (`_model`); telemetry `model=` values unchanged.
-- **Dependencies**: `TelemetryLLMAdapter` is the only `_model_label` caller; openai_compat/mock/anthropic adapters implement the new member.
-- **Deepened module**: `LLMAdapter` gains a shallow-but-real `model_name` member; `_model_label` becomes a thin adapter.
-- **Test survival**: existing telemetry tests pin `model=`; add a fake-adapter test (no `_model`) proving the declared accessor is used.
-- **Deletion test**: concentrates — model identity lives in the contract, not in a getattr probe.
+### RA-121 — converge resume-bundle validation into the load seam
+- **Constraints**: write side stays best-effort (pause path must never raise);
+  read side returning `None` must keep mapping to the handler's existing 404
+  path (`_run_is_recoverable` → "run not found"). Schema version
+  `lca.run.resume_bundle/1` unchanged.
+- **Dependencies**: writers — `lifecycle.py` pause hook calls
+  `write_resume_bundle`; readers — `command_endpoints.py`
+  `_run_is_recoverable`/`_ensure_recovered_session` via `restore_waiting_run`.
+  `_BUNDLE_SCHEMA` check can ride along.
+- **Shape of the deepened module**: a `validate_bundle(data) -> dict | None`
+  seam in `recovery.py` shared by write (pre-write guard) and load; rejects
+  missing/ill-typed `approval_request`, missing `approval_id`,
+  missing/unparseable `resume_point` — fail-loud at the seam, never a zombie
+  `WAITING_INPUT` session with silent `""` defaults.
+- **Test survival**: `test_run_restart_recovery.py` pins happy path, missing
+  bundle, skip-without-snapshot, write-failure containment. New: corrupt-bundle
+  cases (bad `approval_request` type, missing `approval_id`, non-dict JSON)
+  must return `None`.
+- **Deletion test verdict**: concentrates the scattered `str(... or "")`
+  defaults into one explicit contract — earns existence.
+  **Strength: Worth exploring** (real silent-degradation path, no observed
+  failure yet).
 
-### RA-107 (application→harness)
-- **Constraints**: ADR-0199 P1-06 says activation_ref hashing is owned by harness; moving `compute_activation_ref` to contracts changes ownership and may need an ADR note (the code's own backlog already proposes this). `resolve_profile`/`compile_plan` are large harness functions — likely stay behind an injected protocol.
-- **Dependencies**: `PlanResolutionService`/`DefaultRuntimeFacade` are consumed by CLI/HTTP/tests; refs must remain byte-identical.
-- **Deepened module**: the seam between composition root and harness becomes either contracts-owned (small pure functions) or an injected resolver; enforcement makes the boundary real.
-- **Test survival**: `tests/application/runtime/` + package-contract check; add a pin that `lca/application/` has no harness imports.
-- **Deletion test**: concentrates — the declared contract stops being a lie.
-
-### RA-108 (journal step CLI)
-- **Constraints**: CLI is user-facing; `journal step` and `journal steps` are both referenced in docs; choose merge vs cross-reference with evidence.
-- **Dependencies**: both commands read `journal.json` via different paths; docs/`lca-ops` help reference them.
-- **Deepened module**: one step-viewing command + one journal-read seam (or an explicit shared loader).
-- **Test survival**: existing journal CLI tests; add a pin for the chosen surface.
-- **Deletion test**: if merged, the duplicate rendering is deleted and complexity concentrates in one command.
-
-### RA-109 (phase alias vocabulary)
-- **Constraints**: `phase_of` semantics unchanged; legitimate unknowns recorded in a test keep-list, not forced into the alias table.
-- **Dependencies**: `phase_of` is consumed by observers/NodeEnter/NodeExit facts; the test only reads bundle YAMLs.
-- **Deepened module**: `phase_of` + `_PHASE_ALIAS_OF` gain a test surface (the interface is the test surface).
-- **Test survival**: existing graph observation tests; new corpus test walks all bundle node ids.
-- **Deletion test**: the alias table earns its existence by being pinned against real plans.
-
-## Learnings for future iterations
-
-- The runtime probe works in this worktree (`PYTHONPATH=<worktree>` + `python3 /tmp/...py`); the raphy-assess prompt's `Agent(tools=[], llm=...)` snippet is outdated — the public `Agent` requires `role`/`goal`/`backstory` and `ensure_default_ctx` is async.
-- `check_package_contracts.py` only checks README mentions, not imports — "declared forbidden dependency" stories must verify actual imports and the checker's capabilities before asserting enforcement.
-- `verify_doc_slop.py` hits are mostly time-capsule planning docs; a meaningful deslop story should first fix the linter's scope, then the small current-state residue.
-
-# Raphy assess — 2026-10-10 12:45 (branch raphy/arch-20261010-1245)
-
-Mode: ASSESS ONLY. Stopped before writing: a concurrent lane dirtied the checkout mid-assessment (10 files under lca/infrastructure/skills/*, lca/loop/commit/, tests/); per driver instruction no repo writes and no commit were made. All findings below were read against files untouched by that lane; runtime verification targets are disjoint from the dirty files.
-
-## Scope / 禁区 compliance
-
-Hot spots from `git log --oneline -40`: the parallel-tool-execution & run-stability wave (48bf2d6a3, e07666ef5, 8d1fe6f44, ab2383495, 45d714991, 5fba45f95, b67bb82d3) — plan lift, fanout_ntom edge, batch envelopes, tool result attribution, history sanitization, decision output hygiene guard. Respected禁区: ralph Round 2 areas, lca-1000 webserver territory, gate_chain_strategy.py, preamble.py, lca/cognition/memory/.
-
-## Runtime verification (executed)
-
-Scripted-LLM full runs on profiles/web-standard.yaml (LLM_API_KEY unset): basic run → COMPLETED; same agent second run → COMPLETED; tool-call run (bash) → INPUT_REQUIRED (approval-era designed path, NamespaceApprovalStrategy). No crash/hang/silent-failure.
-
-pytest: leak-guard + history-guard tests 6 passed; effect batch-attribution + envelope-check tests 8 passed; tests/integration/test_run_with_tool_use.py 3 passed (incl. full CognitiveAgent.run() e2e).
-
-Pre-existing failure (on main, not today's wave): tests/integration/test_think_llm_journal.py e2e asserts COMPLETED but approval era yields INPUT_REQUIRED (a1c20526d, 2026-10-01). Stale assertion → iter-tests lane, not a raphy story.
-
-## Friction walk
-
-### Area A — effect execution seam
-Read: lca/nodes/concept/effect/execute.py, lca/nodes/effect/pre_dispatch_envelope_check.py, lca/contracts/protocols/act/command/envelope.py, lca/cognition/body/executor/pipeline_safe_executor.py.
-- Q1 sprawl: "is this tool call authorized?" spans the node verdicts (effect.pre_dispatch.*:valid), envelope facts (act.*:allow), and ControlSlot.ACT_SAFE_BOUNDARY plugins — three vocabularies.
-- Q2 shallow: _VERDICT_SAFE_BOUNDARY is emitted but no gate runs it (since 39fa69654) → RA-115. _derive_outcome/_extract_observation unwrap duplication is 2 occurrences — below bar, noted.
-- Q3 locality: attribution helpers co-located in execute.py — fine.
-- Q4 leaky seam: envelope.metadata.get("operation", "unknown") ×2 bypasses the typed tools_meta_of seam (RA-033) — future material. The function-level source_verify.registry import is not a cycle dodge (registry imports only contracts) — hygiene note.
-- Q5 tests: no test pins "verdict set == implemented gates" → RA-115 acceptance.
-
-### Area B — decision parse / prompt-leak guard
-Read: lca/nodes/think/decision/parse.py; producers lca/nodes/think/history/assemble.py, lca/infrastructure/tool_defer/session.py, lca/plugins/prompts/sections/memory.py.
-- Q1–Q4: markers defined at consumer, produced at 3+ sites; two producers of the same defer header; guard references dead markers ("## 认知闭集"/"## 核心不变量"/"## 系统指令" found only in parse.py itself) → RA-116.
-- _guard_acknowledgement is a one-line adapter over guard_reply, single call site — one adapter = hypothetical seam, not a story.
-
-### Area C — history sanitization
-Read: lca/infrastructure/llm_adapter/openai_compat/history/_history.py, lca/infrastructure/llm_adapter/openai_compat/anthropic/_anthropic_messages.py.
-- Q2/Q4/Q5: 8d1fe6f44's closure invariant exists only on the OpenAI path; anthropic_messages_with_history has no equivalent and zero history tests → RA-117.
-
-## Duplication scan
-Only the _resolve_writer pair (persist.py fail-loud vs execute.py fail-soft) clears the two-occurrences bar → RA-118. Diversity quota satisfied: 3 friction + 1 duplication.
+### RA-122 — converge the two `_with_connection`+thread+log wrappers
+- **Constraints**: both wrappers are best-effort (log-and-continue); the log
+  event names (`chat_projection_wait_failed` /
+  `chat_projection_terminal_failed`) are observable — keep them as parameters.
+- **Dependencies**: two callers inside the same module only.
+- **Shape of the deepened module**: `_project_in_thread(fn, *, run_id,
+  log_event)` — one seam for "run sync SQL on a thread, log failure".
+- **Test survival**: `test_chat_projection.py` (188 lines) — behavior
+  unchanged; keep both log-event names asserted.
+- **Deletion test verdict**: concentrates the ritual; the two call sites keep
+  their distinct payloads. **Strength: Worth exploring** (small, honest
+  two-occurrence seam).
 
 ## Candidate table
 
 | ID | Files | Problem | Solution | Benefits (locality+leverage) | Strength |
 |---|---|---|---|---|---|
-| RA-115 | nodes/effect/pre_dispatch_envelope_check.py, bundles/act/act_subgraph.yaml | Claims 5-gate atomic check, runs 4; emits unearned safe-boundary:valid | Implement the gate or drop the verdict + fix narrative | Honesty: emitted facts == established facts; future gate additions get a test pinning the set | Strong |
-| RA-116 | nodes/think/decision/parse.py, nodes/think/history/assemble.py, infrastructure/tool_defer/session.py, plugins/prompts/sections/memory.py | Leak markers at consumer, producers scattered; 2 producers of one header; dead markers prove drift | Single marker registry seam; guard builds pattern from it | Locality: the "prompt-internal strings" invariant gets a home; leverage: section renames can't silently disable the guard | Worth exploring |
-| RA-117 | llm_adapter/openai_compat/history/_history.py, anthropic/_anthropic_messages.py | Hanging-tool_use closure only on OpenAI path; anthropic untested | Port invariant to anthropic wire shape + tests | Testability: the provider seam gets symmetric defense; prevents a known 400-error shape | Worth exploring |
-| RA-118 | nodes/think/llm/persist.py, nodes/concept/effect/execute.py, nodes/_resolve.py | Two _resolve_writer two-shape probes | Shared resolve_writer(*, context, node, required) seam | Locality: one probe ritual; leverage: future nodes get the seam for free | Worth exploring |
+| RA-119 | `lca/nodes/concept/effect/execute.py`, `lca/nodes/_resolve.py` | Two hand-rolled `getattr(context.runtime, "state")` probes duplicate the two-shape ritual RA-118 converged; they miss the mapping-style `.get` fallback and can't use the seam (raise-only) | Add `required: bool` to `resolve_runtime_state` (mirror `resolve_writer`); both probes converge to it with `required=False` | Locality: the runtime-carrier probe ritual lives in exactly one module. Leverage: every future fail-soft runtime read reuses the flag instead of hand-rolling | Strong |
+| RA-120 | `lca/infrastructure/source_verify/registry.py`, `lca/infrastructure/source_verify/claims.py` | `[source:<id>]` format defined twice: producer f-string vs consumer regex — same drift class as RA-116 | One seam owns format + parse; consumer imports the parser | Locality: format knowledge in one place. Leverage: ProvenanceGuard citations can't silently break on a format edit | Strong |
+| RA-121 | `lca/plugins/transport/webserver/carrier/runs/recovery.py` | Write-side guards vs read-side only-checks-`run_id`; corrupt bundle → silent `""` defaults → zombie WAITING_INPUT session | Shared `validate_bundle` at the load seam; corrupt → `None` (fail-loud, existing 404 path) | Locality: validation contract in one seam. Leverage: recovery failures surface at restore time instead of confusing later errors | Worth exploring |
+| RA-122 | `lca/infrastructure/observability/chat_projection.py` | `_with_connection`+`to_thread`+log wrapper copy-pasted twice | `_project_in_thread(fn, *, run_id, log_event)` seam | Locality: the sync-SQL-on-thread ritual in one place | Worth exploring |
 
-## Top recommendation
-Do RA-115 first: it is the only finding where the module's declared interface is factually false (a verdict emitted for a gate that never runs), it sits on the authorization path where dishonest evidence is load-bearing, and the fix is small (drop the verdict or implement the gate) with a test that permanently pins the verdict set.
+**Top recommendation**: RA-119 first — it completes RA-118's own seam one
+round later (the pattern, the tests, and the `required` precedent all exist;
+risk is near zero and the mapping-fallback is a latent correctness fix).
+RA-120 is the highest-leverage correctness story (ProvenanceGuard citations are
+a trust seam; drift there is silent). RA-121 and RA-122 are hygiene with clear
+acceptance tests.
 
-## Self-grilling notes
-- RA-115 constraints: verdict_refs flows to act.join typed port — keep the port shape stable; ADR-0234's "5 gates move to node" claim is the contradicted narrative, and the friction (unearned evidence on the auth path) warrants reopening it. Dependencies: act_subgraph.yaml comments, tests/effect/test_pre_dispatch_envelope_check.py.
-- RA-116: must not change assemble.py's byte-identical strip behavior or the _SAFE_FALLBACK_RESPONSE semantics.
-- RA-117: do not touch the OpenAI projection or its synthesis text; the anthropic choice (synthesize vs drop) is the optimize round's documented decision.
-- RA-118: execute.py's fail-soft None path is load-bearing for legacy harnesses.
-- Deletion test verdicts: RA-115 concentrates honesty; RA-116 concentrates the producer/guard contract; RA-117 concentrates the closure invariant; RA-118 concentrates the probe ritual. All "concentrates".
+**Diversity quota**: satisfied — RA-119 (shallow probe sprawl), RA-120 (leaky
+marker seam), RA-121 (testability/validation gap) are all friction-walk
+findings; RA-122 is the only duplication-class story.
 
-Assessment complete: 4 stories written, top is RA-115.
-## Coordinator note (2026-10-10 13:05)
+## Considered and declined
 
-评估员按指令停手后，coordinator 接管写盘：名义分支 `raphy/arch-20261010-1245` 的主 checkout
-被并发 lane 的 10 个未提交文件占用（`lca/infrastructure/skills/*`、`lca/loop/commit/`、
-`tests/` 下，与本轮 friction 区无交集），按红线不碰。遂开隔离 worktree
-`~/.lca-worktrees/raphy-20261010-1245`、新建分支 `raphy/arch-20261010-1245-b`（起于
-`48bf2d6a3`，与名义分支同 tip），三文件写盘 + ONE commit。本轮 stories 的 `branchName`
-字段记为 `-b` 分支；名义分支保持原 tip 不动，待主树干净后由 close 步骤处理。
+- `turn=step` in `execute.py`/`persist.py`: deliberate documented convention
+  ("the old single node used `state.step` for both writer rows"); the turn
+  seam itself is owned by RA-029. Not re-litigated.
+- `resolve_identity`'s messages-table backfill (session knows only `solo`):
+  documented deliberate; no failure evidence → speculative.
+- `ProactiveScheduler.js` four stringly keys (`last_run_ms`/`attempts`/
+  `next_retry_ms`/`last_error`): true friction, no failure evidence —
+  speculative, stays unfiled per prior round's call.
+- `_connect` psycopg/psycopg2 dual import, `.env` line parser in
+  `lobehub_database_url`: single-occurrence rituals, no failure evidence.
+- NativeToolCall wire getattr guards (prior round's note): type-guaranteed,
+  no story.
+
+## Assessment complete: 4 stories written, top is RA-119.

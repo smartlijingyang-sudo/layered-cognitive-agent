@@ -13,6 +13,8 @@ import json
 from pathlib import Path
 from unittest.mock import MagicMock
 
+import pytest
+
 from lca.contracts.models.core.state.state import StateSnapshot
 from lca.contracts.protocols.declarative.declarative_1.declarative_execution import (
     PhaseRunCursor,
@@ -126,6 +128,34 @@ def test_load_resume_bundle_missing_returns_none(tmp_path: Path) -> None:
     assert load_resume_bundle("run-missing", locator) is None
 
 
+@pytest.mark.parametrize(
+    "payload",
+    [
+        # bad approval_request type
+        '{"run_id": "run-corrupt", "approval_request": "not-a-dict"}',
+        # missing approval_id
+        '{"run_id": "run-corrupt", "approval_request": {"type": "ask_user_question"}}',
+        # empty approval_id
+        '{"run_id": "run-corrupt", "approval_request": {"approval_id": ""}, "resume_point": {"step": 0}}',
+        # non-dict JSON
+        "[1, 2, 3]",
+        # missing resume_point (valid approval side, nothing to resume)
+        '{"run_id": "run-corrupt", "approval_request": {"approval_id": "a:1"}}',
+        # unparseable resume_point (deserialize_resume_point fails closed)
+        '{"run_id": "run-corrupt", "approval_request": {"approval_id": "a:1"}, "resume_point": {"step": -1}}',
+        # invalid JSON text
+        "not json at all{{{",
+    ],
+)
+def test_load_resume_bundle_corrupt_returns_none(tmp_path: Path, payload: str) -> None:
+    run_dir = tmp_path / "traces" / "run-corrupt"
+    run_dir.mkdir(parents=True, exist_ok=True)
+    (run_dir / "resume_bundle.json").write_text(payload, encoding="utf-8")
+    locator = MagicMock(name="locator")
+    locator.run_dir.return_value = run_dir
+    assert load_resume_bundle("run-corrupt", locator) is None
+
+
 def test_write_resume_bundle_skips_without_snapshot(tmp_path: Path) -> None:
     run_dir = tmp_path / "traces" / "run-rec-2"
     run_dir.mkdir(parents=True, exist_ok=True)
@@ -154,10 +184,8 @@ async def test_restore_waiting_run_reuses_existing_session(tmp_path: Path) -> No
     locator = MagicMock(name="locator")
     run_dir = tmp_path / "traces" / "run-rec-1"
     run_dir.mkdir(parents=True, exist_ok=True)
-    (run_dir / "resume_bundle.json").write_text(
-        json.dumps({"schema": "lca.run.resume_bundle/1", "run_id": "run-rec-1"}),
-        encoding="utf-8",
-    )
+    session.locator.run_dir.return_value = run_dir
+    write_resume_bundle(session)
     locator.run_dir.return_value = run_dir
     registry.locator.return_value = locator
     registry.get.return_value = session
