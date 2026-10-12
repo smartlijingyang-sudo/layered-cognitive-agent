@@ -84,10 +84,9 @@ class AgentStateProjection:
             if data.get("error"):
                 state.last_error = data["error"]
 
-        elif event_type == "model.completed.v1":
+        elif event_type == "model.completed.v1" and "response" in data:
             # Track LLM completion
-            if "response" in data:
-                state.extra["last_model_response"] = data["response"]
+            state.extra["last_model_response"] = data["response"]
 
         return state
 
