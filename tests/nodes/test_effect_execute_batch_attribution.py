@@ -171,6 +171,8 @@ async def test_effect_execute_multi_call_partial_batch_fills_missing_calls() -> 
     assert "news cards" in writer.tool_results[0]["content"]
     assert writer.tool_results[1]["error"] is not None
     assert writer.tool_results[2]["error"] is not None
+
+
 def test_ra119_mapping_runtime_state_resolves_via_get() -> None:
     """RA-119: a mapping-style runtime exposes state only through ``.get``;
     the converged probe must resolve it (the old hand-rolled
@@ -180,19 +182,13 @@ def test_ra119_mapping_runtime_state_resolves_via_get() -> None:
     """
     sentinel = object()
     ctx = NodeContext(runtime={"state": sentinel}, budget={}, metadata={})
-    assert (
-        resolve_runtime_state(context=ctx, node="effect.execute", required=False)
-        is sentinel
-    )
+    assert resolve_runtime_state(context=ctx, node="effect.execute", required=False) is sentinel
 
 
 def test_ra119_fail_soft_missing_state_returns_none() -> None:
     """RA-119: required=False preserves the old fail-soft None path."""
     ctx = NodeContext(runtime={}, budget={}, metadata={})
-    assert (
-        resolve_runtime_state(context=ctx, node="effect.execute", required=False)
-        is None
-    )
+    assert resolve_runtime_state(context=ctx, node="effect.execute", required=False) is None
 
 
 def test_ra119_fail_loud_missing_state_raises() -> None:

@@ -141,7 +141,10 @@ def validate_bundle(data: Any, run_id: str) -> dict[str, Any] | None:
     approval_request = data.get("approval_request")
     if not isinstance(approval_request, dict):
         return None
-    if not isinstance(approval_request.get("approval_id"), str) or not approval_request["approval_id"]:
+    if (
+        not isinstance(approval_request.get("approval_id"), str)
+        or not approval_request["approval_id"]
+    ):
         return None
     resume_point = data.get("resume_point")
     if not isinstance(resume_point, dict):

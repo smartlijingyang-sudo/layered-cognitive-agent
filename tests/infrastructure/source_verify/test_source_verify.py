@@ -72,9 +72,7 @@ def test_explicit_marker_round_trip_single_seam() -> None:
     marker = source_marker(ref.source_id)
     assert marker == "[source:tool:c_rt]"
     assert extract_citations(f"结论是标准版 {marker}。", r) == (ref.source_id,)
-    assert extract_explicit_source_ids(f"[source:  {ref.source_id} ]") == (
-        ref.source_id,
-    )
+    assert extract_explicit_source_ids(f"[source:  {ref.source_id} ]") == (ref.source_id,)
 
 
 def test_extract_label_citation() -> None:
