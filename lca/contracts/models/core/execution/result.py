@@ -57,10 +57,8 @@ class Result:
         payload = observation.payload
         if isinstance(payload, str):
             output: str | None = payload
-        elif payload is not None:
-            output = str(payload)
         else:
-            output = None
+            output = str(payload) if payload is not None else None
         raw_total_steps = extra.get("source_total_steps", 1)
         if not isinstance(raw_total_steps, int) or isinstance(raw_total_steps, bool):
             raise ValueError("source_total_steps must be an integer")

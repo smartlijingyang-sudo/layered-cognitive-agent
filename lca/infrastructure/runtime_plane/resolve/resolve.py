@@ -35,10 +35,8 @@ def make_sandbox_ref(*, name: str = "onlyboxes") -> PlaneRef:
     lowered = ident.lower()
     if "local" in lowered:
         label = "Local sandbox"
-    elif "onlyboxes" in lowered:
-        label = "Onlyboxes"
     else:
-        label = ident
+        label = "Onlyboxes" if "onlyboxes" in lowered else ident
     return PlaneRef(
         id=ident,
         label=label,

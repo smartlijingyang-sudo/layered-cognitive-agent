@@ -476,10 +476,8 @@ def _layer_events(events: list[SpineRow]) -> dict[str, Any]:
     health_failed = health.summary.conditions_failed > 0
     if health_failed:
         hint = _NEXT_HINT["events"]["health_failed"]
-    elif rows_present:
-        hint = _NEXT_HINT["events"]["rows_present"]
     else:
-        hint = _NEXT_HINT["events"]["rows_empty"]
+        hint = _NEXT_HINT["events"]["rows_present"] if rows_present else _NEXT_HINT["events"]["rows_empty"]
     return {
         "layer": "events",
         "run_id": events[0].get("run_id") if events else None,
@@ -520,10 +518,8 @@ def _layer_diff(events: list[SpineRow]) -> dict[str, Any]:
     deviations = bool(missing or unexpected)
     if health_failed:
         hint = _NEXT_HINT["diff"]["health_failed"]
-    elif deviations:
-        hint = _NEXT_HINT["diff"]["deviations_present"]
     else:
-        hint = _NEXT_HINT["diff"]["no_deviations"]
+        hint = _NEXT_HINT["diff"]["deviations_present"] if deviations else _NEXT_HINT["diff"]["no_deviations"]
     return {
         "layer": "diff",
         "blueprint_missing": False,

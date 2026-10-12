@@ -96,12 +96,7 @@ class SourceVerifier:
 
         bad = [v for v in verdicts if v.verdict != ClaimVerdict.SUPPORTED]
         decision: Literal["pass", "needs_review", "block"]
-        if not bad:
-            decision = "pass"
-        elif mode == VerifyMode.ENFORCE:
-            decision = "block"
-        else:
-            decision = "needs_review"
+        decision = "pass" if not bad else "block" if mode == VerifyMode.ENFORCE else "needs_review"
         if bad:
             _log.warning(
                 "source_verify: %d/%d cited claims failed (%s)",
