@@ -71,10 +71,11 @@ _EXTRACT_PROMPT = """ROLE: memory_extract
 
 规则：
 - 只提取用户明确陈述的自我身份、偏好或显式要求记住的事实。
+- 只提取长期偏好/身份/事实；针对当前任务的一次性指令（如「这次回复必须包含代号X」「答完只回复一句」）不是用户偏好，禁止提取为 preference。
 - content 必须是第三人称结构化事实（如「用户身份：系统架构师」「用户偏好：不喜欢啰嗦」），禁止输出用户原文整句。
 - category 只能是 identity / preference / fact。
 - confidence 0.0-1.0：用户明确陈述 = 1.0，模型推断 = 0.6 以下。
-- dedupe_key 用于同维度幂等与覆盖更新（supersede），必须是稳定的抽象属性维度（格式为 category:topic，如 identity:role、identity:name、preference:tech_stack、preference:code_style、preference:database、preference:verbosity）。
+- dedupe_key 用于同维度幂等与覆盖更新（supersede），必须是稳定的抽象属性维度（格式为 category:topic，如 identity:role、identity:name、preference:tech_stack、preference:code_style、preference:database、preference:verbosity）。preference:response_code 不是合法维度（回复格式/代号要求不是偏好）。
   【铁律】dedupe_key 代表稳定的主题维度，严禁把具体的偏好值拼入 key（例如偏好 Python 必须是 preference:tech_stack，严禁 preference:tech_stack_python；身份是架构师必须是 identity:role，严禁 identity:architect）。
 - 如果用户陈述是在变更、替换或废弃某项已有偏好/身份，必须直接复用对应已有记忆的 dedupe_key 进行覆盖替换。
 - 没有候选时输出空数组 []。
@@ -90,6 +91,24 @@ _EXTRACT_PROMPT = """ROLE: memory_extract
 """
 
 _JSON_ARRAY_RE = re.compile(r"\[.*\]", re.DOTALL)
+
+#: 「回复必须包含代号X」式一次性回复格式要求。自动提取把这类测试/一次性
+#: 指令当成长期偏好是误提取（典型如浏览器复测残留的「浏览器复测甲」）。
+_RESPONSE_CODE_PREFERENCE_RE = re.compile(r"回复.*(?:代号|验证码|口令|暗号)")
+
+
+def _is_response_code_preference(candidate: dict[str, Any]) -> bool:
+    """判断候选是否为「回复必须包含代号X」式一次性回复格式要求。
+
+    显式 ``memory_add`` 不走本过滤，用户主动要求记住的仍可写入。
+    """
+    if str(candidate.get("category") or "").lower() != "preference":
+        return False
+    dedupe_key = str(candidate.get("dedupe_key") or "").strip().lower()
+    if dedupe_key == "preference:response_code":
+        return True
+    content = str(candidate.get("content") or "")
+    return _RESPONSE_CODE_PREFERENCE_RE.search(content) is not None
 
 
 def _may_contain_self_reference(task: str) -> bool:
@@ -132,7 +151,8 @@ def _parse_candidates(text: str) -> list[dict[str, Any]]:
                 "dedupe_key": str(item.get("dedupe_key") or "").strip() or None,
             }
         )
-    return candidates
+    # 自动蒸馏路径丢弃「回复必须包含代号X」式偏好（显式 memory_add 不受影响）。
+    return [c for c in candidates if not _is_response_code_preference(c)]
 
 
 def _format_existing_memories(runtime: Any) -> str:
