@@ -15,6 +15,7 @@ boot **不再** 因 Session 缺席而 ``mount_sink`` / ``bus.subscribe``。
 
 from __future__ import annotations
 
+import contextlib
 import contextvars
 from collections.abc import Callable
 from typing import TYPE_CHECKING, Any, Protocol, runtime_checkable
@@ -58,6 +59,19 @@ _CURRENT_SESSION_VAR: contextvars.ContextVar[SessionObserverTarget | None] = con
 _observer_catalog: dict[type, EventObserverCallback] = {}
 
 
+def _underlying_session(bound: object) -> object:
+    """从 bus facade / bridge 提取底层 Session 对象。
+
+    ``set_session`` 的幂等标记挂在 Session 本身上（跨 asyncio context 生效），
+    而不是挂在每次新建的 facade 或 ContextVar 上。
+    """
+    for attr in ("session", "inner"):
+        val = getattr(bound, attr, None)
+        if val is not None and callable(getattr(val, "observe", None)):
+            return val
+    return bound
+
+
 def set_session(session: object | None) -> None:
     """装载 / 清空当前上下文 Session 观察目标，并挂上目录中的全部观察者。
 
@@ -71,8 +85,10 @@ def set_session(session: object | None) -> None:
     时序：装载后立即把 :func:`observer_catalog` 中每条挂到新 Session；
     清空只卸当前目标，**不**清目录（下一 run bind 再挂）。
 
-    幂等：同一 session 对象重复调用不重复注册 observer（防止 resume
-    路径与 create 路径各调一次导致事件双写）。
+    幂等：同一 Session 对象只挂载一次目录，无论从哪个 asyncio context 调用。
+    ContextVar 只在当前上下文内幂等（resume 的 HTTP handler task 每次是新
+    context，``_CURRENT_SESSION_VAR`` 为空），因此真正的去重标记挂在底层
+    Session 对象上，防止 resume 路径重复注册 observer 导致 spine 事件双写。
     """
     if session is None:
         _CURRENT_SESSION_VAR.set(None)
@@ -86,8 +102,14 @@ def set_session(session: object | None) -> None:
     if bound is _CURRENT_SESSION_VAR.get():
         return
     _CURRENT_SESSION_VAR.set(bound)
+    inner = _underlying_session(bound)
+    if getattr(inner, "_lca_observer_catalog_mounted", False):
+        return
     for plugin, callback in tuple(_observer_catalog.items()):
         bound.observe(plugin, callback)
+    # 测试桩等无状态对象：忽略标记，仍按 ContextVar 幂等。
+    with contextlib.suppress(AttributeError, TypeError):
+        inner._lca_observer_catalog_mounted = True
 
 
 def current_session() -> SessionObserverTarget | None:

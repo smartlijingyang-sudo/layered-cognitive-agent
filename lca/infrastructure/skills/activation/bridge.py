@@ -113,6 +113,20 @@ class SkillActivationReducerBridge:
         state = state_getter()
         reducer.apply_deactivation(state, skill_id)
 
+    def current_state(self) -> AgentState | None:
+        """返回 reducer 持有的 live state；bridge 未 install 时返回 None。
+
+        供 ``resolve_skill_for_exec`` 在 ContextVar 丢失时兜底读取
+        ``state.activated_skills``（激活状态单一真值在 reducer state）。
+        """
+        with self._lock:
+            if not self._installed:
+                return None
+            state_getter = self._state_getter
+        if state_getter is None:
+            return None
+        return state_getter()
+
 
 # 进程级 singleton —— ``register_activated`` 这条 chokepoint 不持有 run 上下文,
 # 所以需要全局可寻址的 bridge。run 启动时 ``install``,run 结束 ``dispose``。

@@ -63,8 +63,11 @@ class ContextSkillsMergeExecutor:
         inputs 端口(yaml):manifest (ContextManifest | None),
         task (str), state (AgentState)
         outputs 端口(yaml):context (ReasonerContext)
+
+        ``state`` 端口由内核注入的 typed port seed 决定（当前只 seed
+        tools/bindings），因此从 ``context.node_config["agent_state"]``
+        兜底读取 reducer 持有的 live state —— 与 think 子图节点一致。
         """
-        del context
         manifest = input.port_values.get(PortName("manifest"))
         if manifest is not None and not isinstance(manifest, ContextManifest):
             raise TypeError(
@@ -78,6 +81,8 @@ class ContextSkillsMergeExecutor:
                 f"instance, got {type(task).__name__}"
             )
         state = input.port_values.get(PortName("state"))
+        if state is None:
+            state = (context.node_config or {}).get("agent_state")
         if state is not None and not isinstance(state, AgentState):
             raise TypeError(
                 "context.skills.merge: 'state' port must be an AgentState "
