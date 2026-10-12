@@ -3128,3 +3128,37 @@ brain/reducer/memory/hub/standing_refresher 等键，待 RA-123 落地后再评�
     `adapter`; one test file per seam module keeps the next convergence
     obvious.
 ---
+
+## [2026-10-13 01:35 CST] - RA-124
+- Implemented: `SkillActivationReducerBridge.find_activated(skill_id: str | None)
+  -> ActivatedSkill | None` in `lca/infrastructure/skills/activation/bridge.py` —
+  encapsulates the "bridge-installed / state-present / reversed
+  `state.activated_skills` scan" fallback ritual. `skill_id is None` → tail;
+  given → strip + reversed scan matching `skill_id` or `name`; returns None when
+  uninstalled / no state / no match / empty list.
+- `resolve_skill_for_exec` (scope.py) keeps the ContextVar fast path; both
+  fallback branches now delegate to `bridge.find_activated`. Both
+  `SkillNotFoundError` messages byte-identical (verified in diff; the old
+  fallback test asserting "未激活 skill" still passes unchanged).
+  Bridge lifecycle (`install`/`dispose`) untouched — `find_activated` reuses
+  the same `_lock` guard pattern as `current_state`/`handle`.
+- Files changed: `lca/infrastructure/skills/activation/bridge.py` (+28, new seam),
+  `lca/infrastructure/skills/activation/scope.py` (17 lines: 2 fallback blocks
+  collapsed into delegates), `tests/.../activation/test_bridge_find_activated.py`
+  (new, 6 seam tests), `raphy/prd.json` (RA-124 passes:true).
+- Quality: `tests/infrastructure/skills/activation/` → 14 passed
+  (incl. new 6 + unchanged `test_resolve_skill_fallback.py` 2); `ruff check`
+  on the 3 touched files clean.
+- **Learnings for future iterations:**
+  - Bridge singletons are unit-testable without the global: instantiate
+    `SkillActivationReducerBridge()` directly in the test file instead of
+    reusing the process-wide `bridge` singleton — avoids cross-test
+    `install`/`dispose` ordering hazards (`test_resolve_skill_fallback.py`
+    uses the global; keeping the new file off it means both files are safe
+    to run in any order).
+  - Seams that own a "single truth" contract should swallow their own
+    normalization: the seam strips `skill_id` itself, so call sites pass the
+    raw value and the ritual can't drift between callers (same idea as
+    RA-124 tail/empty-list edge being handled once inside, not at two
+    call sites).
+---

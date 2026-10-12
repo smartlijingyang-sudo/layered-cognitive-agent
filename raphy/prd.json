@@ -1806,10 +1806,10 @@
         "`tests/infrastructure/skills/activation/test_resolve_skill_fallback.py` passes unchanged; new bridge-level test for the seam (installed/uninstalled, by-id, by-name, tail); `ruff check` clean."
       ],
       "priority": 2,
-      "passes": false,
+      "passes": true,
       "branchName": "raphy/arch-20261013-0045",
-      "notes": "Source: friction walk Area B (leaky fallback seam). Strength: Worth exploring. Two-occurrence ritual = real seam by repo rule; future ContextVar-loss callers get the fallback free instead of copying it.",
-      "implemented": false,
+      "notes": "Done 2026-10-13: find_activated seam added to bridge.py; resolve_skill_for_exec delegates both fallback branches; 14 tests green, ruff clean.",
+      "implemented": true,
       "dropped": false
     },
     {
