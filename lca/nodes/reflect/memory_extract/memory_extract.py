@@ -57,6 +57,7 @@ from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 from lca.infrastructure.memory.episode_buffer import EpisodeBuffer
 from lca.infrastructure.memory.pre_filter.fallback_filter import FallbackMemoryFilter
 from lca.infrastructure.memory.pre_filter.tokens import DEFAULT_MEMORY_TOKENS
+from lca.nodes._resolve import resolve_runtime_adapter
 from lca.nodes.fast_path import FastPathCounter
 
 # 快速路径成本门：仅当用户陈述可能包含自我身份/偏好信号时才值得调 LLM 蒸馏。
@@ -245,9 +246,9 @@ class ReflectMemoryExtractExecutor(FastPathCounter):
         if not decision.should_extract:
             return self._passthrough(reflection)
 
-        adapter = getattr(runtime, "adapter", None)
-        if adapter is None and hasattr(runtime, "get"):
-            adapter = runtime.get("adapter")
+        adapter = resolve_runtime_adapter(
+            context=context, node="phase.reflect.memory.extract", required=False
+        )
         if adapter is None or not hasattr(adapter, "complete"):
             return self._passthrough(reflection)
 

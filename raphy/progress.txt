@@ -1,5 +1,10 @@
 ## Codebase Patterns
 
+- **动了的文件若有 pre-existing 的 ruff format 漂移，别顺手修（RA-123 实证）：**
+  `invoke.py:90` 在本轮改动前就已 `ruff format --check` 不过，用
+  `git show HEAD:<path> | ruff format --check -` 验证是旧账就原样留下；
+  验收门只有 `ruff check`，修旧账会污染 minimal diff。
+
 - **seam 收敛要按资源键全图 grep，别只收手头的两个（RA-123 教训）：**
   RA-118/119 收了 `writer`/`state` 两-shape probe 就宣布 done，
   同一仪式在 `adapter` 键下（think.llm.invoke fail-loud vs
@@ -3093,3 +3098,33 @@ duplication 类唯一）。diversity quota 满足（123/124 friction walk）。
 brain/reducer/memory/hub/standing_refresher 等键，待 RA-123 落地后再评估
 通用 `resolve_runtime_attr` 是否值得；`agent_state` vs `state` 键命名分歧
 无故障证据，speculative。
+
+## 2026-10-13 01:18 (Asia/Shanghai) - RA-123
+- Implemented: `resolve_runtime_adapter(*, context, node, required=True)` in
+  `lca/nodes/_resolve.py`, exact RA-118/119 shape (two-shape probe;
+  `{node}: 'adapter' must be supplied via context.runtime` fail-loud
+  wording). `think.llm.invoke._resolve_adapter` is now a thin delegate
+  (`required=True`; fail-loud TypeError naming `llm.invoke` preserved);
+  `reflect.memory_extract`'s hand-rolled probe block replaced with
+  `required=False` (`None` passthrough + `hasattr(adapter, "complete")` gate
+  preserved, ADR-0246 fail-soft intact). Repo-wide key-dimension grep found
+  exactly the 2 assessed sites — assessment was accurate, no third site.
+- Files changed: `lca/nodes/_resolve.py` (docstring paragraph + new seam),
+  `lca/nodes/think/llm/invoke.py` (import + thin delegate),
+  `lca/nodes/reflect/memory_extract/memory_extract.py` (import + 3-line delegate),
+  `tests/nodes/test_resolve_adapter.py` (new, 6 seam tests),
+  `raphy/prd.json` (RA-123 passes:true).
+- **Learnings for future iterations:**
+  - The RA-123 "grep by resource key before writing the seam" lesson verified:
+    `getattr(runtime, "adapter", ...)` + `runtime.get("adapter")` grep found
+    exactly 2 sites; trust the count, then stop. No drive-by fixes elsewhere.
+  - Pre-existing `ruff format` drift in a touched file is NOT yours to fix:
+    `invoke.py:90` fails `ruff format --check` at HEAD too — verified via
+    `git show HEAD:...`, left alone per minimal-diff. Only `ruff check` is
+    in the acceptance gate.
+  - New seam gets its own test file (`tests/nodes/test_resolve_adapter.py`,
+    `test_ra123_*`): RA-119's seam tests live inside
+    `test_effect_execute_batch_attribution.py`, which is off-topic for
+    `adapter`; one test file per seam module keeps the next convergence
+    obvious.
+---
