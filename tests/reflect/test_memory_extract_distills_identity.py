@@ -73,6 +73,27 @@ def test_parse_candidates_rejects_invalid_or_returns_empty() -> None:
     assert _parse_candidates('[{"category": "identity", "content": ""}]') == []
 
 
+def test_parse_candidates_drops_response_code_preference() -> None:
+    text = (
+        '[{"category": "preference", "content": "回复必须包含代号：浏览器复测甲", '
+        '"confidence": 1.0, "dedupe_key": "preference:response_code"}, '
+        '{"category": "preference", "content": "用户偏好：喜欢猫", '
+        '"confidence": 1.0, "dedupe_key": "preference:pets"}]'
+    )
+    candidates = _parse_candidates(text)
+    assert len(candidates) == 1
+    assert candidates[0]["content"] == "用户偏好：喜欢猫"
+    assert candidates[0]["dedupe_key"] == "preference:pets"
+
+
+def test_parse_candidates_drops_response_code_content_variant() -> None:
+    text = (
+        '[{"category": "preference", "content": "回复需要带上代号复测子", '
+        '"confidence": 0.9, "dedupe_key": "preference:reply_marker"}]'
+    )
+    assert _parse_candidates(text) == []
+
+
 @pytest.mark.asyncio
 async def test_extract_distills_identity_without_keywords() -> None:
     adapter = _JsonLLMAdapter(
@@ -95,6 +116,30 @@ async def test_extract_distills_identity_without_keywords() -> None:
     assert candidates[0]["category"] == "identity"
     assert candidates[0]["content"] == "用户身份：架构师"
     assert adapter.calls == 1
+
+
+@pytest.mark.asyncio
+async def test_extract_drops_response_code_preference() -> None:
+    adapter = _JsonLLMAdapter(
+        '[{"category": "preference", "content": "回复必须包含代号：浏览器复测甲", '
+        '"confidence": 1.0, "dedupe_key": "preference:response_code"}]'
+    )
+    executor = ReflectMemoryExtractExecutor()
+    context = NodeContext(
+        runtime={
+            "adapter": adapter,
+            "agent_state": _state("答完只回复一句，必须包含代号浏览器复测甲"),
+        },
+        metadata={},
+        budget=None,
+    )
+    node_input = NodeInput(port_values={"reflection": _reflection()})
+
+    output = await executor.node_execute(context, node_input)
+
+    reflection = output.port_values["reflection"]
+    candidates = reflection.extra.get("memory_candidates")
+    assert not candidates
 
 
 @pytest.mark.asyncio
