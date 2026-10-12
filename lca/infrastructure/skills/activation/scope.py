@@ -89,9 +89,7 @@ def unregister_activated(skill_id: str) -> bool:
     )
     if target is None:
         return False
-    _activated_skills.set(
-        tuple(item for item in current if item.skill_id != target.skill_id)
-    )
+    _activated_skills.set(tuple(item for item in current if item.skill_id != target.skill_id))
     bridge.handle_deactivation(skill_id=target.skill_id)
     return True
 
@@ -111,8 +109,18 @@ def resolve_skill_for_exec(skill_id: str | None) -> ActivatedSkill:
         for item in reversed(activated):
             if item.skill_id == sid or item.name == sid:
                 return item
+        # ContextVar 可能在工具执行间丢失；激活状态的单一真值在 reducer
+        # state.activated_skills（register_activated 经 bridge 已写入）。
+        state = bridge.current_state()
+        if state is not None:
+            for item in reversed(tuple(state.activated_skills)):
+                if item.skill_id == sid or item.name == sid:
+                    return item
         raise SkillNotFoundError(f"未激活 skill: {skill_id!r}；请先 activate_skill")
     if not activated:
+        state = bridge.current_state()
+        if state is not None and state.activated_skills:
+            return state.activated_skills[-1]
         raise SkillNotFoundError("无已激活 skill；请先 activate_skill")
     return activated[-1]
 
