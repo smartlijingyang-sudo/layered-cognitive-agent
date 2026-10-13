@@ -558,6 +558,90 @@ async def test_s10_authorize_passes_grant_agnostic_tool() -> None:
     assert routing.next_hint is None  # 无授权拒绝
 
 
+@pytest.mark.asyncio
+async def test_s10_authorize_allows_previously_approved_tool(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """工具权限审批通过后（``RunSession.approved_tool_names`` 含该工具），
+    act.authorize 必须放行，避免 full-restart resume 的「审批→重调→再审批」
+    循环。放行的标志是传给 gate 的 ``approval_requirement.required == False``。"""
+    import lca.nodes.act.authorize.authorize as authorize_mod
+    from lca.nodes.act.authorize.authorize import ActAuthorizeExecutor
+
+    monkeypatch.setattr(authorize_mod, "_approved_tool_names", lambda: {"executeCode"})
+    decision = Decision(
+        decision_id="dec_s10_approved_001",
+        action_type="use_tool",
+        rationale="approved shell tool re-called after resume",
+        confidence=1.0,
+        needs_approval=True,
+        tool_calls=[ToolCall(call_id="tc_exec", tool_name="executeCode", arguments={"code": "1"})],
+    )
+    executor = ActAuthorizeExecutor()
+    output = await executor.node_execute(
+        NodeContext(runtime={}, budget={}, metadata={}),
+        NodeInput(port_values={"decision": decision}),
+    )
+    req = output.port_values["approval_requirement"]
+    assert req.required is False
+    assert output.port_values["approval_required"] is False
+
+
+@pytest.mark.asyncio
+async def test_s10_authorize_still_requires_unapproved_tool(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """未在 ``approved_tool_names`` 中的 shell 工具仍必须要求审批（安全门不失效）。"""
+    import lca.nodes.act.authorize.authorize as authorize_mod
+    from lca.nodes.act.authorize.authorize import ActAuthorizeExecutor
+
+    monkeypatch.setattr(authorize_mod, "_approved_tool_names", lambda: set())
+    decision = Decision(
+        decision_id="dec_s10_unapproved_001",
+        action_type="use_tool",
+        rationale="shell tool not yet approved",
+        confidence=1.0,
+        needs_approval=True,
+        tool_calls=[ToolCall(call_id="tc_exec2", tool_name="executeCode", arguments={"code": "1"})],
+    )
+    executor = ActAuthorizeExecutor()
+    output = await executor.node_execute(
+        NodeContext(runtime={}, budget={}, metadata={}),
+        NodeInput(port_values={"decision": decision}),
+    )
+    req = output.port_values["approval_requirement"]
+    assert req.required is True
+    assert output.port_values["approval_required"] is True
+
+
+@pytest.mark.asyncio
+async def test_s10_authorize_approved_alias_allows_camel_case_call(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """批准记录与放行检查都用规范形：批准 ``execute_code``（snake）后，模型用
+    ``executeCode``（camelCase 别名）再次调用同一工具也必须放行。"""
+    import lca.nodes.act.authorize.authorize as authorize_mod
+    from lca.nodes.act.authorize.authorize import ActAuthorizeExecutor
+
+    monkeypatch.setattr(authorize_mod, "_approved_tool_names", lambda: {"executeCode"})
+    decision = Decision(
+        decision_id="dec_s10_alias_001",
+        action_type="use_tool",
+        rationale="snake_case alias of the approved tool",
+        confidence=1.0,
+        needs_approval=True,
+        tool_calls=[ToolCall(call_id="tc_alias", tool_name="execute_code", arguments={"code": "1"})],
+    )
+    executor = ActAuthorizeExecutor()
+    output = await executor.node_execute(
+        NodeContext(runtime={}, budget={}, metadata={}),
+        NodeInput(port_values={"decision": decision}),
+    )
+    req = output.port_values["approval_requirement"]
+    assert req.required is False
+    assert output.port_values["approval_required"] is False
+
+
 def test_s9_standing_write_refused_for_external_ambient_decision() -> None:
     """ADR-0292 §9-③ T4 (kept under §10): the standing writer gate reads the
     ambient Decision's content_origin — the only gate still origin-triggered
