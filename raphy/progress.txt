@@ -1,5 +1,22 @@
 ## Codebase Patterns
 
+- **"two = real" 的逐字两次是 Strong 信号（RA-136 实证）：** 两处逐字相同的私有
+  `_model` 探针（`getattr(adapter, "_model", None) or getattr(adapter, "model",
+  None)`），deletion test 通过（删掉零测试变红）+ interface 在行为上被实证更优
+  （Mock 上探针 None vs `model_name` "mock-llm"）→ 直接判 Strong，不必犹豫。
+  附带识别法：私有探针的"公共回退"（`or getattr(x, "model", None)`）若读的属性
+  在全仓零定义，就是伪装成防御式读取的纯私有探针。
+- **删死代码前要查"名字被谁 import"，不只查"函数被谁调用"（RA-137 实证）：**
+  `carrier/runs/resume.py::resume_run` 零调用方还不够——测试里
+  `monkeypatch.setattr(registry_commands, "resume_run", ...)` patch 的是
+  `execute.execute` 版（`commands.py:20-24` 从 execute 导入）。同名双胞胎删错
+  一个就炸：删之前用 rg 确认每个同名引用的归属模块。
+- **Legacy ingress 的 Protocol 默认值会撒谎（RA-138）：** `is_rejection: bool =
+  False` 让"表达不了拒绝"的 legacy 路径静默变成"已批准"——"未知"≠"批准"。
+  fail-closed 要求：要么默认拒绝，要么逼调用方显式表态（去默认化）。凡是看到
+  "bool 默认 False + 另一条路径给不出该信息"的形状，先怀疑。
+
+
 - **动了的文件若有 pre-existing 的 ruff format 漂移，别顺手修（RA-123 实证）：**
   `invoke.py:90` 在本轮改动前就已 `ruff format --check` 不过，用
   `git show HEAD:<path> | ruff format --check -` 验证是旧账就原样留下；
@@ -3492,3 +3509,18 @@ brain/reducer/memory/hub/standing_refresher 等键，待 RA-123 落地后再评�
   both 'no import at module time' and 'monkeypatch target exists';
   a try/except-guarded top-level import would still execute at import
   time and fail acceptance criterion 1.
+
+## [2026-10-14 05:10 CST] - Assess round (raphy/arch-20261014-0448)
+
+- Friction walk 3 areas (D: runs chain post-RA-131, E: model-identity probes, F:
+  skills _package_lookup -- 0 candidates, RA-107 confirmed landed).
+- Runtime verification (clean tree, LLM_API_KEY=dummy, ScriptedLLMAdapter):
+  basic/tool-call/sequential all completed; non-converging returns failed Result
+  with no exception (RA-023 holds). No P0.
+- Duplication scan: no new clusters; remaining hand-rolled probes match 01:45
+  round Area B's 6 declined points.
+- Wrote RA-136 (Strong: two verbatim _model probes -> model_name),
+  RA-137 (Strong: delete dead carrier/runs/resume.py resume_run),
+  RA-138 (Worth exploring: legacy /answer is_rejection gap, evidence-first).
+  RA-139 (typed ResumeAnswer) speculative -- deferred until RA-138 evidence lands.
+- Diversity quota: all 3 from friction walk, none duplication-class.
