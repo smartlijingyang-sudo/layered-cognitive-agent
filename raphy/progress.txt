@@ -3448,3 +3448,18 @@ brain/reducer/memory/hub/standing_refresher 等键，待 RA-123 落地后再评�
   model-emitted query names) -- the domain of the heuristic is underspecified.
   A future story should first pin the domain (shell-namespace-only?) before
   moving the invariant.
+
+## [2026-10-14 03:20 CST] - RA-133
+
+- Pure test story (zero production changes). New file
+  tests/unit/infrastructure/test_approved_tool_names_contextvar.py pins both
+  ContextVar directions against the real seam:
+  (1) parent sets approved names -> create_task child inherits them;
+  (2) child injects its own set (mirroring execute.resume_run) -> parent
+      still sees its own original value after the child completes.
+- 2 passed, ruff clean.
+- **Learnings:** the real flow is commands.py:321
+  `asyncio.create_task(resume_run(...))` + execute.resume_run sets the names
+  inside the child; pytest-asyncio auto mode runs async tests fine without
+  extra config; ContextVar sets inside a test task do not leak across tests
+  (each test gets its own task context), but reset in finally anyway.
