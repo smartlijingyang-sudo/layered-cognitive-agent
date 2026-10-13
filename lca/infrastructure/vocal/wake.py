@@ -20,14 +20,14 @@ class WakeClassifier:
                 requires_reply_first=False,
                 priority=priority,
             )
-        elif src in (WakeSource.USER_INPUT, WakeSource.FIRST_RUN):
+        if src in (WakeSource.USER_INPUT, WakeSource.FIRST_RUN):
             return WakeContext(
                 source=src,
                 is_silence_allowed=False,
                 requires_reply_first=True,
                 priority=priority,
             )
-        elif src == WakeSource.INBOUND:
+        if src == WakeSource.INBOUND:
             return WakeContext(
                 source=src,
                 is_silence_allowed=False,
@@ -35,7 +35,7 @@ class WakeClassifier:
                 channel_target=channel_target,
                 priority=priority,
             )
-        elif src == WakeSource.REVIVAL:
+        if src == WakeSource.REVIVAL:
             return WakeContext(
                 source=src,
                 is_silence_allowed=True,
