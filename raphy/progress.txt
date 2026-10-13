@@ -3553,3 +3553,29 @@ brain/reducer/memory/hub/standing_refresher 等键，待 RA-123 落地后再评�
     not just producers: public `model` attr existed on zero adapters, but the
     real clincher was Mock behavioral divergence (None vs "mock-llm").
 ---
+
+## 2026-10-14 05:33 CST - RA-137
+
+- Implemented: deleted the dead `resume_run` name-twin in
+  `lca/plugins/transport/webserver/carrier/runs/resume.py` (was :47); `__all__`
+  narrowed to `["resume_cache_ready", "validate_durable_resume"]`; removed the
+  now-unused `RunRegistry` import (ruff F401).
+- Pre-delete re-verification (independent of assess): the 3 module import sites
+  take only the other two names (`execute.py:148` -> `validate_durable_resume`,
+  `commands.py:217` -> both others, `lifecycle.py:256` -> `resume_cache_ready`);
+  `commands.py:20-24` imports `resume_run` from `execute.execute` (the one with
+  the approved-tools ContextVar injection), so every
+  `monkeypatch.setattr(registry_commands, "resume_run", ...)` in tests targets
+  the execute version, not the deleted one.
+- Verification: `rg resume_run` on the deleted module -> zero refs; `ruff check`
+  clean. Tests: 38 passed (test_resume_idempotency, test_resume_concurrency,
+  test_resume_approval_rejection_not_recorded,
+  test_approved_tool_names_contextvar, test_run_execution_facade,
+  test_runs_create_facade_path).
+- **Learnings for future iterations:**
+  - 同名双胞胎的归属判定要看 import 语句的行级来源，不是文件名：`registry_commands.resume_run`
+    这个名字在测试里出现 10 次，但 `commands.py:20-24` 的 from-import 一行就定案——
+    删之前先读那行，5 秒的事。
+  - 纯删除类 story 记得顺手清 import：`RunRegistry` 只在被删签名里用过，ruff F401
+    会立刻抓；删除 diff 里附带一行 import 清理不算 scope creep。
+---

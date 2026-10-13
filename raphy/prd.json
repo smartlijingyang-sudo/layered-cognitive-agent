@@ -2029,10 +2029,10 @@
     "Existing resume/idempotency/concurrency tests stay green; `ruff check` clean."
    ],
    "priority": 5,
-   "passes": false,
+   "passes": true,
    "branchName": "raphy/arch-20261014-0448",
-   "notes": "Assessed 2026-10-14 04:45 round (Area D). Strong: deletion test PASS (removing it changes nothing), removes a footgun. Territory: webserver carrier is lca-1000 territory but the file's recent 8 commits are all user-side work (runtime/types/import-sort/arch-discipline), no lca-1000 churn; pure deletion, no behavior change.",
-   "implemented": false,
+   "notes": "Assessed 2026-10-14 04:45 round (Area D). Strong: deletion test PASS (removing it changes nothing), removes a footgun. Territory: webserver carrier is lca-1000 territory but the file's recent 8 commits are all user-side work (runtime/types/import-sort/arch-discipline), no lca-1000 churn; pure deletion, no behavior change.  Implemented 2026-10-14 optimize round: deleted the def and narrowed __all__ to [\"resume_cache_ready\", \"validate_durable_resume\"]; removed the now-unused RunRegistry import (ruff F401); independently re-verified: 3 import sites of the module take only the other two names (execute.py:148 -> validate_durable_resume, commands.py:217 -> both others, lifecycle.py:256 -> resume_cache_ready), commands.py's resume_run comes from execute.execute (approved-tools ContextVar injection version), all test patches target registry_commands.resume_run = execute version. Zero remaining refs to the deleted function. 38 tests passed (resume idempotency/concurrency/rejection-not-recorded/contextvar/facade), ruff check clean. No assessment drift.",
+   "implemented": true,
    "dropped": false
   },
   {
