@@ -1877,9 +1877,9 @@
         "Each affected node's test file passes; the nodes regression suite passes; seam branch tests (both required modes) pass."
       ],
       "priority": 2,
-      "passes": false,
+      "passes": true,
       "branchName": "raphy/arch-20261013-2255",
-      "notes": "Pattern/duplication-class story (resource-key dimension scan). RA-118/119/123 tail. Strength: Worth exploring.",
+      "notes": "Implemented: assessed 9, converged 6. Delegated to `resolve_runtime_state(context=context, node=<id>, required=False)`: think/gate.py, think/reason/plan.py, think/reason/render.py, think/context/budgeting.py (deleted the duplicate `_resolve_state` helper, inlined the seam at its 2 call sites), think/budget/threshold_gate.py x2. DECLINED with reasons: think/route/route.py + think/route/shortcut.py are fail-LOUD with `RuntimeError` -- converging would change the exception type (a behavior-contract change, not this story); perceive/fold/fold.py has an extra `agent_state` key fallback (the two-keys-may-be-load-bearing divergence the 0045 round declined) -- dropping it would change behavior. `ruff check` clean; tests/nodes (65) + tests/think (139) pass. Strength: Worth exploring.",
       "implemented": false,
       "dropped": false
     },

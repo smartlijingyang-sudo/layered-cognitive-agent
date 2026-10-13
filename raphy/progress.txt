@@ -3275,3 +3275,27 @@ brain/reducer/memory/hub/standing_refresher 等键，待 RA-123 落地后再评�
   - 预先红点不顺手修：它的 seam（merged store global reachability）是另一个故事的
     领地；修了就是 scope creep，不修但如实记录。
 ---
+---
+
+## [2026-10-14 00:05 CST] - RA-128
+
+- Implemented: assessed 9, converged 6. 9 个手写 `getattr(runtime, "state", None)`
+  探针收敛到 `resolve_runtime_state(required=False)`：think/gate.py、
+  think/reason/plan.py、think/reason/render.py、think/context/budgeting.py
+ （删掉与 seam 逐字重复的 `_resolve_state` helper、两调用点直调 seam）、
+  think/budget/threshold_gate.py ×2（`_last_tool_error`、`_resolve_budget`）。
+- **Declined with reasons（实现与评估差异）**：route.py / shortcut.py 是
+  fail-loud 的 `RuntimeError`（非 TypeError）——收敛会改异常类型，属行为契约变更，
+  不在本 story；fold.py 的探针带 `agent_state` 键回退（00:45 轮已判定的
+  "two keys may be load-bearing" 分歧）——删掉回退会改行为，不收。
+  诚实收敛只收语义逐字相同的 6 处。
+- Verification: `ruff check` 全绿；tests/nodes 65 passed + tests/think 139 passed
+  （--no-cov, LLM_API_KEY=dummy）。
+- Files changed: 5 node 文件、raphy/prd.json。
+- **Learnings for future iterations:**
+  - "assessed N, converged M" 是诚实记账：评估时按形状数簇，实现时逐站点核对
+    missing 语义（fail-soft vs fail-loud）和键集合（`agent_state` 回退），语义
+    不逐字相同就不收——收敛的验收是"零语义变更"，不是"数字好看"。
+  - 异常类型也是契约：`RuntimeError`→`TypeError` 的收敛看起来只是"统一"，实际
+    改变调用方可见的行为分类；fail-loud 站点的收敛需要先确认异常类型契约。
+---
