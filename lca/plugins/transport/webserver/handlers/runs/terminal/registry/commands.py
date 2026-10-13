@@ -13,8 +13,10 @@ from typing import Any, cast
 
 import structlog
 
+from lca.contracts.models.core.execution.decision import HITL_TOOL_NAMES
 from lca.contracts.observability.registry.status import RunLifecycleStatus
 from lca.contracts.protocols.runtime.infra.infra import MachineResolver
+from lca.infrastructure.runtime_plane.access.approved_tools import canonical_tool_name
 from lca.plugins.transport.webserver.carrier.runs.execute.execute import (
     create_run_session,
     resume_run,
@@ -273,6 +275,19 @@ class RegistryRunCommands:
             has_plugin_state=bool(plugin_state),
             parent_message_id=parent_message_id,
         )
+        # 工具权限审批（shell 等命名空间策略）通过后，把被批准的工具名记入
+        # 会话。resume 是 full-restart（从 perceive.main 重跑），模型会重新
+        # 调用同一工具；只有记录「已批准」并在 act.authorize 放行，才能避免
+        # 「审批→重调→再审批」循环。HITL 交互工具（askUserQuestion）不属于
+        # 工具权限审批，不记录。
+        if session.approval_request is not None:
+            for _call in session.approval_request.get("tool_calls") or []:
+                if not isinstance(_call, dict):
+                    continue
+                _tool_name = str(_call.get("tool_name") or "").strip()
+                if _tool_name and _tool_name not in HITL_TOOL_NAMES:
+                    session.approved_tool_names.add(canonical_tool_name(_tool_name))
+
         # Resume 是新请求 = 新 context：create 时的 Session 绑定不在场。
         # create_task 拷贝当前 context，run task 继承这里的绑定；
         # 请求 context 随请求结束丢弃，无需 reset。

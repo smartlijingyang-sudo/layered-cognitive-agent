@@ -148,6 +148,13 @@ async def resume_run(session: RunSession, registry: RunRegistry, answer: str) ->
     from lca.plugins.transport.webserver.carrier.runs.resume import validate_durable_resume
 
     validate_durable_resume(session)
+    # 工具权限审批通过后，把已批准工具名注入本 resume 任务的 context，
+    # 供 act.authorize 放行同一工具的再次调用（防「审批→重调→再审批」循环）。
+    from lca.infrastructure.runtime_plane.access.approved_tools import (
+        set_approved_tool_names,
+    )
+
+    set_approved_tool_names(frozenset(session.approved_tool_names))
     # Late-bound so test patches on the execute package take effect at call time.
     import lca.plugins.transport.webserver.carrier.runs.execute as _self_pkg
 
