@@ -15,27 +15,15 @@ from lca.contracts.atoms.semantic.keys import FAILURE_KIND, FAILURE_KIND_VALIDAT
 from lca.contracts.models.core.execution.decision import Observation
 from lca.contracts.models.core.policy.budget import DEFAULT_TOOL_TIMEOUT_S
 from lca.contracts.protocols import Tool
-from lca.contracts.protocols.memory.operational_skills import (
-    SkillNotFoundError,
-    SkillPackageStore,
-)
+from lca.contracts.protocols.memory.operational_skills import SkillPackageStore
 from lca.infrastructure.tools.contract.render.render import RenderContract, contract
 from lca.infrastructure.tools.contract.schema.schema import COMMON
+from lca.infrastructure.tools.skills._package_lookup import (
+    resolve_package as _resolve_package,
+)
 
 RETIRE_SKILL_TOOL = "retire_skill"
 UNRETIRE_SKILL_TOOL = "unretire_skill"
-
-
-def _resolve_package(store: SkillPackageStore, raw: str):
-    try:
-        return store.get(raw)
-    except SkillNotFoundError:
-        pass
-    raw_lower = raw.lower()
-    for entry in store.list_installed():
-        if entry.name.lower() == raw_lower:
-            return store.get(entry.skill_id)
-    return None
 
 
 class _ReviewBase(Tool):
