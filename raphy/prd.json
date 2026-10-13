@@ -1840,9 +1840,9 @@
         "Full skills activation test dir passes (`tests/infrastructure/skills/activation/`)."
       ],
       "priority": 1,
-      "passes": false,
+      "passes": true,
       "branchName": "raphy/arch-20261013-2255",
-      "notes": "Friction-walk finding (Area B, F1). RA-124's leftover corpse. Strength: Strong.",
+      "notes": "Implemented: deleted `SkillActivationReducerBridge.current_state()` (bridge.py:116-129). `rg \"current_state\" lca/ tests/` returns zero hits; the `AgentState` TYPE_CHECKING import is retained (still referenced by the `StateGetter` string annotation). `ruff check` clean; 14 activation tests pass. Friction-walk finding (Area B, F1); RA-124's leftover corpse. Strength: Strong.",
       "implemented": false,
       "dropped": false
     },

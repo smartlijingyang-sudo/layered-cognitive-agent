@@ -3234,3 +3234,22 @@ brain/reducer/memory/hub/standing_refresher 等键，待 RA-123 落地后再评�
     ADR-0199 迁移进行中 + webserver 禁区）——diversity quota 的"无发现"文档化
     义务，不是没写 story 就没产出。
 ---
+---
+
+## [2026-10-13 23:35 CST] - RA-126
+
+- Implemented: deleted the orphaned `SkillActivationReducerBridge.current_state()`
+  (bridge.py:116-129) — RA-124's leftover corpse, zero callers / zero tests /
+  docstring falsely claiming to serve `resolve_skill_for_exec` (now `find_activated`).
+- Verification: `rg "current_state" lca/ tests/` → zero hits; `AgentState`
+  TYPE_CHECKING import retained (still used by the `StateGetter` string annotation);
+  `ruff check` clean; 14 activation tests passed (`tests/infrastructure/skills/activation/`,
+  --no-cov, LLM_API_KEY=dummy).
+- Files changed: `lca/infrastructure/skills/activation/bridge.py` (-14 lines),
+  `raphy/prd.json` (RA-126 passes:true).
+- **Learnings for future iterations:**
+  - 收敛轮的尸体要当场火化（RA-124 实证）：seam 收敛（`find_activated`）替代旧
+    seam 后，旧 public method 当天就该删——留到下一轮才删就是给未来误用留诱饵。
+  - TYPE_CHECKING import 删 method 前先数引用：本例 `AgentState` 还被 `StateGetter`
+    的字符串注解引用，import 保留是对的；`ruff check` 会兜底 F401。
+---

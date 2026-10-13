@@ -113,20 +113,6 @@ class SkillActivationReducerBridge:
         state = state_getter()
         reducer.apply_deactivation(state, skill_id)
 
-    def current_state(self) -> AgentState | None:
-        """返回 reducer 持有的 live state；bridge 未 install 时返回 None。
-
-        供 ``resolve_skill_for_exec`` 在 ContextVar 丢失时兜底读取
-        ``state.activated_skills``（激活状态单一真值在 reducer state）。
-        """
-        with self._lock:
-            if not self._installed:
-                return None
-            state_getter = self._state_getter
-        if state_getter is None:
-            return None
-        return state_getter()
-
     def find_activated(self, skill_id: str | None) -> ActivatedSkill | None:
         """reducer state 里的激活查找（ContextVar 丢失时的兜底 seam）。
 
