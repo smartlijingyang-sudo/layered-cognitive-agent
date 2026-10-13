@@ -35,6 +35,7 @@ from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import
 )
 from lca.contracts.protocols.think.cognition import SkillRouter
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
+from lca.nodes._resolve import resolve_runtime_brain
 
 
 @dataclass(frozen=True, slots=True)
@@ -63,7 +64,9 @@ class ThinkRouteExecutor:
         _log = logging.getLogger(__name__)
         runtime = context.runtime
         state = getattr(runtime, "state", None)
-        brain = getattr(runtime, "brain", None)
+        brain = resolve_runtime_brain(
+            context=context, node="think.route", required=False
+        )
         router = getattr(brain, "skill_router", None) if brain is not None else None
         reducer = getattr(runtime, "reducer", None)
 

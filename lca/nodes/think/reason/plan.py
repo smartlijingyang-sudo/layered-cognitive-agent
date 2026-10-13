@@ -35,7 +35,7 @@ from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import
     OwnershipDeclaration,
 )
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
-from lca.nodes._resolve import resolve_runtime_state
+from lca.nodes._resolve import resolve_runtime_brain, resolve_runtime_state
 
 
 @dataclass(frozen=True, slots=True)
@@ -62,11 +62,12 @@ class ThinkReasonPlanExecutor:
         import logging
 
         _log = logging.getLogger(__name__)
-        runtime = context.runtime
         state = resolve_runtime_state(
             context=context, node="think.reason.plan", required=False
         )
-        brain = getattr(runtime, "brain", None)
+        brain = resolve_runtime_brain(
+            context=context, node="think.reason.plan", required=False
+        )
         reasoner = getattr(brain, "reasoner", None) if brain is not None else None
         build = getattr(reasoner, "build_turn_plan", None) if reasoner is not None else None
         if reasoner is None or state is None or not callable(build):

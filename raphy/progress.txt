@@ -3299,3 +3299,32 @@ brain/reducer/memory/hub/standing_refresher 等键，待 RA-123 落地后再评�
   - 异常类型也是契约：`RuntimeError`→`TypeError` 的收敛看起来只是"统一"，实际
     改变调用方可见的行为分类；fail-loud 站点的收敛需要先确认异常类型契约。
 ---
+---
+
+## [2026-10-14 00:30 CST] - RA-129
+
+- Implemented: assessed 10, converged 8. 新增
+  `resolve_runtime_brain(*, context, node, required=False)`（`lca/nodes/_resolve.py`
+  末尾，RA-118/119/123 逐字同形：attribute 优先 + mapping `.get` 回退 + fail-loud
+  TypeError 点名 node）。8 个单形状 `getattr(runtime, "brain", None)` 探针收敛：
+  score.py（原已手写 two-shape）、gate.py、route.py、shortcut.py、plan.py、
+  render.py（node_execute）、chain_run.py、try_shortcut.py。3 处 `runtime =
+  context.runtime` 在收敛后无用（F841），已删除。
+- **Declined（实现与评估差异）**：render.py `_resolve_role_profile(runtime)`
+  helper 里的 2 个 brain 探针不收——helper 只收 bare runtime 对象（无 context）、
+  且内部混着 `reasoner` 键探针；为 compat 路径改两个私有 helper 签名是 churn，
+  不收。`rg` 确认剩余 brain 探针只剩 seam 本体 + 这 2 处。
+- Verification: 新 seam 单元测试 tests/nodes/test_resolve_brain.py（6 个：
+  attribute/mapping/None × required 两种分支）；`ruff check` 全绿；
+  tests/nodes + tests/think + tests/reflect 242 passed + tests/concept 53 passed
+  （--no-cov, LLM_API_KEY=dummy）。
+- Files changed: `_resolve.py`（+seam）、8 node 文件、tests/nodes/test_resolve_brain.py、
+  raphy/prd.json。
+- **Learnings for future iterations:**
+  - 新 seam 的 `required` 默认值要看现有全部调用点的 missing 语义：brain 10 处
+    全是 fail-soft → 默认 `required=False`（与前三兄弟默认 True 相反）；默认值的
+    依据是调用点证据，不是惯例。
+  - helper 参数是 runtime 而非 context 时别硬收：seam 的 interface 是
+    `(context, node, required)`，为收敛改私有 helper 签名 = 用 churn 换数字，
+    不值；诚实做法是 decline 并写清理由。
+---

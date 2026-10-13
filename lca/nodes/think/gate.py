@@ -40,7 +40,7 @@ from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import
 )
 from lca.contracts.protocols.think.cognition import DecisionGate
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
-from lca.nodes._resolve import resolve_runtime_state
+from lca.nodes._resolve import resolve_runtime_brain, resolve_runtime_state
 
 
 @dataclass(frozen=True, slots=True)
@@ -64,11 +64,12 @@ class ThinkGateExecutor:
         ADR-0219 §7: gate 写回 ``decision`` 槽——**不发明新字段**。
         语义:gate 是 decision 的 transformer,enforce 之后仍是 decision。
         """
-        runtime = context.runtime
         state = resolve_runtime_state(
             context=context, node="think.gate", required=False
         )
-        brain = getattr(runtime, "brain", None)
+        brain = resolve_runtime_brain(
+            context=context, node="think.gate", required=False
+        )
         gate = getattr(brain, "decision_gate", None) if brain is not None else None
         decision = input.port_values.get(PortName("decision"))
 

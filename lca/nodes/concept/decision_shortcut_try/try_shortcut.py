@@ -40,6 +40,7 @@ from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import
 )
 from lca.contracts.protocols.think.cognition import SupportsShortcut
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
+from lca.nodes._resolve import resolve_runtime_brain
 
 
 @dataclass(frozen=True, slots=True)
@@ -71,7 +72,9 @@ class ShortcutTryExecutor:
         if state is None or not isinstance(state, AgentState):
             return NodeOutput(port_values={})
 
-        brain = getattr(runtime, "brain", None)
+        brain = resolve_runtime_brain(
+            context=context, node="shortcut.try", required=False
+        )
         shortcut = getattr(brain, "supports_shortcut", None) if brain is not None else None
         if not isinstance(shortcut, SupportsShortcut):
             return NodeOutput(port_values={})

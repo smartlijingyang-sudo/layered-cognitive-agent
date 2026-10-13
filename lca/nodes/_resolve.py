@@ -135,3 +135,25 @@ def resolve_runtime_adapter(*, context: NodeContext, node: str, required: bool =
     if adapter is None and required:
         raise TypeError(f"{node}: 'adapter' must be supplied via context.runtime")
     return adapter
+
+
+def resolve_runtime_brain(*, context: NodeContext, node: str, required: bool = False) -> Any:
+    """Pull the brain (capability host) from the whitelisted kernel runtime carrier.
+
+    Two-shape probe (attribute first, then mapping-style ``.get``) — the
+    same ritual ``resolve_writer`` / ``resolve_runtime_state`` /
+    ``resolve_runtime_adapter`` use.
+
+    ``required=True`` (fail-loud): a missing brain raises ``TypeError``
+    naming the node.
+    ``required=False`` (fail-soft, default — all current brain consumers
+    treat ``None`` as absent): a missing brain returns ``None`` so the
+    call site's own capability-absence branch stays load-bearing.
+    """
+    runtime = getattr(context, "runtime", None)
+    brain = getattr(runtime, "brain", None) if runtime is not None else None
+    if brain is None and runtime is not None and hasattr(runtime, "get"):
+        brain = runtime.get("brain")
+    if brain is None and required:
+        raise TypeError(f"{node}: 'brain' must be supplied via context.runtime")
+    return brain

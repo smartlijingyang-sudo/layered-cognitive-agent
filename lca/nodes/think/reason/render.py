@@ -47,7 +47,7 @@ from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import
     OwnershipDeclaration,
 )
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
-from lca.nodes._resolve import resolve_runtime_state
+from lca.nodes._resolve import resolve_runtime_brain, resolve_runtime_state
 
 _log = logging.getLogger(__name__)
 
@@ -192,7 +192,9 @@ class ThinkReasonRenderExecutor:
         state = resolve_runtime_state(
             context=context, node="think.reason.render", required=False
         )
-        brain = getattr(runtime, "brain", None)
+        brain = resolve_runtime_brain(
+            context=context, node="think.reason.render", required=False
+        )
         reasoner = getattr(brain, "reasoner", None) if brain is not None else None
         plan = input.port_values.get(PortName("turn_plan"))
         render_turn = getattr(reasoner, "render_turn", None) if reasoner is not None else None

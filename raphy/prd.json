@@ -1895,9 +1895,9 @@
         "No other `getattr(runtime, \"brain\"` probes remain outside the seam."
       ],
       "priority": 3,
-      "passes": false,
+      "passes": true,
       "branchName": "raphy/arch-20261013-2255",
-      "notes": "Pattern story: new seam in proven shape + convergence (RA-123's 2-site shape generalized to the key's full map). Strength: Worth exploring.",
+      "notes": "Implemented: assessed 10, converged 8. New seam `resolve_runtime_brain(*, context, node, required=False)` in `lca/nodes/_resolve.py` (exact RA-118/119/123 shape: attribute first, mapping `.get` fallback, fail-loud TypeError naming the node). Delegates: reflect/score/score.py, think/gate.py, think/route/route.py, think/route/shortcut.py, think/reason/plan.py, think/reason/render.py (node_execute), concept/decision_enforce/chain_run.py, concept/decision_shortcut_try/try_shortcut.py. DECLINED: the 2 brain probes inside render.py's private `_resolve_role_profile(runtime)` helper -- it takes a bare runtime object (no context in scope) and mixes `reasoner` probes; threading context through would churn two private helper signatures for a compat path. New seam unit tests (tests/nodes/test_resolve_brain.py, 6 tests, both required branches x attribute/mapping/None carriers). `ruff check` clean; tests/nodes + tests/think + tests/reflect (242) + tests/concept (53) pass. Strength: Worth exploring.",
       "implemented": false,
       "dropped": false
     },
