@@ -40,6 +40,7 @@ from lca.infrastructure.skills.settings.settings import SkillSettings
 from lca.infrastructure.skills.zip.security import extract_zip_bytes, find_skill_markdown
 from lca.infrastructure.tools.contract.project.project import project_tool_state
 from lca.infrastructure.tools.default.set import build_default_tools
+from lca.infrastructure.tools.skills._package_lookup import resolve_package
 from lca.infrastructure.tools.skills.activate.tool import SkillActivateTool
 from lca.infrastructure.tools.skills.importer.import_tool import SkillImportTool
 from lca.infrastructure.tools.skills.read.reference_tool import SkillReadReferenceOnceTool
@@ -462,7 +463,7 @@ class TestImportPublishesAssistantHome(unittest.IsolatedAsyncioTestCase):
                 for item in build_operational_skill_tools(importer=importer, store=global_store)
                 if item.name == "activate_skill"
             )
-            self.assertEqual(activate._resolve_package(stored.skill_id).skill_id, stored.skill_id)
+            self.assertEqual(resolve_package(activate._store, stored.skill_id).skill_id, stored.skill_id)
 
 
 class TestOperationalSkillToolAssembly(unittest.TestCase):

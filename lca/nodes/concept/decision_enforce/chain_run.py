@@ -38,6 +38,7 @@ from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import
     OwnershipDeclaration,
 )
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
+from lca.nodes._resolve import resolve_runtime_brain
 
 
 @dataclass(frozen=True, slots=True)
@@ -90,8 +91,9 @@ def _resolve_gates(context: NodeContext) -> tuple[DecisionGate, ...]:
     iterable of gates; both shapes are common depending on how the
     parent profile wires the capability.
     """
-    runtime = context.runtime
-    brain = getattr(runtime, "brain", None)
+    brain = resolve_runtime_brain(
+        context=context, node="gate.chain.run", required=False
+    )
     if brain is not None:
         raw: object = getattr(brain, "agent_gates", None)
         if raw is None:

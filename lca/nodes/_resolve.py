@@ -53,19 +53,25 @@ def resolve_typed_port(name: PortName, *, input: NodeInput, node: str) -> Any:
 
 
 def resolve_typed_port_or_runtime(
-    name: PortName, *, input: NodeInput, context: NodeContext, node: str
+    name: PortName, *, input: NodeInput, context: NodeContext, node: str,
+    required: bool = True,
 ) -> Any:
     """Read a declared port from input.port_values or context.runtime.
 
     Mirror the think.shortcut convention: runtime is a namespace object;
     resolve by attribute first, then mapping-style .get.
+
+    ``required=True`` (fail-loud, default): a missing value raises
+    ``TypeError`` naming the node. ``required=False`` (fail-soft): a
+    missing value returns ``None`` so the call site's own absence branch
+    stays load-bearing.
     """
     value = input.port_values.get(name)
     if value is None and hasattr(context, "runtime") and context.runtime is not None:
         value = getattr(context.runtime, name, None)
         if value is None and hasattr(context.runtime, "get"):
             value = context.runtime.get(name)
-    if value is None:
+    if value is None and required:
         raise TypeError(
             f"{node}: '{name}' port must be supplied via input.port_values or context.runtime"
         )
@@ -135,3 +141,25 @@ def resolve_runtime_adapter(*, context: NodeContext, node: str, required: bool =
     if adapter is None and required:
         raise TypeError(f"{node}: 'adapter' must be supplied via context.runtime")
     return adapter
+
+
+def resolve_runtime_brain(*, context: NodeContext, node: str, required: bool = False) -> Any:
+    """Pull the brain (capability host) from the whitelisted kernel runtime carrier.
+
+    Two-shape probe (attribute first, then mapping-style ``.get``) — the
+    same ritual ``resolve_writer`` / ``resolve_runtime_state`` /
+    ``resolve_runtime_adapter`` use.
+
+    ``required=True`` (fail-loud): a missing brain raises ``TypeError``
+    naming the node.
+    ``required=False`` (fail-soft, default — all current brain consumers
+    treat ``None`` as absent): a missing brain returns ``None`` so the
+    call site's own capability-absence branch stays load-bearing.
+    """
+    runtime = getattr(context, "runtime", None)
+    brain = getattr(runtime, "brain", None) if runtime is not None else None
+    if brain is None and runtime is not None and hasattr(runtime, "get"):
+        brain = runtime.get("brain")
+    if brain is None and required:
+        raise TypeError(f"{node}: 'brain' must be supplied via context.runtime")
+    return brain

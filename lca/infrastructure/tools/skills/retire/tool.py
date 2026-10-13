@@ -18,9 +18,7 @@ from lca.contracts.protocols import Tool
 from lca.contracts.protocols.memory.operational_skills import SkillPackageStore
 from lca.infrastructure.tools.contract.render.render import RenderContract, contract
 from lca.infrastructure.tools.contract.schema.schema import COMMON
-from lca.infrastructure.tools.skills._package_lookup import (
-    resolve_package as _resolve_package,
-)
+from lca.infrastructure.tools.skills._package_lookup import resolve_package
 
 RETIRE_SKILL_TOOL = "retire_skill"
 UNRETIRE_SKILL_TOOL = "unretire_skill"
@@ -46,7 +44,7 @@ class _ReviewBase(Tool):
     async def execute(self, args: dict[str, Any]) -> Observation:
         start = time.monotonic()
         raw = str(args.get("skill_id") or "").strip()
-        package = _resolve_package(self._store, raw)
+        package = resolve_package(self._store, raw)
         if package is None:
             latency_ms = int((time.monotonic() - start) * 1000)
             return Observation(

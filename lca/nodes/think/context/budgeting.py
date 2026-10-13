@@ -19,6 +19,7 @@ from typing import Any
 
 from lca.contracts.models.core.state.state import Budget
 from lca.contracts.protocols.declarative.declarative_1.node_executor import NodeContext
+from lca.nodes._resolve import resolve_runtime_state
 
 # Soft compaction threshold: only compact once the working context has
 # grown past this fraction of the token budget. Below it the node emits a
@@ -78,22 +79,11 @@ def truncate_oldest_to_byte_budget(
     return tuple(kept)
 
 
-def _resolve_state(*, context: NodeContext) -> object:
-    """Pull ``state`` from the whitelisted runtime carrier.
-
-    Runtime-carrier read; matches the convention used by
-    ``think.budget.gate`` and ``think.decision.repair``.
-    """
-    runtime = getattr(context, "runtime", None)
-    state_obj = getattr(runtime, "state", None) if runtime is not None else None
-    if state_obj is None and runtime is not None and hasattr(runtime, "get"):
-        state_obj = runtime.get("state")
-    return state_obj
-
-
 def resolve_budget(*, context: NodeContext) -> Budget:
     """Pull ``Budget`` from ``state.budget`` via the runtime carrier."""
-    state_obj = _resolve_state(context=context)
+    state_obj = resolve_runtime_state(
+        context=context, node="think.context.budgeting", required=False
+    )
     budget = getattr(state_obj, "budget", None) if state_obj is not None else None
     if isinstance(budget, Budget):
         return budget
@@ -109,7 +99,9 @@ def resolve_context_payload(*, context: NodeContext) -> tuple[Any, ...]:
     Behavior-preserving fallback to ``state.retrieved_context`` (the
     same source the prior single ``context.compact`` node read).
     """
-    state_obj = _resolve_state(context=context)
+    state_obj = resolve_runtime_state(
+        context=context, node="think.context.budgeting", required=False
+    )
     value = getattr(state_obj, "retrieved_context", None) if state_obj is not None else None
     if value is None:
         return ()

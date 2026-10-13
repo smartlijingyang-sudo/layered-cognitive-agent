@@ -59,7 +59,7 @@ class SkillDeactivateTool(Tool):
     async def execute(self, args: dict[str, Any]) -> Observation:
         start = time.monotonic()
         raw = str(args.get("skill_id") or "").strip()
-        package = self._resolve_package(raw)
+        package = resolve_package(self._store, raw)
         if package is None:
             latency_ms = int((time.monotonic() - start) * 1000)
             return Observation(
@@ -96,5 +96,3 @@ class SkillDeactivateTool(Tool):
             latency_ms=latency_ms,
         )
 
-    def _resolve_package(self, raw: str):
-        return resolve_package(self._store, raw)

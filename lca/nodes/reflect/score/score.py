@@ -40,6 +40,7 @@ from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import
 from lca.contracts.protocols.graph.routing import RoutingDecision
 from lca.contracts.protocols.think.cognition import Brain
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
+from lca.nodes._resolve import resolve_runtime_brain
 from lca.nodes.fast_path import FastPathCounter
 
 
@@ -130,9 +131,9 @@ class ReflectScoreExecutor(FastPathCounter):
     ) -> NodeOutput:
         runtime = context.runtime or {}
         observation = _normalize_observation(input.port_values.get(PortName("observation")))
-        brain = getattr(runtime, "brain", None)
-        if brain is None and hasattr(runtime, "get"):
-            brain = runtime.get("brain")
+        brain = resolve_runtime_brain(
+            context=context, node="phase.reflect.score", required=False
+        )
         pipeline = input.port_values.get(PortName("cognitive_reflection_pipeline"))
         state = input.port_values.get(PortName("state"))
         if state is None and hasattr(runtime, "get"):

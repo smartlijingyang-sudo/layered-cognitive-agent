@@ -47,6 +47,7 @@ from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import
 )
 from lca.contracts.protocols.graph.routing import RoutingDecision
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
+from lca.nodes._resolve import resolve_runtime_state
 
 # Declaration order used to pick the first exceeded resource when more than
 # one cap trips on the same turn. Mirrors the SSOT order in ``Budget.exceeded``
@@ -141,10 +142,9 @@ def _harvest_decision(budget: Budget, *, context: NodeContext) -> Decision:
 
 
 def _last_tool_error(context: NodeContext) -> str:
-    runtime = getattr(context, "runtime", None)
-    state_obj = getattr(runtime, "state", None) if runtime is not None else None
-    if state_obj is None and runtime is not None and hasattr(runtime, "get"):
-        state_obj = runtime.get("state")
+    state_obj = resolve_runtime_state(
+        context=context, node="think.budget.threshold_gate", required=False
+    )
     if state_obj is None:
         return ""
     from lca.infrastructure.session.context.turn_control_reader import (
@@ -165,10 +165,9 @@ def _resolve_budget(*, context: NodeContext) -> Budget:
     by ``think.decision.repair`` and the rest of the think subgraph.
     The plan validator treats runtime carriers as always-available.
     """
-    runtime = getattr(context, "runtime", None)
-    state_obj = getattr(runtime, "state", None) if runtime is not None else None
-    if state_obj is None and runtime is not None and hasattr(runtime, "get"):
-        state_obj = runtime.get("state")
+    state_obj = resolve_runtime_state(
+        context=context, node="think.budget.threshold_gate", required=False
+    )
     budget = getattr(state_obj, "budget", None) if state_obj is not None else None
     if isinstance(budget, Budget):
         return budget

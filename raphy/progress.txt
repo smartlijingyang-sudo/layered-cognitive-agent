@@ -3191,3 +3191,169 @@ brain/reducer/memory/hub/standing_refresher 等键，待 RA-123 落地后再评�
     `task` 是用户文本，可能字面包含占位符串；先替换常量槽再插入用户文本，
     避免用户文本被当成模板二次解释。
 ---
+---
+
+## [2026-10-13 23:20 CST] - raphy/arch-20261013-2255 ASSESS (5 candidates)
+
+- 热点：`git log -40` 里 iter-tests-20261013-1843（run facade session-interface pin
+  + console record_runtime）、iter-quality-20261013-1831（skills
+  `_resolve_package` dedup → `_package_lookup.py`）、PR #43（agent-run-binding）。
+  摩擦漫步拆成 3 区：Area A run execution facade 链（子任务+自己精读补全）、
+  Area B skills 工具生命周期+包解析缝（子任务）、Area C resource-key 维度
+  runtime 探针全图（自己：RA-123 教训的键维度 grep）。
+- Area A 结论：无 story。`contracts/runtime/` + `application/runtime/` 是活跃的
+  ADR-0199 迁移（P1-01…P1-10 并行 PR 未落完，`RunHandle` 还是 placeholder）；
+  pin 测试钉的是 `plugins/transport/webserver/`（lca-1000 领地，禁区）。
+  `SessionBusFacade` 是诚实的 adapter（两形状真实、docstring 精确、idempotent），
+  deletion test 通过，无摩擦。
+- Area B 结论：两轮收敛（dedup + RA-124）都是实的、无第三处残留仪式；摩擦在
+  收敛的副产品：**F1** `bridge.current_state()` 零调用方零测试的孤儿 seam
+  （RA-124 尸体）→ RA-126；**F2** 两个一行 `_resolve_package` adapter + retire
+  的第三种 import 别名风格、两个测试调私有 adapter 而共享 seam 零直接测试
+  → RA-127。`find_activated` 有 6 个教科书级 seam 直接测试。
+- Area C 结论：resource-key 全图——`state` 键 12 手写+3 已收敛→剩余 9 手写
+  fail-soft 探针 → RA-128（收敛到既有 `resolve_runtime_state(required=False)`）；
+  `brain` 键 10 手写单形状探针、无 seam → RA-129（新增
+  `resolve_runtime_brain`，RA-118/119/123 形状）；port-then-runtime
+  `PortName("state") or getattr(runtime, "state")` 3 手写 fail-soft →
+  RA-130（给 `resolve_typed_port_or_runtime` 加 `required` 旗语，一次收完
+  两种语义——RA-119 教训）。
+- 运行时验证（干净 worktree、LLM_API_KEY=dummy、timeout 120）：4 流全 PASS
+  （基本 run / 带 tool call / 两次顺序 run / 非收敛 run）；RA-023 修复确认真实
+  （非收敛 run 返回 `Result(status=failed)`，不再抛 `LoopObligationExceededError`）。
+  无 P0。anomaly_detector cycle/stalled 日志警告仍在（P2，未追踪）。
+- 考虑过但未立项：F3（name-fallback 碰撞消解需领域决策，speculative）、F4
+  （tail 语义补 tool description 一行，非架构深化）、F5（ContextVar 快路径是
+  已证实的 fallback 链，删快路径是语义变更）、F6（OSError 穿透取决于外层框架
+  兜底，未验证）、F7/F8（speculative）。
+- **Learnings for future iterations:**
+  - 评估阶段的 resource-key 维度 grep（`getattr(runtime, "<key>"`）是 RA-118/119/123
+    线的收官动作：本轮一次摸清 state/brain/reducer/memory 四个键的剩余簇，
+    后续轮不必再扫 `lca/nodes/` 的 runtime 探针维度。
+  - friction walk 的"无 story"区也要写清读了哪些文件、为什么不适用（Area A：
+    ADR-0199 迁移进行中 + webserver 禁区）——diversity quota 的"无发现"文档化
+    义务，不是没写 story 就没产出。
+---
+---
+
+## [2026-10-13 23:35 CST] - RA-126
+
+- Implemented: deleted the orphaned `SkillActivationReducerBridge.current_state()`
+  (bridge.py:116-129) — RA-124's leftover corpse, zero callers / zero tests /
+  docstring falsely claiming to serve `resolve_skill_for_exec` (now `find_activated`).
+- Verification: `rg "current_state" lca/ tests/` → zero hits; `AgentState`
+  TYPE_CHECKING import retained (still used by the `StateGetter` string annotation);
+  `ruff check` clean; 14 activation tests passed (`tests/infrastructure/skills/activation/`,
+  --no-cov, LLM_API_KEY=dummy).
+- Files changed: `lca/infrastructure/skills/activation/bridge.py` (-14 lines),
+  `raphy/prd.json` (RA-126 passes:true).
+- **Learnings for future iterations:**
+  - 收敛轮的尸体要当场火化（RA-124 实证）：seam 收敛（`find_activated`）替代旧
+    seam 后，旧 public method 当天就该删——留到下一轮才删就是给未来误用留诱饵。
+  - TYPE_CHECKING import 删 method 前先数引用：本例 `AgentState` 还被 `StateGetter`
+    的字符串注解引用，import 保留是对的；`ruff check` 会兜底 F401。
+---
+---
+
+## [2026-10-13 23:45 CST] - RA-127
+
+- Implemented: 删掉 activate/deactivate 两个一行 `_resolve_package` method adapter
+  （纯直调、零行为增量），调用点 inline 为 `resolve_package(self._store, raw)`；
+  retire/tool.py 的 `resolve_package as _resolve_package` import 别名统一为 plain import
+  + 直接调用。两个测试改调共享 seam（`resolve_package(tool._store, x)`）；
+  新增 `TestResolvePackageSeam` 3 个 seam 直接单元测试（exact-id / 大小写不敏感
+  name fallback / miss→None）。
+- Verification: 126 passed；`ruff check` 全绿；`rg _resolve_package lca/` 零命中。
+  **CAVEAT（预先存在的红）**：`test_activate_skill_resolves_home_skill` 的
+  global-reachability 断言（`resolve_package(merged, "global-skill") is not None`）
+  在 base HEAD（stash 后）同样失败——与本改动无关的 merged-store 预先红点，
+  不在本 story 范围内，未顺手修（minimal diff 纪律）。
+- Files changed: 3 tool.py（-6/+4 行）、tests 2 文件、raphy/prd.json。
+- **Learnings for future iterations:**
+  - 红测试先判"是不是我的"：`git stash` → 跑 → `git stash pop` 是自己的改动时
+    最快的归因手段（别人的未提交工作绝不 stash——本次 worktree 里只有自己的改动）。
+  - 预先红点不顺手修：它的 seam（merged store global reachability）是另一个故事的
+    领地；修了就是 scope creep，不修但如实记录。
+---
+---
+
+## [2026-10-14 00:05 CST] - RA-128
+
+- Implemented: assessed 9, converged 6. 9 个手写 `getattr(runtime, "state", None)`
+  探针收敛到 `resolve_runtime_state(required=False)`：think/gate.py、
+  think/reason/plan.py、think/reason/render.py、think/context/budgeting.py
+ （删掉与 seam 逐字重复的 `_resolve_state` helper、两调用点直调 seam）、
+  think/budget/threshold_gate.py ×2（`_last_tool_error`、`_resolve_budget`）。
+- **Declined with reasons（实现与评估差异）**：route.py / shortcut.py 是
+  fail-loud 的 `RuntimeError`（非 TypeError）——收敛会改异常类型，属行为契约变更，
+  不在本 story；fold.py 的探针带 `agent_state` 键回退（00:45 轮已判定的
+  "two keys may be load-bearing" 分歧）——删掉回退会改行为，不收。
+  诚实收敛只收语义逐字相同的 6 处。
+- Verification: `ruff check` 全绿；tests/nodes 65 passed + tests/think 139 passed
+  （--no-cov, LLM_API_KEY=dummy）。
+- Files changed: 5 node 文件、raphy/prd.json。
+- **Learnings for future iterations:**
+  - "assessed N, converged M" 是诚实记账：评估时按形状数簇，实现时逐站点核对
+    missing 语义（fail-soft vs fail-loud）和键集合（`agent_state` 回退），语义
+    不逐字相同就不收——收敛的验收是"零语义变更"，不是"数字好看"。
+  - 异常类型也是契约：`RuntimeError`→`TypeError` 的收敛看起来只是"统一"，实际
+    改变调用方可见的行为分类；fail-loud 站点的收敛需要先确认异常类型契约。
+---
+---
+
+## [2026-10-14 00:30 CST] - RA-129
+
+- Implemented: assessed 10, converged 8. 新增
+  `resolve_runtime_brain(*, context, node, required=False)`（`lca/nodes/_resolve.py`
+  末尾，RA-118/119/123 逐字同形：attribute 优先 + mapping `.get` 回退 + fail-loud
+  TypeError 点名 node）。8 个单形状 `getattr(runtime, "brain", None)` 探针收敛：
+  score.py（原已手写 two-shape）、gate.py、route.py、shortcut.py、plan.py、
+  render.py（node_execute）、chain_run.py、try_shortcut.py。3 处 `runtime =
+  context.runtime` 在收敛后无用（F841），已删除。
+- **Declined（实现与评估差异）**：render.py `_resolve_role_profile(runtime)`
+  helper 里的 2 个 brain 探针不收——helper 只收 bare runtime 对象（无 context）、
+  且内部混着 `reasoner` 键探针；为 compat 路径改两个私有 helper 签名是 churn，
+  不收。`rg` 确认剩余 brain 探针只剩 seam 本体 + 这 2 处。
+- Verification: 新 seam 单元测试 tests/nodes/test_resolve_brain.py（6 个：
+  attribute/mapping/None × required 两种分支）；`ruff check` 全绿；
+  tests/nodes + tests/think + tests/reflect 242 passed + tests/concept 53 passed
+  （--no-cov, LLM_API_KEY=dummy）。
+- Files changed: `_resolve.py`（+seam）、8 node 文件、tests/nodes/test_resolve_brain.py、
+  raphy/prd.json。
+- **Learnings for future iterations:**
+  - 新 seam 的 `required` 默认值要看现有全部调用点的 missing 语义：brain 10 处
+    全是 fail-soft → 默认 `required=False`（与前三兄弟默认 True 相反）；默认值的
+    依据是调用点证据，不是惯例。
+  - helper 参数是 runtime 而非 context 时别硬收：seam 的 interface 是
+    `(context, node, required)`，为收敛改私有 helper 签名 = 用 churn 换数字，
+    不值；诚实做法是 decline 并写清理由。
+---
+---
+
+## [2026-10-14 00:55 CST] - RA-130
+
+- Implemented: `resolve_typed_port_or_runtime` 加 `required: bool = True`（默认
+  保持 3 个既有 fail-loud 调用点 parse.py×2/assemble.py×2 逐字不变）；3 个
+  fail-soft 的 port-then-runtime 探针收敛（`required=False`）：memory_write/dispatch.py、
+  decision_shortcut_try/try_shortcut.py、reflection_critique/critique_run.py。
+  dispatch.py 的 `runtime_obj` 与 try_shortcut 的 `runtime = context.runtime`
+  在收敛后无用（F841），已删。
+- 语义差异逐项核对（实现与评估差异）：① `or` vs `is None`——port 契约是
+  AgentState|None，falsy 非 None 在契约内不存在，等价；② seam 多出的 mapping
+  `.get` 回退——类型契约履行（RA-119 实证），attribute carrier 行为不变；
+  ③ seam 的 `hasattr(context, "runtime")` 守卫比站点的直接 `context.runtime`
+  更宽松——只把原来会 AttributeError 的情况变成 None，fail-soft 站点本就
+  处理 None。
+- Verification: 新 seam 测试 tests/nodes/test_resolve_typed_port.py（4 个：
+  port-wins / runtime-fallback / fail-soft None / fail-loud TypeError 点名）；
+  `ruff check` 全绿（含修好的 dispatch.py I001 import 排序）；
+  tests/nodes + tests/think + tests/reflect + tests/concept 299 passed。
+- Files changed: `_resolve.py`、3 concept 文件、tests/nodes/test_resolve_typed_port.py、
+  raphy/prd.json。
+- **Learnings for future iterations:**
+  - seam 收 `required` 旗语时，默认值的选择依据是"既有调用点不动"：True 默认
+    让 parse/assemble 零改动；新收敛点显式传 False——这就是 RA-119"一次给全"
+    的落地形态。
+  - `or`→`is None` 的等价性论证要落在端口类型契约上（AgentState|None），不是
+    "感觉差不多"；契约在 yaml 的 inputs 端口声明里（state (AgentState)）。
+---

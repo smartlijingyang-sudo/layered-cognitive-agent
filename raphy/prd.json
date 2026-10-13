@@ -1,6 +1,6 @@
 {
   "project": "LCA Raphy Architecture Optimization",
-  "branchName": "raphy/arch-20261010-1245-b",
+  "branchName": "raphy/arch-20261013-2255",
   "description": "Continuous architecture deepening for the LCA cognitive-agent codebase via the raphy fresh-session loop. Round 1 (2026-10-06, old prompt): RA-001/RA-002 converged, RA-003 dropped with evidence. Round 2 (2026-10-06, hardened prompt): RA-004..RA-009 all done (merged to main 2026-10-07, merge 1b1526a94). Round 3 (2026-10-07, hardened prompt): friction walk over session plugins, loop_cursor, delegation/body executor; RA-010..RA-013 below. Out of scope: ralph Round 2 areas (DecisionGates, Ingest, ContextFiles shims, Read Runs micro-dirs, MemoryTools directory seam), lca/cognition/memory/ (frozen per Round 2 AP-01), CLI surface must not import contracts (deliberate rule), gate_chain_strategy.py (hands-off: another party's uncommitted work + pre-existing red test). Round 10 (2026-10-08 12:06, branch raphy/arch-20261008-1206): RA-033..RA-041 below (3 Strong + 5 Worth exploring + 1 Speculative; all from friction walk, none duplication-class). Round 11 (2026-10-08 15:05, branch raphy/arch-20261008-1505): RA-042..RA-047 all done (merged to main 2026-10-08, merge 0ab9d67cd). Round 12 (2026-10-08 22:05, branch raphy/arch-20261008-2205): RA-048..RA-050 below (1 Strong + 2 Worth exploring; all from friction walk, none duplication-class). Round DESLOP-100 (2026-10-10, branch raphy/deslop-100, batch-wave Plan A): new wave of architecture deepening + de-slop stories, continuing RA-104+. Focus: remove AI/change-narration slop from current-state prose and code comments, plus real architecture optimizations (deep modules, locality, deletion test) per improve-codebase-architecture. Waves of 5-10 stories, each story one commit with tests.",
   "userStories": [
     {
@@ -1826,6 +1826,97 @@
       "branchName": "raphy/arch-20261013-0045",
       "notes": "Source: duplication scan (secondary) + friction walk Area A. Strength: Worth exploring. Small honest two-producer literal seam; diversity quota already satisfied by RA-123/124 (friction-walk findings), so this is the one duplication-class story. | Implemented 2026-10-13: single module-level constant `_RESPONSE_CODE_DEDUPE_KEY`; filter compares against it; prompt interpolates via `{response_code_dedupe_key}` .replace (not an f-string, confirmed at implementation time). Prompt render verified byte-identical to pre-change; 24 memory_extract tests green; ruff clean.",
       "implemented": true,
+      "dropped": false
+    },
+    {
+      "id": "RA-126",
+      "title": "Delete the orphaned SkillActivationReducerBridge.current_state() seam",
+      "description": "As an LCA maintainer, I want the dead public method `SkillActivationReducerBridge.current_state()` (bridge.py:116-129) removed, so the bridge's public surface is exactly its live contract. RA-124 deleted its only two callers (scope.py's ContextVar-loss fallback, now `find_activated`); a full-map `rg \"current_state\" lca/ tests/` hits only the definition -- zero callers, zero tests -- and its docstring falsely claims to serve `resolve_skill_for_exec`. Deletion-test verdict: concentrates to zero; nothing moves, nothing breaks.",
+      "acceptanceCriteria": [
+        "`current_state()` method removed from `lca/infrastructure/skills/activation/bridge.py`.",
+        "`rg \"current_state\" lca/ tests/` returns zero hits after the change.",
+        "If the `AgentState` import in bridge.py becomes unused, it is removed (`ruff check` clean, no F401).",
+        "`tests/infrastructure/skills/activation/test_resolve_skill_fallback.py` passes unchanged.",
+        "Full skills activation test dir passes (`tests/infrastructure/skills/activation/`)."
+      ],
+      "priority": 1,
+      "passes": true,
+      "branchName": "raphy/arch-20261013-2255",
+      "notes": "Implemented: deleted `SkillActivationReducerBridge.current_state()` (bridge.py:116-129). `rg \"current_state\" lca/ tests/` returns zero hits; the `AgentState` TYPE_CHECKING import is retained (still referenced by the `StateGetter` string annotation). `ruff check` clean; 14 activation tests pass. Friction-walk finding (Area B, F1); RA-124's leftover corpse. Strength: Strong.",
+      "implemented": false,
+      "dropped": false
+    },
+    {
+      "id": "RA-127",
+      "title": "Delete the one-line _resolve_package adapters; test the shared seam's interface",
+      "description": "As an LCA maintainer, I want the private one-line `_resolve_package` method adapters in `activate/tool.py` (:300-301) and `deactivate/tool.py` (:99-100) deleted and inlined to the shared `resolve_package(self._store, raw)` seam, with `retire/tool.py`'s import-alias style (:20-22) normalized to a plain import, so user-reference-to-package resolution has one interface and one test surface. Each adapter has exactly one call site and zero behavioral delta (hypothetical seams per \"one adapter = hypothetical seam\"). Two tests poke the private adapter (`tests/infrastructure/test_skill_store_resolver.py:119`, `tests/scenario/operational/test_operational_skills.py:465`) while the shared seam has no direct unit test -- \"the interface is the test surface\" violated.",
+      "acceptanceCriteria": [
+        "The `_resolve_package` method adapters deleted from activate/tool.py and deactivate/tool.py; their call sites call `resolve_package(self._store, raw)` directly.",
+        "retire/tool.py uses a plain `from ..._package_lookup import resolve_package` import and calls it directly.",
+        "No `_resolve_package` references remain in lca/ (rg-verified); no `getattr` indirection added.",
+        "The two retargeted tests pass with identical assertions (`resolve_package(tool._store, x)` instead of `tool._resolve_package(x)`).",
+        "New direct seam unit tests for `resolve_package`: exact-id hit, case-insensitive name fallback, miss returns None.",
+        "Skills tools test dirs pass (`tests/infrastructure/tools/skills/`, `tests/scenario/operational/`)."
+      ],
+      "priority": 1,
+      "passes": true,
+      "branchName": "raphy/arch-20261013-2255",
+      "notes": "Implemented: deleted the two one-line `_resolve_package` method adapters (activate/tool.py:300-301, deactivate/tool.py:99-100), inlined call sites to `resolve_package(self._store, raw)`; retire/tool.py normalized from the `resolve_package as _resolve_package` import alias to a plain import + direct call. Two tests retargeted to the shared seam (`resolve_package(tool._store, x)`); added TestResolvePackageSeam with 3 direct seam unit tests (exact-id hit, case-insensitive name fallback, miss -> None). CAVEAT: `test_activate_skill_resolves_home_skill`'s global-reachability assertion is RED on base HEAD too (verified via git stash: fails identically before/after) -- pre-existing merged-store issue, unrelated to this change; not fixed here (out of story scope). 126 other tests pass; `ruff check` clean; `rg _resolve_package lca/` zero hits. Strength: Strong.",
+      "implemented": false,
+      "dropped": false
+    },
+    {
+      "id": "RA-128",
+      "title": "Converge the 9 hand-rolled fail-soft state probes onto resolve_runtime_state",
+      "description": "As an LCA maintainer, I want the 9 remaining hand-rolled `getattr(runtime, \"state\", None)` fail-soft probes in node modules converged onto the existing `lca/nodes/_resolve.py::resolve_runtime_state(..., required=False)` seam, so the `state` resource key has one probe ritual and one missing-semantics convention. Same key, same shape, same semantics -- the unfinished tail of RA-118/119/123 and the literal execution of the RA-123 lesson (convergence scanned per resource key across the full map). Sites: think/gate.py:67, think/route/route.py:65, think/route/shortcut.py:65, think/context/budgeting.py:88, think/reason/plan.py:65, think/reason/render.py:191, think/budget/threshold_gate.py:145, think/budget/threshold_gate.py:169, perceive/fold/fold.py:76.",
+      "acceptanceCriteria": [
+        "All 9 sites delegate: `resolve_runtime_state(context=context, node=\"<node-id>\", required=False)` with node ids matching each module's existing naming convention.",
+        "Fail-soft None semantics byte-identical at every site (verified per site: the call site keeps its existing None branch); the mapping `.get` fallback is type-contract fulfillment per the RA-119 lesson (NodeContext.runtime: Mapping), no behavior change on attribute carriers.",
+        "Each site has `context` in scope (verified per site; no new threading of state).",
+        "`rg 'getattr(.*runtime[^,]*, \"state\"' lca/nodes/` hits only the seam definition itself.",
+        "Each affected node's test file passes; the nodes regression suite passes; seam branch tests (both required modes) pass."
+      ],
+      "priority": 2,
+      "passes": true,
+      "branchName": "raphy/arch-20261013-2255",
+      "notes": "Implemented: assessed 9, converged 6. Delegated to `resolve_runtime_state(context=context, node=<id>, required=False)`: think/gate.py, think/reason/plan.py, think/reason/render.py, think/context/budgeting.py (deleted the duplicate `_resolve_state` helper, inlined the seam at its 2 call sites), think/budget/threshold_gate.py x2. DECLINED with reasons: think/route/route.py + think/route/shortcut.py are fail-LOUD with `RuntimeError` -- converging would change the exception type (a behavior-contract change, not this story); perceive/fold/fold.py has an extra `agent_state` key fallback (the two-keys-may-be-load-bearing divergence the 0045 round declined) -- dropping it would change behavior. `ruff check` clean; tests/nodes (65) + tests/think (139) pass. Strength: Worth exploring.",
+      "implemented": false,
+      "dropped": false
+    },
+    {
+      "id": "RA-129",
+      "title": "Add a resolve_runtime_brain seam and converge the 10 single-shape brain probes",
+      "description": "As an LCA maintainer, I want a `resolve_runtime_brain(*, context, node, required=False)` two-shape seam in `lca/nodes/_resolve.py` (attribute first, then mapping `.get`, in the exact RA-118/119/123 shape) and the 10 hand-rolled single-shape `getattr(runtime, \"brain\", None)` probes converged onto it, so the `brain` resource key stops drifting site by site. All 10 sites treat None as absent (fail-soft), so the seam defaults `required=False` while carrying the `required` flag for any future fail-loud consumer. Sites: reflect/score/score.py:133, think/gate.py:68, think/route/route.py:66, think/route/shortcut.py:66, think/reason/plan.py:66, think/reason/render.py:153, think/reason/render.py:160, think/reason/render.py:192, concept/decision_enforce/chain_run.py:94, concept/decision_shortcut_try/try_shortcut.py:74.",
+      "acceptanceCriteria": [
+        "New seam `resolve_runtime_brain(*, context: NodeContext, node: str, required: bool = False)` added to `lca/nodes/_resolve.py` in the proven RA-118/119/123 shape (attribute-first, mapping `.get` fallback, `{node}: 'brain' must be supplied via context.runtime` fail-loud wording).",
+        "All 10 sites delegate to the seam; per-site None-handling re-verified before editing (no site dereferences unconditionally).",
+        "New seam unit tests cover both `required` branches (fail-loud raises naming the node; fail-soft returns None on empty carrier).",
+        "Each affected node's test file passes; nodes regression suite passes.",
+        "No other `getattr(runtime, \"brain\"` probes remain outside the seam."
+      ],
+      "priority": 3,
+      "passes": true,
+      "branchName": "raphy/arch-20261013-2255",
+      "notes": "Implemented: assessed 10, converged 8. New seam `resolve_runtime_brain(*, context, node, required=False)` in `lca/nodes/_resolve.py` (exact RA-118/119/123 shape: attribute first, mapping `.get` fallback, fail-loud TypeError naming the node). Delegates: reflect/score/score.py, think/gate.py, think/route/route.py, think/route/shortcut.py, think/reason/plan.py, think/reason/render.py (node_execute), concept/decision_enforce/chain_run.py, concept/decision_shortcut_try/try_shortcut.py. DECLINED: the 2 brain probes inside render.py's private `_resolve_role_profile(runtime)` helper -- it takes a bare runtime object (no context in scope) and mixes `reasoner` probes; threading context through would churn two private helper signatures for a compat path. New seam unit tests (tests/nodes/test_resolve_brain.py, 6 tests, both required branches x attribute/mapping/None carriers). `ruff check` clean; tests/nodes + tests/think + tests/reflect (242) + tests/concept (53) pass. Strength: Worth exploring.",
+      "implemented": false,
+      "dropped": false
+    },
+    {
+      "id": "RA-130",
+      "title": "Give resolve_typed_port_or_runtime a required flag; converge the 3 fail-soft port-then-runtime state probes",
+      "description": "As an LCA maintainer, I want `lca/nodes/_resolve.py::resolve_typed_port_or_runtime` to accept `required: bool = True` (default preserves its 3 existing fail-loud callers byte-identically: think/decision/parse.py x2, think/history/assemble.py x2) and the 3 fail-soft port-then-runtime probes `input.port_values.get(PortName(\"state\")) or getattr(runtime, \"state\", None)` in concept/memory_write/dispatch.py:72, concept/decision_shortcut_try/try_shortcut.py:70, concept/reflection_critique/critique_run.py:64 converged onto it with `required=False`. The RA-119 lesson verbatim: \"required flag must be given completely at once -- fail-loud and fail-soft semantics collected in one pass, no half-seam left behind.\"",
+      "acceptanceCriteria": [
+        "`resolve_typed_port_or_runtime` gains `required: bool = True`; its 3 existing call sites pass unchanged (no argument added).",
+        "The 3 concept/ sites delegate with `required=False`; their fail-soft None behavior preserved (verified per site).",
+        "New seam unit tests for the `required=False` branch (None returned on empty port+runtime; port value still wins over runtime).",
+        "Existing fail-loud behavior tests (parse.py, assemble.py paths) pass unchanged; concept node tests pass.",
+        "No hand-rolled `port_values.get(PortName(\"state\")) or getattr(runtime` probes remain."
+      ],
+      "priority": 4,
+      "passes": true,
+      "branchName": "raphy/arch-20261013-2255",
+      "notes": "Implemented: `resolve_typed_port_or_runtime` gains `required: bool = True` (default keeps the 3 existing fail-loud callers -- think/decision/parse.py x2, think/history/assemble.py x2 -- byte-identical). The 3 fail-soft port-then-runtime probes converge with `required=False`: concept/memory_write/dispatch.py:72, concept/decision_shortcut_try/try_shortcut.py:70, concept/reflection_critique/critique_run.py:64. Reviewed semantic deltas: `or` vs `is None` are equivalent on the AgentState|None port contract; the added mapping `.get` fallback is type-contract fulfillment; the seam's context.runtime guard is strictly more lenient than the sites' direct attribute access. New seam tests tests/nodes/test_resolve_typed_port.py (4: port-wins, runtime-fallback, fail-soft None, fail-loud TypeError naming node). `ruff check` clean; tests/nodes + tests/think + tests/reflect + tests/concept 299 pass. Strength: Worth exploring.",
+      "implemented": false,
       "dropped": false
     }
   ]
