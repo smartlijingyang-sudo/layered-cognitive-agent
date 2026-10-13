@@ -38,6 +38,7 @@ from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import
 )
 from lca.contracts.protocols.think.cognition import Critic
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
+from lca.nodes._resolve import resolve_typed_port_or_runtime
 
 
 @dataclass(frozen=True, slots=True)
@@ -61,7 +62,13 @@ class ReflectCritiqueRunExecutor:
         """
         runtime = context.runtime
         observation = input.port_values.get(PortName("observation"))
-        state = input.port_values.get(PortName("state")) or getattr(runtime, "state", None)
+        state = resolve_typed_port_or_runtime(
+            PortName("state"),
+            input=input,
+            context=context,
+            node="reflect.critique.run",
+            required=False,
+        )
 
         if not isinstance(observation, Observation):
             raise TypeError(

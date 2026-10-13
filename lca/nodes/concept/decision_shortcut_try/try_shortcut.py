@@ -40,7 +40,7 @@ from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import
 )
 from lca.contracts.protocols.think.cognition import SupportsShortcut
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
-from lca.nodes._resolve import resolve_runtime_brain
+from lca.nodes._resolve import resolve_runtime_brain, resolve_typed_port_or_runtime
 
 
 @dataclass(frozen=True, slots=True)
@@ -67,8 +67,13 @@ class ShortcutTryExecutor:
         命中 ``shortcut.try`` 返回 ``None`` → driver 顺 edge 走到
         ``agent.reasoning.turn`` 走 LLM 完整路径)。
         """
-        runtime = context.runtime
-        state = input.port_values.get(PortName("state")) or getattr(runtime, "state", None)
+        state = resolve_typed_port_or_runtime(
+            PortName("state"),
+            input=input,
+            context=context,
+            node="shortcut.try",
+            required=False,
+        )
         if state is None or not isinstance(state, AgentState):
             return NodeOutput(port_values={})
 

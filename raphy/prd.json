@@ -1913,9 +1913,9 @@
         "No hand-rolled `port_values.get(PortName(\"state\")) or getattr(runtime` probes remain."
       ],
       "priority": 4,
-      "passes": false,
+      "passes": true,
       "branchName": "raphy/arch-20261013-2255",
-      "notes": "Pattern story: the RA-119 \"required once and completely\" lesson applied to the port-then-runtime shape. Strength: Worth exploring.",
+      "notes": "Implemented: `resolve_typed_port_or_runtime` gains `required: bool = True` (default keeps the 3 existing fail-loud callers -- think/decision/parse.py x2, think/history/assemble.py x2 -- byte-identical). The 3 fail-soft port-then-runtime probes converge with `required=False`: concept/memory_write/dispatch.py:72, concept/decision_shortcut_try/try_shortcut.py:70, concept/reflection_critique/critique_run.py:64. Reviewed semantic deltas: `or` vs `is None` are equivalent on the AgentState|None port contract; the added mapping `.get` fallback is type-contract fulfillment; the seam's context.runtime guard is strictly more lenient than the sites' direct attribute access. New seam tests tests/nodes/test_resolve_typed_port.py (4: port-wins, runtime-fallback, fail-soft None, fail-loud TypeError naming node). `ruff check` clean; tests/nodes + tests/think + tests/reflect + tests/concept 299 pass. Strength: Worth exploring.",
       "implemented": false,
       "dropped": false
     }

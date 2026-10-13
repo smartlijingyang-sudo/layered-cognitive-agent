@@ -53,19 +53,25 @@ def resolve_typed_port(name: PortName, *, input: NodeInput, node: str) -> Any:
 
 
 def resolve_typed_port_or_runtime(
-    name: PortName, *, input: NodeInput, context: NodeContext, node: str
+    name: PortName, *, input: NodeInput, context: NodeContext, node: str,
+    required: bool = True,
 ) -> Any:
     """Read a declared port from input.port_values or context.runtime.
 
     Mirror the think.shortcut convention: runtime is a namespace object;
     resolve by attribute first, then mapping-style .get.
+
+    ``required=True`` (fail-loud, default): a missing value raises
+    ``TypeError`` naming the node. ``required=False`` (fail-soft): a
+    missing value returns ``None`` so the call site's own absence branch
+    stays load-bearing.
     """
     value = input.port_values.get(name)
     if value is None and hasattr(context, "runtime") and context.runtime is not None:
         value = getattr(context.runtime, name, None)
         if value is None and hasattr(context.runtime, "get"):
             value = context.runtime.get(name)
-    if value is None:
+    if value is None and required:
         raise TypeError(
             f"{node}: '{name}' port must be supplied via input.port_values or context.runtime"
         )

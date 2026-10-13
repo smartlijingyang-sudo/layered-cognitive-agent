@@ -3328,3 +3328,32 @@ brain/reducer/memory/hub/standing_refresher 等键，待 RA-123 落地后再评�
     `(context, node, required)`，为收敛改私有 helper 签名 = 用 churn 换数字，
     不值；诚实做法是 decline 并写清理由。
 ---
+---
+
+## [2026-10-14 00:55 CST] - RA-130
+
+- Implemented: `resolve_typed_port_or_runtime` 加 `required: bool = True`（默认
+  保持 3 个既有 fail-loud 调用点 parse.py×2/assemble.py×2 逐字不变）；3 个
+  fail-soft 的 port-then-runtime 探针收敛（`required=False`）：memory_write/dispatch.py、
+  decision_shortcut_try/try_shortcut.py、reflection_critique/critique_run.py。
+  dispatch.py 的 `runtime_obj` 与 try_shortcut 的 `runtime = context.runtime`
+  在收敛后无用（F841），已删。
+- 语义差异逐项核对（实现与评估差异）：① `or` vs `is None`——port 契约是
+  AgentState|None，falsy 非 None 在契约内不存在，等价；② seam 多出的 mapping
+  `.get` 回退——类型契约履行（RA-119 实证），attribute carrier 行为不变；
+  ③ seam 的 `hasattr(context, "runtime")` 守卫比站点的直接 `context.runtime`
+  更宽松——只把原来会 AttributeError 的情况变成 None，fail-soft 站点本就
+  处理 None。
+- Verification: 新 seam 测试 tests/nodes/test_resolve_typed_port.py（4 个：
+  port-wins / runtime-fallback / fail-soft None / fail-loud TypeError 点名）；
+  `ruff check` 全绿（含修好的 dispatch.py I001 import 排序）；
+  tests/nodes + tests/think + tests/reflect + tests/concept 299 passed。
+- Files changed: `_resolve.py`、3 concept 文件、tests/nodes/test_resolve_typed_port.py、
+  raphy/prd.json。
+- **Learnings for future iterations:**
+  - seam 收 `required` 旗语时，默认值的选择依据是"既有调用点不动"：True 默认
+    让 parse/assemble 零改动；新收敛点显式传 False——这就是 RA-119"一次给全"
+    的落地形态。
+  - `or`→`is None` 的等价性论证要落在端口类型契约上（AgentState|None），不是
+    "感觉差不多"；契约在 yaml 的 inputs 端口声明里（state (AgentState)）。
+---

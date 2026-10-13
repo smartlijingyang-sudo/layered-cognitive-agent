@@ -38,6 +38,7 @@ from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import
 from lca.contracts.protocols.memory.memory import MemorySystem
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 from lca.infrastructure.memory.contextfiles.domain.curated import may_acknowledge_projection
+from lca.nodes._resolve import resolve_typed_port_or_runtime
 
 
 class MemoryWriteDispatchExecutor:
@@ -65,11 +66,16 @@ class MemoryWriteDispatchExecutor:
         reflection (Reflection), state (AgentState)
         outputs 端口(yaml):memory_receipt (MemoryReceipt,可能填 memory_ref)
         """
-        runtime_obj = context.runtime
         receipt = input.port_values.get(PortName("memory_receipt"))
         observation = input.port_values.get(PortName("observation"))
         reflection = input.port_values.get(PortName("reflection"))
-        state = input.port_values.get(PortName("state")) or getattr(runtime_obj, "state", None)
+        state = resolve_typed_port_or_runtime(
+            PortName("state"),
+            input=input,
+            context=context,
+            node="memory.write.dispatch",
+            required=False,
+        )
 
         if not isinstance(receipt, MemoryReceipt):
             raise TypeError(
