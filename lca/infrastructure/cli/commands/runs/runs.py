@@ -89,9 +89,11 @@ def register(app: typer.Typer) -> None:
     """Register the ``runs`` subcommand on the CLI app."""
     runs_app = typer.Typer(help="Run lifecycle (carrier-aligned).", no_args_is_help=True)
     runs_app.command(name="create", help=_create.__doc__ or "")(_create)
+    from lca.infrastructure.cli.commands.runs import answer as runs_answer
     from lca.infrastructure.cli.commands.runs import debug as runs_debug
     from lca.infrastructure.cli.commands.runs import health as runs_health
 
+    runs_answer.register(runs_app)
     runs_debug.register(runs_app)
     runs_health.register(runs_app)
     app.add_typer(runs_app, name="runs")
