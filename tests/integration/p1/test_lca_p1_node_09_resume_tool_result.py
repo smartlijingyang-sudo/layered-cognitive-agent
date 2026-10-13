@@ -60,6 +60,7 @@ class _RecordingPort:
         *,
         plugin_state: dict[str, Any] | None = None,
         parent_message_id: str = "",
+        is_rejection: bool = False,
     ) -> Any:
         from lca.plugins.transport.webserver.handlers.runs.terminal.port.port import (
             RunCommandReceipt,
@@ -73,6 +74,7 @@ class _RecordingPort:
                 "idempotency_key": idempotency_key,
                 "plugin_state": plugin_state,
                 "parent_message_id": parent_message_id,
+                "is_rejection": is_rejection,
             }
         )
         return RunCommandReceipt(accepted=True, status="resumed")
@@ -343,3 +345,4 @@ async def test_decode_create_run_rejects_malformed_resume_tool_result(
         resolve_mode=lambda _ctx, mode: mode or "solo",
     )
     assert decoded.status_code == 400
+

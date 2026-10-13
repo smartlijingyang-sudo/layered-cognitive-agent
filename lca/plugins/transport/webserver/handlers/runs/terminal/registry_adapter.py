@@ -57,6 +57,7 @@ class RegistryRunAdapter:
         *,
         plugin_state: dict[str, Any] | None = None,
         parent_message_id: str = "",
+        is_rejection: bool = False,
     ) -> RunCommandReceipt:
         return await self._commands.resume_approval(
             run_id,
@@ -65,6 +66,7 @@ class RegistryRunAdapter:
             idempotency_key,
             plugin_state=plugin_state,
             parent_message_id=parent_message_id,
+            is_rejection=is_rejection,
         )
 
     async def summary(self, run_id: str) -> dict[str, Any] | None:

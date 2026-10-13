@@ -154,6 +154,7 @@ class RegistryRunCommands:
         *,
         plugin_state: dict[str, Any] | None = None,
         parent_message_id: str = "",
+        is_rejection: bool = False,
     ) -> RunCommandReceipt:
         if not isinstance(payload, str):
             _log.warning(
@@ -280,7 +281,11 @@ class RegistryRunCommands:
         # 调用同一工具；只有记录「已批准」并在 act.authorize 放行，才能避免
         # 「审批→重调→再审批」循环。HITL 交互工具（askUserQuestion）不属于
         # 工具权限审批，不记录。
-        if session.approval_request is not None:
+        #
+        # RA-131: 拒绝答案绝不记入 approved_tool_names。人类拒绝某工具后若仍
+        # 记录它，模型重调同一工具时会被 act.authorize 的 approved-override
+        # 直接放行 —— 「拒绝→重调→自动放行」审批绕过。只有真正的批准答案才记录。
+        if not is_rejection and session.approval_request is not None:
             for _call in session.approval_request.get("tool_calls") or []:
                 if not isinstance(_call, dict):
                     continue

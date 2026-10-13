@@ -315,6 +315,30 @@
   （f21cd0af2，12:11:45），评估中途 HEAD 移动——长评估里读文件用
   `git show <sha>:` 锁定版本；子任务误报写树时先查 reflog 再定论。
 
+- **"批准"语义必须钉在记录点，不能只活在注释里（RA-131）：**
+  resume 记录点对任何被接受的 answer 无条件记录 `approval_request["tool_calls"]`
+  进持久的 `approved_tool_names`，但 resume 契约显式支持 `rejectionReason`，且
+  `_dispatch_resume` 把 content/rejection_reason fold 成一个 payload——approve/reject
+  的区分在到达记录点前被销毁。人类拒绝某工具 → 该工具被记为"已批准" → 模型重调时
+  `act.authorize` 的 approved-override 直接放行。安全绕过语义的记录点必须区分答案类型。
+- **seam 的 fail-soft 承诺要覆盖导入时（RA-135）：**
+  模块级 import 把失效域画在了调用时之外；"Never raises into the run-creation path"
+  这类承诺必须包含 import（懒加载进 fallback 分支，或 try/except ImportError → None）。
+- **读写两端的归一化不变量要收进 seam（RA-132）：**
+  "两边都记得调 canonical_tool_name" 靠程序员纪律维持——seam 应该让非法状态不可表示
+  （set 侧 canonicalize 输入），而不是在两个模块里各调一次。
+- **ContextVar 缝的测试要跨 task 边界（RA-133）：**
+  同一 task 内 set→get 是 tautology；"注入随 resume task 生死"的隔离论证依赖的恰恰是
+  `create_task` 后子 task 的继承——测试必须钉住那个环节，论证与测试之间不能有 gap。
+- **decoder 支持的字段就是可达的输入（RA-131 方法论）：**
+  评估 latent/real 时看 decoder/契约，不看当前调用方——`_decode_resume_approval`
+  显式解码 `rejectionReason` 即证明拒绝答案可达，前端今天发不发不重要。
+- **sys.path 顺序会遮蔽包（运行时验证教训）：**
+  `sys.path.insert(0, tests_dir)` 若在 repo-root insert 之后执行，会把 tests/ 插到最前，
+  `tests/lca_kernel` 测试桩包遮蔽真正的 `lca_kernel`——tests/ 必须 `insert(1, ...)`。
+  另：`Tool` 子类注册要求非空 `namespace` ClassVar（ADR-0256 在 `tools.register` 处
+  fail-fast），NoopTool 这类探针桩必须带 `namespace = "..."`。
+
 ---
 
 ## Round — assess (2026-10-10 23:45, branch raphy/arch-20261010-2345)
@@ -3357,3 +3381,114 @@ brain/reducer/memory/hub/standing_refresher 等键，待 RA-123 落地后再评�
   - `or`→`is None` 的等价性论证要落在端口类型契约上（AgentState|None），不是
     "感觉差不多"；契约在 yaml 的 inputs 端口声明里（state (AgentState)）。
 ---
+---
+
+## [2026-10-14 02:26 CST] - raphy/arch-20261014-0145 ASSESS (5 candidates)
+
+- 热点：`git log -40` 里 2e8264fb4（authorize approved-tool bypass）、d809c5b55（cli
+  runs answer）、ee48d1d2e（lobehub run-agent mapping）、37a17cc49（lobehub_database_url
+  收敛）、991ff7ba3（skills dedup）。摩擦漫步拆成 3 区（全新会话子任务，只读零写入）：
+  Area A approved-tool bypass 缝链、Area B `lca/nodes/_resolve.py` 收敛后审计、
+  Area C run→agent 绑定/lobehub 映射缝。禁区全遵守（ralph Round 2 / memory /
+  gate_chain_strategy.py / preamble.py 未碰；webserver carrier 仅只读评估）。
+- Area A 结论：对称性成立——CLI `runs answer` 只是 HTTP 客户端，走同一
+  `RunPort.resume_approval` seam，无不对称；`approved_tools.py` 是薄而合格的中立 seam。
+  **F1** 记录点"回答即批准"→ coordinator 逐段读码复核后从 Worth exploring 升级为
+  **Strong**：拒绝答案经 decoder（显式支持 rejectionReason）→ `_dispatch_resume` :709
+  fold 销毁区分 → 记录点 :285-291 无条件记录 → `approved_tool_names` 跨请求持久无清理 →
+  authorize bypass 自动放行 ="拒绝→重调→自动放行" → RA-131；**F2** canonical 不变量
+  收进 `set_approved_tool_names` → RA-132；**F3** ContextVar 跨 task 继承缝测试缺失 → RA-133。
+- Area B 结论：`_resolve.py`（165 行，6 seam）经逐 seam deletion test 确认为 **deep
+  module**（depth 在 interface：缺失语义只决策一次 + required 旗语 + 命名 node 的
+  TypeError），不为形状立 story；上一轮 6 个 declined 探针簇逐项复核 decline 全部成立
+  （含 memory×2、agent_state×2 两个"two = real"陷阱的正面论证：locality 已到顶 /
+  required 旗语无东西可统一）；唯一缺口是 3/6 seam 无直接单元测试 → P2 hygiene，
+  deferred 不单独占轮。
+- Area C 结论：lobehub 映射是单处 SQL seam（`lobehub_agents.py:34-35`，全仓唯一读
+  LobeHub agents 表）；"三个找 agent 的 seam"证伪（用户域内协议后端 ×2 + 外部回退 ×1，
+  领域事实）；CLI surface 检查：`runs.py:62` contracts 顶层 import 属 pre-existing
+  （2026-09-06），本轮新增 answer.py 136 行干净 → 记入 CLI 清理 backlog。**S1**
+  fail-soft 承诺漏了导入时（模块级 import 破坏失效域）→ RA-135；**S2** seam 自身 5 条
+  fail-soft 路径零测试 → RA-134。
+- 运行时验证（干净树 = main tip `31e7db97a`，`LLM_API_KEY=dummy`，kernel boot
+  web-standard + ScriptedLLMAdapter）：基本 run COMPLETED / 带 tool call（NoopTool）
+  COMPLETED / 两次顺序 run completed+completed / 非收敛 run `Result(status=failed)`
+  无异常（RA-023 成立）——4/4 PASS，无 P0。
+- 考虑过但未立项：_resolve.py 测试面缺口（P2，deferred 搭车）、postgres `__all__`
+  stale（hygiene 顺手）、authorize.py 双 import（hygiene 顺手）、legacy resume.py
+  无注入 resume_run（dead-ish 兼容壳，fail-closed 方向）、CLI contracts import
+  （pre-existing，backlog）。
+- **Learnings for future iterations:** 见本轮新增的 6 条 Codebase Patterns（顶部）。
+
+## [2026-10-14 03:00 CST] - RA-131 RECOVER (interrupted 01:45 round residue)
+
+- Recovery: main worktree was on raphy/arch-20261014-0145 with uncommitted RA-131 residue.
+  Ran related tests first: 5 new rejection tests green, 29 bypass+rejection tests green.
+  2 reds in test_lca_p1_node_09_resume_tool_result.py are PRE-EXISTING (verified identical
+  failures at clean branch HEAD 107a866c7 in an isolated worktree; 404 on POST routes,
+  orthogonal to this change). Fixed 4 ruff errors in the new test file (I001 + 3x RUF100)
+  before committing the residue as one recover commit.
+- RA-131 closed: `is_rejection: bool = False` keyword threaded _dispatch_resume -> RunPort
+  (both Protocol decls) -> registry adapter -> RegistryRunCommands.resume_approval; record
+  point skips approved_tool_names recording on rejection. Signature change inside carrier.
+  Closes the "reject -> retry -> auto-approved" bypass.
+
+## [2026-10-14 03:10 CST] - RA-132 DROPPED (mis-assessed, evidence below)
+
+- Story wanted set_approved_tool_names to own the canonical invariant.
+- Test-proven conflict: canonical_tool_name('tool_fs.read') -> 'toolFs.read'
+  (mangles dotted namespace prefixes); the facade test
+  (tests/scenario/run_1/test_run_execution_facade.py) pins {'tool_fs.read'}
+  round-tripping through set_/get_. Story forbids changing the heuristic body.
+  (a) canonicalize-everything + (b) facade green + (c) heuristic untouched
+  cannot all hold. Dropped per optimize-prompt rule; no code changed.
+- Learning: canonical_tool_name is only safe for dot-less names; its docstring
+  claims LobeHub wire camelCase but it is applied to namespaced names too
+  (record point canonicalizes approval_request tool_calls, reader canonicalizes
+  model-emitted query names) -- the domain of the heuristic is underspecified.
+  A future story should first pin the domain (shell-namespace-only?) before
+  moving the invariant.
+
+## [2026-10-14 03:20 CST] - RA-133
+
+- Pure test story (zero production changes). New file
+  tests/unit/infrastructure/test_approved_tool_names_contextvar.py pins both
+  ContextVar directions against the real seam:
+  (1) parent sets approved names -> create_task child inherits them;
+  (2) child injects its own set (mirroring execute.resume_run) -> parent
+      still sees its own original value after the child completes.
+- 2 passed, ruff clean.
+- **Learnings:** the real flow is commands.py:321
+  `asyncio.create_task(resume_run(...))` + execute.resume_run sets the names
+  inside the child; pytest-asyncio auto mode runs async tests fine without
+  extra config; ContextVar sets inside a test task do not leak across tests
+  (each test gets its own task context), but reset in finally anyway.
+
+## [2026-10-14 03:35 CST] - RA-134
+
+- New tests/unit/infrastructure/test_lobehub_agents_fail_soft.py: 5 direct
+  unit tests for agent_assistant_id_from_lobehub's fail-soft paths (empty
+  agent_id / no DATABASE_URL / connection raises / row missing / row NULL),
+  using a fake postgres_connection contextmanager stub -- no real DB.
+  Pins the None contract, not the SQL text (agency_config is ADR-0187 D7).
+- 5 passed, ruff clean; 4f67f10d7 binding tests stay green (20 passed).
+- **Learnings:** lca/infrastructure/persistence/postgres.py has no heavy
+  third-party imports at module top, so the seam imports hermetically;
+  monkeypatching the seam module's globals works because the function
+  references them as module attributes.
+
+
+## [2026-10-14 03:40 CST] - RA-135
+
+- command_endpoints.py: removed the module-level
+  `from lca.infrastructure.persistence.lobehub_agents import ...`;
+  added a module-level lazy proxy `agent_assistant_id_from_lobehub` that
+  imports inside the call. Verified: after importing command_endpoints,
+  lobehub_agents is NOT in sys.modules; the module attribute still
+  exists so 4f67f10d7's monkeypatch target works (binding tests green).
+- Fallback call site unchanged; behavior byte-identical on success.
+- 25 tests passed (20 binding + 5 RA-134), ruff clean.
+- **Learnings:** a same-named lazy proxy is the minimal shape that keeps
+  both 'no import at module time' and 'monkeypatch target exists';
+  a try/except-guarded top-level import would still execute at import
+  time and fail acceptance criterion 1.

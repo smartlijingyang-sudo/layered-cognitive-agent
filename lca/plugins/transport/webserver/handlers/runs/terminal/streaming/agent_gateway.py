@@ -62,6 +62,7 @@ class RunPort(Protocol):
         *,
         plugin_state: dict[str, Any] | None = None,
         parent_message_id: str = "",
+        is_rejection: bool = False,
     ) -> Any: ...
 
 

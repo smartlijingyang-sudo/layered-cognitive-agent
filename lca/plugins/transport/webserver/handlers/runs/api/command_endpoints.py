@@ -35,9 +35,6 @@ from lca.cognition.team.modes_catalog import resolve_profile_mode
 from lca.contracts.models.core.conversation.conversation import ConversationTurn
 from lca.contracts.protocols.assistant.ownership import AssistantOwnership
 from lca.infrastructure.file.store import LocalFileStore
-from lca.infrastructure.persistence.lobehub_agents import (
-    agent_assistant_id_from_lobehub,
-)
 from lca.plugins.transport.webserver.carrier.runs.recovery import (
     load_resume_bundle,
     restore_waiting_run,
@@ -61,6 +58,24 @@ from lca.plugins.transport.webserver.read.runs.identity import (
 )
 
 log = structlog.get_logger(__name__)
+
+
+def agent_assistant_id_from_lobehub(agent_id: str) -> str | None:
+    """Lazy proxy for the LobeHub agt_* -> asst_* fallback (RA-135).
+
+    The real import lives inside this call: an import-time failure of
+    ``lca.infrastructure.persistence.lobehub_agents`` must not break this
+    whole module -- the seam's fail-soft boundary ("Never raises into the
+    run-creation path") covers import time too. The module attribute keeps
+    its name so the existing monkeypatch seam
+    (``endpoints.agent_assistant_id_from_lobehub`` in tests) keeps working;
+    when the import succeeds the fallback behaves byte-identically.
+    """
+    from lca.infrastructure.persistence.lobehub_agents import (
+        agent_assistant_id_from_lobehub as _impl,
+    )
+
+    return _impl(agent_id)
 
 
 def _file_store_of(request: Request) -> LocalFileStore:
@@ -707,6 +722,11 @@ async def _dispatch_resume(
             code="invalid_resume_payload",
         )
     content = str(payload_dict.get("content") or payload_dict.get("rejection_reason") or "")
+    # RA-131: the approve/reject distinction must survive the payload fold to
+    # the record point. ``rejection_reason`` non-empty means the human REJECTED
+    # the tool call; the distinction is carried as ``is_rejection`` so the
+    # record point can skip recording rejected tools as approved.
+    is_rejection = bool(payload_dict.get("rejection_reason"))
     plugin_state = payload_dict.get("plugin_state")
     parent_message_id = str(payload_dict.get("parent_message_id") or "")
     idempotency_key = f"{run_id}:{approval_id}:resume:{parent_message_id or 'topic'}"
@@ -718,6 +738,7 @@ async def _dispatch_resume(
         idempotency_key,
         plugin_state=plugin_state,
         parent_message_id=parent_message_id,
+        is_rejection=is_rejection,
     )
     if not receipt.accepted:
         return _err(
