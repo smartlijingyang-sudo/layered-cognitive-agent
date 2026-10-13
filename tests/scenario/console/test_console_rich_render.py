@@ -266,20 +266,27 @@ def test_mapping_repr_handles_non_serializable() -> None:
 
 
 def test_record_runtime_fallback_on_unknown_category() -> None:
-    """record_runtime 收到未知 category 时不应抛异常；落 _DEFAULT_KIND。"""
+    """record_runtime 收到未知 category 时落 _DEFAULT_KIND（= RuntimeKind.PLUGIN）。
+
+    todo-38 裁决：facade.record() 无 bound Session 时 fail-loud 抛 RuntimeError，
+    且生产 run 中工具执行恒有 Session。此处用 cordis e2e 既有的 bind_journal()
+    绑定 Session 即是对生产路径的忠实模拟——测试本意是 category→kind 映射，
+    必须真实落到 journal 上才能断言。
+    """
     from lca.contracts.models.observability.event.event import RuntimeKind
     from lca.infrastructure.observability.facade.facade.facade import (
         _DEFAULT_KIND,
         record_runtime,
     )
+    from tests.scenario.cordis.test_cordis_creator_e2e import bind_journal
 
     assert _DEFAULT_KIND == RuntimeKind.PLUGIN
-    # 关键断言：不抛异常。返回 None 是测试上下文无 ambient journal，可接受。
-    stamped = record_runtime(
-        "unknown-category",
-        "test.operation",
-        plugin="test-plugin",
-    )
-    # 不抛即通过；如有返回值，kind 必须是 PLUGIN
-    if stamped is not None:
-        assert stamped.event.kind == RuntimeKind.PLUGIN
+    with bind_journal() as journal:
+        stamped = record_runtime(
+            "unknown-category",
+            "test.operation",
+            plugin="test-plugin",
+        )
+    assert stamped is not None
+    assert stamped.event.kind == RuntimeKind.PLUGIN
+    assert len(journal.store.events) == 1
