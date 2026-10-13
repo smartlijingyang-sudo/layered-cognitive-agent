@@ -630,7 +630,9 @@ async def test_s10_authorize_approved_alias_allows_camel_case_call(
         rationale="snake_case alias of the approved tool",
         confidence=1.0,
         needs_approval=True,
-        tool_calls=[ToolCall(call_id="tc_alias", tool_name="execute_code", arguments={"code": "1"})],
+        tool_calls=[
+            ToolCall(call_id="tc_alias", tool_name="execute_code", arguments={"code": "1"})
+        ],
     )
     executor = ActAuthorizeExecutor()
     output = await executor.node_execute(
