@@ -3463,3 +3463,17 @@ brain/reducer/memory/hub/standing_refresher 等键，待 RA-123 落地后再评�
   inside the child; pytest-asyncio auto mode runs async tests fine without
   extra config; ContextVar sets inside a test task do not leak across tests
   (each test gets its own task context), but reset in finally anyway.
+
+## [2026-10-14 03:35 CST] - RA-134
+
+- New tests/unit/infrastructure/test_lobehub_agents_fail_soft.py: 5 direct
+  unit tests for agent_assistant_id_from_lobehub's fail-soft paths (empty
+  agent_id / no DATABASE_URL / connection raises / row missing / row NULL),
+  using a fake postgres_connection contextmanager stub -- no real DB.
+  Pins the None contract, not the SQL text (agency_config is ADR-0187 D7).
+- 5 passed, ruff clean; 4f67f10d7 binding tests stay green (20 passed).
+- **Learnings:** lca/infrastructure/persistence/postgres.py has no heavy
+  third-party imports at module top, so the seam imports hermetically;
+  monkeypatching the seam module's globals works because the function
+  references them as module attributes.
+
