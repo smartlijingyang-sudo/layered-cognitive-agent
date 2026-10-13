@@ -11,6 +11,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+import pytest
+
 from lca.plugins.transport.webserver.handlers.runs.api.command_endpoints import (
     render_create_run_receipt,
 )
@@ -18,6 +20,17 @@ from lca.plugins.transport.webserver.jwt_keys_seam.jwt_keys import (
     JwtKeys,
     generate_dev_keypair,
 )
+
+
+@pytest.fixture(autouse=True)
+def _scrub_jwt_env(monkeypatch: pytest.MonkeyPatch) -> None:
+    # Hermetic "no JWT material" precondition: tests/integration/p1/conftest.py
+    # installs LCA_JWT_SECRET process-wide via a session fixture, and
+    # mint_user_jwt falls back to it when jwt_keys is None. Without the scrub
+    # this module's 503 regression test passes in isolation but fails in
+    # directory-batch runs (same pattern as test_ws_handshake_jwt.py).
+    monkeypatch.delenv("LCA_JWT_SECRET", raising=False)
+    monkeypatch.delenv("LCA_JWT_PUBLIC_KEY", raising=False)
 
 
 @dataclass(frozen=True, slots=True)

@@ -19,6 +19,7 @@ from pathlib import Path
 
 import pytest
 
+import lca.infrastructure.tools.contract.sandbox.contracts  # noqa: F401  # self-registers into REGISTRY
 from lca.infrastructure.tools.contract import REGISTRY, render_registry_to_ts
 
 _REPO = Path(__file__).resolve().parents[2]
@@ -73,6 +74,17 @@ def test_every_contract_has_a_renderer_file(tool_name: str, identifier: str, api
     )
 
 
+# Wire keys that intentionally break the camelCase rule, with evidence they are
+# the real wire protocol (not a contract typo):
+# - "lca_run_id" (askUserQuestion arg): injected by the runtime so the frontend
+#   submit handler can resume the run
+#   (lca/infrastructure/session/emit/lifecycle_emit.py:209); consumed by the
+#   frontend (deploy/lobehub/patches/runtime/lcaGateway/lcaStepPersist.test.ts
+#   fixtures use '{"lca_run_id":"run-1",...}'); declared in the RenderContract
+#   (lca/infrastructure/tools/contract/sandbox/contracts.py:285).
+_WIRE_KEY_ALLOWLIST = frozenset({"lca_run_id"})
+
+
 @pytest.mark.parametrize("tool_name", sorted(REGISTRY.keys()))
 def test_every_contract_wire_keys_are_lobehub_compatible(tool_name: str) -> None:
     """Every wire_key on a state field must be camelCase or single-word lower.
@@ -83,12 +95,16 @@ def test_every_contract_wire_keys_are_lobehub_compatible(tool_name: str) -> None
     contract = REGISTRY[tool_name]
     camel_re = re.compile(r"^[a-z][a-zA-Z0-9]*$")
     for field in contract.state:
+        if field.wire_key in _WIRE_KEY_ALLOWLIST:
+            continue
         if not camel_re.match(field.wire_key):
             pytest.fail(
                 f"Tool {tool_name!r} state field wire_key={field.wire_key!r} "
                 f"is not camelCase; LobeHub renderer won't find it"
             )
     for field in contract.args:
+        if field.wire_key in _WIRE_KEY_ALLOWLIST:
+            continue
         if not camel_re.match(field.wire_key):
             pytest.fail(
                 f"Tool {tool_name!r} arg field wire_key={field.wire_key!r} "
