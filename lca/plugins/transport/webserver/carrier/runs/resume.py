@@ -11,10 +11,7 @@ from collections.abc import Iterable
 from typing import Any, cast
 
 from lca.contracts.harness.tasks.session import SessionEvent
-from lca.plugins.transport.webserver.handlers.runs.session.session.session import (
-    RunRegistry,
-    RunSession,
-)
+from lca.plugins.transport.webserver.handlers.runs.session.session.session import RunSession
 from lca.session.lifecycle.recovery import assert_resume_allowed
 
 
@@ -44,12 +41,4 @@ def resume_cache_ready(session: RunSession) -> bool:
     return session.snapshot is not None and session.runnable is not None
 
 
-async def resume_run(session: RunSession, registry: RunRegistry, answer: str) -> None:
-    """Resume a paused run; durable Session facts gate acceptance."""
-    validate_durable_resume(session)
-    from lca.plugins.transport.webserver.carrier.runs.lifecycle import RunLifecycleCoordinator
-
-    await RunLifecycleCoordinator(registry).resume(session, answer=answer)
-
-
-__all__ = ["resume_cache_ready", "resume_run", "validate_durable_resume"]
+__all__ = ["resume_cache_ready", "validate_durable_resume"]

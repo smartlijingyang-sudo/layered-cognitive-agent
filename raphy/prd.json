@@ -1,7 +1,7 @@
 {
  "project": "LCA Raphy Architecture Optimization",
- "branchName": "raphy/arch-20261014-0145",
- "description": "Continuous architecture deepening for the LCA cognitive-agent codebase via the raphy fresh-session loop. Round 1 (2026-10-06, old prompt): RA-001/RA-002 converged, RA-003 dropped with evidence. Round 2 (2026-10-06, hardened prompt): RA-004..RA-009 all done (merged to main 2026-10-07, merge 1b1526a94). Round 3 (2026-10-07, hardened prompt): friction walk over session plugins, loop_cursor, delegation/body executor; RA-010..RA-013 below. Out of scope: ralph Round 2 areas (DecisionGates, Ingest, ContextFiles shims, Read Runs micro-dirs, MemoryTools directory seam), lca/cognition/memory/ (frozen per Round 2 AP-01), CLI surface must not import contracts (deliberate rule), gate_chain_strategy.py (hands-off: another party's uncommitted work + pre-existing red test). Round 10 (2026-10-08 12:06, branch raphy/arch-20261008-1206): RA-033..RA-041 below (3 Strong + 5 Worth exploring + 1 Speculative; all from friction walk, none duplication-class). Round 11 (2026-10-08 15:05, branch raphy/arch-20261008-1505): RA-042..RA-047 all done (merged to main 2026-10-08, merge 0ab9d67cd). Round 12 (2026-10-08 22:05, branch raphy/arch-20261008-2205): RA-048..RA-050 below (1 Strong + 2 Worth exploring; all from friction walk, none duplication-class). Round DESLOP-100 (2026-10-10, branch raphy/deslop-100, batch-wave Plan A): new wave of architecture deepening + de-slop stories, continuing RA-104+. Focus: remove AI/change-narration slop from current-state prose and code comments, plus real architecture optimizations (deep modules, locality, deletion test) per improve-codebase-architecture. Waves of 5-10 stories, each story one commit with tests. Round 2026-10-14 01:45 (branch raphy/arch-20261014-0145): RA-131..RA-135 -- approved-tool bypass seam chain (record-point approve/reject distinction, canonical invariant in set_approved_tool_names, ContextVar cross-task inheritance seam test) + lobehub run-agent mapping seam (fail-soft contract tests, lazy import for import-time fail-soft). _resolve.py audited as a deep module; six declined probe clusters re-declined.",
+ "branchName": "raphy/arch-20261014-0448",
+ "description": "Continuous architecture deepening for the LCA cognitive-agent codebase via the raphy fresh-session loop. Round 1 (2026-10-06, old prompt): RA-001/RA-002 converged, RA-003 dropped with evidence. Round 2 (2026-10-06, hardened prompt): RA-004..RA-009 all done (merged to main 2026-10-07, merge 1b1526a94). Round 3 (2026-10-07, hardened prompt): friction walk over session plugins, loop_cursor, delegation/body executor; RA-010..RA-013 below. Out of scope: ralph Round 2 areas (DecisionGates, Ingest, ContextFiles shims, Read Runs micro-dirs, MemoryTools directory seam), lca/cognition/memory/ (frozen per Round 2 AP-01), CLI surface must not import contracts (deliberate rule), gate_chain_strategy.py (hands-off: another party's uncommitted work + pre-existing red test). Round 10 (2026-10-08 12:06, branch raphy/arch-20261008-1206): RA-033..RA-041 below (3 Strong + 5 Worth exploring + 1 Speculative; all from friction walk, none duplication-class). Round 11 (2026-10-08 15:05, branch raphy/arch-20261008-1505): RA-042..RA-047 all done (merged to main 2026-10-08, merge 0ab9d67cd). Round 12 (2026-10-08 22:05, branch raphy/arch-20261008-2205): RA-048..RA-050 below (1 Strong + 2 Worth exploring; all from friction walk, none duplication-class). Round DESLOP-100 (2026-10-10, branch raphy/deslop-100, batch-wave Plan A): new wave of architecture deepening + de-slop stories, continuing RA-104+. Focus: remove AI/change-narration slop from current-state prose and code comments, plus real architecture optimizations (deep modules, locality, deletion test) per improve-codebase-architecture. Waves of 5-10 stories, each story one commit with tests. Round 2026-10-14 01:45 (branch raphy/arch-20261014-0145): RA-131..RA-135 -- approved-tool bypass seam chain (record-point approve/reject distinction, canonical invariant in set_approved_tool_names, ContextVar cross-task inheritance seam test) + lobehub run-agent mapping seam (fail-soft contract tests, lazy import for import-time fail-soft). _resolve.py audited as a deep module; six declined probe clusters re-declined. Round 2026-10-14 04:45 (branch raphy/arch-20261014-0448): RA-136..RA-138 -- two verbatim private _model probes converged onto model_name (RA-106 follow-up, two = real), dead carrier/runs/resume.py resume_run name-twin deleted (zero callers), legacy /answer ingress is_rejection gap (evidence-first: retire route or add in-band rejection marker). Speculative RA-139 (typed ResumeAnswer value object) deferred until RA-138 evidence lands. Areas D (runs chain post-RA-131) / E (model identity) / F (skills _package_lookup, RA-107 landed, 0 candidates) friction-walked; runtime verification 4 flows green, RA-023 holds, no P0.",
  "userStories": [
   {
    "id": "RA-001",
@@ -1999,6 +1999,56 @@
    "passes": true,
    "branchName": "raphy/arch-20261014-0145",
    "notes": "Assessed 2026-10-14 01:45 round (Area C S1). Mechanical 3-line change. Territory: same note as RA-131 -- no active lca-1000 churn on this file (last 8 commits user-side runs work). Done 2026-10-14 02:45 round: lazy proxy, 25 tests green, ruff clean.",
+   "implemented": true,
+   "dropped": false
+  },
+  {
+   "id": "RA-136",
+   "title": "Converge the two verbatim private _model probes onto the model_name protocol",
+   "description": "As an LCA maintainer, I want the two verbatim private probes `getattr(adapter, \"_model\", None) or getattr(adapter, \"model\", None)` in `lca/infrastructure/cli/commands/runs/driver_debug.py:190` and `lca/plugins/think/reasoner/credentials.py:131` replaced with `getattr(adapter, \"model_name\", None)`, because RA-106 established `LLMAdapter.model_name` as the protocol seam for model identity yet these two readers bypass it; the fallback public `model` attribute exists on zero production adapters (pure-private read masquerading as defensive), and on MockLLMAdapter the probe returns None while the interface returns \"mock-llm\" -- the probe is strictly worse. Deletion test passes (removing either probe turns zero tests red).",
+   "acceptanceCriteria": [
+    "Both probe sites read `getattr(adapter, \"model_name\", None)` and nothing else.",
+    "Zero `getattr(.*\"_model\"` reads remain in lca/ (rg-verified); anthropic internal `_model` constructor-passed fields untouched.",
+    "`tests/unit/observability/adapters/test_model_label.py` and the driver_debug/reasoner-adjacent tests stay green; `ruff check` clean.",
+    "Mock-backed debug output now reports \"mock-llm\" instead of None (behavior pinned by test)."
+   ],
+   "priority": 5,
+   "passes": true,
+   "branchName": "raphy/arch-20261014-0448",
+   "notes": "Assessed 2026-10-14 04:45 round (Area E, RA-106 follow-up). Strong: two = real (verbatim twice), deletion test PASS, interface behaviorally superior (Mock evidence). Territory: both files' recent commits are user-side rounds (think-subgraph/ADR-0220, cli style/region), no lca-1000 churn. model_visible/adapter.py:78 unwrap chain deliberately out of scope (reads public attrs).  Implemented 2026-10-14 optimize round: assessed 2 sites, converged 2 -- both now read getattr(adapter, \"model_name\", None); rg-verified zero getattr(.*\"_model\") reads remain in lca/; new tests/infrastructure/cli/test_debug_credentials_model_name.py pins mock-backed debug output == \"mock-llm\" end to end through both real functions (was None); 7 tests passed incl. test_model_label, 9 adjacent driver_debug CLI tests passed, ruff check clean. No assessment drift.",
+   "implemented": true,
+   "dropped": false
+  },
+  {
+   "id": "RA-137",
+   "title": "Delete the dead carrier/runs/resume.py resume_run name-twin",
+   "description": "As an LCA maintainer, I want `resume_run` (lca/plugins/transport/webserver/carrier/runs/resume.py:47) deleted and `__all__` narrowed to `[\"resume_cache_ready\", \"validate_durable_resume\"]`, because it has zero production importers (all three import sites take only the other two names -- independently re-verified) and zero test references, while its name-twin `carrier/runs/execute/execute.py:146::resume_run` (the one WITH the approved-tools ContextVar injection) is the real resume entry -- any future caller picking the wrong module silently loses the injection. Deleting an uncalled alias is net positive.",
+   "acceptanceCriteria": [
+    "`resume_run` def and its `__all__` entry are gone from carrier/runs/resume.py.",
+    "rg confirms zero remaining references to the deleted function in lca/ and tests/ (tests patch `registry_commands.resume_run`, which resolves to execute.py's version).",
+    "Existing resume/idempotency/concurrency tests stay green; `ruff check` clean."
+   ],
+   "priority": 5,
+   "passes": true,
+   "branchName": "raphy/arch-20261014-0448",
+   "notes": "Assessed 2026-10-14 04:45 round (Area D). Strong: deletion test PASS (removing it changes nothing), removes a footgun. Territory: webserver carrier is lca-1000 territory but the file's recent 8 commits are all user-side work (runtime/types/import-sort/arch-discipline), no lca-1000 churn; pure deletion, no behavior change.  Implemented 2026-10-14 optimize round: deleted the def and narrowed __all__ to [\"resume_cache_ready\", \"validate_durable_resume\"]; removed the now-unused RunRegistry import (ruff F401); independently re-verified: 3 import sites of the module take only the other two names (execute.py:148 -> validate_durable_resume, commands.py:217 -> both others, lifecycle.py:256 -> resume_cache_ready), commands.py's resume_run comes from execute.execute (approved-tools ContextVar injection version), all test patches target registry_commands.resume_run = execute version. Zero remaining refs to the deleted function. 38 tests passed (resume idempotency/concurrency/rejection-not-recorded/contextvar/facade), ruff check clean. No assessment drift.",
+   "implemented": true,
+   "dropped": false
+  },
+  {
+   "id": "RA-138",
+   "title": "Close the legacy /answer ingress is_rejection gap (evidence first)",
+   "description": "As an LCA maintainer, I want the legacy `POST /runs/{run_id}/answer` ingress (`answer_run`, command_endpoints.py:790-838) to stop silently defaulting `is_rejection=False`, because the route takes a pure-string payload that cannot express rejection while `RunPort.resume_approval`'s default turns \"cannot express\" into \"approved\" -- RA-131's record-point guard is a dead letter on this route. First gather evidence: does the LobeHub frontend still call /answer? (a) migrated -> retire the route (after a deprecation window); (b) still called -> give the legacy payload an in-band rejection marker and export is_rejection explicitly in answer_run. Keeping the silent default is not an option.",
+   "acceptanceCriteria": [
+    "Evidence recorded: LobeHub frontend still calls /answer, or it does not (with the evidence cited).",
+    "If (a): route retired (deprecation shim or removed) and no ingress defaults is_rejection to False.",
+    "If (b): answer_run explicitly derives is_rejection from the payload marker and passes it to the port; a rejection sent via /answer is not recorded into approved_tool_names (new test -- the test that is unwritable today).",
+    "Existing RA-131 rejection tests stay green; `ruff check` clean."
+   ],
+   "priority": 4,
+   "passes": true,
+   "branchName": "raphy/arch-20261014-0448",
+   "notes": "Assessed 2026-10-14 04:45 round (Area D). Worth exploring: the gap is real but the fix shape depends on frontend evidence. recovery.py docstring confirms /answer is still a considered path, not retired. Territory: same as RA-137 (webserver carrier, user-side runs work, no lca-1000 churn).  Evidence 2026-10-14 optimize round -> direction (b): deploy/lobehub/patches/ui/WidgetCard.tsx:66 still POSTs to `/lca-api/runs/${runId}/answer` with {approval_id, idempotency_key, payload} -- no rejection marker, route not retired. Implemented (b): answer_run reads an in-band `rejection_reason` key from the legacy body (same marker as _dispatch_resume's RA-131 seam, no new marker invented) and passes is_rejection explicitly to the port; marker absent keeps the legacy approve-only widget behavior. Frontend untouched (widget only ever sends approvals). 4 new tests in tests/plugins/transport/webserver/test_answer_run_rejection_marker.py: marker->is_rejection True/False forwarding, rejection-via-answer not recorded into approved_tool_names, approval-via-answer still records canonicalized names. 27 tests passed incl. RA-131 suite, ruff check clean. No assessment drift.",
    "implemented": true,
    "dropped": false
   }

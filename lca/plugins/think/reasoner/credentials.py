@@ -128,7 +128,7 @@ async def setup(ctx: PluginContext, config: Config) -> None:
         "phase_think_reasoner_credentials.served",
         {
             "adapter_type": type(adapter).__name__,
-            "adapter_model": getattr(adapter, "_model", None) or getattr(adapter, "model", None),
+            "adapter_model": getattr(adapter, "model_name", None),
             "adapter_base_url": getattr(adapter, "_base_url", None) or getattr(adapter, "base_url", None),
             "adapter_api_style": str(getattr(adapter, "_api", None) or getattr(adapter, "api", None)),
         },

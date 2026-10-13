@@ -823,6 +823,14 @@ async def answer_run(request: Request) -> JSONResponse:
     approval_id = str(body.get("approval_id", "")).strip()
     payload = str(body.get("payload", "")).strip()
     idempotency_key = str(body.get("idempotency_key", "")).strip()
+    # RA-138: mirror the RA-131 marker from _dispatch_resume. The legacy
+    # /answer body could not express rejection, so the port's
+    # is_rejection=False default silently turned "cannot express" into
+    # "approved" — RA-131's record-point guard was a dead letter on this
+    # route. An explicit rejection_reason is now honored and forwarded;
+    # absence keeps the legacy approve-only behavior of the current frontend
+    # (WidgetCard.tsx posts no marker).
+    rejection_reason = str(body.get("rejection_reason", "")).strip()
     if not approval_id or not payload or not idempotency_key:
         return JSONResponse(
             {"error": "approval_id, payload and idempotency_key are required"},
@@ -834,6 +842,7 @@ async def answer_run(request: Request) -> JSONResponse:
         approval_id,
         payload,
         idempotency_key,
+        is_rejection=bool(rejection_reason),
     )
     if not receipt.accepted:
         return JSONResponse(

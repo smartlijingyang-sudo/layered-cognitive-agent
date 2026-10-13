@@ -1,5 +1,22 @@
 ## Codebase Patterns
 
+- **"two = real" 的逐字两次是 Strong 信号（RA-136 实证）：** 两处逐字相同的私有
+  `_model` 探针（`getattr(adapter, "_model", None) or getattr(adapter, "model",
+  None)`），deletion test 通过（删掉零测试变红）+ interface 在行为上被实证更优
+  （Mock 上探针 None vs `model_name` "mock-llm"）→ 直接判 Strong，不必犹豫。
+  附带识别法：私有探针的"公共回退"（`or getattr(x, "model", None)`）若读的属性
+  在全仓零定义，就是伪装成防御式读取的纯私有探针。
+- **删死代码前要查"名字被谁 import"，不只查"函数被谁调用"（RA-137 实证）：**
+  `carrier/runs/resume.py::resume_run` 零调用方还不够——测试里
+  `monkeypatch.setattr(registry_commands, "resume_run", ...)` patch 的是
+  `execute.execute` 版（`commands.py:20-24` 从 execute 导入）。同名双胞胎删错
+  一个就炸：删之前用 rg 确认每个同名引用的归属模块。
+- **Legacy ingress 的 Protocol 默认值会撒谎（RA-138）：** `is_rejection: bool =
+  False` 让"表达不了拒绝"的 legacy 路径静默变成"已批准"——"未知"≠"批准"。
+  fail-closed 要求：要么默认拒绝，要么逼调用方显式表态（去默认化）。凡是看到
+  "bool 默认 False + 另一条路径给不出该信息"的形状，先怀疑。
+
+
 - **动了的文件若有 pre-existing 的 ruff format 漂移，别顺手修（RA-123 实证）：**
   `invoke.py:90` 在本轮改动前就已 `ruff format --check` 不过，用
   `git show HEAD:<path> | ruff format --check -` 验证是旧账就原样留下；
@@ -3492,3 +3509,103 @@ brain/reducer/memory/hub/standing_refresher 等键，待 RA-123 落地后再评�
   both 'no import at module time' and 'monkeypatch target exists';
   a try/except-guarded top-level import would still execute at import
   time and fail acceptance criterion 1.
+
+## [2026-10-14 05:10 CST] - Assess round (raphy/arch-20261014-0448)
+
+- Friction walk 3 areas (D: runs chain post-RA-131, E: model-identity probes, F:
+  skills _package_lookup -- 0 candidates, RA-107 confirmed landed).
+- Runtime verification (clean tree, LLM_API_KEY=dummy, ScriptedLLMAdapter):
+  basic/tool-call/sequential all completed; non-converging returns failed Result
+  with no exception (RA-023 holds). No P0.
+- Duplication scan: no new clusters; remaining hand-rolled probes match 01:45
+  round Area B's 6 declined points.
+- Wrote RA-136 (Strong: two verbatim _model probes -> model_name),
+  RA-137 (Strong: delete dead carrier/runs/resume.py resume_run),
+  RA-138 (Worth exploring: legacy /answer is_rejection gap, evidence-first).
+  RA-139 (typed ResumeAnswer) speculative -- deferred until RA-138 evidence lands.
+- Diversity quota: all 3 from friction walk, none duplication-class.
+
+## 2026-10-14 05:27 CST - RA-136
+
+- Implemented: two verbatim private `_model` probes converged onto the
+  `LLMAdapter.model_name` protocol seam (RA-106).
+  - `lca/infrastructure/cli/commands/runs/driver_debug.py:190`:
+    `"model": getattr(adapter, "_model", None) or getattr(adapter, "model", None)`
+    -> `"model": getattr(adapter, "model_name", None)`
+  - `lca/plugins/think/reasoner/credentials.py:131`:
+    `"adapter_model": ...` same replacement.
+- New test `tests/infrastructure/cli/test_debug_credentials_model_name.py`:
+  fake ProductionLLMResolver -> MockLLMAdapter, runs the real
+  `cmd_debug_credentials(json_mode=True)` and the real reasoner
+  `credentials.setup` (via `Plugin.setup`), asserts both report `"mock-llm"`
+  (was None before). Note: `@plugin` wraps setup in a `Plugin` object;
+  the raw coroutine is `Plugin.setup`.
+- Verification: `rg 'getattr\(.*"_model"' lca/` -> zero hits; anthropic
+  `self._model` constructor-passed fields untouched. Tests: 7 passed
+  (new 2 + test_model_label 5); adjacent driver_debug CLI tests 9 passed;
+  `ruff check` clean on all 3 touched files.
+- **Learnings for future iterations:**
+  - End-to-end behavior pins beat helper-unit pins: the probe lived inside two
+    env-heavy functions, but monkeypatching the resolver module attr at call
+    time (both imports are function-local) made the real path testable in
+    <2s with zero fixture cost.
+  - When assessing "dead fallback" claims, check protocol implementations,
+    not just producers: public `model` attr existed on zero adapters, but the
+    real clincher was Mock behavioral divergence (None vs "mock-llm").
+---
+
+## 2026-10-14 05:33 CST - RA-137
+
+- Implemented: deleted the dead `resume_run` name-twin in
+  `lca/plugins/transport/webserver/carrier/runs/resume.py` (was :47); `__all__`
+  narrowed to `["resume_cache_ready", "validate_durable_resume"]`; removed the
+  now-unused `RunRegistry` import (ruff F401).
+- Pre-delete re-verification (independent of assess): the 3 module import sites
+  take only the other two names (`execute.py:148` -> `validate_durable_resume`,
+  `commands.py:217` -> both others, `lifecycle.py:256` -> `resume_cache_ready`);
+  `commands.py:20-24` imports `resume_run` from `execute.execute` (the one with
+  the approved-tools ContextVar injection), so every
+  `monkeypatch.setattr(registry_commands, "resume_run", ...)` in tests targets
+  the execute version, not the deleted one.
+- Verification: `rg resume_run` on the deleted module -> zero refs; `ruff check`
+  clean. Tests: 38 passed (test_resume_idempotency, test_resume_concurrency,
+  test_resume_approval_rejection_not_recorded,
+  test_approved_tool_names_contextvar, test_run_execution_facade,
+  test_runs_create_facade_path).
+- **Learnings for future iterations:**
+  - 同名双胞胎的归属判定要看 import 语句的行级来源，不是文件名：`registry_commands.resume_run`
+    这个名字在测试里出现 10 次，但 `commands.py:20-24` 的 from-import 一行就定案——
+    删之前先读那行，5 秒的事。
+  - 纯删除类 story 记得顺手清 import：`RunRegistry` 只在被删签名里用过，ruff F401
+    会立刻抓；删除 diff 里附带一行 import 清理不算 scope creep。
+---
+
+## 2026-10-14 05:38 CST - RA-138
+
+- Evidence first (direction b confirmed): `deploy/lobehub/patches/ui/WidgetCard.tsx:66`
+  still POSTs to `/lca-api/runs/${runId}/answer` with
+  `{approval_id, idempotency_key, payload}` — pure-string payload, no
+  rejection marker. Route is NOT retired (recovery.py docstring already hinted
+  it, WidgetCard proves it).
+- Implemented (b): `answer_run` (command_endpoints.py) now reads an in-band
+  `rejection_reason` key from the legacy body — the SAME marker as
+  `_dispatch_resume`'s RA-131 seam, no new marker invented — and passes
+  `is_rejection=bool(rejection_reason)` explicitly to `RunPort.resume_approval`.
+  Marker absent -> legacy approve-only widget behavior unchanged. Frontend
+  untouched (the widget only ever sends approvals).
+- New tests `tests/plugins/transport/webserver/test_answer_run_rejection_marker.py`
+  (4): marker -> `is_rejection=True` forwarding; no marker -> `False` and
+  payload forwarded verbatim; rejection-via-answer NOT recorded into
+  `approved_tool_names` (end to end through the real `RegistryRunCommands`,
+  the test that was unwritable before); approval-via-answer still records
+  canonicalized `{"executeCode"}`.
+- Verification: RA-131 suite + resume idempotency/concurrency + run_isolation
+  = 27 passed; `ruff check` clean on both touched files.
+- **Learnings for future iterations:**
+  - "Evidence first" stories 的取证要去看调用方的真实代码，不是只看服务端的
+    docstring：recovery.py 的 docstring 只说"仍是被考虑的路径"，WidgetCard.tsx:66
+    的 fetch 调用才是"仍在调"的硬证据——取证结论 (b) 直接决定了修法形状。
+  - 收敛优先于发明：in-band marker 直接复用 `_dispatch_resume` 的
+    `rejection_reason`，两条 ingress 的"拒绝显式"不变量共享同一个标记语义，
+    而不是给 legacy 路由发明第二个标记。
+---

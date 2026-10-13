@@ -187,7 +187,7 @@ def cmd_debug_credentials(json_mode: bool) -> None:
             adapter_info = {
                 "resolved": True,
                 "type": type(adapter).__name__,
-                "model": getattr(adapter, "_model", None) or getattr(adapter, "model", None),
+                "model": getattr(adapter, "model_name", None),
                 "base_url": (
                     getattr(adapter, "_base_url", None)
                     or getattr(adapter, "base_url", None)
