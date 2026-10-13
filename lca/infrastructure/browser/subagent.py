@@ -66,26 +66,26 @@ class BrowserSubagent:
                     url=action.url,
                     title="Navigated Page",
                 )
-            elif action.action_type == BrowserActionType.CLICK:
+            if action.action_type == BrowserActionType.CLICK:
                 return BrowserActionResult(
                     action_type=action.action_type,
                     success=True,
                     text_content=f"Clicked selector: {action.selector}",
                 )
-            elif action.action_type == BrowserActionType.TYPE:
+            if action.action_type == BrowserActionType.TYPE:
                 return BrowserActionResult(
                     action_type=action.action_type,
                     success=True,
                     text_content=f"Typed text: {action.text}",
                 )
-            elif action.action_type == BrowserActionType.SCREENSHOT:
+            if action.action_type == BrowserActionType.SCREENSHOT:
                 art_id = new_id("art_screenshot")
                 return BrowserActionResult(
                     action_type=action.action_type,
                     success=True,
                     screenshot_artifact_id=art_id,
                 )
-            elif action.action_type == BrowserActionType.CLOSE:
+            if action.action_type == BrowserActionType.CLOSE:
                 return BrowserActionResult(
                     action_type=action.action_type,
                     success=True,

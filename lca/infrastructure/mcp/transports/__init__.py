@@ -12,7 +12,7 @@ def create_mcp_transport(config: MCPServerConfig) -> MCPTransportPort:
     """Instantiate appropriate transport port according to server config."""
     if config.transport == MCPTransportType.STDIO:
         return StdioMCPTransport(config)
-    elif config.transport in (
+    if config.transport in (
         MCPTransportType.HTTP,
         MCPTransportType.STREAMABLE_HTTP,
         MCPTransportType.SSE,
