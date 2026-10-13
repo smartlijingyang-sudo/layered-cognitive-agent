@@ -3477,3 +3477,18 @@ brain/reducer/memory/hub/standing_refresher 等键，待 RA-123 落地后再评�
   monkeypatching the seam module's globals works because the function
   references them as module attributes.
 
+
+## [2026-10-14 03:40 CST] - RA-135
+
+- command_endpoints.py: removed the module-level
+  `from lca.infrastructure.persistence.lobehub_agents import ...`;
+  added a module-level lazy proxy `agent_assistant_id_from_lobehub` that
+  imports inside the call. Verified: after importing command_endpoints,
+  lobehub_agents is NOT in sys.modules; the module attribute still
+  exists so 4f67f10d7's monkeypatch target works (binding tests green).
+- Fallback call site unchanged; behavior byte-identical on success.
+- 25 tests passed (20 binding + 5 RA-134), ruff clean.
+- **Learnings:** a same-named lazy proxy is the minimal shape that keeps
+  both 'no import at module time' and 'monkeypatch target exists';
+  a try/except-guarded top-level import would still execute at import
+  time and fail acceptance criterion 1.

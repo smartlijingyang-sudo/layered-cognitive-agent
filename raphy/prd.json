@@ -1996,10 +1996,10 @@
     "Fallback behavior byte-identical when the import succeeds; `ruff check` clean."
    ],
    "priority": 5,
-   "passes": false,
+   "passes": true,
    "branchName": "raphy/arch-20261014-0145",
-   "notes": "Assessed 2026-10-14 01:45 round (Area C S1). Mechanical 3-line change. Territory: same note as RA-131 -- no active lca-1000 churn on this file (last 8 commits user-side runs work).",
-   "implemented": false,
+   "notes": "Assessed 2026-10-14 01:45 round (Area C S1). Mechanical 3-line change. Territory: same note as RA-131 -- no active lca-1000 churn on this file (last 8 commits user-side runs work). Done 2026-10-14 02:45 round: lazy proxy, 25 tests green, ruff clean.",
+   "implemented": true,
    "dropped": false
   }
  ]
