@@ -50,7 +50,7 @@ from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import
     OwnershipDeclaration,
 )
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
-from lca.nodes._resolve import resolve_runtime_state, resolve_typed_port
+from lca.nodes._resolve import resolve_runtime_adapter, resolve_runtime_state, resolve_typed_port
 
 
 @dataclass(frozen=True, slots=True)
@@ -225,13 +225,7 @@ def _model_visible_identity(state: Any, request: Any) -> tuple[Any, Any]:
 
 def _resolve_adapter(*, context: NodeContext) -> Any:
     """Pull the LLMAdapter from the runtime carrier (``adapter`` key)."""
-    runtime = getattr(context, "runtime", None)
-    adapter = getattr(runtime, "adapter", None) if runtime is not None else None
-    if adapter is None and runtime is not None and hasattr(runtime, "get"):
-        adapter = runtime.get("adapter")
-    if adapter is None:
-        raise TypeError("llm.invoke: 'adapter' must be supplied via context.runtime")
-    return adapter
+    return resolve_runtime_adapter(context=context, node="llm.invoke", required=True)
 
 
 @plugin(

@@ -127,6 +127,34 @@ class SkillActivationReducerBridge:
             return None
         return state_getter()
 
+    def find_activated(self, skill_id: str | None) -> ActivatedSkill | None:
+        """reducer state 里的激活查找（ContextVar 丢失时的兜底 seam）。
+
+        封装 ``resolve_skill_for_exec`` 原来手写的两处兜底仪式：
+        - bridge 未 install / state 不存在 → None（call-site 按各自路径抛错）。
+        - ``skill_id`` 给出时：reversed 扫描 ``state.activated_skills``，
+          按 ``skill_id`` 或 ``name`` 匹配（strip 后）。
+        - ``skill_id`` 为 None 时：返回 tail（最后激活的）。
+        - 无匹配 / 列表为空 → None。
+        """
+        with self._lock:
+            if not self._installed:
+                return None
+            state_getter = self._state_getter
+        if state_getter is None:
+            return None
+        state = state_getter()
+        if state is None:
+            return None
+        activated = state.activated_skills
+        if skill_id is None:
+            return activated[-1] if activated else None
+        sid = skill_id.strip()
+        for item in reversed(tuple(activated)):
+            if item.skill_id == sid or item.name == sid:
+                return item
+        return None
+
 
 # 进程级 singleton —— ``register_activated`` 这条 chokepoint 不持有 run 上下文,
 # 所以需要全局可寻址的 bridge。run 启动时 ``install``,run 结束 ``dispose``。

@@ -110,17 +110,16 @@ def resolve_skill_for_exec(skill_id: str | None) -> ActivatedSkill:
             if item.skill_id == sid or item.name == sid:
                 return item
         # ContextVar 可能在工具执行间丢失；激活状态的单一真值在 reducer
-        # state.activated_skills（register_activated 经 bridge 已写入）。
-        state = bridge.current_state()
-        if state is not None:
-            for item in reversed(tuple(state.activated_skills)):
-                if item.skill_id == sid or item.name == sid:
-                    return item
+        # state.activated_skills（register_activated 经 bridge 已写入）——
+        # 兜底查找收敛到 bridge.find_activated seam。
+        found = bridge.find_activated(skill_id)
+        if found is not None:
+            return found
         raise SkillNotFoundError(f"未激活 skill: {skill_id!r}；请先 activate_skill")
     if not activated:
-        state = bridge.current_state()
-        if state is not None and state.activated_skills:
-            return state.activated_skills[-1]
+        found = bridge.find_activated(None)
+        if found is not None:
+            return found
         raise SkillNotFoundError("无已激活 skill；请先 activate_skill")
     return activated[-1]
 

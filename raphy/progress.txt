@@ -1,5 +1,24 @@
 ## Codebase Patterns
 
+- **动了的文件若有 pre-existing 的 ruff format 漂移，别顺手修（RA-123 实证）：**
+  `invoke.py:90` 在本轮改动前就已 `ruff format --check` 不过，用
+  `git show HEAD:<path> | ruff format --check -` 验证是旧账就原样留下；
+  验收门只有 `ruff check`，修旧账会污染 minimal diff。
+
+- **seam 收敛要按资源键全图 grep，别只收手头的两个（RA-123 教训）：**
+  RA-118/119 收了 `writer`/`state` 两-shape probe 就宣布 done，
+  同一仪式在 `adapter` 键下（think.llm.invoke fail-loud vs
+  memory_extract fail-soft）漏网。开故事前对 `getattr(runtime, "..."`
+  + `hasattr(runtime, "get")` 做键维度全图 grep；RA-119 的"两种语义
+  一次收完"教训适用于所有 resource key，不是只适用于开题的那两个。
+
+- **prompt steering + 确定性 filter 是纵深防御，不是重复——但共享的
+  identity 字面量必须 single-source（RA-125）：** 同一策略（"一次性
+  回复格式要求不是偏好"）用中文 prompt 引导和用代码强制执行是互补，
+  不删任何一边；但两者共用的 key（`preference:response_code`）
+  必须是一个常量插值进两边。RA-120 marker 类的 prompt 版。
+
+
 - **resume_point 校验复用 fail-closed 的 deserialize（RA-121 实证）：**
   `deserialize_resume_point` 对任何非法字段直接 raise，所以 bundle 校验
   不必手写字段检查——`validate_bundle` 只需 try/except 包一层即得"不可解析"
@@ -3046,4 +3065,129 @@ Learnings for future iterations:
     persist wrappers; the behavioral smoke check above was the evidence that
     the refactor was behavior-preserving. When tests don't cover the refactored
     seam, write the throwaway check rather than claiming equivalence by eye.
+---
+## 2026-10-13 00:45 CST - Round assess（branch raphy/arch-20261013-0045，基线 40717b8f4）
+
+基线 40717b8f4（merge: iter-tests-20261012-2243）。热点：19ee778ec
+(memory-extract response-code guard)、c5696c81e（session observer 挂载
+幂等 + activated_skills 回读 reducer state）、4a6b5e04a/b71a73f2d
+(spine manifest/ package split)。禁区全遵守：主工作树脏
+(docs/plans/task.md 他人未提交改动）——只在干净 worktree
+/home/lichao/.lca-worktrees/raphy-20261013-0045 内读和跑，主树一次没碰。
+
+Friction walk 三个区逐个端到端读完：
+- A: lca/nodes/reflect/memory_extract/memory_extract.py（387 行全）→
+  RA-123（adapter probe 是 RA-118/119 漏网的一半）+ RA-125
+ （`preference:response_code` prompt/filter 双生产者字面量）。
+- B: bridge.py/scope.py/context_compose/skills.py/_session_observe.py 全 →
+  RA-124（resolve_skill_for_exec 两处手写 bridge fallback ritual；
+  `_underlying_session` unwrap 只有一处 = hypothetical seam，不立案）。
+- C: spine manifest/ 包（manifest.py + __init__ 全）→ 意图明确的
+  COMPAT shim，import cycle 文档化，deletion test 通过，无故事。
+
+运行时验证（干净 worktree，LLM_API_KEY=dummy，MockLLMAdapter）：
+basic/completed、tool-call/completed、同一 agent 双 run/completed+completed、
+RA-023 回归：非收敛 run 不抛异常、返回 status=failed（日志
+`status=failed max_steps=5`）。无新 P0/P1。
+
+写出 RA-123（Strong，top 推荐：RA-118/119 续尾）/RA-124
+（Worth exploring，bridge 真值 seam 加深）/RA-125（Worth exploring，
+duplication 类唯一）。diversity quota 满足（123/124 friction walk）。
+
+遗留方向（未立案）：`getattr(runtime, ...)` 两-shape probe 全图还有
+brain/reducer/memory/hub/standing_refresher 等键，待 RA-123 落地后再评估
+通用 `resolve_runtime_attr` 是否值得；`agent_state` vs `state` 键命名分歧
+无故障证据，speculative。
+
+## 2026-10-13 01:18 (Asia/Shanghai) - RA-123
+- Implemented: `resolve_runtime_adapter(*, context, node, required=True)` in
+  `lca/nodes/_resolve.py`, exact RA-118/119 shape (two-shape probe;
+  `{node}: 'adapter' must be supplied via context.runtime` fail-loud
+  wording). `think.llm.invoke._resolve_adapter` is now a thin delegate
+  (`required=True`; fail-loud TypeError naming `llm.invoke` preserved);
+  `reflect.memory_extract`'s hand-rolled probe block replaced with
+  `required=False` (`None` passthrough + `hasattr(adapter, "complete")` gate
+  preserved, ADR-0246 fail-soft intact). Repo-wide key-dimension grep found
+  exactly the 2 assessed sites — assessment was accurate, no third site.
+- Files changed: `lca/nodes/_resolve.py` (docstring paragraph + new seam),
+  `lca/nodes/think/llm/invoke.py` (import + thin delegate),
+  `lca/nodes/reflect/memory_extract/memory_extract.py` (import + 3-line delegate),
+  `tests/nodes/test_resolve_adapter.py` (new, 6 seam tests),
+  `raphy/prd.json` (RA-123 passes:true).
+- **Learnings for future iterations:**
+  - The RA-123 "grep by resource key before writing the seam" lesson verified:
+    `getattr(runtime, "adapter", ...)` + `runtime.get("adapter")` grep found
+    exactly 2 sites; trust the count, then stop. No drive-by fixes elsewhere.
+  - Pre-existing `ruff format` drift in a touched file is NOT yours to fix:
+    `invoke.py:90` fails `ruff format --check` at HEAD too — verified via
+    `git show HEAD:...`, left alone per minimal-diff. Only `ruff check` is
+    in the acceptance gate.
+  - New seam gets its own test file (`tests/nodes/test_resolve_adapter.py`,
+    `test_ra123_*`): RA-119's seam tests live inside
+    `test_effect_execute_batch_attribution.py`, which is off-topic for
+    `adapter`; one test file per seam module keeps the next convergence
+    obvious.
+---
+
+## [2026-10-13 01:35 CST] - RA-124
+- Implemented: `SkillActivationReducerBridge.find_activated(skill_id: str | None)
+  -> ActivatedSkill | None` in `lca/infrastructure/skills/activation/bridge.py` —
+  encapsulates the "bridge-installed / state-present / reversed
+  `state.activated_skills` scan" fallback ritual. `skill_id is None` → tail;
+  given → strip + reversed scan matching `skill_id` or `name`; returns None when
+  uninstalled / no state / no match / empty list.
+- `resolve_skill_for_exec` (scope.py) keeps the ContextVar fast path; both
+  fallback branches now delegate to `bridge.find_activated`. Both
+  `SkillNotFoundError` messages byte-identical (verified in diff; the old
+  fallback test asserting "未激活 skill" still passes unchanged).
+  Bridge lifecycle (`install`/`dispose`) untouched — `find_activated` reuses
+  the same `_lock` guard pattern as `current_state`/`handle`.
+- Files changed: `lca/infrastructure/skills/activation/bridge.py` (+28, new seam),
+  `lca/infrastructure/skills/activation/scope.py` (17 lines: 2 fallback blocks
+  collapsed into delegates), `tests/.../activation/test_bridge_find_activated.py`
+  (new, 6 seam tests), `raphy/prd.json` (RA-124 passes:true).
+- Quality: `tests/infrastructure/skills/activation/` → 14 passed
+  (incl. new 6 + unchanged `test_resolve_skill_fallback.py` 2); `ruff check`
+  on the 3 touched files clean.
+- **Learnings for future iterations:**
+  - Bridge singletons are unit-testable without the global: instantiate
+    `SkillActivationReducerBridge()` directly in the test file instead of
+    reusing the process-wide `bridge` singleton — avoids cross-test
+    `install`/`dispose` ordering hazards (`test_resolve_skill_fallback.py`
+    uses the global; keeping the new file off it means both files are safe
+    to run in any order).
+  - Seams that own a "single truth" contract should swallow their own
+    normalization: the seam strips `skill_id` itself, so call sites pass the
+    raw value and the ritual can't drift between callers (same idea as
+    RA-124 tail/empty-list edge being handled once inside, not at two
+    call sites).
+---
+
+## [2026-10-13 01:50 CST] - RA-125
+- Implemented: module-level `_RESPONSE_CODE_DEDUPE_KEY = "preference:response_code"`
+  in `lca/nodes/reflect/memory_extract/memory_extract.py` (single source for the
+  "一次性回复格式要求不是偏好" policy literal). `_is_response_code_preference`
+  compares `dedupe_key == _RESPONSE_CODE_DEDUPE_KEY`; `_EXTRACT_PROMPT` interpolates
+  via a `{response_code_dedupe_key}` placeholder through the existing
+  `.replace("{existing_memories}"/"{task}")` chain (constant slot replaced FIRST,
+  before the user-controlled inserts, so task/existing_memories text containing
+  the placeholder string is never interpreted).
+- Verification: rendered prompt text is byte-identical to the pre-change version
+  (compared against `git show HEAD:...`); filter semantics unchanged (fail-open
+  regex untouched; explicit `memory_add` never passes through this filter);
+  RA-123's `resolve_runtime_adapter` delegation untouched.
+- Files changed: `lca/nodes/reflect/memory_extract/memory_extract.py` (+10/-3),
+  `raphy/prd.json` (RA-125 passes:true).
+- Quality: 5 memory_extract test files → **24 passed**
+  (test_memory_extract_distills_identity.py + fast_path_no_llm +
+  with_prefilter + existing_memories + preference_without_pronoun);
+  `ruff check` and `ruff format --check` clean on the touched file.
+- **Learnings for future iterations:**
+  - 评估的插值建议要按实际代码形态落地（RA-125 实证）：assessment 说
+    "f-string 或改成 f-string 插值——读代码确认"，读代码发现 prompt 实际是
+    `.replace` 链而非 f-string（`{existing_memories}`/`{task}` 占位在定义时是
+    普通字符串），插值就走同一条链加一个占位。不要按评估假设写、按实际写。
+  - Placeholder 链里常量槽要排在用户可控输入之前：`existing_memories` 和
+    `task` 是用户文本，可能字面包含占位符串；先替换常量槽再插入用户文本，
+    避免用户文本被当成模板二次解释。
 ---

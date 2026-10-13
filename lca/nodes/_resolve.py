@@ -19,6 +19,12 @@ difference an explicit ``required`` flag.
 RA-119 mirrored the ``required`` flag onto ``resolve_runtime_state`` so the
 fail-soft ``concept.effect.execute`` probes converge here too instead of
 hand-rolling the two-shape probe.
+
+RA-123 converged the ``adapter`` two-shape probe here as well:
+``think.llm.invoke`` (fail-loud) and ``reflect.memory_extract``
+(fail-soft) hand-rolled the same attribute-then-``.get`` ritual with
+divergent missing semantics; ``resolve_runtime_adapter`` makes that
+difference an explicit ``required`` flag, completing the RA-118/119 tail.
 """
 
 from __future__ import annotations
@@ -108,3 +114,24 @@ def resolve_runtime_state(*, context: NodeContext, node: str, required: bool = T
     if state_obj is None and required:
         raise TypeError(f"{node}: 'state' must be supplied via context.runtime")
     return state_obj
+
+
+def resolve_runtime_adapter(*, context: NodeContext, node: str, required: bool = True) -> Any:
+    """Pull the LLM adapter from the whitelisted kernel runtime carrier.
+
+    Two-shape probe (attribute first, then mapping-style ``.get``) — the
+    same ritual ``resolve_writer`` / ``resolve_runtime_state`` use.
+
+    ``required=True`` (fail-loud, e.g. ``think.llm.invoke``): a missing
+    adapter raises ``TypeError`` naming the node.
+    ``required=False`` (fail-soft, e.g. ``reflect.memory_extract``): a
+    missing adapter returns ``None`` so the call site's own passthrough
+    branch (missing adapter or no ``complete`` method) stays load-bearing.
+    """
+    runtime = getattr(context, "runtime", None)
+    adapter = getattr(runtime, "adapter", None) if runtime is not None else None
+    if adapter is None and runtime is not None and hasattr(runtime, "get"):
+        adapter = runtime.get("adapter")
+    if adapter is None and required:
+        raise TypeError(f"{node}: 'adapter' must be supplied via context.runtime")
+    return adapter
