@@ -48,7 +48,7 @@ def _is_failure(observation: object) -> bool:
         return observation.outcome is not EffectOutcome.SUCCEEDED
     if isinstance(observation, Mapping):
         return observation.get("success") is False
-    return bool(getattr(observation, "success", None) is False)
+    return getattr(observation, "success", None) is False
 
 
 @dataclass(frozen=True, slots=True)

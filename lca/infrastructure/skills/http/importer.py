@@ -194,7 +194,7 @@ class HttpSkillImporter(SkillImporter):
 
     async def _fetch_text(self, url: str) -> str:
         data = await self._fetch_bytes(url)
-        if data.startswith(b"PK\x03\x04") or data.startswith(b"PK\x05\x06"):
+        if data.startswith((b"PK\x03\x04", b"PK\x05\x06")):
             raise SkillImportError(
                 "下载内容是 ZIP，不能当作 SKILL.md 保存。使用 market identifier，或 kind=zip。"
             )

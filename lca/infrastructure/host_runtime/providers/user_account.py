@@ -22,7 +22,7 @@ class UserProvider(Provider):
 
     @property
     def _exists(self) -> bool:
-        return bool(self.run(["id", "-u", self.user.name]).returncode == 0)
+        return self.run(["id", "-u", self.user.name]).returncode == 0
 
     def provision(self) -> bool:
         """Create the configured system user when it is not already present."""
@@ -41,7 +41,7 @@ class UserProvider(Provider):
                 self.user.name,
             ]
         )
-        return bool(result.returncode == 0)
+        return result.returncode == 0
 
     def destroy(self) -> bool:
         """Stop user processes and remove the user, home directory, and stale group."""

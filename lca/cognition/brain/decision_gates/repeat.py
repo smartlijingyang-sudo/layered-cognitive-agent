@@ -91,7 +91,7 @@ class RepeatToolCallGate(DecisionGate):
             return decision
 
         last_success = last_observation_success(state)
-        failed = bool(last_success is False)
+        failed = last_success is False
         detailed_threshold = (
             self._repeat_thresholds[1] if len(self._repeat_thresholds) > 1 else trigger_at
         )

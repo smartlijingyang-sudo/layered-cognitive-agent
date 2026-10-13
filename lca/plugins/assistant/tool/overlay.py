@@ -288,7 +288,7 @@ class _AssistantToolOverlayImpl(AssistantToolOverlay):
         if isinstance(previous_digests, dict):
             for name, value in previous_digests.items():
                 if isinstance(value, str) and (
-                    str(name).startswith("skills/") or str(name).startswith(_TOOLS_DIGEST_PREFIX)
+                    str(name).startswith(("skills/", _TOOLS_DIGEST_PREFIX))
                 ):
                     extra[str(name)] = value
         tools_section = manifest.get("tools")
