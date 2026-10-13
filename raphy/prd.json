@@ -2013,10 +2013,10 @@
     "Mock-backed debug output now reports \"mock-llm\" instead of None (behavior pinned by test)."
    ],
    "priority": 5,
-   "passes": false,
+   "passes": true,
    "branchName": "raphy/arch-20261014-0448",
-   "notes": "Assessed 2026-10-14 04:45 round (Area E, RA-106 follow-up). Strong: two = real (verbatim twice), deletion test PASS, interface behaviorally superior (Mock evidence). Territory: both files' recent commits are user-side rounds (think-subgraph/ADR-0220, cli style/region), no lca-1000 churn. model_visible/adapter.py:78 unwrap chain deliberately out of scope (reads public attrs).",
-   "implemented": false,
+   "notes": "Assessed 2026-10-14 04:45 round (Area E, RA-106 follow-up). Strong: two = real (verbatim twice), deletion test PASS, interface behaviorally superior (Mock evidence). Territory: both files' recent commits are user-side rounds (think-subgraph/ADR-0220, cli style/region), no lca-1000 churn. model_visible/adapter.py:78 unwrap chain deliberately out of scope (reads public attrs).  Implemented 2026-10-14 optimize round: assessed 2 sites, converged 2 -- both now read getattr(adapter, \"model_name\", None); rg-verified zero getattr(.*\"_model\") reads remain in lca/; new tests/infrastructure/cli/test_debug_credentials_model_name.py pins mock-backed debug output == \"mock-llm\" end to end through both real functions (was None); 7 tests passed incl. test_model_label, 9 adjacent driver_debug CLI tests passed, ruff check clean. No assessment drift.",
+   "implemented": true,
    "dropped": false
   },
   {

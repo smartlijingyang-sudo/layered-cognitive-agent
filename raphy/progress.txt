@@ -3524,3 +3524,32 @@ brain/reducer/memory/hub/standing_refresher 等键，待 RA-123 落地后再评�
   RA-138 (Worth exploring: legacy /answer is_rejection gap, evidence-first).
   RA-139 (typed ResumeAnswer) speculative -- deferred until RA-138 evidence lands.
 - Diversity quota: all 3 from friction walk, none duplication-class.
+
+## 2026-10-14 05:27 CST - RA-136
+
+- Implemented: two verbatim private `_model` probes converged onto the
+  `LLMAdapter.model_name` protocol seam (RA-106).
+  - `lca/infrastructure/cli/commands/runs/driver_debug.py:190`:
+    `"model": getattr(adapter, "_model", None) or getattr(adapter, "model", None)`
+    -> `"model": getattr(adapter, "model_name", None)`
+  - `lca/plugins/think/reasoner/credentials.py:131`:
+    `"adapter_model": ...` same replacement.
+- New test `tests/infrastructure/cli/test_debug_credentials_model_name.py`:
+  fake ProductionLLMResolver -> MockLLMAdapter, runs the real
+  `cmd_debug_credentials(json_mode=True)` and the real reasoner
+  `credentials.setup` (via `Plugin.setup`), asserts both report `"mock-llm"`
+  (was None before). Note: `@plugin` wraps setup in a `Plugin` object;
+  the raw coroutine is `Plugin.setup`.
+- Verification: `rg 'getattr\(.*"_model"' lca/` -> zero hits; anthropic
+  `self._model` constructor-passed fields untouched. Tests: 7 passed
+  (new 2 + test_model_label 5); adjacent driver_debug CLI tests 9 passed;
+  `ruff check` clean on all 3 touched files.
+- **Learnings for future iterations:**
+  - End-to-end behavior pins beat helper-unit pins: the probe lived inside two
+    env-heavy functions, but monkeypatching the resolver module attr at call
+    time (both imports are function-local) made the real path testable in
+    <2s with zero fixture cost.
+  - When assessing "dead fallback" claims, check protocol implementations,
+    not just producers: public `model` attr existed on zero adapters, but the
+    real clincher was Mock behavioral divergence (None vs "mock-llm").
+---
