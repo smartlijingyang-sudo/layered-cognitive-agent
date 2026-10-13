@@ -1950,9 +1950,9 @@
    "priority": 5,
    "passes": false,
    "branchName": "raphy/arch-20261014-0145",
-   "notes": "Assessed 2026-10-14 01:45 round (Area A F2). The canonical heuristic body itself is NOT changed (LobeHub wire convention); only where the invariant is enforced moves.",
+   "notes": "Assessed 2026-10-14 01:45 round (Area A F2). The canonical heuristic body itself is NOT changed (LobeHub wire convention); only where the invariant is enforced moves. DROPPED 2026-10-14 02:45 round: mis-assessed. Evidence: canonical_tool_name('tool_fs.read') -> 'toolFs.read' (mangles dotted namespace prefixes; proven by direct call). Acceptance requires (a) set_approved_tool_names canonicalizes every name, (b) tests/scenario/run_1/test_run_execution_facade.py set->get stays green (injects {'tool_fs.read'} via execute.resume_run and asserts round-trip), (c) canonical heuristic body NOT changed. (a)+(b)+(c) are jointly unsatisfiable. Future options: canonicalize only the leaf segment of dotted names, or declare the approved-tool domain shell-namespace-only (authorize.py docstring says the override covers shell namespace policy). Reader-side canonicalization (authorize.py:281) must stay regardless: it canonicalizes the model-emitted query name, which set_ can never control.",
    "implemented": false,
-   "dropped": false
+   "dropped": true
   },
   {
    "id": "RA-133",

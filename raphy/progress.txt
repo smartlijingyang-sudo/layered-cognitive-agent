@@ -3432,3 +3432,19 @@ brain/reducer/memory/hub/standing_refresher 等键，待 RA-123 落地后再评�
   (both Protocol decls) -> registry adapter -> RegistryRunCommands.resume_approval; record
   point skips approved_tool_names recording on rejection. Signature change inside carrier.
   Closes the "reject -> retry -> auto-approved" bypass.
+
+## [2026-10-14 03:10 CST] - RA-132 DROPPED (mis-assessed, evidence below)
+
+- Story wanted set_approved_tool_names to own the canonical invariant.
+- Test-proven conflict: canonical_tool_name('tool_fs.read') -> 'toolFs.read'
+  (mangles dotted namespace prefixes); the facade test
+  (tests/scenario/run_1/test_run_execution_facade.py) pins {'tool_fs.read'}
+  round-tripping through set_/get_. Story forbids changing the heuristic body.
+  (a) canonicalize-everything + (b) facade green + (c) heuristic untouched
+  cannot all hold. Dropped per optimize-prompt rule; no code changed.
+- Learning: canonical_tool_name is only safe for dot-less names; its docstring
+  claims LobeHub wire camelCase but it is applied to namespaced names too
+  (record point canonicalizes approval_request tool_calls, reader canonicalizes
+  model-emitted query names) -- the domain of the heuristic is underspecified.
+  A future story should first pin the domain (shell-namespace-only?) before
+  moving the invariant.
