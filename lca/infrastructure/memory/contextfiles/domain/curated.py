@@ -17,14 +17,14 @@ from typing import Any
 
 _SECRET = re.compile(
     r"(?i)(\bsk-(?:[A-Za-z0-9]+-){0,3}[A-Za-z0-9]{8,}\b"
-    r"|\bapi[ _-]?key\s*[:=]\s*\S+"
-    r"|\bpassword\s*[:=]\s*\S+"
-    r"|\btoken\s*[:=]\s*\S+"
-    r"|\baws_secret_access_key\s*=\s*\S+"
+    r"|\bapi[ _-]?key\s*[:=：＝]\s*\S+"
+    r"|\bpassword\s*[:=：＝]\s*\S+"
+    r"|\btoken\s*[:=：＝]\s*\S+"
+    r"|\baws_secret_access_key\s*[=＝]\s*\S+"
     r"|-----BEGIN [A-Z0-9 ]*PRIVATE KEY-----"
-    r"|密码\s*[:=]\s*\S+"
-    r"|密码\s*(?:是|就是|为)\s*[A-Za-z0-9][A-Za-z0-9+/=_@#$.-]{3,}"
-    r"|卡号\s*[:=]\s*\S+)"
+    r"|密码\s*[:=：＝]\s*\S+"
+    r"|密码\s*(?:是|就是|为)\s*[:=：＝]?\s*[A-Za-z0-9][A-Za-z0-9+/=_@#$.-]{3,}"
+    r"|卡号\s*[:=：＝]\s*\S+)"
 )
 _B64_BLOB = re.compile(r"[A-Za-z0-9+/_-]{32,}={0,2}")
 _CHAR_BUDGET = 12_000
@@ -290,4 +290,3 @@ __all__ = [
     "render_curated_markdown",
     "render_curated_memory_markdown",
 ]
-

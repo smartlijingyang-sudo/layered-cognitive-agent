@@ -80,6 +80,69 @@ def test_projection_never_contains_credentials(tmp_path) -> None:
     assert "密码" not in projected
 
 
+def test_contains_secret_detects_fullwidth_credential_shapes() -> None:
+    assert contains_secret("用户银行卡密码：123456")
+    assert contains_secret("password：hunter2")
+    assert contains_secret("API Key：abcdef123456")
+    assert contains_secret("token＝sk-abcdefghijklmnopqrstuvwxyz1234567890")
+    assert contains_secret("数据库密码就是：admin888")
+    assert contains_secret("卡号：6222020202020202020")
+    assert contains_secret("AWS_SECRET_ACCESS_KEY＝wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY")
+    assert not contains_secret("用户把密码记在笔记本上")
+    assert not contains_secret("密码就是记不住")
+
+
+def test_memory_add_rejects_fullwidth_credential_content(tmp_path) -> None:
+    memory = AssistantMemory(tmp_path / "asst")
+    memory.upsert(
+        MemoryRecord(
+            record_id="leak-fw-1",
+            content="用户银行卡密码：123456",
+            memory_type=MemoryLayer.SEMANTIC,
+            importance=0.9,
+            category=MemoryCategory.FACT,
+            dedupe_key="bank_password",
+            confidence=1.0,
+            metadata={"source": "model"},
+        )
+    )
+    assert memory.query(MemoryLayer.SEMANTIC) == []
+    assert memory.last_curated_receipt is not None
+    assert memory.last_curated_receipt.ok is False
+    assert memory.last_curated_receipt.error == "credential_rejected"
+
+
+def test_projection_never_contains_fullwidth_credentials(tmp_path) -> None:
+    memory = AssistantMemory(tmp_path / "asst")
+    memory.upsert(
+        MemoryRecord(
+            record_id="ok-fw-1",
+            content="用户住在杭州",
+            memory_type=MemoryLayer.SEMANTIC,
+            importance=0.9,
+            category=MemoryCategory.FACT,
+            dedupe_key="city",
+            confidence=1.0,
+            metadata={"source": "user"},
+        )
+    )
+    memory.upsert(
+        MemoryRecord(
+            record_id="leak-fw-2",
+            content="用户银行卡密码：123456",
+            memory_type=MemoryLayer.SEMANTIC,
+            importance=0.9,
+            category=MemoryCategory.FACT,
+            dedupe_key="bank_password",
+            confidence=1.0,
+            metadata={"source": "user"},
+        )
+    )
+    projected = (tmp_path / "asst" / "MEMORY.md").read_text(encoding="utf-8")
+    assert "用户住在杭州" in projected
+    assert "123456" not in projected
+
+
 def test_projection_failure_rolls_back_semantic_json(tmp_path, monkeypatch) -> None:
     memory = AssistantMemory(tmp_path / "asst")
     memory.upsert(
