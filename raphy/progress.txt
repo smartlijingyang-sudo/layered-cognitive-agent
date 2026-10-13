@@ -3191,3 +3191,46 @@ brain/reducer/memory/hub/standing_refresher 等键，待 RA-123 落地后再评�
     `task` 是用户文本，可能字面包含占位符串；先替换常量槽再插入用户文本，
     避免用户文本被当成模板二次解释。
 ---
+---
+
+## [2026-10-13 23:20 CST] - raphy/arch-20261013-2255 ASSESS (5 candidates)
+
+- 热点：`git log -40` 里 iter-tests-20261013-1843（run facade session-interface pin
+  + console record_runtime）、iter-quality-20261013-1831（skills
+  `_resolve_package` dedup → `_package_lookup.py`）、PR #43（agent-run-binding）。
+  摩擦漫步拆成 3 区：Area A run execution facade 链（子任务+自己精读补全）、
+  Area B skills 工具生命周期+包解析缝（子任务）、Area C resource-key 维度
+  runtime 探针全图（自己：RA-123 教训的键维度 grep）。
+- Area A 结论：无 story。`contracts/runtime/` + `application/runtime/` 是活跃的
+  ADR-0199 迁移（P1-01…P1-10 并行 PR 未落完，`RunHandle` 还是 placeholder）；
+  pin 测试钉的是 `plugins/transport/webserver/`（lca-1000 领地，禁区）。
+  `SessionBusFacade` 是诚实的 adapter（两形状真实、docstring 精确、idempotent），
+  deletion test 通过，无摩擦。
+- Area B 结论：两轮收敛（dedup + RA-124）都是实的、无第三处残留仪式；摩擦在
+  收敛的副产品：**F1** `bridge.current_state()` 零调用方零测试的孤儿 seam
+  （RA-124 尸体）→ RA-126；**F2** 两个一行 `_resolve_package` adapter + retire
+  的第三种 import 别名风格、两个测试调私有 adapter 而共享 seam 零直接测试
+  → RA-127。`find_activated` 有 6 个教科书级 seam 直接测试。
+- Area C 结论：resource-key 全图——`state` 键 12 手写+3 已收敛→剩余 9 手写
+  fail-soft 探针 → RA-128（收敛到既有 `resolve_runtime_state(required=False)`）；
+  `brain` 键 10 手写单形状探针、无 seam → RA-129（新增
+  `resolve_runtime_brain`，RA-118/119/123 形状）；port-then-runtime
+  `PortName("state") or getattr(runtime, "state")` 3 手写 fail-soft →
+  RA-130（给 `resolve_typed_port_or_runtime` 加 `required` 旗语，一次收完
+  两种语义——RA-119 教训）。
+- 运行时验证（干净 worktree、LLM_API_KEY=dummy、timeout 120）：4 流全 PASS
+  （基本 run / 带 tool call / 两次顺序 run / 非收敛 run）；RA-023 修复确认真实
+  （非收敛 run 返回 `Result(status=failed)`，不再抛 `LoopObligationExceededError`）。
+  无 P0。anomaly_detector cycle/stalled 日志警告仍在（P2，未追踪）。
+- 考虑过但未立项：F3（name-fallback 碰撞消解需领域决策，speculative）、F4
+  （tail 语义补 tool description 一行，非架构深化）、F5（ContextVar 快路径是
+  已证实的 fallback 链，删快路径是语义变更）、F6（OSError 穿透取决于外层框架
+  兜底，未验证）、F7/F8（speculative）。
+- **Learnings for future iterations:**
+  - 评估阶段的 resource-key 维度 grep（`getattr(runtime, "<key>"`）是 RA-118/119/123
+    线的收官动作：本轮一次摸清 state/brain/reducer/memory 四个键的剩余簇，
+    后续轮不必再扫 `lca/nodes/` 的 runtime 探针维度。
+  - friction walk 的"无 story"区也要写清读了哪些文件、为什么不适用（Area A：
+    ADR-0199 迁移进行中 + webserver 禁区）——diversity quota 的"无发现"文档化
+    义务，不是没写 story 就没产出。
+---
