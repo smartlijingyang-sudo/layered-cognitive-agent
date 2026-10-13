@@ -3419,3 +3419,16 @@ brain/reducer/memory/hub/standing_refresher 等键，待 RA-123 落地后再评�
   无注入 resume_run（dead-ish 兼容壳，fail-closed 方向）、CLI contracts import
   （pre-existing，backlog）。
 - **Learnings for future iterations:** 见本轮新增的 6 条 Codebase Patterns（顶部）。
+
+## [2026-10-14 03:00 CST] - RA-131 RECOVER (interrupted 01:45 round residue)
+
+- Recovery: main worktree was on raphy/arch-20261014-0145 with uncommitted RA-131 residue.
+  Ran related tests first: 5 new rejection tests green, 29 bypass+rejection tests green.
+  2 reds in test_lca_p1_node_09_resume_tool_result.py are PRE-EXISTING (verified identical
+  failures at clean branch HEAD 107a866c7 in an isolated worktree; 404 on POST routes,
+  orthogonal to this change). Fixed 4 ruff errors in the new test file (I001 + 3x RUF100)
+  before committing the residue as one recover commit.
+- RA-131 closed: `is_rejection: bool = False` keyword threaded _dispatch_resume -> RunPort
+  (both Protocol decls) -> registry adapter -> RegistryRunCommands.resume_approval; record
+  point skips approved_tool_names recording on rejection. Signature change inside carrier.
+  Closes the "reject -> retry -> auto-approved" bypass.

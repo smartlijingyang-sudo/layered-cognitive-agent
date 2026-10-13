@@ -707,6 +707,11 @@ async def _dispatch_resume(
             code="invalid_resume_payload",
         )
     content = str(payload_dict.get("content") or payload_dict.get("rejection_reason") or "")
+    # RA-131: the approve/reject distinction must survive the payload fold to
+    # the record point. ``rejection_reason`` non-empty means the human REJECTED
+    # the tool call; the distinction is carried as ``is_rejection`` so the
+    # record point can skip recording rejected tools as approved.
+    is_rejection = bool(payload_dict.get("rejection_reason"))
     plugin_state = payload_dict.get("plugin_state")
     parent_message_id = str(payload_dict.get("parent_message_id") or "")
     idempotency_key = f"{run_id}:{approval_id}:resume:{parent_message_id or 'topic'}"
@@ -718,6 +723,7 @@ async def _dispatch_resume(
         idempotency_key,
         plugin_state=plugin_state,
         parent_message_id=parent_message_id,
+        is_rejection=is_rejection,
     )
     if not receipt.accepted:
         return _err(

@@ -106,6 +106,7 @@ class RunPort(Protocol):
         *,
         plugin_state: dict[str, Any] | None = None,
         parent_message_id: str = "",
+        is_rejection: bool = False,
     ) -> RunCommandReceipt: ...
 
     async def summary(self, run_id: str) -> dict[str, Any] | None: ...
