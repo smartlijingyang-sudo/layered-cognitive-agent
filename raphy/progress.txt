@@ -3253,3 +3253,25 @@ brain/reducer/memory/hub/standing_refresher 等键，待 RA-123 落地后再评�
   - TYPE_CHECKING import 删 method 前先数引用：本例 `AgentState` 还被 `StateGetter`
     的字符串注解引用，import 保留是对的；`ruff check` 会兜底 F401。
 ---
+---
+
+## [2026-10-13 23:45 CST] - RA-127
+
+- Implemented: 删掉 activate/deactivate 两个一行 `_resolve_package` method adapter
+  （纯直调、零行为增量），调用点 inline 为 `resolve_package(self._store, raw)`；
+  retire/tool.py 的 `resolve_package as _resolve_package` import 别名统一为 plain import
+  + 直接调用。两个测试改调共享 seam（`resolve_package(tool._store, x)`）；
+  新增 `TestResolvePackageSeam` 3 个 seam 直接单元测试（exact-id / 大小写不敏感
+  name fallback / miss→None）。
+- Verification: 126 passed；`ruff check` 全绿；`rg _resolve_package lca/` 零命中。
+  **CAVEAT（预先存在的红）**：`test_activate_skill_resolves_home_skill` 的
+  global-reachability 断言（`resolve_package(merged, "global-skill") is not None`）
+  在 base HEAD（stash 后）同样失败——与本改动无关的 merged-store 预先红点，
+  不在本 story 范围内，未顺手修（minimal diff 纪律）。
+- Files changed: 3 tool.py（-6/+4 行）、tests 2 文件、raphy/prd.json。
+- **Learnings for future iterations:**
+  - 红测试先判"是不是我的"：`git stash` → 跑 → `git stash pop` 是自己的改动时
+    最快的归因手段（别人的未提交工作绝不 stash——本次 worktree 里只有自己的改动）。
+  - 预先红点不顺手修：它的 seam（merged store global reachability）是另一个故事的
+    领地；修了就是 scope creep，不修但如实记录。
+---

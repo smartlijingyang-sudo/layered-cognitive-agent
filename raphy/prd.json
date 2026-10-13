@@ -1859,9 +1859,9 @@
         "Skills tools test dirs pass (`tests/infrastructure/tools/skills/`, `tests/scenario/operational/`)."
       ],
       "priority": 1,
-      "passes": false,
+      "passes": true,
       "branchName": "raphy/arch-20261013-2255",
-      "notes": "Friction-walk finding (Area B, F2). dedup tail of 991ff7ba3. Strength: Strong.",
+      "notes": "Implemented: deleted the two one-line `_resolve_package` method adapters (activate/tool.py:300-301, deactivate/tool.py:99-100), inlined call sites to `resolve_package(self._store, raw)`; retire/tool.py normalized from the `resolve_package as _resolve_package` import alias to a plain import + direct call. Two tests retargeted to the shared seam (`resolve_package(tool._store, x)`); added TestResolvePackageSeam with 3 direct seam unit tests (exact-id hit, case-insensitive name fallback, miss -> None). CAVEAT: `test_activate_skill_resolves_home_skill`'s global-reachability assertion is RED on base HEAD too (verified via git stash: fails identically before/after) -- pre-existing merged-store issue, unrelated to this change; not fixed here (out of story scope). 126 other tests pass; `ruff check` clean; `rg _resolve_package lca/` zero hits. Strength: Strong.",
       "implemented": false,
       "dropped": false
     },

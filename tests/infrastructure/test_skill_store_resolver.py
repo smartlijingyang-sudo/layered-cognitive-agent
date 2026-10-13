@@ -18,6 +18,7 @@ from lca.infrastructure.skills.assistant.merged_store import AssistantMergedSkil
 from lca.infrastructure.skills.assistant.resolver import resolve_skill_store
 from lca.infrastructure.skills.disk.store import DiskSkillPackageStore
 from lca.infrastructure.skills.settings.settings import SkillSettings
+from lca.infrastructure.tools.skills._package_lookup import resolve_package
 from lca.infrastructure.tools.skills.activate.tool import SkillActivateTool
 from lca.plugins.assistant.skill.overlay import AssistantSkillOverlayImpl
 from lca.plugins.domain.assistant.catalog.plugin import AssistantCatalogImpl
@@ -116,8 +117,39 @@ class TestHomeSkillActivationViaMergedStore:
         assert isinstance(merged, AssistantMergedSkillStore)
 
         tool = SkillActivateTool(store=merged)
-        package = tool._resolve_package("assistant-only")
+        package = resolve_package(tool._store, "assistant-only")
         assert package is not None
         assert package.skill_id == "assistant-only"
         # Global skills remain reachable through the same merged view.
-        assert tool._resolve_package("global-skill") is not None
+        assert resolve_package(tool._store, "global-skill") is not None
+
+
+class TestResolvePackageSeam:
+    """``resolve_package`` 的直接单元测试：interface 即测试面（RA-127）。
+
+    此前覆盖走的是各 tool 的私有 ``_resolve_package`` adapter；adapter 已删，
+    测试面回到共享 seam 本体。
+    """
+
+    def _store(self, tmp_path: Path) -> DiskSkillPackageStore:
+        store = DiskSkillPackageStore(SkillSettings(cache_dir=tmp_path / "seam"))
+        store.install_package(
+            skill_id="pkg-one",
+            skill_md_text="---\nname: One\ndescription: d\nreferences: []\n---\nbody",
+            resource_files={},
+            source_url="u",
+        )
+        return store
+
+    def test_exact_id_hit(self, tmp_path: Path) -> None:
+        package = resolve_package(self._store(tmp_path), "pkg-one")
+        assert package is not None
+        assert package.skill_id == "pkg-one"
+
+    def test_name_fallback_case_insensitive(self, tmp_path: Path) -> None:
+        package = resolve_package(self._store(tmp_path), "ONE")
+        assert package is not None
+        assert package.skill_id == "pkg-one"
+
+    def test_miss_returns_none(self, tmp_path: Path) -> None:
+        assert resolve_package(self._store(tmp_path), "no-such-skill") is None
