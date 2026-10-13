@@ -108,7 +108,7 @@ def recalibrate_probs(probs: list[float], temperature: float) -> list[float]:
     ``temperature > 1`` flattens (counters over-confidence),
     ``temperature < 1`` sharpens. Must be > 0.
     """
-    if not (temperature > 0) or not math.isfinite(temperature):
+    if temperature <= 0 or not math.isfinite(temperature):
         raise ValueError(f"temperature must be a positive finite number, got {temperature!r}")
     eps = 1e-12
     zs = [math.log(max(p, eps)) for p in probs]
@@ -159,7 +159,7 @@ class LayaScoreEngine:
         temperature: float = DEFAULT_TEMPERATURE,
         device: str | None = None,
     ) -> None:
-        if not (temperature > 0) or not math.isfinite(temperature):
+        if temperature <= 0 or not math.isfinite(temperature):
             raise ValueError(f"temperature must be a positive finite number, got {temperature!r}")
         self.checkpoint = checkpoint
         self.cache_dir = cache_dir
