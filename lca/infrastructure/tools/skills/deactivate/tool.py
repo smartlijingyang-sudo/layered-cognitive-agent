@@ -11,13 +11,11 @@ from lca.contracts.atoms.semantic.keys import FAILURE_KIND, FAILURE_KIND_VALIDAT
 from lca.contracts.models.core.execution.decision import Observation
 from lca.contracts.models.core.policy.budget import DEFAULT_TOOL_TIMEOUT_S
 from lca.contracts.protocols import Tool
-from lca.contracts.protocols.memory.operational_skills import (
-    SkillNotFoundError,
-    SkillPackageStore,
-)
+from lca.contracts.protocols.memory.operational_skills import SkillPackageStore
 from lca.infrastructure.skills.activation.scope import unregister_activated
 from lca.infrastructure.tools.contract.render.render import FieldSpec, RenderContract, contract
 from lca.infrastructure.tools.contract.schema.schema import COMMON
+from lca.infrastructure.tools.skills._package_lookup import resolve_package
 
 DEACTIVATE_SKILL_TOOL = "deactivate_skill"
 
@@ -99,12 +97,4 @@ class SkillDeactivateTool(Tool):
         )
 
     def _resolve_package(self, raw: str):
-        try:
-            return self._store.get(raw)
-        except SkillNotFoundError:
-            pass
-        raw_lower = raw.lower()
-        for entry in self._store.list_installed():
-            if entry.name.lower() == raw_lower:
-                return self._store.get(entry.skill_id)
-        return None
+        return resolve_package(self._store, raw)

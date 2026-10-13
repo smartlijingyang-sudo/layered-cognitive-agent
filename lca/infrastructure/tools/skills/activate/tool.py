@@ -29,7 +29,6 @@ from lca.contracts.models.core.execution.decision import Observation
 from lca.contracts.models.core.policy.budget import DEFAULT_TOOL_TIMEOUT_S
 from lca.contracts.protocols import Tool
 from lca.contracts.protocols.memory.operational_skills import (
-    SkillNotFoundError,
     SkillPackage,
     SkillPackageStore,
 )
@@ -42,6 +41,7 @@ from lca.infrastructure.skills.activation.scope import (
 )
 from lca.infrastructure.tools.contract.render.render import FieldSpec, RenderContract, contract
 from lca.infrastructure.tools.contract.schema.schema import COMMON
+from lca.infrastructure.tools.skills._package_lookup import resolve_package
 
 logger = logging.getLogger(__name__)
 
@@ -298,14 +298,4 @@ class SkillActivateTool(Tool):
         )
 
     def _resolve_package(self, raw: str) -> SkillPackage | None:
-        try:
-            return self._store.get(raw)
-        except SkillNotFoundError:
-            # INTENTIONAL: 精确 ID 未命中 → 落到 case-insensitive 名字 fallback;
-            # 这是用户输入容错的预期路径,不是错误。
-            pass
-        raw_lower = raw.lower()
-        for entry in self._store.list_installed():
-            if entry.name.lower() == raw_lower:
-                return self._store.get(entry.skill_id)
-        return None
+        return resolve_package(self._store, raw)
