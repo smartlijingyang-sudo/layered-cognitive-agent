@@ -3579,3 +3579,33 @@ brain/reducer/memory/hub/standing_refresher 等键，待 RA-123 落地后再评�
   - 纯删除类 story 记得顺手清 import：`RunRegistry` 只在被删签名里用过，ruff F401
     会立刻抓；删除 diff 里附带一行 import 清理不算 scope creep。
 ---
+
+## 2026-10-14 05:38 CST - RA-138
+
+- Evidence first (direction b confirmed): `deploy/lobehub/patches/ui/WidgetCard.tsx:66`
+  still POSTs to `/lca-api/runs/${runId}/answer` with
+  `{approval_id, idempotency_key, payload}` — pure-string payload, no
+  rejection marker. Route is NOT retired (recovery.py docstring already hinted
+  it, WidgetCard proves it).
+- Implemented (b): `answer_run` (command_endpoints.py) now reads an in-band
+  `rejection_reason` key from the legacy body — the SAME marker as
+  `_dispatch_resume`'s RA-131 seam, no new marker invented — and passes
+  `is_rejection=bool(rejection_reason)` explicitly to `RunPort.resume_approval`.
+  Marker absent -> legacy approve-only widget behavior unchanged. Frontend
+  untouched (the widget only ever sends approvals).
+- New tests `tests/plugins/transport/webserver/test_answer_run_rejection_marker.py`
+  (4): marker -> `is_rejection=True` forwarding; no marker -> `False` and
+  payload forwarded verbatim; rejection-via-answer NOT recorded into
+  `approved_tool_names` (end to end through the real `RegistryRunCommands`,
+  the test that was unwritable before); approval-via-answer still records
+  canonicalized `{"executeCode"}`.
+- Verification: RA-131 suite + resume idempotency/concurrency + run_isolation
+  = 27 passed; `ruff check` clean on both touched files.
+- **Learnings for future iterations:**
+  - "Evidence first" stories 的取证要去看调用方的真实代码，不是只看服务端的
+    docstring：recovery.py 的 docstring 只说"仍是被考虑的路径"，WidgetCard.tsx:66
+    的 fetch 调用才是"仍在调"的硬证据——取证结论 (b) 直接决定了修法形状。
+  - 收敛优先于发明：in-band marker 直接复用 `_dispatch_resume` 的
+    `rejection_reason`，两条 ingress 的"拒绝显式"不变量共享同一个标记语义，
+    而不是给 legacy 路由发明第二个标记。
+---

@@ -2046,10 +2046,10 @@
     "Existing RA-131 rejection tests stay green; `ruff check` clean."
    ],
    "priority": 4,
-   "passes": false,
+   "passes": true,
    "branchName": "raphy/arch-20261014-0448",
-   "notes": "Assessed 2026-10-14 04:45 round (Area D). Worth exploring: the gap is real but the fix shape depends on frontend evidence. recovery.py docstring confirms /answer is still a considered path, not retired. Territory: same as RA-137 (webserver carrier, user-side runs work, no lca-1000 churn).",
-   "implemented": false,
+   "notes": "Assessed 2026-10-14 04:45 round (Area D). Worth exploring: the gap is real but the fix shape depends on frontend evidence. recovery.py docstring confirms /answer is still a considered path, not retired. Territory: same as RA-137 (webserver carrier, user-side runs work, no lca-1000 churn).  Evidence 2026-10-14 optimize round -> direction (b): deploy/lobehub/patches/ui/WidgetCard.tsx:66 still POSTs to `/lca-api/runs/${runId}/answer` with {approval_id, idempotency_key, payload} -- no rejection marker, route not retired. Implemented (b): answer_run reads an in-band `rejection_reason` key from the legacy body (same marker as _dispatch_resume's RA-131 seam, no new marker invented) and passes is_rejection explicitly to the port; marker absent keeps the legacy approve-only widget behavior. Frontend untouched (widget only ever sends approvals). 4 new tests in tests/plugins/transport/webserver/test_answer_run_rejection_marker.py: marker->is_rejection True/False forwarding, rejection-via-answer not recorded into approved_tool_names, approval-via-answer still records canonicalized names. 27 tests passed incl. RA-131 suite, ruff check clean. No assessment drift.",
+   "implemented": true,
    "dropped": false
   }
  ]
