@@ -16,6 +16,8 @@ from typing import Any
 
 import structlog
 
+from lca.infrastructure.persistence.postgres import lobehub_database_url
+
 _log = structlog.get_logger(__name__)
 
 _ASK_API = "askUserQuestion"
@@ -329,30 +331,6 @@ def clear_pending_question(cur: Any, identity: ChatIdentity, *, approved: bool) 
             resolved.run_id,
         ),
     )
-
-
-def lobehub_database_url() -> str | None:
-    """The database that owns ``messages``.
-
-    The kernel process does not inherit the LobeHub dev server's env.
-    ``DATABASE_URL`` wins. The dev checkout's ``lobehub-ui/.env`` is the
-    fallback, because that file is what the UI uses to read the same table.
-    """
-    from lca.infrastructure.persistence.postgres import database_url_from_env
-
-    configured = database_url_from_env()
-    if configured:
-        return configured
-    env_file = Path(__file__).resolve().parents[3] / "lobehub-ui" / ".env"
-    if not env_file.is_file():
-        return None
-    for line in env_file.read_text(encoding="utf-8").splitlines():
-        stripped = line.strip()
-        if stripped.startswith("DATABASE_URL="):
-            value = stripped.split("=", 1)[1].strip().strip('"').strip("'")
-            if value.startswith("postgres"):
-                return value
-    return None
 
 
 def _connect(url: str) -> Any:

@@ -165,6 +165,57 @@ class TestDecodeCreateRunAssistantId:
         assert decoded.assistant_id == ""
 
     @pytest.mark.asyncio
+    async def test_agent_falls_back_to_lobehub_mapping(
+        self, file_store: LocalFileStore, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Run-created agents live in LobeHub ``agents.agency_config``, not the
+        ownership store; the carrier must fall back to that mapping truth."""
+        import lca.plugins.transport.webserver.handlers.runs.api.command_endpoints as endpoints
+
+        class _Ownership:
+            def assistant_id_for_agent(self, agent_id: str) -> str | None:
+                return None
+
+        monkeypatch.setattr(
+            endpoints,
+            "agent_assistant_id_from_lobehub",
+            lambda agent_id: "asst_lobehub" if agent_id == "agt_run_created" else None,
+        )
+        decoded = await decode_create_run(
+            {"messages": _messages(), "agent": {"id": "agt_run_created"}},
+            ctx=None,
+            file_store=file_store,
+            resolve_mode=_resolve_mode,
+            ownership=_Ownership(),
+        )
+        assert isinstance(decoded, CreateRunRequest)
+        assert decoded.assistant_id == "asst_lobehub"
+
+    @pytest.mark.asyncio
+    async def test_ownership_mapping_wins_over_lobehub_fallback(
+        self, file_store: LocalFileStore, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        import lca.plugins.transport.webserver.handlers.runs.api.command_endpoints as endpoints
+
+        class _Ownership:
+            def assistant_id_for_agent(self, agent_id: str) -> str | None:
+                return "asst_owned"
+
+        def _unexpected_fallback(agent_id: str) -> str | None:
+            raise AssertionError("fallback must not run when ownership maps the agent")
+
+        monkeypatch.setattr(endpoints, "agent_assistant_id_from_lobehub", _unexpected_fallback)
+        decoded = await decode_create_run(
+            {"messages": _messages(), "agent": {"id": "agt_owned"}},
+            ctx=None,
+            file_store=file_store,
+            resolve_mode=_resolve_mode,
+            ownership=_Ownership(),
+        )
+        assert isinstance(decoded, CreateRunRequest)
+        assert decoded.assistant_id == "asst_owned"
+
+    @pytest.mark.asyncio
     async def test_non_string_rejected_400(self, file_store: LocalFileStore) -> None:
         decoded = await decode_create_run(
             {"messages": _messages(), "assistant_id": 123},

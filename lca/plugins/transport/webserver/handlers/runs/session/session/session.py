@@ -95,6 +95,9 @@ class RunSession:
     snapshot: Any = None
     runnable: Any = None
     approval_request: dict[str, Any] | None = None
+    # 工具权限审批通过后，把已批准的工具名记在这里。resume 后同一 run 内
+    # 模型再次调用这些工具时，act.authorize 放行（避免「审批→重调→再审批」循环）。
+    approved_tool_names: set[str] = field(default_factory=set)
     # Same hot-cache class: RuntimePlane handles published per-turn by the
     # execution environment. A HIL resume runs in a new task without the
     # environment, so it re-publishes these instead of re-resolving

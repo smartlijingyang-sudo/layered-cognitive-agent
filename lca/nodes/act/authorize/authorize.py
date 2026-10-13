@@ -28,6 +28,11 @@ from lca.contracts.harness.composition.plugin_contract import (
     PluginContract,
     PluginIdentity,
 )
+from lca.contracts.models.core.execution.approval import (
+    ApprovalReasonKind,
+    ApprovalRequirement,
+    RiskLevel,
+)
 from lca.contracts.models.core.execution.decision import Decision
 from lca.contracts.models.core.state.state import AgentState
 from lca.contracts.observability.evidence.evidence import (
@@ -46,6 +51,7 @@ from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import
 from lca.contracts.protocols.graph.routing import RoutingDecision
 from lca.contracts.runtime.trust import get_current_trust_envelope
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
+from lca.infrastructure.runtime_plane.access.approved_tools import canonical_tool_name
 
 _NEXT_HINT_GRANT_REFUSED = "grant_refused"
 
@@ -58,6 +64,22 @@ def _required_grant_of(tool: object) -> str:
     class attribute 声明。grant-agnostic 工具不受运行时授权检查约束。
     """
     return str(getattr(tool, "required_grant", "") or "").strip()
+
+
+def _approved_tool_names() -> set[str]:
+    """Return tool names the human already approved for this run.
+
+    工具权限审批（shell 命名空间策略）通过后，carrier 把被批准的工具名记在
+    ``RunSession.approved_tool_names`` 并在 resume 任务注入当前 context。
+    本节点读它来放行同一 run 内的后续调用，避免 full-restart resume 后
+    「审批→重调→再审批」循环。context 未注入时返回空集（fail-safe：
+    不放行任何工具）。
+    """
+    from lca.infrastructure.runtime_plane.access.approved_tools import (
+        get_approved_tool_names,
+    )
+
+    return set(get_approved_tool_names())
 
 
 def _no_refusal() -> RoutingDecision:
@@ -249,7 +271,26 @@ class ActAuthorizeExecutor:
         plane = getattr(state, "primary_plane", None) or current_primary()
         req = build_default_approval_engine().evaluate(decision.tool_calls, plane=plane)
 
+        # 工具权限审批通过后，同一 run 内再次调用已批准工具直接放行，
+        # 避免 full-restart resume 的「审批→重调→再审批」循环。只覆盖
+        # 非 HITL 工具（carrier 记录时已排除 askUserQuestion）。
+        approved_override = False
+        if req.required and decision.action_type == "use_tool" and decision.tool_calls:
+            approved = _approved_tool_names()
+            if approved and all(
+                canonical_tool_name(call.tool_name) in approved for call in decision.tool_calls
+            ):
+                req = ApprovalRequirement(
+                    required=False,
+                    reason_kind=ApprovalReasonKind.NONE,
+                    risk_level=RiskLevel.LOW,
+                    summary="工具已在本次 run 中获人工批准",
+                )
+                approved_override = True
+
         approval_required = bool(decision.needs_approval) or bool(req.required)
+        if approved_override:
+            approval_required = False
 
         # ADR-0292 §10 P3 运行时授权检查：对声明了 required_grant 的工具，
         # 要求该 grant 在 ambient TrustEnvelope 里。检查不读
