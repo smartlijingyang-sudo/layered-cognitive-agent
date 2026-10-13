@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import unittest
 from importlib import import_module
+from types import SimpleNamespace
 from typing import Any, cast
 from unittest.mock import patch
 
@@ -59,9 +60,18 @@ class TestRunExecutionFacade(unittest.IsolatedAsyncioTestCase):
         )
 
     async def test_resume_delegates_answer_to_lifecycle_coordinator(self) -> None:
+        from lca.infrastructure.runtime_plane.access.approved_tools import (
+            get_approved_tool_names,
+        )
+
         registry = RunRegistry()
         coordinator = _Coordinator()
-        session = cast("RunSession", object())
+        # 2e8264fb4 后 resume_run 读取 session.approved_tool_names 注入当前
+        # context；裸 object() 已不满足接口，用满足新接口的最小 stand-in。
+        session = cast(
+            "RunSession",
+            SimpleNamespace(event_session=None, approved_tool_names={"tool_fs.read"}),
+        )
         execution_module = import_module("lca.plugins.transport.webserver.carrier.runs.execute")
 
         with patch.object(
@@ -73,6 +83,7 @@ class TestRunExecutionFacade(unittest.IsolatedAsyncioTestCase):
 
         factory.assert_called_once_with(registry)
         self.assertEqual(coordinator.resume_calls, [(session, "批准")])
+        self.assertEqual(get_approved_tool_names(), frozenset({"tool_fs.read"}))
 
 
 if __name__ == "__main__":
