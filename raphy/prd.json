@@ -1,7 +1,7 @@
 {
   "project": "LCA Raphy Architecture Optimization",
-  "branchName": "raphy/arch-20261013-2255",
-  "description": "Continuous architecture deepening for the LCA cognitive-agent codebase via the raphy fresh-session loop. Round 1 (2026-10-06, old prompt): RA-001/RA-002 converged, RA-003 dropped with evidence. Round 2 (2026-10-06, hardened prompt): RA-004..RA-009 all done (merged to main 2026-10-07, merge 1b1526a94). Round 3 (2026-10-07, hardened prompt): friction walk over session plugins, loop_cursor, delegation/body executor; RA-010..RA-013 below. Out of scope: ralph Round 2 areas (DecisionGates, Ingest, ContextFiles shims, Read Runs micro-dirs, MemoryTools directory seam), lca/cognition/memory/ (frozen per Round 2 AP-01), CLI surface must not import contracts (deliberate rule), gate_chain_strategy.py (hands-off: another party's uncommitted work + pre-existing red test). Round 10 (2026-10-08 12:06, branch raphy/arch-20261008-1206): RA-033..RA-041 below (3 Strong + 5 Worth exploring + 1 Speculative; all from friction walk, none duplication-class). Round 11 (2026-10-08 15:05, branch raphy/arch-20261008-1505): RA-042..RA-047 all done (merged to main 2026-10-08, merge 0ab9d67cd). Round 12 (2026-10-08 22:05, branch raphy/arch-20261008-2205): RA-048..RA-050 below (1 Strong + 2 Worth exploring; all from friction walk, none duplication-class). Round DESLOP-100 (2026-10-10, branch raphy/deslop-100, batch-wave Plan A): new wave of architecture deepening + de-slop stories, continuing RA-104+. Focus: remove AI/change-narration slop from current-state prose and code comments, plus real architecture optimizations (deep modules, locality, deletion test) per improve-codebase-architecture. Waves of 5-10 stories, each story one commit with tests.",
+  "branchName": "raphy/arch-20261014-0145",
+  "description": "Continuous architecture deepening for the LCA cognitive-agent codebase via the raphy fresh-session loop. Round 1 (2026-10-06, old prompt): RA-001/RA-002 converged, RA-003 dropped with evidence. Round 2 (2026-10-06, hardened prompt): RA-004..RA-009 all done (merged to main 2026-10-07, merge 1b1526a94). Round 3 (2026-10-07, hardened prompt): friction walk over session plugins, loop_cursor, delegation/body executor; RA-010..RA-013 below. Out of scope: ralph Round 2 areas (DecisionGates, Ingest, ContextFiles shims, Read Runs micro-dirs, MemoryTools directory seam), lca/cognition/memory/ (frozen per Round 2 AP-01), CLI surface must not import contracts (deliberate rule), gate_chain_strategy.py (hands-off: another party's uncommitted work + pre-existing red test). Round 10 (2026-10-08 12:06, branch raphy/arch-20261008-1206): RA-033..RA-041 below (3 Strong + 5 Worth exploring + 1 Speculative; all from friction walk, none duplication-class). Round 11 (2026-10-08 15:05, branch raphy/arch-20261008-1505): RA-042..RA-047 all done (merged to main 2026-10-08, merge 0ab9d67cd). Round 12 (2026-10-08 22:05, branch raphy/arch-20261008-2205): RA-048..RA-050 below (1 Strong + 2 Worth exploring; all from friction walk, none duplication-class). Round DESLOP-100 (2026-10-10, branch raphy/deslop-100, batch-wave Plan A): new wave of architecture deepening + de-slop stories, continuing RA-104+. Focus: remove AI/change-narration slop from current-state prose and code comments, plus real architecture optimizations (deep modules, locality, deletion test) per improve-codebase-architecture. Waves of 5-10 stories, each story one commit with tests. Round 2026-10-14 01:45 (branch raphy/arch-20261014-0145): RA-131..RA-135 -- approved-tool bypass seam chain (record-point approve/reject distinction, canonical invariant in set_approved_tool_names, ContextVar cross-task inheritance seam test) + lobehub run-agent mapping seam (fail-soft contract tests, lazy import for import-time fail-soft). _resolve.py audited as a deep module; six declined probe clusters re-declined.",
   "userStories": [
     {
       "id": "RA-001",
@@ -1916,6 +1916,89 @@
       "passes": true,
       "branchName": "raphy/arch-20261013-2255",
       "notes": "Implemented: `resolve_typed_port_or_runtime` gains `required: bool = True` (default keeps the 3 existing fail-loud callers -- think/decision/parse.py x2, think/history/assemble.py x2 -- byte-identical). The 3 fail-soft port-then-runtime probes converge with `required=False`: concept/memory_write/dispatch.py:72, concept/decision_shortcut_try/try_shortcut.py:70, concept/reflection_critique/critique_run.py:64. Reviewed semantic deltas: `or` vs `is None` are equivalent on the AgentState|None port contract; the added mapping `.get` fallback is type-contract fulfillment; the seam's context.runtime guard is strictly more lenient than the sites' direct attribute access. New seam tests tests/nodes/test_resolve_typed_port.py (4: port-wins, runtime-fallback, fail-soft None, fail-loud TypeError naming node). `ruff check` clean; tests/nodes + tests/think + tests/reflect + tests/concept 299 pass. Strength: Worth exploring.",
+      "implemented": false,
+      "dropped": false
+    },
+    {
+      "id": "RA-131",
+      "title": "Rejection answers must never be recorded into approved_tool_names at the resume record point",
+      "description": "As an LCA maintainer, I want the resume record point to distinguish approval answers from rejection answers, because today `command_endpoints._dispatch_resume` folds `content` and `rejection_reason` into one payload string (command_endpoints.py:709), and `RegistryRunCommands.resume_approval` (commands.py:285-291) unconditionally records `session.approval_request[\"tool_calls\"]` into the persistent `session.approved_tool_names` set whenever `approval_request` is present. The resume-approval decoder explicitly supports `rejectionReason` (command_endpoints.py:247/258), so a human REJECTION of a tool call records the rejected tool as approved; when the model retries it, `act.authorize`'s approved-override (authorize.py:279-286) auto-approves without asking again -- \"reject, retry, auto-approved\".",
+      "acceptanceCriteria": [
+        "A resume answer carrying `rejection_reason` (no approving content) never adds its tool names to `session.approved_tool_names`.",
+        "A genuine approval answer still records exactly as today (existing behavior preserved; 7ecb54c6c bypass tests stay green).",
+        "The approve/reject distinction survives from `_dispatch_resume` to the record point (no fold destroys it); any `RunPort.resume_approval` signature change stays inside the carrier.",
+        "New tests pin both directions: rejection -> set unchanged; approval -> recorded (canonicalized).",
+        "`ruff check` clean on touched files."
+      ],
+      "priority": 4,
+      "passes": false,
+      "branchName": "raphy/arch-20261014-0145",
+      "notes": "Assessed 2026-10-14 01:45 round (Area A F1, coordinator-verified and upgraded from Worth exploring to Strong). Territory: webserver carrier is lca-1000 land (PILOT taxonomy + retirement stubs), but this touches the resume_approval record point -- git log shows the last 8 commits on these files are all user-side runs work (ee48d1d2e etc.), no active lca-1000 churn; the bypass feature itself is user-side commit 2e8264fb4.",
+      "implemented": false,
+      "dropped": false
+    },
+    {
+      "id": "RA-132",
+      "title": "Make set_approved_tool_names canonicalize: the seam owns the invariant, not caller discipline",
+      "description": "As an LCA maintainer, I want `set_approved_tool_names` (`lca/infrastructure/runtime_plane/access/approved_tools.py`) to canonicalize its input, because today both the writer (commands.py:289) and the reader (authorize.py:281) must remember to call `canonical_tool_name` -- an invariant held by programmer discipline across two modules. If one side forgets, the bypass silently fails (fail-closed, hard to debug). Make illegal (non-canonical) states unrepresentable at the seam.",
+      "acceptanceCriteria": [
+        "`set_approved_tool_names` canonicalizes every name before storing (snake_case in -> canonical stored).",
+        "Reader-side `canonical_tool_name` call kept or removed by implementer decision; behavior pinned by tests either way.",
+        "New tests: snake_case input stored canonical; idempotency of canonicalize covered.",
+        "Existing tests (test_run_execution_facade.py set->get, 7ecb54c6c) stay green; `ruff check` clean."
+      ],
+      "priority": 5,
+      "passes": false,
+      "branchName": "raphy/arch-20261014-0145",
+      "notes": "Assessed 2026-10-14 01:45 round (Area A F2). The canonical heuristic body itself is NOT changed (LobeHub wire convention); only where the invariant is enforced moves.",
+      "implemented": false,
+      "dropped": false
+    },
+    {
+      "id": "RA-133",
+      "title": "Pin the approved-names ContextVar inheritance across create_task(resume_run) with a seam test",
+      "description": "As an LCA maintainer, I want a seam test proving the approved-tool-names ContextVar is inherited by the `create_task(resume_run(...))` child task and invisible to the parent, because the isolation argument (\"injection lives and dies with the resume task\") rests entirely on that link, yet 7ecb54c6c monkeypatches `_approved_tool_names` (bypassing the ContextVar) and the facade test does set->get inside one task (near-tautology).",
+      "acceptanceCriteria": [
+        "New test: parent task sets approved names, spawns `asyncio.create_task` wrapping a stub resume body (mock coordinator), child task's `get_approved_tool_names()` returns the injected set.",
+        "Same test asserts the parent task (after the child completes) does not see the child's set / set-then-reset is invisible.",
+        "Pure test story: zero production code changes; `ruff check` clean."
+      ],
+      "priority": 5,
+      "passes": false,
+      "branchName": "raphy/arch-20261014-0145",
+      "notes": "Assessed 2026-10-14 01:45 round (Area A F3). Turns the Q3 isolation argument into pinned evidence.",
+      "implemented": false,
+      "dropped": false
+    },
+    {
+      "id": "RA-134",
+      "title": "Test the five fail-soft paths of agent_assistant_id_from_lobehub directly",
+      "description": "As an LCA maintainer, I want direct unit tests for the five fail-soft paths of `agent_assistant_id_from_lobehub` (`lca/infrastructure/persistence/lobehub_agents.py`: empty agent_id / no DATABASE_URL / connection raises / row missing / `agency_config` lacks the key -- all must return None and never raise), because the existing tests (4f67f10d7) all monkeypatch the seam away: they prove the carrier calls the seam correctly, but nobody proves the seam itself is correct. `except Exception: return None` without tests is not a contract.",
+      "acceptanceCriteria": [
+        "Five test cases cover the five fail-soft paths, using a fake `postgres_connection` contextmanager stub (no real DB).",
+        "Tests pin the None contract, NOT the SQL text (the `agency_config` column is ADR-0187 D7 domain knowledge; its change is ADR-driven).",
+        "Existing 4f67f10d7 monkeypatch tests stay green; `ruff check` clean."
+      ],
+      "priority": 5,
+      "passes": false,
+      "branchName": "raphy/arch-20261014-0145",
+      "notes": "Assessed 2026-10-14 01:45 round (Area C S2). The module is a 46-line pure function -- the cheapest seam in the repo to test.",
+      "implemented": false,
+      "dropped": false
+    },
+    {
+      "id": "RA-135",
+      "title": "Lazy-load the lobehub fallback import so the seam's fail-soft promise covers import time",
+      "description": "As an LCA maintainer, I want the `agent_assistant_id_from_lobehub` import in `lca/plugins/transport/webserver/handlers/runs/api/command_endpoints.py:38` moved into the `if not assistant_id:` fallback branch (or guarded by try/except ImportError -> None), because the module-level import means any import-time failure of `lobehub_agents.py` breaks the entire run-creation module -- the seam's fail-soft boundary is drawn at call time but misses import time, contradicting its own \"Never raises into the run-creation path\" promise.",
+      "acceptanceCriteria": [
+        "The import no longer executes at `command_endpoints` module import time.",
+        "4f67f10d7's monkeypatch target (module attribute `endpoints.agent_assistant_id_from_lobehub`) still exists and the binding tests stay green.",
+        "Fallback behavior byte-identical when the import succeeds; `ruff check` clean."
+      ],
+      "priority": 5,
+      "passes": false,
+      "branchName": "raphy/arch-20261014-0145",
+      "notes": "Assessed 2026-10-14 01:45 round (Area C S1). Mechanical 3-line change. Territory: same note as RA-131 -- no active lca-1000 churn on this file (last 8 commits user-side runs work).",
       "implemented": false,
       "dropped": false
     }
