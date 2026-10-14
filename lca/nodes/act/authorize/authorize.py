@@ -164,6 +164,10 @@ class ActAuthorizeExecutor:
     declared_inputs: tuple[PortName, ...] = (
         PortName("decision"),
         PortName("state"),
+        # RA-140: kernel-owned 端口，与 bundles/act/act_subgraph.yaml 的
+        # inputs:[decision, state, tools] 声明同步；无 seed 时读数为 None，
+        # node_execute 用 current_tools_service() 作 fail-soft 回退。
+        PortName("tools"),
     )
     # ADR-0237 / PR-1b: typed ``approval_required: bool`` port replaces
     # the previous ``decision.extra["needs_approval"]`` metadata grep.
@@ -187,7 +191,8 @@ class ActAuthorizeExecutor:
     ) -> NodeOutput:
         """act.authorize 入口。
 
-        inputs 端口(yaml): decision (Decision), state (AgentState)
+        inputs 端口(yaml): decision (Decision), state (AgentState),
+                            tools (ToolsService, kernel-owned seed)
         outputs 端口(yaml): decision (Decision), state (AgentState),
                             approval_required (bool),
                             approval_requirement (ApprovalRequirement),

@@ -58,7 +58,11 @@ nodes:
     # risk is bounded.
     # ADR-0292 §10 P3: 授权检查读取 ambient TrustEnvelope 与 ToolsService；
     # ``grant_routing`` 携带授权拒绝路由信号。
-    inputs: [decision, state]
+    # RA-140: ``tools`` 是 kernel-owned 端口（interpreter 经
+    # ``_port_registry_seed_from_runtime_plane`` 注入 per-turn ToolsService，
+    # 同 llm.invoke 的 inputs:[render, tools, state]）；无 seed 时
+    # ``build_input`` 缺失→None，executor 用 ``current_tools_service()`` 兜底。
+    inputs: [decision, state, tools]
     outputs: [decision, state, approval_required, approval_requirement, grant_routing]
     config:
       emit_on_enter: [think.gate.start]

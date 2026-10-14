@@ -3686,3 +3686,34 @@ brain/reducer/memory/hub/standing_refresher 等键，待 RA-123 落地后再评�
   - tests 必须从 worktree 内部跑：/tmp 残留 `lca/` 目录会遮蔽 namespace 包导致
     ModuleNotFoundError；验证脚本写在 worktree 里，跑完 rm 掉。
 ---
+
+## 2026-10-14 08:55 - RA-140
+- What was implemented: chose option (a) DECLARE — `bundles/act/act_subgraph.yaml`
+  act.authorize inputs `[decision, state]` -> `[decision, state, tools]`
+  (like llm.invoke's `inputs: [render, tools, state]`), and
+  `ActAuthorizeExecutor.declared_inputs` gained `PortName("tools")`. The
+  `current_tools_service()` probe in `node_execute` stays as the fail-soft
+  fallback (`build_input` yields None for missing ports, no error), so paths
+  without a kernel seed behave exactly as before. Evidence for (a): the
+  executor's own comment (authorize.py:161-163) already claims "tools 是
+  kernel-owned 端口（_port_registry_seed_from_runtime_plane 注入）" — the
+  declaration makes the intent real; deletion (b) would have hidden the intent
+  deeper (deletion test verdict in assessment: (a) concentrates, (b) moves).
+- Files changed:
+  - bundles/act/act_subgraph.yaml (inputs + RA-140 comment)
+  - lca/nodes/act/authorize/authorize.py (declared_inputs, docstring)
+  - tests/integration/test_act_authorize_tools_port.py (new, 2 tests)
+- Tests: new graph-level test — lifted bundle node declares `tools` in
+  required_inputs; spy executor over real PlanInterpreter +
+  port_registry_seed={"tools": sentinel} asserts node_execute received the
+  sentinel (mutation check: both tests FAIL with the yaml declaration stashed,
+  PASS with it — proving the "fails today" property). Regression set:
+  66 passed, 1 skipped (pre-existing fixture-staleness skip in e2e:677,
+  unrelated); `ruff check` clean; yaml parses.
+- **Learnings for future iterations:**
+  - `build_input` 的 fail-soft（缺失→None 不报错）是"声明 kernel-owned 端口"
+    的安全前提——先读 port_registry.py 再动手，别凭印象断言 fail-loud。
+  - interpreter `run(port_registry_seed=...)` 的 Mapping 分支就是为测试注入设计
+    的（docstring 明写 "Mapping → used directly (test injection)"），graph-level
+    测试优先用它，不用手搭 PortRegistry。
+---
