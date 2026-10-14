@@ -15,6 +15,13 @@ import pytest
 
 from lca.cognition.body.tools.tool_wire_gate import unexposed_tool_block_observation
 from lca.contracts.atoms.enums.enums import ActionType
+from lca.contracts.atoms.semantic.keys import (
+    FAILURE_KIND,
+    OBS_RESULT_KIND,
+    TOOL_WIRE_INVALID,
+    TOOL_WIRE_REASON,
+    TOOL_WIRE_STATUS,
+)
 from lca.contracts.models.core.execution.decision import Decision, ToolCall
 from lca.infrastructure.tool_defer.policy import DeferPolicy
 from lca.infrastructure.tool_defer.session import (
@@ -142,3 +149,23 @@ def test_f3_duplicate_emissions_in_one_turn_deduplicated():
     projection = project_llm_response(LLMResponse(text="", tool_calls=[*dupes, other]))
     names = [(c.tool_name, c.arguments.get("path")) for c in projection.tool_calls]
     assert names == [("listFiles", "/home/lichao"), ("listFiles", "/var/data")]
+def test_ra143_unexposed_block_uses_shared_extra_contract(defer_session: Any):
+    """RA-143: the unexposed gate builds through _wire_block_observation.
+
+    The blocked-Observation `extra` key set must match the single
+    constructor seam's contract; the model-facing text keeps the
+    tool_search instruction and the namespace name.
+    """
+    obs = unexposed_tool_block_observation(_decision("readFile"))
+    assert obs is not None
+    assert obs.success is False
+    assert set(obs.extra or {}) == {
+        FAILURE_KIND,
+        OBS_RESULT_KIND,
+        TOOL_WIRE_STATUS,
+        TOOL_WIRE_REASON,
+    }
+    assert obs.extra[TOOL_WIRE_STATUS] == TOOL_WIRE_INVALID
+    assert obs.extra[TOOL_WIRE_REASON] == "namespace_not_loaded"
+    assert "tool_search" in (obs.error or "")
+    assert "file" in (obs.error or "")

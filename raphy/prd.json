@@ -2120,7 +2120,7 @@
       "branchName": "raphy/arch-20261014-2245",
       "description": "As an LCA maintainer, I want the unexposed-namespace gate to build its blocking Observation through `_wire_block_observation`, because the constructor's own docstring declares it the 'Single constructor seam for wire-gate blocking Observations' whose guidance text is 'single-sourced here so the product text cannot drift between gates', yet `unexposed_tool_block_observation` bypasses it and hand-duplicates the `extra` key contract (FAILURE_KIND, OBS_RESULT_KIND, TOOL_WIRE_STATUS, TOOL_WIRE_REASON). If the constructor gains a key, the unexposed gate silently diverges.",
       "id": "RA-143",
-      "passes": false,
+      "passes": true,
       "priority": "P1",
       "title": "Route unexposed_tool_block_observation through the _wire_block_observation constructor seam"
     },

@@ -124,22 +124,16 @@ def unexposed_tool_block_observation(decision: Decision) -> Observation | None:
         if tc.tool_name in visible:
             continue
         ns_name = session.namespace_of_tool(tc.tool_name) or "deferred"
-        return Observation(
-            observation_id=new_id("obs"),
-            success=False,
-            payload=None,
-            error=(
-                f"tool {tc.tool_name} belongs to deferred namespace '{ns_name}' "
-                "which is not loaded this turn. "
-                "Call tool_search for its namespace before using it."
-            ),
-            tool_call_id=tc.call_id,
-            extra={
-                FAILURE_KIND: FAILURE_KIND_TOOL_WIRE,
-                OBS_RESULT_KIND: MemoryRecordKind.TOOL_RESULT,
-                TOOL_WIRE_STATUS: TOOL_WIRE_INVALID,
-                TOOL_WIRE_REASON: "namespace_not_loaded",
-            },
+        # Single constructor seam (RA-143): the extra-key contract lives in
+        # _wire_block_observation; this gate supplies only condition +
+        # names. Per-gate guidance overrides the default shorten/split text.
+        return _wire_block_observation(
+            status=TOOL_WIRE_INVALID,
+            reason="namespace_not_loaded",
+            tool_name=tc.tool_name,
+            call_id=tc.call_id,
+            middle_parts=(f"namespace '{ns_name}' is not loaded this turn",),
+            guidance="Call tool_search for its namespace before using it.",
         )
     return None
 

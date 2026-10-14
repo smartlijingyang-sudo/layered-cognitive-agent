@@ -3843,3 +3843,25 @@ brain/reducer/memory/hub/standing_refresher 等键，待 RA-123 落地后再评�
     `NamespaceApprovalStrategy.evaluate` stays (import-cycle constraint);
     only the traversal moved behind the seam.
 ---
+
+## 2026-10-15 01:10 (CST) - RA-143
+- Implemented: `unexposed_tool_block_observation` now builds its block via
+  `_wire_block_observation` (status=TOOL_WIRE_INVALID,
+  reason="namespace_not_loaded", namespace message as `middle_parts`,
+  "Call tool_search for its namespace before using it." as per-gate
+  `guidance`). The hand-duplicated `extra` key contract is deleted; all
+  Observation construction in the module flows through the one seam.
+- Files changed: `lca/cognition/body/tools/tool_wire_gate.py`,
+  `tests/scenario/test_wire_gate_namespace.py` (+1 test:
+  `test_ra143_unexposed_block_uses_shared_extra_contract` asserting the
+  extra key set equals the constructor contract).
+- **Learnings for future iterations:**
+  - Assessment said "model-facing message must stay byte-equivalent", but its
+    own Solution (middle_parts + guidance composition) necessarily changes
+    the format: the constructor always prefixes
+    `tool_wire_<status>; tool=<name>; reason=<reason>; `. Followed the
+    Solution; content preserved ("tool_search", namespace, reason key).
+    Noted as implementation-vs-assessment deviation in the commit.
+  - `ruff check --fix` auto-sorts the new import block; run it before
+    committing test files with added imports.
+---
