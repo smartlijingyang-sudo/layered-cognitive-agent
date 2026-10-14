@@ -95,9 +95,7 @@ def filter_tools_by_assistant(
             if required_grant in grants:
                 kept.append(tool)
             continue
-        if not allow or keys & allow:
-            kept.append(tool)
-        elif keys & _VOCAL_SYSTEM_TOOLS:
+        if not allow or keys & allow or keys & _VOCAL_SYSTEM_TOOLS:
             # 声带系统工具始终保留（gated 唯一发声通道，见模块 docstring）。
             kept.append(tool)
     return tuple(kept)
