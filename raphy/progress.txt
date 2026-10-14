@@ -3609,3 +3609,47 @@ brain/reducer/memory/hub/standing_refresher 等键，待 RA-123 落地后再评�
     `rejection_reason`，两条 ingress 的"拒绝显式"不变量共享同一个标记语义，
     而不是给 legacy 路由发明第二个标记。
 ---
+## 2026-10-14 08:10 CST - assess round (raphy/arch-20261014-0745)
+
+- Assessed: 3 new stories RA-139/140/141 (passes=false). Branch
+  `raphy/arch-20261014-0745` from main `4e34c2d54`; isolated worktree
+  (main tree dirty by someone else's `test_openai_compat_gateway.py`, untouched).
+- Friction walk areas: (A) 授权门机 authorize/approved_tools/resume_approval,
+  (B) LLM adapter history projection, (C) run binding / assistant identity.
+  Area B: no story (sanitizers stable post-RA-117; `_model` probe residuals
+  already converged — `credentials.py:131` now reads `model_name`,
+  remaining `_model` reads are own-field `self._model`).
+- RA-139 (Strong): two byte-identical `_required_grant` probes
+  (`filter.py:151` vs `authorize.py:59`, author self-documented "同语义")
+  → converge onto public `required_grant_of` in
+  `lca/infrastructure/runtime_plane/access/`. RA-136 "two = real" precedent.
+- RA-140 (Worth exploring): `act.authorize` reads `PortName("tools")` but
+  yaml `inputs: [decision, state]` never declares it;
+  `PortRegistry.build_input(schema.required_inputs())` only projects declared
+  ports → read provably always None, silently falls back to global
+  `current_tools_service()`. Declare it (like llm.invoke) or delete the dead read.
+- RA-141 (Worth exploring): "agt_* → asst_*" answered by 3 modules +
+  hand-written precedence chain in `command_endpoints.py:179-188` → single
+  `resolve_assistant_binding` seam (keep RA-135 lazy-import fail-soft).
+- Deliberately not storied: `canonical_tool_name` dotted-name mangling
+  (production chain self-consistent; RA-132 proved setter-move unsatisfiable;
+  leaf-only fix is speculative on wire forms), sanitizer closure-window
+  divergence (no failing wire case).
+- Runtime verification (clean worktree, `LLM_API_KEY=dummy`, 252):
+  (a) basic run completed PASS, (b) tool-call run completed PASS,
+  (c) two sequential runs completed/completed PASS,
+  (d) non-converging run → `Result(status=failed)` no exception PASS
+  (RA-023 regression holds). `DONE failures=0`. No P0.
+- **Learnings for future iterations:**
+  - 传脚本到 252 后先 `wc -l` 确认再跑：本轮 pipe 形式 stdin 没送过去，
+    远端落了个 0 字节文件，python 空跑 exit 0 零输出，差点当成"验证通过"。
+    可靠形式是 `ssh252 'cat > path' < localfile`（stdin 重定向，不是 pipe）。
+  - 设了 `flush=True` 的 print 仍 0 字节 + 进程消失 = 脚本根本没执行，
+    不是"跑得慢"——先查文件大小再查进程。
+  - `pgrep -f <pattern>` 会命中自己的 ssh 命令行：查远端进程用 `[r]attern`
+    括号写法（AGENTS.md 的 pkill 教训同样适用于 pgrep）。
+  - 读端口声明问题时，`required_inputs()` 的默认 required=True
+    （`parsers.py::to_port_specs`）是关键一环：bare-string yaml inputs
+    全是 required，所以"声明了但 optional"和"没声明"是两种完全不同的
+    死因，assess 时要区分。
+---

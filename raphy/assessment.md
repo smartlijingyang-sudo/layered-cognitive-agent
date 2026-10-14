@@ -1,205 +1,282 @@
-# Raphy Assess — 2026-10-14 04:45 round
+# raphy assess — 2026-10-14 07:45 round (branch `raphy/arch-20261014-0745`)
 
-Branch: `raphy/arch-20261014-0448` (main tip `91c6e85be` at assess).
-Assess ran as a fresh session; implementation untouched — only `raphy/` files change in this commit.
+ASSESS ONLY. No code outside `raphy/` was touched. Main tree was dirty
+(`tests/scenario/openai/test_openai_compat_gateway.py`, someone else's
+uncommitted work) — all reads happened in the isolated worktree at
+`/home/lichao/.lca-worktrees/raphy-20261014-0745` (main tip `4e34c2d54`).
 
-Related prior rounds: 2026-10-14 01:45 round (RA-131..RA-135, merged `91c6e85be`); its
-areas A/B/C are closed — this round walks new ground. Since `31e7db97a` the only
-new commits are RA-131..135 themselves, so hot spots = the areas those stories touched.
+## Scope (YAGNI)
 
-Environment: 252 repo `~/layered-cognitive-agent`, branch
-`raphy/arch-20261014-0448` (= main tip `91c6e85be`, `status --porcelain` empty).
-禁区遵守：ralph Round 2 未进、`lca/cognition/memory/` 未碰、`gate_chain_strategy.py`
-未碰、preamble.py 未碰；webserver carrier 只读评估（lca-1000 领地说明见各 story 的
-territory note）。
+`git log --oneline -45` hotspots since 2026-10-13: raphy seam-convergence
+work (RA-129/130 resolve_* seams, RA-136 `_model` probe convergence,
+RA-137/138 approval + legacy ingress), approval-gate machinery
+(`canonical_tool_name`, `approved_tool_names`, `lca-ops runs answer`,
+`2e8264fb4` authorize fix), run binding via lobehub mapping
+(`ee48d1d2e`, `4f67f10d7`, RA-129, RA-135 lazy import), LLM adapter
+history projection (RA-117 anthropic closure).
 
-## Explore
+Avoided: `tests/scenario/openai/` (dirty — someone else working there),
+`ralph/` Round 2 areas, `lca/cognition/memory/` (standing 禁区).
 
-1. **Hot spots → 3 friction-walk areas.** Areas D and E each delegated to a
-   fresh-session subagent (read-only, zero writes). Area F's worker returned a
-   confused completion with no report (treated as undelivered); the coordinator
-   re-walked Area F directly, read-only.
-   - D: webserver runs chain post-RA-131/135 (resume ingress seams).
-   - E: model-identity private `_model` probes (RA-106 follow-up, explicitly deferred).
-   - F: skills `_package_lookup` post-dedup (`991ff7ba3`) + RA-107 landing check.
-2. **CONTEXT.md**: read (profile-launch-product / programmatic profile input /
-   StopPolicy vocabulary). No new domain term needed by this round's stories.
-3. **runtime-findings**: `hidden_files/runtime-findings-20261007.md`; its P0 (RA-023)
-   re-verified this round — non-converging run returns `Result(status=failed)`,
-   no exception. Holds.
+Read first: `CONTEXT.md` (Profile 启动产物 / 程序化 Profile 输入 /
+StopPolicy), `skills/improve-codebase-architecture/SKILL.md`,
+`raphy/prd.json` (138 stories, 0 open), `raphy/progress.txt` top
+(`## Codebase Patterns` + RA-115..138 learnings), ADRs 0292/0293.
 
-## Friction walk
+Prior runtime findings: `runtime-findings-20261007.md` (P0
+LoopObligationExceededError → fixed per RA-023; P2 None-input crash,
+str-arguments cryptic error, anomaly_detector noise). The 01:45 round's
+`raphy-runtime-verify-20261014.py` was reused verbatim against this
+round's clean worktree (see Runtime verification below).
 
-### Area D — webserver runs chain post-RA-131 (subagent, read-only)
+## Friction walk — Area A: 授权门机 (approval / grant gates)
 
-Files read: `command_endpoints.py` (1–330: `_decode_resume_approval` :247–273,
-`CreateRunRequest` :101–143; 560–882: `create_run`, `_dispatch_resume` :664–742,
-`answer_run` :790–838), `terminal/registry/commands.py` (1–325 full:
-`resume_approval` :148–158, record point :285–295), `terminal/port/port.py`
-(:60–160, `RunPort.resume_approval` Protocol :100–111),
-`session/session.py` (1–345 full), `carrier/runs/resume.py` (1–55 full),
-`carrier/runs/execute/execute.py` (:130–170), `carrier/runs/lifecycle/lifecycle.py`
-(:250–265), `runtime_plane/access/approved_tools.py` (1–55 full),
-`routes_2/routes_runs_sessions.py` (:57), `carrier/runs/recovery.py` (1–30),
-`tests/plugins/transport/webserver/test_resume_approval_rejection_not_recorded.py`.
+Files read end-to-end: `lca/nodes/act/authorize/authorize.py` (348 lines),
+`lca/infrastructure/runtime_plane/access/approved_tools.py` (78 lines),
+`lca/infrastructure/cli/commands/runs/answer.py` (136 lines),
+`lca/plugins/transport/webserver/handlers/runs/terminal/registry/commands.py`
+(325 lines), `lca/infrastructure/tools/assistant/filter.py` (grant filter).
+Framework chain verified: `lca/framework/graph/interpreter.py`
+(`_port_registry_seed_from_runtime_plane`, `build_input(schema.required_inputs())`),
+`lca/framework/graph/port_registry.py::build_input`,
+`lca/contracts/protocols/graph/node_io.py::required_inputs`,
+`lca/framework/graph/strategies/node_executor_strategy.py`,
+`lca/framework/graph/adapter.py` (kernel seed),
+`lca/framework/graph/lift/parsers.py::to_port_specs`,
+`bundles/act/act_subgraph.yaml`, `bundles/primitive/llm_call.yaml`.
 
-- **Q1** （浅模块蔓延）: "拒绝"一概念横跨 8 模块（decode 的 dict 约定 →
-  `CreateRunRequest` 字段 → `_dispatch_resume` fold+bool 导出 → `RunPort` kwarg →
-  记录点守卫 → ContextVar → execute 注入 → authorize 读取）；编码/推导/守卫/
-  注入/读取各住一处，概念无单一 home。Locality 差 → 候选 2/3。
-- **Q2** （shallow）: `approved_tools.py` (55 行) shallow——interface 几乎与实现
-  同等复杂；deletion test = 搬运复杂度，可被吸收（非 story，记录在此）。
-  `carrier/runs/resume.py::resume_run` 的 deletion test 更强：零调用方，
-  删了什么都不变 → **候选 RA-137 (Strong)**。
-- **Q3** （无局部性 / bug 藏身处）: `canonical_tool_name` 是教科书纯函数；
-  真风险在调用处组合：`_dispatch_resume` 的 `resume_tool_result or
-  resume_approval` 真值折叠（双字段并存时静默选前者）、`content =
-  get("content") or get("rejection_reason")`（拒绝理由文本被当作 resume 答案注入
-  loop）、`is_rejection = bool(get("rejection_reason"))`（未来批准附 reason 即误判）。
-  纯函数可测，seam 处组合不可测 → 候选 3 的动机。
-- **Q4** （泄漏接缝）: ① `RunPort.resume_approval` 上拒绝语义双通道泄漏
-  （`payload: str` 拒绝时装理由文本 + `is_rejection: bool` 默认 False）；
-  两个 adapter（legacy `answer_run` + 新 `_dispatch_resume`）对同一命令持发散不变量；
-  ② `CreateRunRequest.resume_approval: dict[str, Any] | None` 把未类型化 dict
-  泄漏过 decode→dispatch 边界。→ 候选 2/3。
-- **Q5** （可测试性）: ① RA-131 守卫的 pinning 测试绕过 `RunPort`/HTTP
-  interface（经公共接口到不了 `is_rejection=True`）；② `_dispatch_resume` 的
-  fold 只能 e2e 或调私有函数；③ execute 注入与 authorize 读取被 task 边界隔开，
-  port/authorize 接口都不暴露 approved set。
+1. **浅模块扩张**: "tool grant authorization" forces bouncing across
+   `filter.py` (`_required_grant`, tools.yaml filtering),
+   `authorize.py` (`_required_grant_of` + `_grant_refusal_routing`),
+   `approval_engine.py` (`evaluate`), `contracts/runtime/trust.py`
+   (`TrustEnvelope`). One concept, four modules.
+2. **浅模块**: `approved_tools.py` — ContextVar + `canonical_tool_name`
+   heuristic; interface ≈ implementation in size, but the canonical
+   heuristic is real depth (RA-132 proved its edge cases). Deletion test:
+   deleting it moves the ContextVar into execute.py and the heuristic
+   into two call sites — complexity moves, doesn't concentrate.
+   Verdict: earns existence, barely.
+3. **无 locality 的纯函数**: `canonical_tool_name` is pure; the real defect
+   class (RA-132: `"tool_fs.read"` → `"toolFs.read"` mangling, verified by
+   direct call in commit `a1c41360d`) hides in how the writer
+   (`commands.py:294`, canonicalizes) and the passthrough
+   (`execute.py:157`, does NOT canonicalize) pair up — not in the
+   function body. Classic no-locality: unit tests of the function are
+   green while the writer/reader contract is held only by discipline.
+4. **渗漏 seam**: (a) `act.authorize` reads `PortName("tools")` from typed
+   ports but never declares it — `bundles/act/act_subgraph.yaml:61`
+   declares `inputs: [decision, state]` only, and
+   `PortRegistry.build_input(schema.required_inputs())` projects only
+   declared required inputs, so the read is **provably always None**;
+   production silently falls back to the global
+   `current_tools_service()` probe. The typed seam leaks into a global.
+   (b) three safe-boundary implementations: `authorize.py`'s inline
+   `startswith(("self_destruct", "rm_rf_root"))`, the
+   `pre_dispatch_envelope_check` `safe-boundary:valid` verdict (RA-115:
+   never actually runs), `ControlSlot.ACT_SAFE_BOUNDARY` plugin.
+5. **可测试性**: the `tools`-port path of `act.authorize` cannot be
+   exercised through the graph at all — only the ContextVar fallback is
+   reachable. "The interface is the test surface": a test seeding the
+   kernel `tools` port per the documented seam ("visible to every node
+   that declares them", `adapter.py`) cannot reach this node.
+   → **RA-140**.
 
-**顺带证伪**: `approved_tool_names` 无无界增长担忧——per-session `set[str]`，
-生命周期归 `RunRegistry`→`RunSessionIndex`（`max_terminal`+`terminal_ttl_s` TTL）
-+ `RunTerminalizer.terminalize`→`session.close()`；"无清理代码"是不需要，不是缺失。
-Legacy `resume_run`（`carrier/runs/resume.py:48`）零生产调用方——三个 import 点只拿
-`resume_cache_ready`/`validate_durable_resume`（coordinator 独立复验确认）。
+Duplication found in this area (verbatim, byte-identical):
+`filter.py:151-158::_required_grant` vs `authorize.py:59-66::_required_grant_of`
+(`return str(getattr(tool, "required_grant", "") or "").strip()`).
+The authorize copy's docstring admits it: "与
+`lca.infrastructure.tools.assistant.filter._required_grant` 同语义".
+Two verbatim occurrences = real seam (RA-136 precedent).
+→ **RA-139 (Strong)**.
 
-### Area E — model-identity private probes (subagent, read-only)
+## Friction walk — Area B: LLM adapter 历史投影
 
-Files read: `driver_debug.py` (:150–240, probe :190),
-`cli/commands/kernel/_shared.py` (:188 `emit_report`),
-`lca/plugins/think/reasoner/credentials.py` (:60–141, probe :131 —
-RA-106 记录的 `think/reasoner/credentials.py` 已搬迁至此),
-`contracts/protocols/runtime/infra/infra.py` (:32–57, `LLMAdapter.model_name`
-:51, default `return None`), `llm_adapter/openai_compat/__init__.py` (:51–92),
-`llm_adapter/mock/llm.py` (:27–45), `llm_adapter/model_override.py` (:20–50),
-`observability/adapters/adapters.py` (:59–67 `_model_label`, :135–182),
-`llm/resolver.py` (:81–105), `plugins/events/hooks/model_visible/adapter.py`
-(:66–84), `tests/unit/observability/adapters/test_model_label.py`.
+Files read end-to-end: `lca/infrastructure/llm_adapter/openai_compat/history/_history.py`
+(282 lines), callers: `chat/_chat_completions.py:212`,
+`responses/_responses.py:104`, `anthropic/_anthropic_messages.py:140`,
+`plugins/events/hooks/model_visible/adapter.py:109`.
 
-- **Q1**: "模型身份"跨 5–6 模块（contracts 声明 → 3 覆写 + anthropic 内部字段 →
-  observability `_model_label` → think credentials 探针 → model_visible unwrap 链 →
-  cli driver_debug 探针）。
-- **Q2**: 两处探针都是一行 getattr 链，shallow。Deletion test：删掉任一处，
-  **零测试变红**（无任何断言钉住 `"adapter_model"` payload 或 driver_debug 的
-  `"model"` 键；唯一相关测试 `test_model_label.py` 钉的是 interface）→ 无主死知识。
-- **Q3**: `_model` 定义在 `infrastructure/llm_adapter/`，读者在
-  `infrastructure/cli/commands/runs/` 和 `plugins/think/reasoner/`——三处分属
-  不同 seam，owner 与 reader 零 locality。
-- **Q4**: 是跨 seam 泄漏。且 `or getattr(adapter, "model", None)` 的"公共回退"
-  读的是**不存在的属性**（`llm_adapter/` 下零 `self.model` 定义）——伪装成防御式
-  读取的纯私有探针。interface 在"说"一套（`model_name`），探针在做另一套。
-- **Q5**: 能。`getattr(adapter, "model_name", None)` 即 the interface is the test
-  surface。行为实证：`MockLLMAdapter` 上探针返回 `None`，interface 返回
-  `"mock-llm"`——interface 严格更优。
+1. **浅模块扩张**: "history → wire messages" bounces across `_history.py`
+   (projection + sanitizers) and 4 callers. Moderate; the callers are
+   thin (one call each), so locality is acceptable.
+2. **浅模块**: the two sanitizers (`_sanitize_hanging_tool_calls` /
+   `_sanitize_hanging_tool_use`) are ~60 lines each with a
+   `list → list` interface — depth (closure algorithm) exceeds
+   interface complexity. Not shallow. Deletion test: deleting either
+   re-opens the 400-shape hole it closed (RA-117) — concentrates.
+3. **无 locality 的纯函数**: the closure-window semantics differ —
+   OpenAI closes hanging calls only before user / tool-calling-assistant
+   / end-of-list (NOT before a text-only assistant message);
+   Anthropic always closes when ids are missing. Both pure functions are
+   unit-green; the divergence (is a text-only assistant message after
+   hanging tool_calls legal on the OpenAI wire?) lives in neither —
+   documented as "Choice" in the Anthropic docstring only. Noted, not
+   storied: speculative without a failing wire case.
+4. **渗漏 seam**: journal-neutral dicts are dispatched by hand-rolled
+   `item.get("role")` string switches in both functions — the "neutral
+   history" contract is not a typed seam, so a new role string must be
+   taught to two places. Also asymmetric tolerance: OpenAI passes
+   `arguments: str` through, Anthropic `json.loads` it. Noted, not
+   storied (stable code, no failing case).
+5. **可测试性**: good — pure functions pinned by RA-117 tests. The
+   `_model` private-probe residuals from RA-106 (`credentials.py:131`,
+   `driver_debug.py:190`) were re-checked: `credentials.py:131` now
+   reads `getattr(adapter, "model_name", None)`; `driver_debug.py` has no
+   adapter `_model` probe left. Remaining `_model` reads are
+   `self._model` (own field, not a cross-object probe). No story.
 
-**核实**: `getattr(adapter, "_model"` 全仓恰好 2 命中；`def model_name` 恰好 4 处
-（协议 + 3 覆写：openai_compat/mock/model_override）；anthropic 的 `_model` 是
-内部 helper 自用字段（构造传入），非探针。**"two = real" 成立**：同一模式逐字
-两次出现 → **候选 RA-136 (Strong)**。
-注记（scope 外）: `model_visible/adapter.py:78` 的 unwrap 链读公共属性为主，
-本轮不动，记在此。
+Area B verdict: no new story. The two sanitizers are the "two = real"
+shape, but both are stable, tested, and provider shapes genuinely
+differ — converging them now is speculative.
 
-### Area F — skills `_package_lookup` post-dedup (coordinator, read-only)
+## Friction walk — Area C: run 绑定 / assistant 身份
 
-Files read: `lca/infrastructure/tools/skills/_package_lookup.py` (28 lines, full),
-`git show 991ff7ba3 --stat`, scoped `rg list_installed` / `resolve_package` in
-`lca/infrastructure/tools/skills/`, `git log --grep="RA-107"`.
+Files read end-to-end: `lca/infrastructure/persistence/lobehub_agents.py`
+(46 lines), `command_endpoints.py` (relevant: 55-100, 160-240, 400-460),
+`lca/infrastructure/persistence/user_store.py` (both
+`assistant_id_for_agent` impls), `lca/contracts/protocols/assistant/ownership.py:96`.
 
-- `resolve_package(store, raw)`: exact-id → case-insensitive-name fallback → None。
-  3 调用方（activate/deactivate/retire）已全部收敛；`search/tool.py:158` 的
-  `list_installed()` 是搜索列表用途，非同类探针。无"two = real"漏网。
-- Deletion test: 删掉它只是把 10 行搬回 3 处（moves，非 concentrates）——但它已是
-  既成收敛，无新故事。
-- RA-107 已落地（`a0f547f91` + `4aee9b124`），无需跟进。
-- **F 区 0 候选。**
+1. **浅模块扩张**: "agt_* → asst_*" forces bouncing across
+   `command_endpoints.py` (hand-written chain), the ownership protocol +
+   two `user_store.py` impls (sqlite/postgres), and
+   `lobehub_agents.agent_assistant_id_from_lobehub` (lobehub fallback).
+   One question, three answerers, precedence in a comment.
+2. **浅模块**: `lobehub_agents.py` (46 lines, one function) — deletion
+   moves the SQL into the caller, but concentrates the fail-soft
+   contract ("Never raises into the run-creation path", RA-135 lazy
+   import). Earns existence. The `command_endpoints.py:63` lazy proxy
+   (12 lines) exists only to keep the monkeypatch seam name stable for
+   tests — shallow, but its deletion test concentrates test-seam
+   stability; keep.
+3. **无 locality 的纯函数**: n/a — the fail-soft logic is I/O-bound
+   try/except, not extracted pure functions. Read the files; the question
+   doesn't apply here.
+4. **渗漏 seam**: `standing_files.py:97` and `avatar/routes.py:109`
+   hand-probe `getattr(ownership, "assistant_id_for_agent", None)`
+   instead of a typed accessor; `command_endpoints` mixes body parsing,
+   ownership lookup, lobehub fallback, and mode resolution in one
+   function — transport and identity concerns leak across the seam.
+5. **可测试性**: the precedence chain (ownership → lobehub fallback) is
+   only testable through the HTTP endpoint, never through a seam —
+   "the interface is the test surface" fails. A
+   `resolve_assistant_binding(agent_id)` seam owning the precedence
+   would be unit-testable (ownership hit / lobehub hit / unbound).
+   → **RA-141**.
 
-## Runtime verification (mandatory, clean tree)
+## Runtime verification (mandatory)
 
-Branch `raphy/arch-20261014-0448` (= main tip `91c6e85be`, clean),
-`LLM_API_KEY=dummy`, `ScriptedLLMAdapter` (`tests/harness/scripted_llm.py`),
-`sys.path.insert(1, tests)`（防 `tests/lca_kernel` 桩包遮蔽真包——上轮教训重申）。
+Method: reused the 01:45 round's `raphy-runtime-verify-20261014.py`
+verbatim, repointed at this round's clean worktree
+(`/home/lichao/.lca-worktrees/raphy-20261014-0745`), `LLM_API_KEY=dummy`,
+run on 252. Scenarios: (a) basic run → COMPLETED; (b) tool-call run;
+(c) two sequential runs on one agent; (d) non-converging run →
+`Result(status=failed)`, no exception (RA-023 regression).
 
-| # | Flow | Result |
-|---|------|--------|
-| 1 | Basic run → COMPLETED | ✅ PASS |
-| 2 | Run with a tool call (NoopTool, namespace="probe") → COMPLETED | ✅ PASS |
-| 3 | Two sequential runs on one agent → completed / completed | ✅ PASS |
-| 4 | Non-converging run (always tool-call, max_steps=3) → `Result(status=failed)` | ✅ PASS — **no exception**, RA-023 holds |
+Result (2026-10-14 08:07 CST, 252, clean worktree, `LLM_API_KEY=dummy`):
 
-**No P0 candidates.** (Side note: anomaly_detector cycle/stalled 日志警告仍在，P2，
-既往轮已记录。)
+- (a) basic run → `status=completed` → PASS
+- (b) tool-call run (NoopTool) → `status=completed` → PASS
+- (c) two sequential runs on one agent → `completed / completed` → PASS
+- (d) non-converging run (always tool-calls, max_steps=3) →
+  `Result(status=failed)`, no exception → PASS (RA-023 regression holds)
+- `DONE failures=0`
 
-## Duplication scan (secondary)
-
-No new mechanical duplication clusters. Remaining hand-rolled
-`getattr(runtime, ...)` probes in `lca/nodes/` match the 01:45 round's Area B
-6 declined points (memory_extract `agent_state` ×2, route/shortcut fail-loud
-`RuntimeError`, render brain probes, memory keys ×2, reducer keys ×2) — decline
-reasons still stand. `lca/nodes/_resolve.py` remains the converged deep module.
+No P0 found. Note: two operator errors on my side during setup (script first
+ran locally by mistake → FileNotFoundError; then the stdin pipe through
+ssh252 delivered an empty file → silent exit 0; then forgot `LLM_API_KEY`
+in the relaunch → kernel refused boot). None of these touch the repo.
+Lesson for future rounds: after transferring a script via ssh252, always
+`wc -l` the remote copy before launching; use the stdin-redirect form
+(`ssh252 'cat > path' < localfile`), not a pipe.
 
 ## Candidate table
 
 | ID | Files | Problem | Solution | Benefits (locality + leverage) | Strength |
 |---|---|---|---|---|---|
-| RA-136 | `lca/infrastructure/cli/commands/runs/driver_debug.py:190`, `lca/plugins/think/reasoner/credentials.py:131` | 两处**逐字相同**的私有 `_model` 探针（`getattr(adapter, "_model", None) or getattr(adapter, "model", None)`），绕开 RA-106 落地的 `model_name` 协议；回退读的公共 `model` 属性在所有生产适配器上根本不存在；Mock 上探针返回 None 而 interface 返回 "mock-llm"。deletion test 通过（删掉零测试变红）。 | 两处统一换成 `getattr(adapter, "model_name", None)`——与 `_model_label` 完全一致的协议读取。 | Locality: 身份读取回到 `LLMAdapter` 协议 seam，adapter 内部可自由重命名 `_model`。Leverage: debug 输出、served 事件、telemetry 三方读到同一值。 | **Strong** |
-| RA-137 | `lca/plugins/transport/webserver/carrier/runs/resume.py` (:47–55, `__all__`) | `resume_run` 零生产调用方（3 处 import 只拿 `resume_cache_ready`/`validate_durable_resume`，coordinator 独立复验）、零测试引用；且与 `execute.py:146` 的同名 `resume_run`（带 approved-tools 注入）形成同名双胞胎——未来调用方选错模块会静默丢失注入。footgun，不是备用代码。 | 删 `resume_run` 定义，`__all__` 缩为 `["resume_cache_ready", "validate_durable_resume"]`。 | Locality: resume 入口唯一化。Leverage: 以后 resume 改动不再需要先分辨"调的是哪个 resume_run"。 | **Strong** |
-| RA-138 | `command_endpoints.py` (`answer_run` :790–838, `_dispatch_resume` :664–742), `terminal/port/port.py` (:100–111), `routes_2/routes_runs_sessions.py` (:57) | 同一 `RunPort.resume_approval` 有两个 adapter，不变量发散：legacy `POST /runs/{run_id}/answer` 纯字符串 payload 表达不了拒绝，而 Protocol 默认 `is_rejection=False` 把"表达不了"静默翻译成"已批准"——RA-131 的守卫在该路由上形同虚设。recovery.py docstring 证实 legacy `/answer` 仍是被考虑的路径。 | 先取证：LobeHub 前端是否还在调 `/answer`。(a) 已迁移 → 退役路由（deprecation 期后删）；(b) 仍在调 → 给 legacy payload 带内拒绝标记，在 `answer_run` 内显式导出 `is_rejection`。绝不能保持"默认 False"的沉默。 | Locality: "拒绝必须显式"的不变量收敛到 port seam 一处。Leverage: 记录点守卫对两条 ingress 同时可信。 | Worth exploring |
-| (RA-139, deferred) | `command_endpoints.py` decode 层 + `RunPort` | approve/reject/tool_result 三态以 dict 键非空约定存在，`_dispatch_resume` 用 `or` 链重新推导——类型信息过早序列化成字符串、下游再解析。 | decode 层产出 frozen dataclass `ResumeAnswer(kind, ...)`；port 去掉 `is_rejection` 的 False 默认（逼 legacy adapter 显式表态）。 | — | Speculative → **本轮不写 story**（与 RA-138 同源，等 RA-138 取证结论再定形状，避免两次动 port 签名） |
+| RA-139 | `lca/infrastructure/tools/assistant/filter.py:151`, `lca/nodes/act/authorize/authorize.py:59` | 两处逐字相同的 `_required_grant` 探针；authorize 版 docstring 自认"同语义"却手抄一份 | 收敛到 `lca/infrastructure/runtime_plane/access/` 的公共 `required_grant_of(tool)` seam，两处调用方共用，删掉两个私有版 | locality: "如何读工具的 grant 声明"只存在一处；leverage: 声明机制变更（typed 字段）只改一处 | **Strong** |
+| RA-140 | `lca/nodes/act/authorize/authorize.py:208`, `bundles/act/act_subgraph.yaml:61`, `lca/framework/graph/port_registry.py:98` | `act.authorize` 读 `tools` typed 端口但 yaml `inputs: [decision, state]` 从未声明；`build_input(required_inputs)` 只投影已声明端口 → 该读数恒为 None，静默回退到全局 `current_tools_service()` | 二选一：(a) 在 yaml + `declared_inputs` 声明 `tools`（如 `llm.invoke`），让 kernel-owned typed seam 真正流通；(b) 删掉死读，只走 `current_tools_service()` 并写明 | locality: tools 来源选择收进 seam；leverage: 端口路径可测试（"the interface is the test surface"）；消除"删 fallback 即静默绕过 grant 检查"的隐患 | Worth exploring |
+| RA-141 | `lca/plugins/transport/webserver/handlers/runs/api/command_endpoints.py:179-188`, `lca/infrastructure/persistence/lobehub_agents.py`, `lca/infrastructure/persistence/user_store.py:217,406` | "agt_* → asst_*" 有三个回答者（ownership store ×2 实现 + lobehub fallback），优先级靠 endpoint 注释手写链；`standing_files.py:97`、`avatar/routes.py:109` 还有手写 getattr 探针 | 新建 `resolve_assistant_binding(agent_id)` seam，内聚优先级（ownership → lobehub fallback，保留 RA-135 的 lazy-import fail-soft 边界），endpoint 只调 seam | locality: 绑定优先级只存在一处；leverage: 新调用方不再手写链；seam 可单元测试（hit/miss/unbound） | Worth exploring |
 
-### Self-grilling (per candidate)
+## Self-grilling
 
-**RA-136**
-- Constraints: 不改 `model_name` 协议签名；`TelemetryLLMAdapter` 不覆写 `model_name`
-  （默认 None），收敛后行为与探针一致（None），无回归；`model_visible/adapter.py:78`
-  unwrap 链 scope 外。
-- Dependencies: 依赖 RA-106 的 3 个 `model_name` 覆写（openai_compat/mock/
-  model_override）；anthropic 内部 `_model` 是构造传入的自用字段，不受影响。
-- Shape: 两行 getattr 替换，无结构变化。
-- Test survival: `test_model_label.py` 继续绿；探针零测试钉住，替换不红。
-- Deletion test verdict: **PASS**（删除探针零测试失败）→ 探针无主，应当收敛。
-- Territory: 两文件近期提交全是用户侧 rounds（think-subgraph/ADR-0220、cli
-  style/region），无 lca-1000 churn。
+### RA-139 — 收敛 `_required_grant` 双胞胎
+- **Constraints**: 行为零变更（同一 body）；ADR-0292 §10 的 grant 语义不动；
+  `filter.py` 的调用方（tools.yaml 过滤）与 `authorize.py` 的调用方
+  （`_grant_refusal_routing`）行为一致。
+- **Dependencies**: 调用方 2 处（`filter.py:92`、`authorize.py:145`）；
+  被调用方无（纯 getattr 探针）。移动 seam 不影响任何其他模块。
+- **Shape**: `lca/infrastructure/runtime_plane/access/` 新增公共函数
+  `required_grant_of(tool: object) -> str`（命名对齐既有的
+  `canonical_tool_name` 公共导出风格）；两处改 import + 删私有函数。
+  不从 `filter.py` 反向 import（filter 是 assistant 域，access 是策略域，
+  方向应为两者都依赖 access）。
+- **Test survival**: 现有 grant 相关测试（filter 的 tools.yaml 过滤测试、
+  grant-refusal 路由测试）必须全绿；新增测试钉住"同一 tool 对象两处读数一致"。
+- **Deletion test verdict**: concentrates — "读 grant 声明"的方式只存在一处；
+  删掉任一私有版不丢信息。
 
-**RA-137**
-- Constraints: 无——coordinator 独立复验：3 处生产 import 只拿
-  `resume_cache_ready`/`validate_durable_resume`；测试里
-  `monkeypatch.setattr(registry_commands, "resume_run", ...)` patch 的是
-  `execute.execute` 版（`commands.py:20–24` 从 execute 导入），不是死代码。
-- Dependencies: 无。
-- Shape: 纯删除约 10 行（def + `__all__` 条目）。
-- Test survival: 无测试引用死函数。
-- Deletion test verdict: 删掉"无调用方的别名"= 净收益；消除同名双胞胎 footgun。
-- Territory: webserver carrier 是 lca-1000 领地，但该文件近 8 个提交全是用户侧
-  工作（runtime/types/import-sort/arch-discipline），lca-1000 无活跃 churn；
-  且改动是纯删除，不碰任何行为。
+### RA-140 — `act.authorize` 的 `tools` 端口死读
+- **Constraints**: 生产行为零变更（今天恒走 fallback）；ADR-0241 §2 的
+  kernel-owned 端口语义不动；`grant_routing` 输出端口不动。
+- **Dependencies**: 读方 1 处（`authorize.py:208-214`）；seed 方
+  （`interpreter.py:96` + `adapter.py:60`）是全图共享机制；yaml
+  `act_subgraph.yaml:61` 是声明方。改声明不影响其他节点（投影按节点
+  各自 schema 过滤）。
+- **Shape**: (a) yaml `inputs: [decision, state]` → 加 `tools`（bare string
+  即 required，如 `llm_call.yaml:18` 的 `[render, tools, state]`），
+  executor `declared_inputs` 同步加 `PortName("tools")`，保留
+  `current_tools_service()` 作为 fail-soft 回退；(b) 或删死读。
+  推荐 (a)——注释本意就是读端口（"tools 是 kernel-owned 端口"），让意图成真。
+- **Test survival**: 现有 act.authorize / grant 测试全绿；新增测试：
+  经真实 interpreter seed `tools` 端口，断言 `act.authorize` 的
+  `node_execute` 收到的是 seed 的 ToolsService 而非 fallback
+  （今天该测试失败——端口恒为 None）。
+- **Deletion test verdict**: (a) concentrates — tools 来源从"端口读数+
+  全局回退"的双路径收进"端口优先、回退兜底"的单一语义；(b) moves —
+  删读数只是把意图藏得更深。选 (a)。
 
-**RA-138**
-- Constraints: `payload: str` 是线契约；老前端可能仍发纯文本答案，不能 break。
-- Dependencies: routes_2 注册、LobeHub deploy patch 的前端行为、幂等键语义。
-- Shape: 小——一个调用点 + 可选 deprecation shim；或整条路由退役。
-- Test survival: RA-131 测试只覆盖新路径；新测试（"经 `/answer` 的拒绝不被记录"）
-  今天写不出来——这正是问题本身。
-- Deletion test verdict: 若前端已无人调，删 `answer_run` 是纯删。
-- Territory: 同 RA-137（webserver carrier，用户侧 runs 工作区，lca-1000 无 churn）。
+### RA-141 — `resolve_assistant_binding` seam
+- **Constraints**: 优先级不变（ownership store → lobehub fallback）；
+  fail-soft 边界不变（无 DB / 无映射 → unbound，不 raise 进 run 创建）；
+  RA-135 的 lazy-import 边界保留（import 期失败不炸 endpoint 模块）；
+  ADR-0187 §3 D7 的 mapping 真值（`agency_config->>'lcaAssistantId'`）不动。
+- **Dependencies**: 调用方：`command_endpoints.py:179-188`（主链）、
+  `standing_files.py:97`、`avatar/routes.py:109`（手写探针，可选收敛）；
+  被调用方：ownership 协议（sqlite/postgres 双实现）、`lobehub_agents`。
+- **Shape**: 新 seam（如 `lca/infrastructure/persistence/assistant_binding.py`
+  或归入 ownership 协议实现）`resolve_assistant_binding(agent_id,
+  ownership) -> str | None`，内部先 ownership 后 lobehub，lazy import
+  保持；endpoint 删手写链只调 seam。
+- **Test survival**: `4f67f10d7` 的 lobehub fallback 测试、`ee48d1d2e` 的
+  binding 测试全绿；新增 seam 级测试：ownership 命中 / lobehub 命中 /
+  双 miss → None（今天只能经 HTTP endpoint 测）。
+- **Deletion test verdict**: concentrates — 优先级逻辑从 endpoint 注释
+  收进可测试的 seam；删掉任一数据源分支会丢行为（fail-soft 需要两者）。
 
-### Top recommendation
+## Diversity quota
 
-先做 **RA-136**：两行改动、零风险、interface 在行为上已被实证更优（Mock 反例），
-且测试已钉住 interface——这是"收敛"类 story 里风险收益比最高的一档。接着
-**RA-137**：纯删除，消除同名双胞胎 footgun。**RA-138** 需要先取证（LobeHub 前端
-是否还在调 `/answer`），取证结论决定它是"退役路由"还是"补拒绝标记"。
+最终 3 个 story：RA-139（duplication，逐字两次=Strong，RA-136 实证过的类）、
+RA-140（friction walk：可测试性缺口 + 渗漏 seam）、RA-141（friction walk：
+浅模块扩张 + 渗漏 seam）。不全是 duplication；两个来自 friction walk。✓
 
-Diversity quota: 3 个 stories 全部来自 friction walk（shallow/无主探针、死代码、
-发散 ingress），无 duplication-class。✅
+## Noted but not storied (deliberate)
 
-Assessment complete: 3 stories written, top is RA-136.
+- `canonical_tool_name` 的 dotted 名 mangling（RA-132 已用 direct call 验证
+  `"tool_fs.read"` → `"toolFs.read"`）：生产链自洽（commands.py:294 写时
+  canonical → execute.py:157 透传 → authorize.py:281 读时 canonical），无
+  bypass。RA-132 证明"把规范化搬进 setter"的三约束不可兼得；leaf-only
+  修复对 wire 形态（namespace 是否 camelCase）是推测 —— Speculative，不入。
+- sanitizer 闭包窗口语义差异（OpenAI vs Anthropic）：无失败 wire case，Speculative。
+- journal-neutral history 的手写 role switch：稳定代码，无失败 case。
+- RA-106/136 的 `_model` 残留已收敛（`credentials.py:131` 现读
+  `model_name`；`driver_debug.py` 无 adapter 探针；剩余为 `self._model`）。
+
+## Top recommendation
+
+**先做 RA-139**。它是三者中证据最硬的（逐字相同 body + 作者自认同语义，
+RA-136 的"two = real"判据直接适用），改动最小（一个新公共函数 + 两处
+import），行为零变更，deletion test 通过。RA-140 次之（接口诚实性，
+但今天生产行为正确，属预防性）。RA-141 解决的是真实存在的"优先级只
+活在注释里"问题，但涉及 transport 层，面比前两者大。
+
+Assessment complete: 3 stories written, top is RA-139.
