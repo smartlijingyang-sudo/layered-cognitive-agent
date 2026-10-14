@@ -107,6 +107,10 @@ def _parse_verify_output(stdout: str) -> _VerifySummary:
     return _VerifySummary(ok=ok_count, broken=broken_count, names=tuple(broken_names))
 
 
+# Template owns these. Mock mode collapses every account onto MOCK_DEV_USER_ID.
+_AUTH_MODE_KEYS = ("ENABLE_MOCK_DEV_USER", "NEXT_PUBLIC_ENABLE_MOCK_DEV_USER")
+
+
 class LobeHubService:
     """LobeHub Next.js frontend.
 
@@ -669,6 +673,21 @@ class LobeHubService:
             )
         return worked
 
+    def _template_assignments(self, keys: tuple[str, ...]) -> dict[str, str]:
+        """Return assignment values for ``keys`` from the env template."""
+        template = self._root / self._config.env_template
+        if not template.exists():
+            return {}
+        wanted = set(keys)
+        found: dict[str, str] = {}
+        for line in template.read_text().splitlines():
+            if not line or line.startswith("#") or "=" not in line:
+                continue
+            key, value = line.split("=", 1)
+            if key in wanted:
+                found[key] = value
+        return found
+
     def _ensure_env(self) -> bool:
         """Configure .env for LobeHub."""
         env_file = self._dir / ".env"
@@ -702,6 +721,10 @@ class LobeHubService:
             "NEXT_PUBLIC_LCA_GATEWAY_URL=": gateway_ws,
             "LCA_GATEWAY_PUBLIC_URL=": gateway_base,
         }
+        # Auth mode is owned by the template. A drifted ENABLE_MOCK_DEV_USER=1
+        # makes every lambda caller, including recent.getAll, the mock user.
+        for key, value in self._template_assignments(_AUTH_MODE_KEYS).items():
+            targets[f"{key}="] = value
 
         for line in lines:
             matched = False
@@ -838,6 +861,7 @@ class LobeHubService:
             "ENABLED_OPENAI": "1",
             "NEXT_PUBLIC_LCA_GATEWAY_URL": gateway_ws,
             "NEXT_PUBLIC_LCA_HOST_CONSOLE": os.environ.get("NEXT_PUBLIC_LCA_HOST_CONSOLE", "0"),
+            **self._template_assignments(_AUTH_MODE_KEYS),
             "RAYON_NUM_THREADS": os.environ.get("RAYON_NUM_THREADS", "2"),
             "NODE_OPTIONS": os.environ.get("NODE_OPTIONS", "--max-old-space-size=2048"),
         }

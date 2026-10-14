@@ -210,3 +210,53 @@ def test_ensure_env_is_idempotent(tmp_path: Path, monkeypatch: pytest.MonkeyPatc
     assert second_changed is False
     mtime_after = (ui_dir / ".env").stat().st_mtime_ns
     assert mtime_before == mtime_after
+
+
+def test_ensure_env_restores_auth_mode_from_template(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A drifted mock-user flag must not survive the next frontend start.
+
+    ENABLE_MOCK_DEV_USER=1 makes every lambda call, including recent.getAll,
+    run as MOCK_DEV_USER_ID. Accounts then share one recents list.
+    """
+    from lca.infrastructure.cli.services.lobehub.lobehub import LobeHubService
+
+    cfg_path = tmp_path / "lca-ops.yaml"
+    cfg_path.write_text(
+        "kernel_serve:\n  host: 10.36.6.252\n  port: 8765\n  health_path: /health\n"
+        "  profile: profiles/web-standard.yaml\n"
+        "lobehub:\n  host: 10.36.6.252\n  release: v2.2.13\n  dir: lobehub-ui\n"
+        "  dev_port: 3010\n  spa_port: 9876\n  env_template: deploy/lobehub/.env.lca\n"
+    )
+    cfg = OpsConfig.load(cfg_path)
+    monkeypatch.setattr("os.environ", {"ENABLE_MOCK_DEV_USER": "1"}, raising=False)
+    ui_dir = tmp_path / "lobehub-ui"
+    ui_dir.mkdir(parents=True)
+    template_dir = tmp_path / "deploy" / "lobehub"
+    template_dir.mkdir(parents=True)
+    (template_dir / ".env.lca").write_text(
+        "ENABLE_MOCK_DEV_USER=0\nNEXT_PUBLIC_ENABLE_MOCK_DEV_USER=0\nCUSTOM_KEY=keep_me\n"
+    )
+    (ui_dir / ".env").write_text(
+        "# drifted\n"
+        "ENABLE_MOCK_DEV_USER=1\n"
+        "NEXT_PUBLIC_ENABLE_MOCK_DEV_USER=1\n"
+        "CUSTOM_KEY=keep_me\n"
+    )
+    state_dir = tmp_path / "state_auth"
+    state_dir.mkdir()
+    svc = LobeHubService(
+        config=cfg.lobehub,
+        gateway=cfg.kernel_serve,
+        state_dir=state_dir,
+        root=tmp_path,
+    )
+
+    assert svc._ensure_env() is True
+    text = (ui_dir / ".env").read_text()
+    assert "ENABLE_MOCK_DEV_USER=0\n" in text
+    assert "NEXT_PUBLIC_ENABLE_MOCK_DEV_USER=0\n" in text
+    assert "CUSTOM_KEY=keep_me" in text
+    assert svc._child_env()["ENABLE_MOCK_DEV_USER"] == "0"
+    assert svc._child_env()["NEXT_PUBLIC_ENABLE_MOCK_DEV_USER"] == "0"
