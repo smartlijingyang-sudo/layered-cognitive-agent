@@ -3887,3 +3887,26 @@ brain/reducer/memory/hub/standing_refresher 等键，待 RA-123 落地后再评�
   - Verified all three paths: legacy ambient fallback, explicit session,
     explicit None with no ambient (returns None = legacy full list).
 ---
+
+## 2026-10-15 02:05 (CST) - RA-145
+- Implemented: `canonical_tool_name` in
+  `lca/infrastructure/runtime_plane/access/approved_tools.py` is now
+  namespace-aware: splits on `.` first, canonicalizes only the bare tool name,
+  never mangles the namespace (`mcp_corp.do_thing` → `mcp_corp.doThing`, not
+  `mcpCorp.doThing` — RA-132's trap). The private twin `_canonicalise_tool_name`
+  (+ `_CAMEL_BOUNDARY_RE`) in `lca/cognition/body/tools/tool_batch_executor.py`
+  is deleted; the executor's tolerant registry fallback now calls the shared seam.
+- recover: this round found the code change as uncommitted residue in the raphy
+  worktree (previous round died before committing). Ran related tests first:
+  48 passed → residue healthy. Completed the story by adding the missing RA-132
+  regression pin tests, then committed everything in one commit.
+- Files changed: `lca/cognition/body/tools/tool_batch_executor.py`,
+  `lca/infrastructure/runtime_plane/access/approved_tools.py`,
+  `tests/infrastructure/runtime_plane/access/test_canonical_tool_name.py` (new,
+  5 pin tests), `raphy/prd.json`, `raphy/progress.txt`.
+- **Learnings for future iterations:**
+  - 异常恢复先跑测试判健康再决定：残留 diff 干净 + 相关测试全绿 → 可收尾 commit；
+    若有红则一律不动、报用户处理。
+  - Pin 测试是验收的一部分：上一轮只改了代码没加 pin 测试，按验收标准故事不算
+    done —— 实现与 pin 测试必须同一次 commit 落盘。
+---

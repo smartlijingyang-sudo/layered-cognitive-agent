@@ -2146,9 +2146,10 @@
       "branchName": "raphy/arch-20261014-2245",
       "description": "As an LCA maintainer, I want one shared, namespace-aware tool-name canonicalization seam, because `_canonicalise_tool_name` (private, `tool_batch_executor.py`) and `canonical_tool_name` (public, `approved_tools.py`) are twin snake<->camel normalizers for the same reason (the LLM emits either case style; the registry keeps one), and both cross the namespace separator: `mcp_corp.do_thing` becomes `mcpCorp.doThing`, which matches nothing -- a silent lookup/match failure. RA-132 was dropped for exactly this mangling; the need is real ('two = real'), the shape was wrong. The seam must split the namespace separator first and canonicalize only the bare tool name, never across it.",
       "id": "RA-145",
-      "passes": false,
+      "passes": true,
       "priority": "P2",
-      "title": "One namespace-aware tool-name canonicalization seam (resolves RA-132's mangling trap)"
+      "title": "One namespace-aware tool-name canonicalization seam (resolves RA-132's mangling trap)",
+      "notes": "recover: 2026-10-15 01:45 round recovered uncommitted residue from interrupted round; added RA-132 regression pin tests."
     }
   ]
 }
