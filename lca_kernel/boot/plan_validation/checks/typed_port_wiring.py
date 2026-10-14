@@ -23,10 +23,12 @@ kernel reads them from the registry when the subgraph is entered,
 so a missing predecessor in the enclosing plan does not indicate
 a real wiring fault.
 """
+
 from __future__ import annotations
 
 from lca.contracts.protocols.graph.errors import PlanLiftError
 from lca.contracts.protocols.graph.plan import Plan
+from lca_kernel.boot.plan_validation.typed_ports import _check_typed_port_wiring
 
 from .base import PlanCheck
 
@@ -39,55 +41,7 @@ class TypedPortWiringCheck(PlanCheck):
     label = "Typed-port wiring (required inputs from predecessor)"
 
     def run(self, plan: Plan, *, plan_id: str) -> PlanLiftError | None:
-        skip_ids = {
-            n.id
-            for n in plan.nodes
-            if n.entry or n.subgraph_ref is not None
-        }
-        output_produced: dict[str, frozenset[str]] = {
-            n.id: n.io_schema.output_names() for n in plan.nodes
-        }
-        predecessors: dict[str, frozenset[str]] = {
-            n.id: frozenset() for n in plan.nodes
-        }
-        for edge in plan.edges:
-            predecessors[edge.target] = (
-                predecessors.get(edge.target, frozenset()) | {edge.source}
-            )
-        available: dict[str, frozenset[str]] = {
-            n.id: output_produced[n.id] for n in plan.nodes
-        }
-        changed = True
-        while changed:
-            changed = False
-            for node_id, preds in predecessors.items():
-                if not preds:
-                    continue
-                merged: set[str] = set(available[node_id])
-                for p in preds:
-                    merged |= available.get(p, frozenset())
-                new = frozenset(merged)
-                if new != available[node_id]:
-                    available[node_id] = new
-                    changed = True
-        for node in plan.nodes:
-            if node.id in skip_ids:
-                continue
-            required = node.io_schema.required_inputs()
-            if not required:
-                continue
-            missing = [p for p in required if p not in available[node.id]]
-            if not missing:
-                continue
-            return PlanLiftError(
-                f"plan {plan_id!r}: node {node.id!r} required inputs "
-                f"{missing!r} are not produced by any reachable predecessor "
-                f"(available={sorted(available[node.id])}; "
-                f"predecessors={sorted(predecessors[node.id])})",
-                plan_id=plan_id,
-                node_id=node.id,
-            )
-        return None
+        return _check_typed_port_wiring(plan, plan_id=plan_id)
 
 
 __all__ = ["TypedPortWiringCheck"]

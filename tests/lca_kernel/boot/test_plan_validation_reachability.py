@@ -132,6 +132,14 @@ class TestCheckTypedPortWiring:
         )
         assert _check_typed_port_wiring(plan, plan_id="test.plan") is None
 
+    def test_kernel_seeded_port_needs_no_predecessor(self) -> None:
+        plan = _plan(
+            _node("a", entry=True, outputs=("decision",)),
+            _node("b", terminal=True, inputs=("decision", "tools")),
+            edges=(_edge("a", "b"),),
+        )
+        assert _check_typed_port_wiring(plan, plan_id="test.plan") is None
+
     def test_self_declared_output_satisfies_input(self) -> None:
         # A node starts with its own declared outputs in the available
         # set, so a self-produced port satisfies its own requirement.

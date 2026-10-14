@@ -15,6 +15,12 @@ from __future__ import annotations
 
 from lca.contracts.protocols.graph.errors import PlanLiftError
 from lca.contracts.protocols.graph.plan import Plan
+from lca.contracts.protocols.graph.ports import PortName
+
+# Written onto the port registry at plan entry by
+# ``PlanInterpreter._port_registry_seed_from_runtime_plane``. A node
+# that requires one is reading that seed, not a predecessor output.
+_KERNEL_SEEDED_PORTS = frozenset((PortName("tools"), PortName("bindings")))
 
 
 def _check_typed_port_wiring(plan: Plan, *, plan_id: str) -> PlanLiftError | None:
@@ -57,7 +63,9 @@ def _check_typed_port_wiring(plan: Plan, *, plan_id: str) -> PlanLiftError | Non
     # targets the entry as its predecessor (common in subgraph
     # delegates, where the entry is the delegate's entry) still
     # gets the right "available" set.
-    available: dict[str, frozenset[str]] = {n.id: output_produced[n.id] for n in plan.nodes}
+    available: dict[str, frozenset[str]] = {
+        n.id: output_produced[n.id] | _KERNEL_SEEDED_PORTS for n in plan.nodes
+    }
     changed = True
     while changed:
         changed = False
