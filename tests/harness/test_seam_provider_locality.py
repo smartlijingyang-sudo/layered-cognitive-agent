@@ -15,7 +15,7 @@ This test boots the canonical web-standard profile and asserts:
   domain dir, and are not silently disabled.
 * The resolved capability set is identical to the drift-pin snapshot at
   ``docs/notes/baselines/capability-set-web-standard-2026-10-08.json``
-  (263 enabled plugins / 138 edges).
+  (261 enabled plugins / 137 edges).
 
 Reference:
     docs/notes/proposed/seam/2026-09-04-plugin-universe-single-entry.md
@@ -156,7 +156,7 @@ def test_baseline_capability_set_matches(resolved) -> None:
     """The set of resolved plugin ids + their (provides, requires, kind, layer)
     tuples must equal the drift-pin snapshot at
     ``docs/notes/baselines/capability-set-web-standard-2026-10-08.json``
-    (263 enabled plugins / 138 edges).
+    (261 enabled plugins / 137 edges).
 
     This is a stronger guarantee than the per-pair check above: it catches
     silent capability-string renames, missed migrations, and accidental
