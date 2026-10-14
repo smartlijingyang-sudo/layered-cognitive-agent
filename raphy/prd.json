@@ -2133,7 +2133,7 @@
       "branchName": "raphy/arch-20261014-2245",
       "description": "As an LCA maintainer, I want `unexposed_tool_block_observation` to take the defer session as an explicit parameter, because the `tool_wire_gate` module docstring claims it is a 'pure-function module', yet the gate lazily imports `current_defer_session` inside its body and reads the ambient ContextVar. The interface `(decision) -> Observation | None` lies about its inputs ('the interface is the test surface' fails): the gate is only testable through a ContextVar fixture, and the real decision input (this turn's defer view) hides in the call rather than the signature.",
       "id": "RA-144",
-      "passes": false,
+      "passes": true,
       "priority": "P2",
       "title": "Make the defer-session dependency of the unexposed gate explicit (restore the pure-function contract)"
     },

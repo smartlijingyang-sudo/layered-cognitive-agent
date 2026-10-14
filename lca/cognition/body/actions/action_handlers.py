@@ -237,7 +237,11 @@ class UseToolOperation(Action):
         wire_block = tool_wire_block_observation(decision)
         if wire_block is not None:
             return _journal_blocked_call(decision, wire_block)
-        hidden = unexposed_tool_block_observation(decision)
+        # Boundary reads the ambient defer session once (RA-144); the gate
+        # itself takes it as an explicit parameter.
+        from lca.infrastructure.tool_defer.session import current_defer_session
+
+        hidden = unexposed_tool_block_observation(decision, current_defer_session())
         if hidden is not None:
             return _journal_blocked_call(decision, hidden)
         # ADR-0047: a call whose required arguments never arrived must not

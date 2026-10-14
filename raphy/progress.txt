@@ -3865,3 +3865,25 @@ brain/reducer/memory/hub/standing_refresher 等键，待 RA-123 落地后再评�
   - `ruff check --fix` auto-sorts the new import block; run it before
     committing test files with added imports.
 ---
+
+## 2026-10-15 01:25 (CST) - RA-144
+- Implemented: `unexposed_tool_block_observation(decision, defer_session=None)`.
+  The session is now an explicit parameter; `None` falls back to the ambient
+  `current_defer_session()` for legacy callers. The sole production caller
+  (`action_handlers.py:240`) reads the ContextVar once at the boundary and
+  passes it in (lazy import moved to the caller). The module's
+  "pure-function" claim is true again for the explicit path.
+- Files changed: `lca/cognition/body/tools/tool_wire_gate.py`,
+  `lca/cognition/body/actions/action_handlers.py`,
+  `tests/scenario/test_wire_gate_namespace.py` (fixture drops the ContextVar;
+  all gate calls pass the session explicitly),
+  `tests/cognition/body/test_tool_arguments_wire_gate.py`,
+  `tests/infrastructure/tools/lca/test_nothing_to_do.py`,
+  `tests/scenario/test_tool_namespace_adr0256_conformance.py` (explicit
+  session + RA-143 error-text assertion updated to the constructor format).
+- **Learnings for future iterations:**
+  - TYPE_CHECKING import for the annotation keeps the runtime import lazy
+    (no import-cycle risk); the fallback keeps the lazy runtime import.
+  - Verified all three paths: legacy ambient fallback, explicit session,
+    explicit None with no ambient (returns None = legacy full list).
+---

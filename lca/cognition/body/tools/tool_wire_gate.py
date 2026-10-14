@@ -8,6 +8,10 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from lca.infrastructure.tool_defer.session import ToolDeferSession
 
 from lca.contracts.atoms.enums.enums import MemoryRecordKind
 from lca.contracts.atoms.ids.ids import new_id
@@ -104,17 +108,26 @@ def tool_wire_block_observation(decision: Decision) -> Observation | None:
     )
 
 
-def unexposed_tool_block_observation(decision: Decision) -> Observation | None:
+def unexposed_tool_block_observation(
+    decision: Decision,
+    defer_session: ToolDeferSession | None = None,
+) -> Observation | None:
     """Refuse a call whose schema was not on this turn's tool list.
 
     Defer hides a namespace until ``tool_search`` loads it. The registry
     still holds the tool. Executing a name the model was not given is the
     fail-closed side of that hide. No defer session means the legacy full list.
+
+    The defer session is an explicit parameter (RA-144): the action boundary
+    reads the ambient ContextVar and passes it in, so this gate stays a pure
+    function of its inputs. ``None`` falls back to the ambient read for
+    legacy callers.
     """
+    session = defer_session
+    if session is None:
+        from lca.infrastructure.tool_defer.session import current_defer_session
 
-    from lca.infrastructure.tool_defer.session import current_defer_session
-
-    session = current_defer_session()
+        session = current_defer_session()
     if session is None or not session.policy.enabled or not session.namespaces:
         return None
     # Session-owned seams (RA-142): the gate asks instead of re-deriving.

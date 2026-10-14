@@ -94,7 +94,7 @@ def test_user_round_call_to_nothing_to_do_is_blocked() -> None:
     session.update_turn((_FakeTool(),))
     token = set_current_defer_session(session)
     try:
-        obs = unexposed_tool_block_observation(_decision(IDENTIFIER))
+        obs = unexposed_tool_block_observation(_decision(IDENTIFIER), session)
         assert obs is not None
         assert obs.success is False
         assert IDENTIFIER in obs.error
