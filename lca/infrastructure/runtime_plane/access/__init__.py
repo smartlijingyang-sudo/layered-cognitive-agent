@@ -1,5 +1,8 @@
 """Public exports for ``access`` — the machine-plane authorization boundary."""
 
+from lca.infrastructure.runtime_plane.access.approved_tools import (
+    required_grant_of,
+)
 from lca.infrastructure.runtime_plane.access.classify import (
     call_paths,
     decide_tool_call,
@@ -42,6 +45,7 @@ __all__ = [
     "machine_calls_need_approval",
     "machine_operation",
     "readable_prefixes",
+    "required_grant_of",
     "subcommands",
     "tool_calls_need_approval",
 ]

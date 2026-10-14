@@ -1,5 +1,10 @@
 ## Codebase Patterns
 
+- **双胞胎收敛的 seam 选址：优先塞进"同类家园"而非新建模块（RA-139 实证）：**
+  `_required_grant` 双胞胎收进 `access/approved_tools.py`（`canonical_tool_name`
+  的同类授权探针家园）并包级导出——评估说的"新建公共函数"落到已有模块是
+  正常收敛。看调用方已 import 的域模块，比新建文件 churn 小。
+
 - **"two = real" 的逐字两次是 Strong 信号（RA-136 实证）：** 两处逐字相同的私有
   `_model` 探针（`getattr(adapter, "_model", None) or getattr(adapter, "model",
   None)`），deletion test 通过（删掉零测试变红）+ interface 在行为上被实证更优
@@ -3652,4 +3657,32 @@ brain/reducer/memory/hub/standing_refresher 等键，待 RA-123 落地后再评�
     （`parsers.py::to_port_specs`）是关键一环：bare-string yaml inputs
     全是 required，所以"声明了但 optional"和"没声明"是两种完全不同的
     死因，assess 时要区分。
+---
+
+## 2026-10-14 08:30 - RA-139
+- What was implemented: converged the two byte-identical `_required_grant` probes
+  (`filter.py:151` `_required_grant`, `authorize.py:59` `_required_grant_of`) onto
+  one public seam `required_grant_of(tool) -> str` in
+  `lca/infrastructure/runtime_plane/access/approved_tools.py` (the authorization
+  probe home, next to `canonical_tool_name`), exported from the `access` package
+  `__init__`. Both call sites (`filter.py:92`, `authorize.py:145`) import the seam
+  from `lca.infrastructure.runtime_plane.access`; the two private twins are deleted
+  (grep `def _required_grant` over lca/ = 0 hits). Semantics byte-identical:
+  `str(getattr(tool, "required_grant", "") or "").strip()`.
+- Files changed:
+  - lca/infrastructure/runtime_plane/access/approved_tools.py (+seam, __all__)
+  - lca/infrastructure/runtime_plane/access/__init__.py (+package export)
+  - lca/infrastructure/tools/assistant/filter.py (import seam, delete twin)
+  - lca/nodes/act/authorize/authorize.py (import seam, delete twin)
+  - tests/infrastructure/runtime_plane/access/test_required_grant_of.py (new, 4 tests)
+- Tests: new seam test (4 tests: read+strip / undeclared -> "" / None -> "" /
+  both former call sites use the identical seam object, no twin remains);
+  tests/infrastructure/tools/assistant/test_filter_tools.py (33) +
+  tests/contracts/test_adr0292_authorization_semantic_isolation.py (24) all green;
+  `ruff check` clean on all 5 touched files.
+- **Learnings for future iterations:**
+  - 逐字两次=Strong 的类（RA-136 实证）同样适用于"私有探针 + docstring 自认同语义"，
+    删除测试（deletion test）通过即动手，不用等第三处证据。
+  - tests 必须从 worktree 内部跑：/tmp 残留 `lca/` 目录会遮蔽 namespace 包导致
+    ModuleNotFoundError；验证脚本写在 worktree 里，跑完 rm 掉。
 ---

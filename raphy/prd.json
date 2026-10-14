@@ -2062,8 +2062,8 @@
       "branchName": "raphy/arch-20261014-0745",
       "description": "As an LCA maintainer, I want the two byte-identical grant-declaration probes — `lca/infrastructure/tools/assistant/filter.py::_required_grant` (line 151) and `lca/nodes/act/authorize/authorize.py::_required_grant_of` (line 59), both `return str(getattr(tool, \"required_grant\", \"\") or \"\").strip()` — converged onto one public seam, because the authorize copy's own docstring admits it is '与 filter._required_grant 同语义' yet hand-copies the body; any future change to how a Tool declares its grant (e.g. a typed field) must otherwise be made twice. Export `required_grant_of(tool)` from `lca/infrastructure/runtime_plane/access/` (the access-policy home, which authorize.py already imports from), have both call sites use it, and delete the two private twins. Do NOT have authorize import the private from filter (wrong direction: both domains depend on the access seam).",
       "id": "RA-139",
-      "notes": "Assessed 2026-10-14 07:45 round (Area A). Strong: two verbatim occurrences = real seam per the RA-136 precedent; author self-documented the duplication. Deletion test: concentrates ('how to read a tool's grant declaration' lives in one place).",
-      "passes": false,
+      "notes": "Assessed 2026-10-14 07:45 round (Area A). Strong: two verbatim occurrences = real seam per the RA-136 precedent; author self-documented the duplication. Deletion test: concentrates ('how to read a tool's grant declaration' lives in one place). Implemented 2026-10-14: seam `required_grant_of` in access/approved_tools.py, package-exported; both call sites use it; both private twins deleted. 4 new tests + 37 filter/ADR-0292 tests green.",
+      "passes": true,
       "priority": 1,
       "title": "Converge the two verbatim _required_grant probes onto one shared seam"
     },

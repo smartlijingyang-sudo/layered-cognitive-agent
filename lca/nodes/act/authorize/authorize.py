@@ -51,19 +51,10 @@ from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import
 from lca.contracts.protocols.graph.routing import RoutingDecision
 from lca.contracts.runtime.trust import get_current_trust_envelope
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
+from lca.infrastructure.runtime_plane.access import required_grant_of
 from lca.infrastructure.runtime_plane.access.approved_tools import canonical_tool_name
 
 _NEXT_HINT_GRANT_REFUSED = "grant_refused"
-
-
-def _required_grant_of(tool: object) -> str:
-    """Return the tool's declared grant requirement, or ``""`` when none.
-
-    与 ``lca.infrastructure.tools.assistant.filter._required_grant`` 同语义：
-    ``Tool`` 协议不携带 grant 字段，需要 grant 的工具以 ``required_grant``
-    class attribute 声明。grant-agnostic 工具不受运行时授权检查约束。
-    """
-    return str(getattr(tool, "required_grant", "") or "").strip()
 
 
 def _approved_tool_names() -> set[str]:
@@ -142,7 +133,7 @@ def _grant_refusal_routing(decision: Decision, tools: object) -> RoutingDecision
     missing: list[str] = []
     for call in decision.tool_calls:
         tool = getattr(tools, "get", lambda _name: None)(call.tool_name)
-        required_grant = _required_grant_of(tool)
+        required_grant = required_grant_of(tool)
         if required_grant and (envelope is None or not envelope.grants(required_grant)):
             missing.append(required_grant)
     if not missing:

@@ -38,6 +38,16 @@ def canonical_tool_name(name: str) -> str:
     return name
 
 
+def required_grant_of(tool: object) -> str:
+    """Return the tool's declared grant requirement, or ``""`` when none.
+
+    The ``Tool`` protocol does not carry a grant field; tools that need one
+    declare ``required_grant`` as a class attribute.  Absence means the tool
+    is grant-agnostic and is governed by ``tools.yaml`` alone.
+    """
+    return str(getattr(tool, "required_grant", "") or "").strip()
+
+
 def set_approved_tool_names(names: frozenset[str]) -> None:
     """Set the approved tool set for the current run context (resume task)."""
     _approved_tools_var.set(names)
@@ -48,4 +58,9 @@ def get_approved_tool_names() -> frozenset[str]:
     return _approved_tools_var.get()
 
 
-__all__ = ("canonical_tool_name", "get_approved_tool_names", "set_approved_tool_names")
+__all__ = (
+    "canonical_tool_name",
+    "get_approved_tool_names",
+    "required_grant_of",
+    "set_approved_tool_names",
+)

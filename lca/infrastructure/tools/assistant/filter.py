@@ -30,6 +30,7 @@ from typing import TypeAlias
 import yaml
 
 from lca.contracts.protocols.runtime.infra.infra import Tool
+from lca.infrastructure.runtime_plane.access import required_grant_of
 
 __all__ = ["filter_tools_by_assistant"]
 
@@ -89,7 +90,7 @@ def filter_tools_by_assistant(
         keys = _tool_matching_names(tool)
         if keys & deny:
             continue
-        required_grant = _required_grant(tool)
+        required_grant = required_grant_of(tool)
         if required_grant:
             if required_grant in grants:
                 kept.append(tool)
@@ -147,15 +148,6 @@ def _load_grants(home: Path) -> frozenset[str]:
         return frozenset()
     return _non_empty_strings(grants)
 
-
-def _required_grant(tool: Tool) -> str:
-    """Return the tool's declared grant requirement, or ``""`` when none.
-
-    The ``Tool`` protocol does not carry a grant field; tools that need one
-    declare ``required_grant`` as a class attribute.  Absence means the tool
-    is grant-agnostic and is governed by ``tools.yaml`` alone.
-    """
-    return str(getattr(tool, "required_grant", "") or "").strip()
 
 
 def _non_empty_strings(items: Iterable[object]) -> frozenset[str]:
