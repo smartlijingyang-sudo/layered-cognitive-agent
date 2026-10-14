@@ -1,6 +1,6 @@
 {
   "profile": "profiles/web-standard.yaml",
-  "manifest_hash": "d898e41625210e46",
+  "manifest_hash": "c6bcb9f21fb30aca",
   "nodes": [
     {
       "id": "lca-decision-classifier-seam",
@@ -1008,26 +1008,6 @@
       "provides": [],
       "requires": [
         "trace_inspector_tools"
-      ],
-      "disabled": false
-    },
-    {
-      "id": "lca-cli-debug-command-seam",
-      "kind": "seam",
-      "layer": "L0",
-      "provides": [
-        "cli_debug_command"
-      ],
-      "requires": [],
-      "disabled": false
-    },
-    {
-      "id": "lca-cli-debug-trace",
-      "kind": "provider",
-      "layer": "L0",
-      "provides": [],
-      "requires": [
-        "cli_debug_command"
       ],
       "disabled": false
     },
@@ -2856,10 +2836,6 @@
     [
       "lca-trace-tool-seam",
       "lca-trace-tool-provider"
-    ],
-    [
-      "lca-cli-debug-command-seam",
-      "lca-cli-debug-trace"
     ],
     [
       "lca-genai-semantic-mapper-seam",
