@@ -138,10 +138,6 @@ class TestControlSurfacePurity:
     cordis listeners 不得复活、不得注入 State 突变。
     """
 
-    @pytest.fixture(scope="class")
-    def plugin_guards(self) -> list[Path]:
-        return sorted(PLUGINS.glob("guards/*.py"))
-
     def test_no_cordis_listeners_under_lca(self) -> None:
         for path in _py_files(LCA):
             src = _read_source(path)
