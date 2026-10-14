@@ -256,12 +256,6 @@ class NamespaceApprovalStrategy:
             )
         )
 
-        session_tool_to_ns: dict[str, str] = {}
-        if defer_session is not None:
-            for ns_obj in defer_session.namespaces:
-                for tname in ns_obj.tool_names:
-                    session_tool_to_ns[tname] = ns_obj.name
-
         for call in tool_calls:
             tool_name = getattr(call, "tool_name", None)
             if not isinstance(tool_name, str) or not tool_name:
@@ -270,8 +264,10 @@ class NamespaceApprovalStrategy:
             ns: str | None = None
             if self._tool_namespaces and tool_name in self._tool_namespaces:
                 ns = self._tool_namespaces[tool_name]
-            elif tool_name in session_tool_to_ns:
-                ns = session_tool_to_ns[tool_name]
+            elif defer_session is not None:
+                session_ns = defer_session.namespace_of_tool(tool_name)
+                if session_ns is not None:
+                    ns = session_ns
             elif tool_name in _STANDARD_SHELL_TOOLS:
                 ns = "shell"
 

@@ -117,23 +117,13 @@ def unexposed_tool_block_observation(decision: Decision) -> Observation | None:
     session = current_defer_session()
     if session is None or not session.policy.enabled or not session.namespaces:
         return None
-    wire, _catalog = session.render_turn()
-    visible: set[str] = set()
-    for spec in wire:
-        function = spec.get("function") if isinstance(spec, dict) else None
-        name = function.get("name") if isinstance(function, dict) else ""
-        if isinstance(name, str) and name:
-            visible.add(name)
-
-    tool_to_ns: dict[str, str] = {}
-    for ns_obj in session.namespaces:
-        for tname in ns_obj.tool_names:
-            tool_to_ns[tname] = ns_obj.name
+    # Session-owned seams (RA-142): the gate asks instead of re-deriving.
+    visible = session.turn_visible_tool_names()
 
     for tc in decision.tool_calls:
         if tc.tool_name in visible:
             continue
-        ns_name = tool_to_ns.get(tc.tool_name, "deferred")
+        ns_name = session.namespace_of_tool(tc.tool_name) or "deferred"
         return Observation(
             observation_id=new_id("obs"),
             success=False,

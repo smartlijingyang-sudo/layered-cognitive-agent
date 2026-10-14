@@ -3816,3 +3816,30 @@ brain/reducer/memory/hub/standing_refresher 等键，待 RA-123 落地后再评�
   2026-10-07 的 `LoopObligationExceededError` 透传 P0 在本 tip 重跑
   scenario (d) 后确认为已修复（failed Result + max_steps 生效），
   不是"看着像修了"。assessment 里写"已修复"必须有本轮的重跑证据。
+
+## 2026-10-15 00:55 (CST) - RA-142
+- Implemented: session-owned seams on `ToolDeferSession` — `namespace_of_tool(name)`
+  (backed by `_tool_to_namespace` rebuilt in `update_turn`) and
+  `turn_visible_tool_names()` (reads the wire-spec shape owned by
+  `_tool_to_spec` via `render_turn()`). Converged both hand-rolled
+  traversals: `NamespaceApprovalStrategy.evaluate` (approval_engine.py)
+  now asks `defer_session.namespace_of_tool()`; `unexposed_tool_block_observation`
+  (tool_wire_gate.py) asks `session.turn_visible_tool_names()` +
+  `session.namespace_of_tool()`. Full-repo grep confirmed no other
+  hand-rolled `session.namespaces` traversals (tool_wire_gate.py:118 is a
+  truthiness check, not a traversal).
+- Files changed: `lca/infrastructure/tool_defer/session.py`,
+  `lca/infrastructure/runtime_plane/access/approval_engine.py`,
+  `lca/cognition/body/tools/tool_wire_gate.py`,
+  `tests/infrastructure/tool_defer/test_session.py` (+4 seam tests:
+  hit/miss/unknown/rebuild + visible-set==wire invariant).
+- **Learnings for future iterations:**
+  - Pre-existing red: `test_wire_gate_namespace.py` C1/C4 fail on the base
+    commit too (verified via `git stash`): `DeferPolicy` defaults
+    `eager_namespaces={"core","memory"}`, so `memory_search` is on the wire
+    and never blocked — the fixture assumes "memory" is deferred. Not caused
+    by RA-142; left untouched (fixture fix is out of scope).
+  - The lazy `current_defer_session` import inside
+    `NamespaceApprovalStrategy.evaluate` stays (import-cycle constraint);
+    only the traversal moved behind the seam.
+---

@@ -2107,7 +2107,7 @@
       "branchName": "raphy/arch-20261014-2245",
       "description": "As an LCA maintainer, I want the tool->namespace question answered by one session-owned seam instead of two hand-rolled loops, because `NamespaceApprovalStrategy.evaluate` (approval_engine.py:260-265) and `unexposed_tool_block_observation` (tool_wire_gate.py:128-133) both derive `{tool_name: namespace}` from `session.namespaces` with verbatim-shape loops ('two = real'), leaking the session's internal tuple shape across the seam. A third reader, the unexposed gate, additionally parses wire-spec dicts (`spec.get('function').get('name')`) to recover the visible tool set, while the wire shape is owned by `session._tool_to_spec`. Any new caller re-implements the traversal, and a change to the session's internal shape breaks both silently.",
       "id": "RA-142",
-      "passes": false,
+      "passes": true,
       "priority": "P1",
       "title": "Converge the two hand-rolled tool->namespace maps onto a session-owned seam"
     },
