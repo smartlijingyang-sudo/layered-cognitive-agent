@@ -52,9 +52,6 @@ class GenericInMemoryRegistry(UniqueOperationRegistry[_HandlerT], Generic[_Handl
     使各接缝保留自己的词汇表。
     """
 
-    def __init__(self, registry_kind: str) -> None:
-        super().__init__(registry_kind)
-
     def register(self, operation: str, handler: _HandlerT) -> None:
         """注册 ``operation`` 的唯一 handler 所有者。"""
         self._register(operation, handler)
