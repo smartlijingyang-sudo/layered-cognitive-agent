@@ -35,6 +35,9 @@ from lca.cognition.team.modes_catalog import resolve_profile_mode
 from lca.contracts.models.core.conversation.conversation import ConversationTurn
 from lca.contracts.protocols.assistant.ownership import AssistantOwnership
 from lca.infrastructure.file.store import LocalFileStore
+from lca.infrastructure.persistence.assistant_binding import (
+    resolve_assistant_binding,
+)
 from lca.plugins.transport.webserver.carrier.runs.recovery import (
     load_resume_bundle,
     restore_waiting_run,
@@ -179,13 +182,16 @@ async def decode_create_run(
     if not assistant_id and agent.agent_id:
         # Carrier-side resolution so agent-only callers (lca-ops runs create)
         # get the same assistant identity the gateway bridge asserts.
-        if ownership is not None:
-            assistant_id = ownership.assistant_id_for_agent(agent.agent_id) or ""
-        if not assistant_id:
-            # Run-created assistants exist only in the LobeHub agents row
-            # (agency_config.lcaAssistantId); the ownership store has no row.
-            # This fallback is fail-soft: no DB / no mapping ⇒ unbound (I-A1).
-            assistant_id = agent_assistant_id_from_lobehub(agent.agent_id) or ""
+        # Precedence (ownership store -> LobeHub fallback) lives in the seam;
+        # a miss on both means unbound (""), never raises.
+        assistant_id = (
+            resolve_assistant_binding(
+                agent.agent_id,
+                ownership,
+                lobehub_fallback=agent_assistant_id_from_lobehub,
+            )
+            or ""
+        )
 
     mode = str(body.get("mode") or body.get("model") or "solo")
     resolved_mode = resolve_mode(ctx, mode)

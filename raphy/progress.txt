@@ -3717,3 +3717,39 @@ brain/reducer/memory/hub/standing_refresher 等键，待 RA-123 落地后再评�
     的（docstring 明写 "Mapping → used directly (test injection)"），graph-level
     测试优先用它，不用手搭 PortRegistry。
 ---
+
+## 2026-10-14 09:20 - RA-141
+- What was implemented: new seam `resolve_assistant_binding(agent_id, ownership,
+  *, lobehub_fallback=None)` in `lca/infrastructure/persistence/assistant_binding.py`
+  owning the "agt_* -> asst_*" precedence: ownership store
+  (`ownership.assistant_id_for_agent`) first, LobeHub
+  `agents.agency_config->>'lcaAssistantId'` fallback second (ADR-0187 §3 D7
+  truth unchanged); miss on both -> None; never raises into the run-creation
+  path. `command_endpoints.decode_create_run` no longer hand-chains the two
+  lookups — it calls the seam (the precedence comment moved into the seam
+  docstring) and passes the module's RA-135 lazy proxy
+  (`agent_assistant_id_from_lobehub`) as the injected fallback, so the
+  existing monkeypatch seam (`endpoints.agent_assistant_id_from_lobehub`) and
+  the RA-135 import-time boundary both keep working. When no fallback is
+  injected, the seam lazy-imports the real lobehub reader inside the call
+  (import failure degrades to None). `standing_files.py:97` /
+  `avatar/routes.py:109` hand-probes intentionally left alone (out of story
+  scope, per minimal-diff rule).
+- Files changed:
+  - lca/infrastructure/persistence/assistant_binding.py (new seam)
+  - lca/plugins/transport/webserver/handlers/runs/api/command_endpoints.py (seam call, delete hand-chain)
+  - tests/infrastructure/persistence/test_assistant_binding.py (new, 7 tests)
+- Tests: 7 new seam-level tests (ownership hit / lobehub hit / double miss ->
+  None / ownership None -> fallback / raising fallback -> None / broken
+  lobehub_agents import -> None / default fallback wires the real impl);
+  existing 4f67f10d7 lobehub-fallback + ee48d1d2e binding tests green;
+  RA-134 lobehub fail-soft tests green; explicit process-level check that the
+  endpoint module imports with a broken lobehub_agents; `ruff check` clean
+  (incl. TC002 pytest-into-TYPE_CHECKING convention).
+- **Learnings for future iterations:**
+  - 收敛"手写链"时先找现有测试的 monkeypatch 缝：`endpoints.agent_assistant_id_from_lobehub`
+    被测试 patch，seam 必须把 fallback 做成可注入参数（默认 lazy import 真实现），
+    否则 endpoint 级测试直接变红——"seam 收敛"不等于"把 lazy proxy 内联进 seam"。
+  - TC002（pytest 只用于注解时进 TYPE_CHECKING）是本仓 ruff 的实际门禁，
+    新测试文件照抄既有测试的 import 形状最省事。
+---
