@@ -122,6 +122,9 @@ async def test_create_run_populates_running_op_when_coordinator_bound(
             history = await mgr.read_history(run_id, count=5)
             assert any(e["type"] == "agent_runtime_init" for e in history)
             await mgr.cleanup(run_id)
+    except AssertionError:
+        # Assertion failures must fail loudly, never degrade into a skip.
+        raise
     except Exception:
         pytest.skip("Redis not available for agent_runtime_init assertion")
 
