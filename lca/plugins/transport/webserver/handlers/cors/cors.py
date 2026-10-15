@@ -6,8 +6,10 @@ from __future__ import annotations
 
 CORS_HEADERS: dict[str, str] = {
     "Access-Control-Allow-Origin": "*",
-    "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-    "Access-Control-Allow-Headers": "Content-Type, Authorization, Last-Event-ID",
+    "Access-Control-Allow-Methods": "GET, POST, PATCH, PUT, DELETE, OPTIONS",
+    "Access-Control-Allow-Headers": (
+        "Content-Type, Authorization, Last-Event-ID, X-Lca-Token, x-lca-user-id"
+    ),
     "Access-Control-Expose-Headers": "Content-Type, Content-Disposition",
 }
 

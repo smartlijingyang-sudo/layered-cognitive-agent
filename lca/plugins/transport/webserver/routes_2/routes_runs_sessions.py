@@ -26,6 +26,7 @@ from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import
 )
 from lca.contracts.routing import RouteSpec
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
+from lca.plugins.transport.webserver.handlers.openapi.spec import openapi_json
 from lca.plugins.transport.webserver.handlers.runs.api.command_endpoints import (
     answer_run,
     cancel_run,
@@ -46,6 +47,7 @@ from lca.plugins.transport.webserver.handlers.runs.terminal.streaming.wire.route
 from lca.plugins.transport.webserver.route.register import register_routes
 
 ROUTE_SPECS: tuple[RouteSpec, ...] = (
+    RouteSpec("/v1/openapi.json", openapi_json, ("GET", "OPTIONS")),
     RouteSpec("/runs", create_run, ("POST", "OPTIONS")),
     RouteSpec("/runs/{run_id}", get_run, ("GET",)),
     RouteSpec("/runs/{run_id}/doctor", get_run_doctor, ("GET",)),

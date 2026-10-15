@@ -19,8 +19,11 @@ from __future__ import annotations
 import logging
 from typing import Any
 
+from starlette.responses import JSONResponse
+
 from lca.contracts.mechanisms.capability.capability import MissingCapabilityError
 from lca.contracts.routing import RouteSpec
+from lca.plugins.transport.webserver.handlers.cors.cors import cors_headers
 
 __all__ = ["register_routes", "trace_emit_failures"]
 
@@ -207,6 +210,9 @@ def _instrument_route_handler(handler: Any, *, path: str) -> Any:
         @functools.wraps(handler)
         async def _async_wrapper(request: Any, *args: Any, **kwargs: Any) -> Any:
             method = str(getattr(request, "method", "") or "")
+            if method == "OPTIONS":
+                # CORS 预检必须不经认证直接 2xx，否则浏览器跨域调用被拦。
+                return JSONResponse({}, headers=cors_headers())
             run_id = _bind_run_from_request(request)
             seq = _next_carrier_seq()
             _safe_emit(
@@ -243,6 +249,9 @@ def _instrument_route_handler(handler: Any, *, path: str) -> Any:
     @functools.wraps(handler)
     def _sync_wrapper(request: Any, *args: Any, **kwargs: Any) -> Any:
         method = str(getattr(request, "method", "") or "")
+        if method == "OPTIONS":
+            # CORS 预检必须不经认证直接 2xx，否则浏览器跨域调用被拦。
+            return JSONResponse({}, headers=cors_headers())
         run_id = _bind_run_from_request(request)
         seq = _next_carrier_seq()
         _safe_emit(
