@@ -1,9 +1,12 @@
 import { useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { messageService } from '@/services/message';
 import { useChatStore } from '@/store/chat';
 import { useUserStore } from '@/store/user';
 import { userProfileSelectors } from '@/store/user/selectors';
+
+import { buildOnboardingGreetingMessages } from './onboardingGreeting';
 
 export interface ConversationContextLike {
   agentId?: string;
@@ -17,6 +20,12 @@ export interface ConversationContextLike {
  *
  * Proactively triggers Muse-style onboarding opening messages when a user
  * enters an agent conversation with an empty chat history.
+ *
+ * The bubbles are created through the message service with a `createdAt` that
+ * sorts before any existing message, so they always land at the TOP of the
+ * conversation — even when the user typed their first message before the
+ * welcome fetch resolved (previously they were appended to the latest-reply
+ * slot at the bottom).
  */
 export const useOnboardingGreeting = (
   context: ConversationContextLike,
@@ -82,31 +91,49 @@ export const useOnboardingGreeting = (
         }
 
         if (cancelled) return;
+        if (!Array.isArray(data.messages) || data.messages.length === 0) return;
 
-        if (Array.isArray(data.messages) && data.messages.length > 0) {
-          const optimisticCreateMessage = useChatStore.getState().optimisticCreateMessage;
-          let parentId: string | undefined = undefined;
+        const currentContext = contextRef.current;
+        if (!currentContext.agentId) return;
 
-          for (let i = 0; i < data.messages.length; i++) {
-            // Note: we do not cancel delivery mid-greeting for the same agent
-            if (contextRef.current.agentId !== agentId) break;
-            const content = data.messages[i];
-            const currentContext = contextRef.current;
-            const created = await optimisticCreateMessage({
-              agentId: currentContext.agentId,
-              content,
-              groupId: currentContext.groupId,
-              parentId,
-              role: 'assistant',
-              threadId: currentContext.threadId,
-              topicId: currentContext.topicId,
-            });
-            if (created?.id) {
-              parentId = created.id;
-            }
-            if (i < data.messages.length - 1) {
-              await new Promise((resolve) => setTimeout(resolve, 600));
-            }
+        // Backdate the bubbles before any existing message so they stay pinned
+        // at the top of the conversation (see onboardingGreeting.ts).
+        const bubbles = buildOnboardingGreetingMessages(
+          currentContext,
+          messagesRef.current ?? [],
+          data.messages,
+        );
+
+        const chatStore = useChatStore.getState();
+        let parentId: string | undefined;
+
+        for (let i = 0; i < bubbles.length; i++) {
+          // Note: we do not cancel delivery mid-greeting for the same agent
+          if (contextRef.current.agentId !== agentId) break;
+
+          const bubble = bubbles[i];
+          const created = await messageService.createMessage({
+            agentId: currentContext.agentId,
+            content: bubble.content,
+            createdAt: bubble.createdAt,
+            groupId: currentContext.groupId,
+            parentId,
+            role: 'assistant',
+            threadId: currentContext.threadId,
+            topicId: currentContext.topicId,
+          } as any);
+
+          if (created?.id) {
+            parentId = created.id;
+          }
+          // Replace with the server-sorted list so the backdated greeting
+          // renders at the top immediately (server orders by createdAt ASC).
+          if (created?.messages) {
+            chatStore.replaceMessages(created.messages, { context: currentContext });
+          }
+
+          if (i < bubbles.length - 1) {
+            await new Promise((resolve) => setTimeout(resolve, 600));
           }
         }
       } catch (err) {

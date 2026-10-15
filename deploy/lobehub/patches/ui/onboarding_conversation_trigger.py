@@ -8,19 +8,24 @@ from deploy.lobehub.engine import PatchContext, PatchMeta
 
 _HERE = Path(__file__).resolve().parent
 _HOOK_REL = "src/features/Conversation/hooks/useOnboardingGreeting.ts"
+_HELPER_REL = "src/features/Conversation/hooks/onboardingGreeting.ts"
+_TEST_REL = "src/features/Conversation/hooks/onboardingGreeting.test.ts"
 _CONVERSATION_REL = "src/routes/(main)/agent/features/Conversation/ConversationArea.tsx"
 _SOURCE_NAME = "useOnboardingGreeting.ts"
+_HELPER_NAME = "onboardingGreeting.ts"
+_TEST_NAME = "onboardingGreeting.test.ts"
 
 meta = PatchMeta(
     name="onboarding_conversation_trigger",
     description="Proactively trigger Muse-style onboarding greeting in ConversationArea",
-    files=(_HOOK_REL, _CONVERSATION_REL),
+    files=(_HOOK_REL, _HELPER_REL, _TEST_REL, _CONVERSATION_REL),
     risk="low",
     category="ui",
     depends_on=(),
     why="Proactively greet new users and prompt for name in ConversationArea",
     technical_detail=(
-        "Installs useOnboardingGreeting.ts hook and patches ConversationArea.tsx to invoke it"
+        "Installs useOnboardingGreeting.ts hook (with the pure greeting-ordering "
+        "helper onboardingGreeting.ts + vitest) and patches ConversationArea.tsx to invoke it"
     ),
     verify_file=_CONVERSATION_REL,
     verify_marker="useOnboardingGreeting",
@@ -37,7 +42,21 @@ def apply(ctx: PatchContext) -> bool:
     if ctx.write_if_changed(_HOOK_REL, source.read_text(encoding="utf-8")):
         changed = True
 
-    # 2. Patch ConversationArea.tsx
+    # 2. Write the pure greeting-ordering helper (backdated createdAt logic)
+    helper = _HERE / _HELPER_NAME
+    if not helper.is_file():
+        raise SystemExit(f"[onboarding_conversation_trigger] missing patch source: {helper}")
+    if ctx.write_if_changed(_HELPER_REL, helper.read_text(encoding="utf-8")):
+        changed = True
+
+    # 3. Write the vitest for the helper
+    test = _HERE / _TEST_NAME
+    if not test.is_file():
+        raise SystemExit(f"[onboarding_conversation_trigger] missing patch source: {test}")
+    if ctx.write_if_changed(_TEST_REL, test.read_text(encoding="utf-8")):
+        changed = True
+
+    # 4. Patch ConversationArea.tsx
     conv_text = ctx.read(_CONVERSATION_REL)
     original = conv_text
 
