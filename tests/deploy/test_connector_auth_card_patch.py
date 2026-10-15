@@ -97,3 +97,18 @@ def test_connector_auth_card_intent_id_support() -> None:
     patch_content = patch_path.read_text(encoding="utf-8")
     assert "intentId" in patch_content
     assert "connect.composio.dev" in patch_content
+
+
+def test_connector_auth_card_uses_real_user_id() -> None:
+    """授权轮询与 intent 兑换必须携带真实登录用户 ID。
+
+    Regression: 授权卡片此前发送 ``x-lca-user-id: 'dev_user'``，与真实
+    LobeHub 用户不一致，导致连接归属错乱。
+    """
+    path = _get_card_tsx_path()
+    content = path.read_text(encoding="utf-8")
+
+    assert "userProfileSelectors.userId" in content
+    assert "x-lca-user-id" in content
+    assert "userId || 'local-dev-user'" in content
+    assert "'dev_user'" not in content

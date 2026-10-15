@@ -17,6 +17,9 @@ import {
 import { createStaticStyles } from 'antd-style';
 import React, { memo, useCallback, useEffect, useMemo, useState } from 'react';
 
+import { useUserStore } from '@/store/user';
+import { userProfileSelectors } from '@/store/user/selectors';
+
 const { Text, Title, Paragraph } = Typography;
 
 export interface ConnectorItem {
@@ -343,6 +346,7 @@ export const ConnectorsPanel = memo<ConnectorsPanelProps>(({ assistantId, classN
   const [connectors, setConnectors] = useState<ConnectorItem[]>(DEFAULT_CONNECTORS);
   const [loading, setLoading] = useState(false);
   const [filterKeyword, setFilterKeyword] = useState('');
+  const userId = useUserStore(userProfileSelectors.userId);
 
   // 拉取后端真实连接状态
   const refreshConnections = useCallback(async () => {
@@ -352,7 +356,7 @@ export const ConnectorsPanel = memo<ConnectorsPanelProps>(({ assistantId, classN
         headers: {
           Authorization: 'Bearer dev_local_token',
           'x-lca-token': 'dev_local_token',
-          'x-lca-user-id': 'dev_user',
+          'x-lca-user-id': userId || 'local-dev-user',
         },
       });
       if (res.ok) {
@@ -416,9 +420,9 @@ export const ConnectorsPanel = memo<ConnectorsPanelProps>(({ assistantId, classN
             'Content-Type': 'application/json',
             Authorization: 'Bearer dev_local_token',
             'x-lca-token': 'dev_local_token',
-            'x-lca-user-id': 'dev_user',
+            'x-lca-user-id': userId || 'local-dev-user',
           },
-          body: JSON.stringify({ identifier: lcaId }),
+          body: JSON.stringify({ identifier: lcaId, userId }),
         });
         if (res.ok) {
           const data = await res.json();

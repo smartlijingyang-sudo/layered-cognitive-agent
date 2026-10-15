@@ -4,6 +4,9 @@ import { Button, Card, Tag, Typography, message as antMessage } from 'antd';
 import { createStaticStyles } from 'antd-style';
 import React, { memo, useCallback, useEffect, useRef, useState } from 'react';
 
+import { useUserStore } from '@/store/user';
+import { userProfileSelectors } from '@/store/user/selectors';
+
 const { Text } = Typography;
 
 export interface ConnectorAuthCardProps {
@@ -186,6 +189,7 @@ export const ConnectorAuthCard = memo<ConnectorAuthCardProps>(
     const [resolvedUrl, setResolvedUrl] = useState<string | undefined>(undefined);
     const pollTimerRef = useRef<NodeJS.Timeout | null>(null);
     const startTimeRef = useRef<number>(0);
+    const userId = useUserStore(userProfileSelectors.userId);
 
     const cardTitle = title || `${appName} 连接器授权`;
     const cardDesc =
@@ -204,7 +208,7 @@ export const ConnectorAuthCard = memo<ConnectorAuthCardProps>(
               'Content-Type': 'application/json',
               'Authorization': 'Bearer dev_local_token',
               'x-lca-token': 'dev_local_token',
-              'x-lca-user-id': 'dev_user',
+              'x-lca-user-id': userId || 'local-dev-user',
             },
           });
           if (res.ok) {
@@ -249,7 +253,7 @@ export const ConnectorAuthCard = memo<ConnectorAuthCardProps>(
               'Content-Type': 'application/json',
               'Authorization': 'Bearer dev_local_token',
               'x-lca-token': 'dev_local_token',
-              'x-lca-user-id': 'dev_user',
+              'x-lca-user-id': userId || 'local-dev-user',
             },
           });
           if (res.ok) {

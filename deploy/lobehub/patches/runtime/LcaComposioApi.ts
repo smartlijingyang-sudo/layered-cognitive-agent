@@ -1,10 +1,14 @@
 /** LCA-native Composio connection API (replaces LobeHub lambda composio router). */
 
+import { useUserStore } from '@/store/user';
+import { userProfileSelectors } from '@/store/user/selectors';
+
 export interface LcaComposioCreateParams {
   agentId?: string;
   appSlug: string;
   identifier: string;
   label: string;
+  userId?: string;
 }
 
 export interface LcaComposioCreateResponse {
@@ -67,12 +71,16 @@ const gatewayBase = (): string => {
   return 'http://10.36.6.252:8765';
 };
 
+const currentUserId = (): string | undefined =>
+  userProfileSelectors.userId(useUserStore.getState());
+
 async function lcaComposioFetch<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(`${gatewayBase()}${path}`, {
     ...init,
     headers: {
       'Content-Type': 'application/json',
       ...(init?.headers || {}),
+      'x-lca-user-id': currentUserId() || 'local-dev-user',
     },
   });
   if (!response.ok) {
@@ -86,7 +94,7 @@ async function lcaComposioFetch<T>(path: string, init?: RequestInit): Promise<T>
 export const lcaComposioClient = {
   createConnection: (params: LcaComposioCreateParams) =>
     lcaComposioFetch<LcaComposioCreateResponse>('/composio/connections', {
-      body: JSON.stringify(params),
+      body: JSON.stringify({ ...params, userId: params.userId || currentUserId() }),
       method: 'POST',
     }),
 

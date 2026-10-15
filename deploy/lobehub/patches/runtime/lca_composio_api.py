@@ -30,7 +30,12 @@ meta = PatchMeta(
 def apply(ctx: PatchContext) -> bool:
     changed = False
     client_src = (_HERE / "LcaComposioApi.ts").read_text(encoding="utf-8")
-    if not ctx.has_marker(_CLIENT, "LCA-native Composio connection API"):
+    try:
+        deployed_client = ctx.read(_CLIENT)
+    except FileNotFoundError:
+        deployed_client = None
+    # 内容不同则（重新）写入：首次部署与补丁源更新都能生效，幂等。
+    if deployed_client != client_src:
         ctx.write(_CLIENT, client_src)
         changed = True
 

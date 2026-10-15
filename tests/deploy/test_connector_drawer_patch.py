@@ -75,3 +75,20 @@ def test_connectors_panel_ecosystem_and_tools() -> None:
     # 包含工具展开与开关
     assert "Switch" in content or "switch" in content.lower()
     assert "工具" in content or "tools" in content.lower()
+
+
+def test_connectors_panel_uses_real_user_id() -> None:
+    """连接归属必须使用真实登录用户 ID，而不是硬编码 dev_user。
+
+    Regression: 连接器面板此前发送 ``x-lca-user-id: 'dev_user'``，导致
+    Composio 连接归属到默认 ``lca-local-user`` 而非真实 LobeHub 用户。
+    """
+    path = _get_connectors_panel_path()
+    content = path.read_text(encoding="utf-8")
+
+    assert "userProfileSelectors.userId" in content
+    assert "x-lca-user-id" in content
+    assert "userId || 'local-dev-user'" in content
+    assert "'dev_user'" not in content
+    # POST /composio/connections 需携带 body userId
+    assert "JSON.stringify({ identifier: lcaId, userId })" in content
