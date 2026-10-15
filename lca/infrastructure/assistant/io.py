@@ -97,4 +97,37 @@ def load_grants(home: Path) -> frozenset[str]:
     return frozenset(str(item).strip() for item in grants if isinstance(item, str) and item.strip())
 
 
-__all__ = ["load_grants", "read_json", "read_json_soft", "sha256_digest", "write_json"]
+def assistant_trust_envelope(assistant_id: str, *, profile_path: str = "web-assistant"):
+    """Build the run TrustEnvelope for an assistant-bound HTTP run.
+
+    Mirrors ``DefaultRuntimeFacade._build_trust_envelope`` for carrier paths
+    that skip ``resolve_activation``: ``granted_privileges`` = assistant
+    ``grants.yaml`` ∪ ``RULE_DEFAULTS``. Origins are audit-only and use a
+    single bundled origin, so the envelope satisfies the non-empty invariants
+    without a compiled plan. Local imports keep this IO module free of
+    runtime/application dependencies at import time.
+    """
+    from lca.contracts.runtime.trust import RULE_DEFAULTS, PluginOrigin, TrustEnvelope
+    from lca.infrastructure.path.locator import get_lca_home
+
+    home = get_lca_home() / "assistants" / assistant_id if assistant_id else None
+    grants = load_grants(home) if home is not None else frozenset()
+    origins = (
+        PluginOrigin(
+            source="bundled",
+            trust="core",
+            enabled_by=profile_path,
+            discovered_at="assistant_trust_envelope",
+        ),
+    )
+    return TrustEnvelope(origins=origins, granted_privileges=grants | RULE_DEFAULTS)
+
+
+__all__ = [
+    "assistant_trust_envelope",
+    "load_grants",
+    "read_json",
+    "read_json_soft",
+    "sha256_digest",
+    "write_json",
+]

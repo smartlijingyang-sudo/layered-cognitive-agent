@@ -173,16 +173,32 @@ class RunLifecycleCoordinator:
             async with environment.prepare() as prepared:
                 workspace = prepared.workspace
                 session.workspace = workspace
-                outcome = await prepared.driver.execute(
-                    session,
-                    question=question,
-                    mode=mode,
-                    hub=hub,
-                    bindings=prepared.bindings,
-                    run_context=prepared.run_context,
-                    ctx=ctx,
-                    machine_resolver=self._machine_resolver,
+                # ADR-0292 §10 P3:HTTP carrier 路径不走
+                # ``DefaultRuntimeFacade.resolve_activation``，默认没有绑定
+                # TrustEnvelope。这里补绑 assistant grants ∪ RULE_DEFAULTS，
+                # 否则带 ``required_grant`` 的工具（如 memory_add 需要
+                # ``profile.revise``）在 ``act.authorize`` 被 fail-closed 拒绝。
+                # facade 路径已绑定真实 envelope，此处不覆盖。
+                from lca.contracts.runtime.trust import (
+                    get_current_trust_envelope,
+                    trust_envelope_scope,
                 )
+                from lca.infrastructure.assistant.io import assistant_trust_envelope
+
+                envelope = get_current_trust_envelope()
+                if envelope is None:
+                    envelope = assistant_trust_envelope(session.assistant_id)
+                with trust_envelope_scope(envelope):
+                    outcome = await prepared.driver.execute(
+                        session,
+                        question=question,
+                        mode=mode,
+                        hub=hub,
+                        bindings=prepared.bindings,
+                        run_context=prepared.run_context,
+                        ctx=ctx,
+                        machine_resolver=self._machine_resolver,
+                    )
                 if self._outcomes.apply_driver(session, outcome):
                     _log.info(
                         "run_paused_for_input",
@@ -301,7 +317,18 @@ class RunLifecycleCoordinator:
                 run_workspace_scope(session.run_id),
                 plane_bindings_scope(bindings) if bindings is not None else nullcontext(),
             ):
-                result = await session.runnable.resume(session.snapshot, input=answer)
+                # ADR-0292 §10 P3:resume 同样补绑 TrustEnvelope（见 execute）。
+                from lca.contracts.runtime.trust import (
+                    get_current_trust_envelope,
+                    trust_envelope_scope,
+                )
+                from lca.infrastructure.assistant.io import assistant_trust_envelope
+
+                envelope = get_current_trust_envelope()
+                if envelope is None:
+                    envelope = assistant_trust_envelope(session.assistant_id)
+                with trust_envelope_scope(envelope):
+                    result = await session.runnable.resume(session.snapshot, input=answer)
             # Persist the conclusion text on the session (same as the
             # execute driver) so terminal projection can publish the reply
             # even when the resumed run has no step-tree fold machinery
