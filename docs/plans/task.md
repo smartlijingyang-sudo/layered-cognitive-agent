@@ -621,9 +621,12 @@
 | ARCH-R9-DOMAIN-SERVICES | Round 9 - Domain Layout / Standing Notes / Storage Roots 物理契约统一与去重 | Pending | 待执行 |
 | ARCH-R10-INFRA-FILE-STORE | Round 10 - Infrastructure File / Attachment / Storage Roots 单向依赖与无用抽象清理 | Pending | 待执行 |
 | ARCH-R11-HARNESS-PROFILE | Round 11 - Harness Activation & Profile Resolution 声明式解析与 DAG 验证深度聚合 | Pending | 待执行 |
-| ARCH-R12-CONVERGENCE-AUDIT | Round 12 - 全系统架构不变量终审、契约门禁全量回归与架构基准对齐 | Pending | 待执行 |
-<<<<<<< HEAD
-| BRAINSTORM-DESLOP-100-CONTEXT | 深度梳理代码库与文档 Slop 现状、Raphy 100 轮历史与架构优化热点 | Completed | 已深度梳理 ADR-0293 raphy 100 stories (RA-001~RA-100 已达标，worktree 拓展至 RA-103)、88 处 verify_doc_slop 命中、check_package_contracts 62 项偏差及 ruff/contracts 边界 |
+| BRAINSTORM-BROWSER-CONTEXT | 探索项目上下文、业界方案（Grok Bot / Muse / Steel / Browserbase）与前端/网关现状 | Completed | 已深度调研 Grok Bot（双机架构+Computer视图人闸）、Muse（服务端隔离Chromium+无发声子任务）、Browserbase/Steel（CDP Screencast vs WebRTC/noVNC双协议流式接管）、LCA 既有 ADR-0248 单屏锁与 LobeHub UI 挂载现状 |
+| BRAINSTORM-BROWSER-QUESTIONS | 澄清浏览器卡片与接管的核心业务需求、隔离边界与交互形式（单步提问） | Completed | 用户选定方案 1（LCA 服务端 Headless Chromium 沙箱），纯 Web 端到端无需本地客户端，多端一致秒级交互 |
+| BRAINSTORM-BROWSER-APPROACHES | 提出 2-3 种前后端端到端架构方案与权衡对比 | Completed | 提出方案 A (原生 CDP Screencast + 双向 WS)、方案 B (Xvfb + noVNC)、方案 C (快照轮询)；用户明确选定方案 A |
+| BRAINSTORM-BROWSER-DESIGN-SECTIONS | 逐步呈现设计细节（Owns/Does NOT own/不变量/前后端契约）并获取审批 | Completed | 全部 4 个小节（边界与自治等级、核心架构模型与前后端契约、时序/协议/状态机、测试矩阵与不变量断言）均获用户审批通过 |
+| BRAINSTORM-BROWSER-DESIGN-DOC | 沉淀设计文档至 docs/plans/ 并提交 git | Completed | 成功落盘 docs/plans/2026-10-16-browser-preview-and-takeover-design.md 并准备 git 提交 |
+| BRAINSTORM-BROWSER-TRANSITION | 转换至实施计划制定（writing-plans） | In Progress | 正在调用 writing-plans 规划六大单流实施任务 |
 | BRAINSTORM-DESLOP-100-QUESTIONS | 澄清「100次真实优化与去冗」的具体目标、执行载体与边界（单步提问） | Completed | 用户明确选定：基于 ADR-0293 与 improve-codebase-architecture 开启全新一轮 Raphy 架构加深与去冗循环，派生高质量真实优化故事集并单流交付 |
 | BRAINSTORM-DESLOP-100-APPROACHES | 提出 2-3 种大规模去冗与深度优化实施方案及权衡对比 | Completed | 用户明确确认选定方案 A（波次渐进 Raphy 循环，Batch-Wave Loop，每波 5~10 stories 动态评估与落地） |
 | BRAINSTORM-DESLOP-100-DESIGN-SECTIONS | 逐步呈现分节架构规范（边界/治理清单/执行流水线/测试不变量）并呈批 | Completed | §1 边界与自治、§2 核心架构模型与流水线时序、§3 不变量断言与测试矩阵全部获用户批准通过 |
