@@ -72,3 +72,12 @@ def test_enumeration_comma_stays_inside_one_capture() -> None:
 
     assert fact is not None
     assert fact.content == "用户身份：架构师、技术负责人"
+
+
+def test_negated_role_is_not_an_identity() -> None:
+    """否定句没有可提升的身份。带授权的假身份会在第一次 dream 里变成用户画像。"""
+    assert _govern("我不是架构师") is None
+    assert _govern("我是不是架构师") is None
+    assert _govern("我是不写代码的") is None
+    assert _govern("我是没当过架构师") is None
+    assert _govern("我没当过架构师") is None

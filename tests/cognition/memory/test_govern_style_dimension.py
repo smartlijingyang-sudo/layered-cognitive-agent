@@ -56,3 +56,12 @@ def test_matched_token_drives_the_content() -> None:
 
     assert fact is not None
     assert fact.content == "用户偏好：啰嗦"
+
+
+def test_negated_style_is_not_stored_as_the_positive_token() -> None:
+    """词表只认「啰嗦」这个词，否定句不能落成正向偏好。
+
+    整句留给流水。流水保留「不要」，模板若写成「用户偏好：啰嗦」就会把极性弄反。
+    """
+    assert _govern("记住不要啰嗦") is None
+    assert _govern("以后别简洁") is None

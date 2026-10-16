@@ -34,12 +34,31 @@ def _clean_capture(raw: str) -> str | None:
     return cleaned[:40]
 
 
+def _identity_phrase(raw: str) -> str | None:
+    """一个名词短语。以否定开头的捕获不是身份，不能带着用户授权进入 dream。"""
+    captured = _clean_capture(raw)
+    if captured is None or captured.startswith(("不", "没")):
+        return None
+    return captured
+
+
+_NEGATION_MARKS = ("不要", "别", "严禁", "禁止", "不准")
+
+
+def _style_negated(text: str, token: str) -> bool:
+    """否定词出现在风格词之前时，词表命中的是被否定的那个词。"""
+    head, found, _tail = text.partition(token)
+    if not found:
+        return False
+    return any(mark in head for mark in _NEGATION_MARKS)
+
+
 def _match_template(text: str) -> tuple[MemoryCategory, str, str, bool] | None:
     if not text.strip():
         return None
     role = _ROLE.search(text)
     if role:
-        captured = _clean_capture(role.group(1))
+        captured = _identity_phrase(role.group(1))
         if captured:
             return (
                 MemoryCategory.IDENTITY,
@@ -49,7 +68,7 @@ def _match_template(text: str) -> tuple[MemoryCategory, str, str, bool] | None:
             )
     name = _NAME.search(text)
     if name:
-        captured = _clean_capture(name.group(1) or name.group(2) or "")
+        captured = _identity_phrase(name.group(1) or name.group(2) or "")
         if captured:
             return (
                 MemoryCategory.IDENTITY,
@@ -59,7 +78,7 @@ def _match_template(text: str) -> tuple[MemoryCategory, str, str, bool] | None:
             )
     if "记住" in text or "以后" in text:
         token = matched_style_token(text)
-        if token is not None:
+        if token is not None and not _style_negated(text, token):
             return (
                 MemoryCategory.PREFERENCE,
                 STYLE_PREFERENCE_DIMENSION,
