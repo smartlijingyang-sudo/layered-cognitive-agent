@@ -1,0 +1,4 @@
+id	priority	repeat	verdict	run_id_or_snapshot	user_quote	world_check	fail_class	hypothesis
+W0-3	P0	1	NOT VERIFIED	run_47d5fb0109c9	无法在你的电脑上创建文件。提议路径 /mnt/data/prelaunch/ping.txt，但未写。	ABSENT /home/box/prelaunch/ping.txt; ABSENT /home/lichao/.lca/box/prelaunch/ping.txt; ABSENT /mnt/data/prelaunch/ping.txt	机制	「我的电脑」走到 listEnvironments。当前平面 local-sandbox root=/mnt/data 且 online，模型没有调用 writeFile。伴侣 lichao 与两台 Windows 为 offline。回复把含 sandbox-user 在内的设备说成全部离线，和工具结果不一致。
+W0-3	P0	4	NOT VERIFIED	run_077309ca9bdf	未回复。停在 run_command mkdir -p /mnt/data/prelaunch 的审批。	未写新文件	机制	未加载的 run_command 被审批策略当成即将执行的 shell。
+W0-3	P0	5	GUEST PATH	run_3737ddb37470	已创建。绝对路径 /mnt/data/prelaunch/ping.txt。内容 PING-7F3A。	session file b'PING-7F3A\\n' at .../lsess_eb0fd21afda1/prelaunch/ping.txt; host /mnt/data/prelaunch/ping.txt ABSENT; protocol /home/box and ~/.lca/box ABSENT	契约	ADR-0294 的 agent 绝对路径是 /mnt/data。readFile 读回 PING-7F3A。协议里的 host 路径不是这台平面的落点。
