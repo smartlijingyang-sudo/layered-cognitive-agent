@@ -244,6 +244,7 @@ class NamespaceApprovalStrategy:
             return None
 
         # Build dynamic tool -> namespace map from defer session if present
+        from lca.infrastructure.tool_defer.names import canonical_tool_name
         from lca.infrastructure.tool_defer.session import current_defer_session
 
         defer_session = current_defer_session()
@@ -257,15 +258,33 @@ class NamespaceApprovalStrategy:
         )
 
         session_tool_to_ns: dict[str, str] = {}
+        visible: set[str] = set()
         if defer_session is not None:
             for ns_obj in defer_session.namespaces:
                 for tname in ns_obj.tool_names:
                     session_tool_to_ns[tname] = ns_obj.name
+            wire, _catalog = defer_session.render_turn()
+            for spec in wire:
+                function = spec.get("function") if isinstance(spec, dict) else None
+                name = function.get("name") if isinstance(function, dict) else ""
+                if isinstance(name, str) and name:
+                    visible.add(name)
 
         for call in tool_calls:
             tool_name = getattr(call, "tool_name", None)
             if not isinstance(tool_name, str) or not tool_name:
                 continue
+            if defer_session is not None:
+                # An unloaded name is not about to run. The wire gate returns
+                # the namespace error. Approving it asks a person to authorize
+                # a schema this turn did not expose.
+                resolved = tool_name
+                if resolved not in visible and resolved not in session_tool_to_ns:
+                    alternate = canonical_tool_name(resolved)
+                    if alternate in visible or alternate in session_tool_to_ns:
+                        resolved = alternate
+                if resolved not in visible:
+                    continue
 
             ns: str | None = None
             if self._tool_namespaces and tool_name in self._tool_namespaces:

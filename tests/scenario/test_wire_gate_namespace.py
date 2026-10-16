@@ -78,12 +78,16 @@ def _decision(*tool_names: str) -> Decision:
 
 
 def test_c1_call_to_unloaded_namespace_is_blocked(defer_session: Any):
-    """未加载域的工具被拒:错误含 tool_search 指引,run 不死(验收 4)."""
-    obs = unexposed_tool_block_observation(_decision("memory_search"))
+    """未加载域的工具被拒:错误含 tool_search 指引,run 不死(验收 4).
+
+    ``memory`` 自 ADR-0260 起是 eager 域,``memory_search`` 首 turn 就在 wire
+    上;这里用仍为 deferred 的 ``file`` 域工具 ``readFile`` 验证拒绝路径。
+    """
+    obs = unexposed_tool_block_observation(_decision("readFile"))
     assert obs is not None
     assert obs.success is False
     assert "tool_search" in obs.error
-    assert "memory" in obs.error
+    assert "file" in obs.error
     assert "namespace_not_loaded" in str(obs.extra)
 
 
@@ -102,13 +106,38 @@ def test_c4_blocked_call_can_retry_after_load(defer_session: Any):
 
     回归 run_747963254987:无名 tool call 直接杀死了整个 run.
     """
-    decision = _decision("memory_search")
+    decision = _decision("readFile")
     blocked = unexposed_tool_block_observation(decision)
     assert blocked is not None and blocked.success is False
     # 模型按指引加载后重试,同一 decision 放行,run 继续.
-    defer_session.load_namespace("memory")
+    defer_session.load_namespace("file")
     assert unexposed_tool_block_observation(decision) is None
-    assert "memory" in defer_session.loaded_namespaces
+    assert "file" in defer_session.loaded_namespaces
+
+
+def test_snake_case_names_the_real_namespace_then_passes_once_loaded():
+    """write_file and writeFile are one tool. The unloaded error names file.
+
+    A spelling the registry does not store used to report namespace 'deferred',
+    so the retry after tool_search was refused again.
+    """
+    session = ToolDeferSession(DeferPolicy(namespace_descriptions=DESCRIPTIONS))
+    session.update_turn(
+        (
+            FakeTool("tool_search", namespace="core"),
+            FakeTool("writeFile", namespace="file"),
+        )
+    )
+    token = set_current_defer_session(session)
+    try:
+        blocked = unexposed_tool_block_observation(_decision("write_file"))
+        assert blocked is not None and blocked.success is False
+        assert "namespace 'file'" in blocked.error
+        assert "namespace 'deferred'" not in blocked.error
+        session.load_namespace("file")
+        assert unexposed_tool_block_observation(_decision("write_file")) is None
+    finally:
+        reset_current_defer_session(token)
 
 
 def test_f2_truncated_argument_value_is_rejected():

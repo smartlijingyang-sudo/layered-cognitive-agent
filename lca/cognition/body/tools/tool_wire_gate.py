@@ -23,8 +23,10 @@ from lca.contracts.atoms.semantic.keys import (
     TOOL_WIRE_STATUS,
 )
 from lca.contracts.models.core.execution.decision import Decision, Observation
+from lca.infrastructure.tool_defer.names import canonical_tool_name
 
 _BLOCKING: frozenset[str] = frozenset({TOOL_WIRE_INCOMPLETE, TOOL_WIRE_INVALID})
+
 
 _WIRE_BLOCK_GUIDANCE = (
     "arguments incomplete or invalid; do not treat as successful tool result; "
@@ -131,9 +133,14 @@ def unexposed_tool_block_observation(decision: Decision) -> Observation | None:
             tool_to_ns[tname] = ns_obj.name
 
     for tc in decision.tool_calls:
-        if tc.tool_name in visible:
+        resolved = tc.tool_name
+        if resolved not in visible and resolved not in tool_to_ns:
+            alternate = canonical_tool_name(resolved)
+            if alternate != resolved and (alternate in visible or alternate in tool_to_ns):
+                resolved = alternate
+        if resolved in visible:
             continue
-        ns_name = tool_to_ns.get(tc.tool_name, "deferred")
+        ns_name = tool_to_ns.get(resolved, "deferred")
         return Observation(
             observation_id=new_id("obs"),
             success=False,

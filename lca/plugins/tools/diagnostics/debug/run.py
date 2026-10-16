@@ -265,7 +265,7 @@ class DebugRunToolAdapter:
             if doctor_st == "paused":
                 suggested = (
                     "Run is paused awaiting user input/approval. "
-                    "Resume via POST /runs with resume_tool_result or approve via client UI."
+                    "Resume via: lca-ops runs answer <run_id> --answer '同意执行'"
                 )
             elif _run_failed(manifest_summary, spine_events):
                 suggested = _suggest_action_from_failure_kind(error_type, error_message)

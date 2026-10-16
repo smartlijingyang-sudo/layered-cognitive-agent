@@ -304,7 +304,10 @@ class ToolDeferSession:
                     else:
                         has_deferred = True
                 if has_deferred:
-                    catalog_lines.append(f"- {namespace.name}: {namespace.description}")
+                    tool_list = ", ".join(sorted(namespace.tool_names))
+                    catalog_lines.append(
+                        f"- {namespace.name}: {namespace.description} (tools: {tool_list})"
+                    )
         catalog = ""
         if catalog_lines:
             catalog = (
