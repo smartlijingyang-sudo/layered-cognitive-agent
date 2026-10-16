@@ -258,7 +258,6 @@ def _build_factory_index() -> dict[str, list[str]]:
     Boot-time ``inspect_profile_tree`` therefore cannot see ``lca/nodes/`` plugins
     via capability_graph; the static scan is the only path that covers both.
     """
-    import re
 
     registry: dict[str, list[str]] = {}
     pattern = re.compile(r"provides\s*=\s*\(([^)]*)\)")

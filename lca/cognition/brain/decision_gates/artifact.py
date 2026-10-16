@@ -32,10 +32,7 @@ def _ledger_snapshot_from_manifest(
     artifacts: list[dict[str, object]],
 ) -> ArtifactLedgerSnapshot:
     """Build the minimal ``ArtifactLedgerSnapshot`` shape for the rewrite helpers."""
-    from lca.contracts.models.core.workspace.workspace import (
-        ArtifactLedgerSnapshot,
-        WorkspaceArtifact,
-    )
+    from lca.contracts.models.core.workspace.workspace import WorkspaceArtifact
 
     artifact_objs = tuple(
         WorkspaceArtifact(

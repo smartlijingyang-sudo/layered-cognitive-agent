@@ -60,7 +60,7 @@ def _stop_from_interpretation_output(
     visits when ``final_output_ref`` is a journal pointer.
     """
     from lca.contracts.models.cognition.boundary import StopPayload
-    from lca.contracts.models.core.policy.stop import StopDecision, StopReason
+    from lca.contracts.models.core.policy.stop import StopReason
 
     def _resolve_reason(raw_reason: str | None) -> StopReason:
         if not raw_reason:
@@ -348,7 +348,6 @@ class DeclarativeExecution:
         from lca.contracts.protocols.declarative.declarative_1.declarative_execution import (
             PhaseRunCursor as _ContractsPhaseRunCursor,
         )
-        from lca.framework.graph.adapter import PhaseRunCursor
         from lca.loop.tool_error import (
             build_failure_explanation,
             classify_tool_error,

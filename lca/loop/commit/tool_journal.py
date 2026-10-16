@@ -209,7 +209,6 @@ def commit_body_tool_execute_end(
         error=ToolError(message=error) if error is not None else None,
         meta=meta,
     )
-    from lca.contracts.protocols.loop.fact_gateway import AppendReceipt
 
     parts = ref.event_id.rsplit(":", 1) if ":" in ref.event_id else ["", "0"]
     return AppendReceipt(

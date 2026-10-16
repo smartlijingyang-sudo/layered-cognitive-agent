@@ -1124,7 +1124,6 @@ class JournalRecord:
 
     @classmethod
     def from_dict(cls, payload: Mapping[str, object]) -> JournalRecord:
-        from lca.contracts.observability.evidence.evidence import EvidenceRef as _EvidenceRef
 
         scope = _scope_from_dict(_mapping_field(payload, "scope"))
         causation = Causation.from_dict(_mapping_field(payload, "causation"))

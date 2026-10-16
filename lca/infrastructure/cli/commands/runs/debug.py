@@ -767,9 +767,6 @@ def register(app: typer.Typer) -> None:
 
         events = load_spine_events(run_id)
         if not events:
-            from lca.infrastructure.cli.commands._shared.projection import (
-                spine_filename_for_run_cwd,
-            )
 
             spine_path = spine_filename_for_run_cwd(run_id)
             if spine_path.exists():
