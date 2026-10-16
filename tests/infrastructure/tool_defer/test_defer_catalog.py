@@ -71,20 +71,22 @@ def test_b1_catalog_has_one_line_per_deferred_namespace():
 
     8 域中 core(tool_search) 与 memory 是 eager 域,直接上 wire 不进目录,
     所以目录恰好 6 行.
+
+    47279e11a 起目录行末尾带 canonical 工具名后缀 ``(tools: <name>)``,
+    供模型免试错映射;断言钉住该新格式,而非旧的无后缀格式.
     """
     session = _session()
     session.update_turn(_tools_8ns())
     _, catalog = session.render_turn()
     lines = [line for line in catalog.splitlines() if line.startswith("- ")]
     assert len(lines) == 6, f"期望 6 行目录,实际 {len(lines)} 行:\n{catalog}"
-    assert "tools:" not in catalog
     assert "- core: " not in catalog
     assert "- memory: " not in catalog
     assert "- tool_search: " not in catalog
     for ns in NAMESPACES_8:
         if ns in ("core", "memory"):
             continue
-        assert f"- {ns}: {DESCRIPTIONS[ns]}" in catalog
+        assert f"- {ns}: {DESCRIPTIONS[ns]} (tools: {ns}_tool)" in catalog
 
 
 def test_b2_missing_description_fails_fast():
