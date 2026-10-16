@@ -102,6 +102,7 @@ def apply(ctx: PatchContext) -> bool:
         "              <ConnectorAuthCard\n"
         "                appName={connectorAuthProps.appName}\n"
         "                authUrl={connectorAuthProps.authUrl}\n"
+        "                intentId={connectorAuthProps.intentId}\n"
         "                connectionId={connectorAuthProps.connectionId}\n"
         "              />\n"
         "            )}"
@@ -174,10 +175,7 @@ def apply(ctx: PatchContext) -> bool:
         "            <MessageContent\n"
         "              contentOverride={isAvatarPickerWidget ? avatarPickerCleanContent : contentOverride}"
     )
-    if (
-        "contentOverride={isAvatarPickerWidget ? avatarPickerCleanContent : contentOverride}"
-        not in cb_text
-    ):
+    if "contentOverride={contentOverride}" in cb_text:
         if cb_override_anchor not in cb_text:
             raise SystemExit(
                 "assistant_avatar_widget: ContentBlock MessageContent contentOverride anchor not found"
