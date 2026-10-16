@@ -162,7 +162,17 @@ class TestOpenAiCompatGateway(unittest.TestCase):
         expectation belonged to the retired resolver-based contract.
         """
         app = create_scripted_app()
-        with TestClient(app) as client:
+        # "no key" must not depend on ambient env: the repo-root .env (git-ignored)
+        # can inject a real key via load_dotenv_if_present(), which turns the
+        # expected 502 into 200. Force the no-key contract explicitly, same as
+        # test_chat_completions_without_llm_key_returns_502.
+        with (
+            TestClient(app) as client,
+            patch(
+                "lca.infrastructure.openai.compat.llm_openai_credentials",
+                return_value=(None, None, None),
+            ),
+        ):
             response = client.post("/v1/responses", json={"model": "solo", "input": "hello"})
             self.assertEqual(response.status_code, 502)
             emb_response = client.post(
