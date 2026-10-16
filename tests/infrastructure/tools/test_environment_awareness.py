@@ -11,6 +11,7 @@ from lca.infrastructure.tools.environment_awareness import API_NAME, build_tools
 def test_build_tools_exposes_list_environments() -> None:
     tools = build_tools(catalog=None)
     assert [tool.name for tool in tools] == [API_NAME]
+    assert "不要调用本工具" in (tools[0].description or "")
 
 
 def test_execute_with_empty_catalog_returns_empty() -> None:

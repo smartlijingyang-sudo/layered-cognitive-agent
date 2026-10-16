@@ -28,6 +28,14 @@ def test_unbound_renders_cloud_sandbox() -> None:
     assert "Your Workspace" in text
 
 
+def test_file_request_without_hostname_stays_on_sandbox() -> None:
+    text = render_plane_prompt(())
+    assert "我的电脑" in text
+    assert "unless the user names a paired hostname" in text
+    assert "Do not answer a file request with a device list" in text
+    assert "Do not shell out to find it" in text
+
+
 def test_machine_tools_switch_to_local_system_role() -> None:
     with plane_bindings_scope(PlaneBindings(primary=_machine())):
         text = render_plane_prompt([SimpleNamespace(name="local_listFiles")])
