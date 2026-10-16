@@ -314,7 +314,10 @@ class RunLifecycleCoordinator:
                     session.attachment_ids or (),
                     getattr(session, "assistant_id", "") or "",
                 ),
-                run_workspace_scope(session.run_id),
+                run_workspace_scope(
+                    session.run_id,
+                    workspace=getattr(session, "workspace", None),
+                ),
                 plane_bindings_scope(bindings) if bindings is not None else nullcontext(),
             ):
                 # ADR-0292 §10 P3:resume 同样补绑 TrustEnvelope（见 execute）。

@@ -100,10 +100,16 @@ class RunBoundSandboxRuntime(SandboxRuntime):
         self._staged_file_keys: set[str] = set()
         # name → sha256 of last harvested content (run-scoped; skips unchanged re-export)
         self._output_fingerprints: dict[str, str] = {}
+        self._baseline_digests: dict[str, str] = {}
+        self._baseline_captured = False
 
     @property
     def run_id(self) -> str:
         return self._run_id
+
+    @property
+    def store(self) -> FileStore:
+        return self._store
 
     @property
     def manifest(self) -> MountManifest:
@@ -389,6 +395,21 @@ class RunBoundSandboxRuntime(SandboxRuntime):
         )
         return tuple(raw.generated_files)
 
+    async def outputs_changed_since_baseline(
+        self, *, invocation_id: str = ""
+    ) -> tuple[SandboxFile, ...]:
+        """Office seal publishes this set. An uncaptured baseline must not treat history as new."""
+        if not self._baseline_captured:
+            return ()
+        scanned = await self.scan_output_files(invocation_id=invocation_id)
+        changed: list[SandboxFile] = []
+        for item in scanned:
+            digest = _file_fingerprint(item.data)
+            prior = self._baseline_digests.get(item.name)
+            if prior is None or prior != digest:
+                changed.append(item)
+        return tuple(changed)
+
     async def flush_office_residents(self, *, timeout_s: int = 30) -> None:
         """Persist officecli resident handles to disk before a Work publish."""
         await self._flush_office_residents(timeout_s=timeout_s)
@@ -419,6 +440,8 @@ class RunBoundSandboxRuntime(SandboxRuntime):
             _log.debug("sandbox_output_baseline_skipped", run_id=self._run_id, exc_info=True)
             return
         self._remember_generated(existing)
+        self._baseline_digests = dict(self._output_fingerprints)
+        self._baseline_captured = True
 
     def _exec_result(
         self, raw: SandboxResult, generated: tuple[SandboxFile, ...]
