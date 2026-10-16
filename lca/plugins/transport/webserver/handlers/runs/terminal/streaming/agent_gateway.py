@@ -105,9 +105,7 @@ def _classify_recv_task(task: asyncio.Task[dict[str, Any] | None]) -> RecvOutcom
     """Map a finished recv task to Msg, silent disconnect, or swallowed failure."""
     try:
         return _RecvMsg(msg=task.result())
-    except WebSocketDisconnect:
-        return _RecvDisconnected()
-    except asyncio.CancelledError:
+    except (WebSocketDisconnect, asyncio.CancelledError):
         # Recv cancellation means the socket is gone; the client resumes from last_id.
         return _RecvDisconnected()
     except Exception as exc:
