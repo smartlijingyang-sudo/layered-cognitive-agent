@@ -176,4 +176,5 @@ def test_debug_run_paused_run_without_manifest(tmp_path: Path) -> None:
     rendered = report.render_text()
     assert "status=paused" in rendered
     assert "status: paused" in rendered
-    assert "Resume via POST /runs" in rendered
+    # 47279e11a 起 paused run 的 resume 指引改为 lca-ops CLI,不再是 POST /runs.
+    assert "Resume via: lca-ops runs answer" in rendered
