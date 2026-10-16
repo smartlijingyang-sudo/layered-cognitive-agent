@@ -72,13 +72,10 @@ class LlmStreamActivityTracker:
         self._task = None
 
     async def _heartbeat_loop(self) -> None:
-        try:
-            while not self._closed:
-                await asyncio.sleep(LLM_ACTIVITY_HEARTBEAT_S)
-                idle_s = self.idle_s()
-                if idle_s >= LLM_ACTIVITY_HEARTBEAT_S - 0.25:
-                    if self._on_idle is not None:
-                        self._on_idle(idle_s, self._seq)
-                    self._seq += 1
-        except asyncio.CancelledError:
-            raise
+        while not self._closed:
+            await asyncio.sleep(LLM_ACTIVITY_HEARTBEAT_S)
+            idle_s = self.idle_s()
+            if idle_s >= LLM_ACTIVITY_HEARTBEAT_S - 0.25:
+                if self._on_idle is not None:
+                    self._on_idle(idle_s, self._seq)
+                self._seq += 1
