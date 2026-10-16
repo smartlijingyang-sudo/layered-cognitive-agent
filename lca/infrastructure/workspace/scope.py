@@ -40,10 +40,12 @@ def run_workspace_scope(
     run_id: str,
     *,
     wall_clock_seconds: int = DEFAULT_RUN_WALL_CLOCK_SECONDS,
+    workspace: RunWorkspace | None = None,
 ) -> Iterator[RunWorkspace]:
     """Bind a RunWorkspace for the duration of a gateway run."""
-    deadline = utc_now() + timedelta(seconds=wall_clock_seconds)
-    workspace = RunWorkspace(run_id=run_id, deadline=deadline)
+    if workspace is None:
+        deadline = utc_now() + timedelta(seconds=wall_clock_seconds)
+        workspace = RunWorkspace(run_id=run_id, deadline=deadline)
     token: Token[RunWorkspace | None] = _current_workspace.set(workspace)
     try:
         yield workspace

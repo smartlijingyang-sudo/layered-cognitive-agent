@@ -28,6 +28,8 @@ async def seal_office_works(store: FileStore | None = None) -> list[dict[str, An
     """Flush residents, persist finished Office files + HTML previews, update ledger."""
     runtime = get_sandbox_runtime()
     workspace = get_run_workspace()
+    if store is None and runtime is not None:
+        store = getattr(runtime, "store", None)
     if runtime is None or workspace is None or store is None:
         return []
     try:
@@ -43,7 +45,7 @@ async def seal_office_works(store: FileStore | None = None) -> list[dict[str, An
 async def publish_office_works(runtime: Any, store: FileStore) -> list[dict[str, Any]]:
     """Scan outputs after flush; publish finished Office binaries and HTML previews."""
     await runtime.flush_office_residents(timeout_s=30)
-    scanned = await runtime.scan_output_files(invocation_id="office_works_scan")
+    scanned = await runtime.outputs_changed_since_baseline(invocation_id="office_works_scan")
     published: list[dict[str, Any]] = []
     for sandbox_file in scanned:
         name = getattr(sandbox_file, "name", "") or ""
