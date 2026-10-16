@@ -350,7 +350,6 @@ def _derive_outcome(
     retries without re-classifying the text).
     """
     from lca.contracts.atoms.semantic.keys import FAILURE_KIND
-    from lca.contracts.models.core.execution.decision import Observation
 
     obs: object | None = None
     if isinstance(result, Observation):

@@ -837,7 +837,6 @@ class LobeHubService:
         return pid
 
     def _child_env(self) -> dict[str, str]:
-        import os
 
         # ADR-0200 §1: LcaAgentStreamClient dials `<gatewayBase>/v1/runs/<id>/ws`.
         # The frontend (lobehub SPA, vite dev) needs the base URL injected

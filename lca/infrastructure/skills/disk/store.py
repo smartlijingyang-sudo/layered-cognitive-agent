@@ -287,7 +287,6 @@ class DiskSkillPackageStore(SkillPackageInstaller, SkillPackageStore):
         usage_count: int | None = None,
     ) -> SkillPackage:
         """重写 manifest.json 中的退役标记 / 使用计数（其余字段原样保留）。"""
-        from lca.contracts.protocols.memory.operational_skills import SkillNotFoundError
 
         sid = sanitize_skill_id(skill_id)
         manifest_path = self._root / sid / _MANIFEST

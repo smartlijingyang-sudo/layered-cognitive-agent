@@ -174,7 +174,6 @@ class ReflectScoreExecutor(FastPathCounter):
         if candidate is not None:
             if payload is None:
                 from lca.contracts.atoms.enums.enums import ReflectionVerdict
-                from lca.contracts.models.core.execution.decision import Reflection
 
                 payload = Reflection(
                     reflection_id=new_id("refl"),
