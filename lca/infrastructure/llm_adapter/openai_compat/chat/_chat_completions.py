@@ -82,7 +82,6 @@ class _ChatCompletionsStrategy:
         api_kwargs["stream_options"] = {"include_usage": True}
 
         accumulated_text = ""
-        reasoning_text = ""
         tool_calls: dict[int, dict[str, str]] = {}
         think_splitter = ThinkTagStreamSplitter()
         finish_reason: str | None = None
@@ -93,7 +92,6 @@ class _ChatCompletionsStrategy:
             if not chunk.choices:
                 for kind, piece in think_splitter.flush():
                     if kind == "reasoning":
-                        reasoning_text += piece
                         yield LLMStreamEvent(
                             type=LLMStreamEventType.REASONING_TEXT_DELTA,
                             text=piece,
@@ -126,7 +124,6 @@ class _ChatCompletionsStrategy:
             delta = choice.delta
             reasoning_piece = extract_reasoning_text(delta)
             if reasoning_piece:
-                reasoning_text += reasoning_piece
                 yield LLMStreamEvent(
                     type=LLMStreamEventType.REASONING_TEXT_DELTA,
                     text=reasoning_piece,
@@ -135,7 +132,6 @@ class _ChatCompletionsStrategy:
             if delta.content:
                 for kind, piece in think_splitter.feed(delta.content):
                     if kind == "reasoning":
-                        reasoning_text += piece
                         yield LLMStreamEvent(
                             type=LLMStreamEventType.REASONING_TEXT_DELTA,
                             text=piece,
@@ -175,7 +171,6 @@ class _ChatCompletionsStrategy:
             return
         for kind, piece in think_splitter.flush():
             if kind == "reasoning":
-                reasoning_text += piece
                 yield LLMStreamEvent(
                     type=LLMStreamEventType.REASONING_TEXT_DELTA,
                     text=piece,
