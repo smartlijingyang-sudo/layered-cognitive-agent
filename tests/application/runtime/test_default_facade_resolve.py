@@ -378,3 +378,7 @@ def test_options_mapping_is_preserved_on_intent() -> None:
     facade = _facade(service)
     # Should not raise — the facade does not consume options in P1-09.
     facade.resolve_activation(intent)
+    # The test name pins preservation: options must come back unmutated too.
+    assert options == {"temperature": 0.2, "max_steps": 5}, (
+        "facade must not mutate RunIntent.options"
+    )

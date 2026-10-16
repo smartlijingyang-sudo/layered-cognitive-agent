@@ -50,11 +50,6 @@ def authorized_plugin() -> type:
     return DelegationCachePlugin
 
 
-@pytest.fixture
-def payload() -> TeamDelegationCacheHit:
-    return TeamDelegationCacheHit(callee_role="a", subtask="b", step=1)
-
-
 # ── contextvars 三件套 ──────────────────────────────────────────────────
 
 
