@@ -311,7 +311,7 @@ def register(app: typer.Typer) -> None:
             return
 
         if action == "stop":
-            status = sup.stop()
+            sup.stop()
             orphans = _find_orphan_pids()
             _kill_orphans(orphans, grace_s=cfg.stopwaitsecs)
             status = sup.status()
