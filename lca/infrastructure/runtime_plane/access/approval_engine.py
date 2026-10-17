@@ -292,6 +292,10 @@ class NamespaceApprovalStrategy:
                 session_ns = defer_session.namespace_of_tool(tool_name)
                 if session_ns is not None:
                     ns = session_ns
+                elif tool_name in _STANDARD_SHELL_TOOLS:
+                    # Session missed (e.g. snake_case alias): fall back to the
+                    # standard shell-tool set, as before the session lookup.
+                    ns = "shell"
             elif tool_name in _STANDARD_SHELL_TOOLS:
                 ns = "shell"
 

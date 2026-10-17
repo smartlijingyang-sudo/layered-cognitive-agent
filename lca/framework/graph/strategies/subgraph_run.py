@@ -28,8 +28,8 @@ from lca.framework.graph.observation import (
 from lca.framework.graph.port_registry import PortRegistry
 
 RecursiveRunner = Callable[
-    [Plan, AgentState, int, "PortRegistry | None", "Mapping | None"],
-    "Mapping[str, Any] | Awaitable[Mapping[str, Any]]",
+    [Plan, AgentState, int, PortRegistry | None, Mapping | None],
+    Mapping[str, Any] | Awaitable[Mapping[str, Any]],
 ]
 
 
