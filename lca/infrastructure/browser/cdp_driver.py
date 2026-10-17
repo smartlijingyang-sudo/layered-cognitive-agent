@@ -78,7 +78,10 @@ class PlaywrightCDPDriver(BrowserDriverPort):
             try:
                 await self._init_cdp_for_session(session_id, initial_url)
             except Exception as e:
-                logger.info("[PlaywrightCDPDriver] Playwright not launching live display (%s), running in resilient mode", e)
+                logger.info(
+                    "[PlaywrightCDPDriver] Playwright not launching live display (%s), running in resilient mode",
+                    e,
+                )
 
             return summary
 
@@ -89,10 +92,31 @@ class PlaywrightCDPDriver(BrowserDriverPort):
 
             if self._playwright is None:
                 self._playwright = await async_playwright().start()
-                self._browser = await self._playwright.chromium.launch(
-                    headless=self.headless,
-                    args=["--disable-gpu", "--no-sandbox"],
-                )
+                launch_kwargs: dict[str, Any] = {
+                    "headless": self.headless,
+                    "args": ["--disable-gpu", "--no-sandbox"],
+                }
+                from pathlib import Path
+
+                candidates = [
+                    Path("/home/lichao/.cache/ms-playwright/chromium-1243/chrome-linux64/chrome"),
+                    Path(
+                        "/home/lichao/.cache/ms-playwright/chromium_headless_shell-1243/chrome-headless-shell-linux64/chrome-headless-shell"
+                    ),
+                    Path("/usr/bin/google-chrome"),
+                    Path("/usr/bin/chromium-browser"),
+                    Path("/usr/bin/chromium"),
+                ]
+                for cand in candidates:
+                    if cand.is_file():
+                        launch_kwargs["executable_path"] = str(cand)
+                        break
+
+                try:
+                    self._browser = await self._playwright.chromium.launch(**launch_kwargs)
+                except Exception:
+                    launch_kwargs.pop("executable_path", None)
+                    self._browser = await self._playwright.chromium.launch(**launch_kwargs)
 
             context = await self._browser.new_context(
                 viewport={"width": self.default_width, "height": self.default_height}
@@ -106,21 +130,34 @@ class PlaywrightCDPDriver(BrowserDriverPort):
             # 绑定 Page.screencastFrame 监听
             relay = self._relays.get(session_id)
             if relay:
+
                 async def _on_screencast_frame(payload: dict[str, Any]) -> None:
                     try:
                         import base64
+
                         data_bytes = base64.b64decode(payload["data"])
                         await relay.emit_frame(data_bytes, payload.get("metadata"))
-                        await cdp.send("Page.screencastFrameAck", {"sessionId": payload["sessionId"]})
+                        await cdp.send(
+                            "Page.screencastFrameAck", {"sessionId": payload["sessionId"]}
+                        )
                     except Exception as err:
-                        logger.warning("[PlaywrightCDPDriver] Error handling screencast frame: %s", err)
+                        logger.warning(
+                            "[PlaywrightCDPDriver] Error handling screencast frame: %s", err
+                        )
 
                 cdp.on("Page.screencastFrame", _on_screencast_frame)
-                await cdp.send("Page.startScreencast", {"format": "jpeg", "quality": 75, "everyNthFrame": 1})
+                await cdp.send(
+                    "Page.startScreencast", {"format": "jpeg", "quality": 75, "everyNthFrame": 1}
+                )
 
             if url and url != "about:blank":
-                await page.goto(url)
-                title = await page.title()
+                title = "Page"
+                try:
+                    await page.goto(url, timeout=5000)
+                    title = await page.title()
+                except Exception as goto_err:
+                    logger.debug("[PlaywrightCDPDriver] page.goto timeout/error: %s", goto_err)
+
                 if session_id in self._sessions:
                     old = self._sessions[session_id]
                     self._sessions[session_id] = BrowserSessionSummary(
@@ -221,12 +258,27 @@ class PlaywrightCDPDriver(BrowserDriverPort):
                 await cdp.send("Input.dispatchMouseEvent", {"type": "mouseMoved", "x": x, "y": y})
             elif event.type == BrowserInputEventType.MOUSE_DOWN:
                 btn = event.button or "left"
-                await cdp.send("Input.dispatchMouseEvent", {"type": "mousePressed", "x": x, "y": y, "button": btn, "clickCount": 1})
+                await cdp.send(
+                    "Input.dispatchMouseEvent",
+                    {"type": "mousePressed", "x": x, "y": y, "button": btn, "clickCount": 1},
+                )
             elif event.type == BrowserInputEventType.MOUSE_UP:
                 btn = event.button or "left"
-                await cdp.send("Input.dispatchMouseEvent", {"type": "mouseReleased", "x": x, "y": y, "button": btn, "clickCount": 1})
+                await cdp.send(
+                    "Input.dispatchMouseEvent",
+                    {"type": "mouseReleased", "x": x, "y": y, "button": btn, "clickCount": 1},
+                )
             elif event.type == BrowserInputEventType.WHEEL:
-                await cdp.send("Input.dispatchMouseEvent", {"type": "mouseWheel", "x": x, "y": y, "deltaX": event.delta_x, "deltaY": event.delta_y})
+                await cdp.send(
+                    "Input.dispatchMouseEvent",
+                    {
+                        "type": "mouseWheel",
+                        "x": x,
+                        "y": y,
+                        "deltaX": event.delta_x,
+                        "deltaY": event.delta_y,
+                    },
+                )
             elif event.type == BrowserInputEventType.KEY_DOWN:
                 params = {"type": "keyDown"}
                 if event.key:

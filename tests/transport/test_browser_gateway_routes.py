@@ -1,5 +1,7 @@
 """Tests for browser gateway REST routes and WebSocket streaming (INV-BROWSER-05)."""
 
+from unittest.mock import AsyncMock
+
 import pytest
 from starlette.applications import Starlette
 from starlette.routing import Route, WebSocketRoute
@@ -19,14 +21,33 @@ from lca.plugins.transport.webserver.routes_browser import (
 @pytest.fixture
 def test_app() -> Starlette:
     driver = PlaywrightCDPDriver()
+    driver._init_cdp_for_session = AsyncMock()
     app = Starlette(
         routes=[
-            Route("/lca-api/browser/sessions", list_browser_sessions_endpoint, methods=["GET", "OPTIONS"]),
+            Route(
+                "/lca-api/browser/sessions",
+                list_browser_sessions_endpoint,
+                methods=["GET", "OPTIONS"],
+            ),
             Route("/lca-api/browser/sessions", create_browser_session_endpoint, methods=["POST"]),
-            Route("/lca-api/browser/sessions/{session_id}", get_browser_session_endpoint, methods=["GET", "OPTIONS"]),
-            Route("/lca-api/browser/sessions/{session_id}/navigate", navigate_browser_session_endpoint, methods=["POST"]),
-            Route("/lca-api/browser/sessions/{session_id}", close_browser_session_endpoint, methods=["DELETE"]),
-            WebSocketRoute("/lca-api/browser/sessions/{session_id}/stream", stream_browser_session_ws),
+            Route(
+                "/lca-api/browser/sessions/{session_id}",
+                get_browser_session_endpoint,
+                methods=["GET", "OPTIONS"],
+            ),
+            Route(
+                "/lca-api/browser/sessions/{session_id}/navigate",
+                navigate_browser_session_endpoint,
+                methods=["POST"],
+            ),
+            Route(
+                "/lca-api/browser/sessions/{session_id}",
+                close_browser_session_endpoint,
+                methods=["DELETE"],
+            ),
+            WebSocketRoute(
+                "/lca-api/browser/sessions/{session_id}/stream", stream_browser_session_ws
+            ),
         ]
     )
     app.state.browser_driver = driver
@@ -44,7 +65,11 @@ def test_browser_sessions_crud_endpoints(test_app: Starlette) -> None:
     # 2. 创建新会话
     resp = client.post(
         "/lca-api/browser/sessions",
-        json={"session_id": "test_sess_crud", "run_id": "run_01", "initial_url": "https://example.com"},
+        json={
+            "session_id": "test_sess_crud",
+            "run_id": "run_01",
+            "initial_url": "https://example.com",
+        },
     )
     assert resp.status_code == 201
     data = resp.json()
@@ -85,6 +110,7 @@ def test_browser_websocket_screencast_stream(test_app: Starlette) -> None:
 
         # 模拟后端推送图像二进制帧
         import asyncio
+
         asyncio.run(relay.emit_frame(b"\xff\xd8\xffsampleframe"))
 
         # 前端客户端接收二进制数据
@@ -96,15 +122,17 @@ def test_browser_websocket_screencast_stream(test_app: Starlette) -> None:
         websocket.send_json({"type": "ack"})
 
         # 前端发送输入事件
-        websocket.send_json({
-            "type": "input",
-            "event": {
-                "type": "mouse_down",
-                "x": 640.0,
-                "y": 360.0,
-                "button": "left",
-            },
-        })
+        websocket.send_json(
+            {
+                "type": "input",
+                "event": {
+                    "type": "mouse_down",
+                    "x": 640.0,
+                    "y": 360.0,
+                    "button": "left",
+                },
+            }
+        )
 
     # 连接断开后验证客户端注销
     assert relay.client_count == 0

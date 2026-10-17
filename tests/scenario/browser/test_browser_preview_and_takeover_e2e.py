@@ -10,6 +10,7 @@ Verifies the complete life cycle across Contracts, Infrastructure, Transport, Co
 """
 
 import asyncio
+from unittest.mock import AsyncMock
 
 import pytest
 from pydantic import ValidationError
@@ -41,16 +42,35 @@ from lca.plugins.transport.webserver.routes_browser import (
 def e2e_system():
     arbitration = BrowserArbitrationEngine()
     driver = PlaywrightCDPDriver(arbitration_engine=arbitration)
+    driver._init_cdp_for_session = AsyncMock()
     subagent = BrowserSubagent(agent_id="e2e_browser_worker", arbitration_engine=arbitration)
 
     app = Starlette(
         routes=[
-            Route("/lca-api/browser/sessions", list_browser_sessions_endpoint, methods=["GET", "OPTIONS"]),
+            Route(
+                "/lca-api/browser/sessions",
+                list_browser_sessions_endpoint,
+                methods=["GET", "OPTIONS"],
+            ),
             Route("/lca-api/browser/sessions", create_browser_session_endpoint, methods=["POST"]),
-            Route("/lca-api/browser/sessions/{session_id}", get_browser_session_endpoint, methods=["GET", "OPTIONS"]),
-            Route("/lca-api/browser/sessions/{session_id}/navigate", navigate_browser_session_endpoint, methods=["POST"]),
-            Route("/lca-api/browser/sessions/{session_id}", close_browser_session_endpoint, methods=["DELETE"]),
-            WebSocketRoute("/lca-api/browser/sessions/{session_id}/stream", stream_browser_session_ws),
+            Route(
+                "/lca-api/browser/sessions/{session_id}",
+                get_browser_session_endpoint,
+                methods=["GET", "OPTIONS"],
+            ),
+            Route(
+                "/lca-api/browser/sessions/{session_id}/navigate",
+                navigate_browser_session_endpoint,
+                methods=["POST"],
+            ),
+            Route(
+                "/lca-api/browser/sessions/{session_id}",
+                close_browser_session_endpoint,
+                methods=["DELETE"],
+            ),
+            WebSocketRoute(
+                "/lca-api/browser/sessions/{session_id}/stream", stream_browser_session_ws
+            ),
         ]
     )
     app.state.browser_driver = driver
@@ -81,7 +101,11 @@ def test_e2e_browser_preview_and_takeover_lifecycle(e2e_system):
     # --- Step 2: REST 会话创建 ---
     resp = client.post(
         "/lca-api/browser/sessions",
-        json={"session_id": session_id, "run_id": "run_e2e_01", "initial_url": "https://example.com"},
+        json={
+            "session_id": session_id,
+            "run_id": "run_e2e_01",
+            "initial_url": "https://example.com",
+        },
     )
     assert resp.status_code == 201
     summary_data = resp.json()

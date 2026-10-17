@@ -182,15 +182,49 @@ async def stream_browser_session_ws(websocket: WebSocket) -> None:
                 await websocket.close()
 
 
+async def sessions_endpoint(request: Request) -> Response:
+    """处理会话列表 (GET) 与创建会话 (POST)。"""
+    if request.method == "OPTIONS":
+        return Response(status_code=204, headers=cors_headers())
+    if request.method == "POST":
+        return await create_browser_session_endpoint(request)
+    return await list_browser_sessions_endpoint(request)
+
+
+async def session_detail_endpoint(request: Request) -> Response:
+    """处理单个会话查询 (GET) 与销毁 (DELETE)。"""
+    if request.method == "OPTIONS":
+        return Response(status_code=204, headers=cors_headers())
+    if request.method == "DELETE":
+        return await close_browser_session_endpoint(request)
+    return await get_browser_session_endpoint(request)
+
+
 ROUTE_SPECS = (
-    RouteSpec("/lca-api/browser/sessions", list_browser_sessions_endpoint, ("GET", "OPTIONS")),
-    RouteSpec("/lca-api/browser/sessions", create_browser_session_endpoint, ("POST", "OPTIONS")),
-    RouteSpec("/lca-api/browser/sessions/{session_id}", get_browser_session_endpoint, ("GET", "OPTIONS")),
-    RouteSpec("/lca-api/browser/sessions/{session_id}/navigate", navigate_browser_session_endpoint, ("POST", "OPTIONS")),
-    RouteSpec("/lca-api/browser/sessions/{session_id}", close_browser_session_endpoint, ("DELETE", "OPTIONS")),
+    RouteSpec("/browser/sessions", sessions_endpoint, ("GET", "POST", "OPTIONS")),
+    RouteSpec(
+        "/browser/sessions/{session_id}", session_detail_endpoint, ("GET", "DELETE", "OPTIONS")
+    ),
+    RouteSpec(
+        "/browser/sessions/{session_id}/navigate",
+        navigate_browser_session_endpoint,
+        ("POST", "OPTIONS"),
+    ),
+    RouteSpec("/lca-api/browser/sessions", sessions_endpoint, ("GET", "POST", "OPTIONS")),
+    RouteSpec(
+        "/lca-api/browser/sessions/{session_id}",
+        session_detail_endpoint,
+        ("GET", "DELETE", "OPTIONS"),
+    ),
+    RouteSpec(
+        "/lca-api/browser/sessions/{session_id}/navigate",
+        navigate_browser_session_endpoint,
+        ("POST", "OPTIONS"),
+    ),
 )
 
-_WS_STREAM_PATH = "/lca-api/browser/sessions/{session_id}/stream"
+_WS_STREAM_PATH = "/browser/sessions/{session_id}/stream"
+_WS_LCA_STREAM_PATH = "/lca-api/browser/sessions/{session_id}/stream"
 
 
 @plugin(
@@ -200,7 +234,7 @@ _WS_STREAM_PATH = "/lca-api/browser/sessions/{session_id}/stream"
     layer="L1",
     kind=PluginKind.PROVIDER,
     effects="none",
-    description="Register /lca-api/browser/* REST & WebSocket screencast routes.",
+    description="Register /browser/* and /lca-api/browser/* REST & WebSocket screencast routes.",
     contract=PluginContract(
         identity=PluginIdentity(version="v1"),
         architecture=ArchitectureContract(
@@ -227,9 +261,15 @@ async def setup(ctx: PluginContext, config: Any) -> None:
 
     from starlette.routing import WebSocketRoute
 
-    ws_dispose = registry.register_websocket(WebSocketRoute(_WS_STREAM_PATH, stream_browser_session_ws))
+    ws_dispose_1 = registry.register_websocket(
+        WebSocketRoute(_WS_STREAM_PATH, stream_browser_session_ws)
+    )
+    ws_dispose_2 = registry.register_websocket(
+        WebSocketRoute(_WS_LCA_STREAM_PATH, stream_browser_session_ws)
+    )
     inner: Any = ctx._runtime()  # type: ignore[attr-defined]
-    inner.effect(ws_dispose, label=f"ws:{_WS_STREAM_PATH}")
+    inner.effect(ws_dispose_1, label=f"ws:{_WS_STREAM_PATH}")
+    inner.effect(ws_dispose_2, label=f"ws:{_WS_LCA_STREAM_PATH}")
 
 
 __all__ = [
@@ -239,6 +279,8 @@ __all__ = [
     "get_browser_session_endpoint",
     "list_browser_sessions_endpoint",
     "navigate_browser_session_endpoint",
+    "session_detail_endpoint",
+    "sessions_endpoint",
     "setup",
     "stream_browser_session_ws",
 ]

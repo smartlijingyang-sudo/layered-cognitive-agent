@@ -281,6 +281,10 @@ entries:
   name: lca_gateway_routes_channels_wechat
   $module: lca.plugins.transport.webserver.routes_channels_wechat
   config: {}
+- id: lca-gateway-routes-browser
+  name: lca_gateway_routes_browser
+  $module: lca.plugins.transport.webserver.routes_browser
+  config: {}
 - id: lca-webserver-bootstrap
   name: lca_webserver_bootstrap
   $module: lca.plugins.transport.webserver.bootstrap.bootstrap
