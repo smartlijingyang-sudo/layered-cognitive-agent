@@ -658,9 +658,9 @@
 | RUN-STAB-TASK-5-OUTPUT-GUARD | [声带净化] `decision/parse.py` Prompt 泄露与反刍条文净化门禁 | Completed | 成功拦截与净化反刍系统提示词/条文泄露，3/3 测试全绿 |
 | RUN-STAB-TASK-6-INTEGRATION-E2E | [回归验收] 服务重启与真实端到端并发与创建助理复测 | Completed | 服务重启全健康；真实 run_1c9a1e257cd9 743 事实事件全绿，并发工具与 Defer 机制完美协作，向导交互无缝推进且 0 泄露 |
 | LCA-2026-10-08-RELIABILITY | 修复刷盘报告、账本恢复、CI基线门禁与来源校验接入；仅改这四项及必要测试/豁免配置，不改无关基线和非LCA资产 | Completed | 聚焦回归 149/149 通过；profile closure、capability snapshot 与 plan_ref 3/3 通过；文件名、typed-port、package-organization 和 README 严格门禁全通过（既存失败使用 2026-11-07 到期的责任人/精确指纹豁免）。全量 pytest：12,330 passed、192 failed、160 skipped、13 deselected、8 xfailed、13 errors；相较修复前全量结果无新增失败节点、6 项失败已消除；干净 HEAD 复跑的 19 个相关失败节点均可重现，因此不宣称全量测试全绿。 |
-| MUSE-BROWSER-TASK-1-NAMESPACES | [契约规范] DeferPolicy 声明 browser 命名空间与描述，收敛共享 CDP 驱动单例 | In Progress | 正在落地 DeferPolicy 注册与 get_shared_browser_driver |
-| MUSE-BROWSER-TASK-2-TOOLS-IMPL | [驱动接通] BrowserNavigateTool / BrowserOpenTool 对接真实 Playwright CDP 驱动并输出预览微件 | Pending | 待实现 |
-| MUSE-BROWSER-TASK-3-TOOLSET-WIRING | [装配注入] build_default_tools 注入浏览器工具集，使 Agent 具备默认浏览器心智与按需加载 | Pending | 待实现 |
-| MUSE-BROWSER-TASK-4-DETERMINISTIC-FALLBACK | [网关保底] run_session_writer.py 落地 ADR-0280 browser_preview 微件确定性保底投影 | Pending | 待实现 |
-| MUSE-BROWSER-TASK-5-REGRESSION-AND-TESTS | [单测矩阵] 编写契约、驱动、装配及网关保底完整单测与回归套件 | Pending | 待执行 |
-| MUSE-BROWSER-TASK-6-LIVE-VERIFY | [真实复测] 内核平滑重启并在真实多轮会话提问，验证浏览器端到端自动打开与卡片交互 | Pending | 待执行 |
+| MUSE-BROWSER-TASK-1-NAMESPACES | [契约规范] DeferPolicy 声明 browser 命名空间与描述，收敛共享 CDP 驱动单例 | Completed | policy.py 注册 browser 域与说明，cdp_driver.py 导出 get_shared_browser_driver 单例并与 routes_browser 对齐，单测 4/4 全绿 |
+| MUSE-BROWSER-TASK-2-TOOLS-IMPL | [驱动接通] BrowserNavigateTool / BrowserOpenTool 对接真实 Playwright CDP 驱动并输出预览微件 | Completed | tools.py 接入 CDP 驱动创建会话，生成 [widget:browser_preview]，支持协议自愈与 browser_open 别名，解除循环导入 |
+| MUSE-BROWSER-TASK-3-TOOLSET-WIRING | [装配注入] build_default_tools 注入浏览器工具集，使 Agent 具备默认浏览器心智与按需加载 | Completed | set.py build_default_tools 注入 5 大浏览器工具（open/navigate/click/screenshot/close），支持 tool_search 按需加载 |
+| MUSE-BROWSER-TASK-4-DETERMINISTIC-FALLBACK | [网关保底] run_session_writer.py 落地 ADR-0280 browser_preview 微件确定性保底投影 | Completed | 落地 extract_pending_browser_widgets 与 ensure_browser_widget，大模型正文漏写时自动追加微件标签，单测全绿 |
+| MUSE-BROWSER-TASK-5-REGRESSION-AND-TESTS | [单测矩阵] 编写契约、驱动、装配及网关保底完整单测与回归套件 | Completed | 落地 test_browser_integration_and_fallback.py，28/28 浏览器全套测试 100% 全绿，ruff check/format clean，git diff 干净 |
+| MUSE-BROWSER-TASK-6-LIVE-VERIFY | [真实复测] 内核平滑重启并在真实多轮会话提问，验证浏览器端到端自动打开与卡片交互 | Completed | 内核健康重启（:8765）；真实 run_1a4b94813de5 全流程验证：模型感知 browser 域并调用 tool_search，连续执行 browser_open（打开 news.ycombinator.com，分配 brw_e1f043d649b2，用时 2.6s）与 browser_screenshot，成功抓取 Hacker News 首页并向用户总结，GET /lca-api/browser/sessions 确认会话存活并推流 |
