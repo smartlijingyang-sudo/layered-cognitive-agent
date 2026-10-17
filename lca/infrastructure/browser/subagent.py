@@ -9,6 +9,7 @@ from lca.contracts.models.browser.models import (
     BrowserActionType,
 )
 from lca.contracts.protocols import Tool
+from lca.infrastructure.browser.arbitration import BrowserArbitrationEngine
 from lca.infrastructure.computer.desktop_lock import DesktopLockCoordinator
 from lca.infrastructure.tools.browser.tools import build_browser_tools
 
@@ -19,15 +20,18 @@ class BrowserSubagent:
     不变量：
     - INV-05: 物理禁声（子代理严格剔除 send_message 工具，只能向父代理返回结构化数据，无权对用户通道发声）。
     - 自动化操作前抢占桌面单屏锁，结束后主动归还锁。
+    - 与 BrowserArbitrationEngine 联动维护 AGENT_RUNNING 态。
     """
 
     def __init__(
         self,
         agent_id: str = "browser_subagent",
         lock_manager: DesktopLockCoordinator | None = None,
+        arbitration_engine: BrowserArbitrationEngine | None = None,
     ) -> None:
         self.agent_id = agent_id
         self.lock_manager = lock_manager
+        self.arbitration_engine = arbitration_engine
         # 严格过滤工具集：严禁声带发声工具
         self._tools: list[Tool] = [
             tool for tool in build_browser_tools() if getattr(tool, "name", "") != "send_message"
@@ -56,6 +60,9 @@ class BrowserSubagent:
                     success=False,
                     error=f"桌面单屏锁正被其他任务占用 ({self.lock_manager.get_current_owner()})",
                 )
+
+        if self.arbitration_engine is not None:
+            self.arbitration_engine.start_agent_task(session_id)
 
         try:
             # 2. 执行浏览器动作
@@ -96,6 +103,8 @@ class BrowserSubagent:
                 text_content=f"Executed action {action.action_type}",
             )
         finally:
+            if self.arbitration_engine is not None:
+                self.arbitration_engine.release_to_agent(session_id)
             # 3. 动作完成后立即释放单屏桌面锁
             if self.lock_manager is not None:
                 await self.lock_manager.free_window(

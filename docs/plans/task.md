@@ -627,12 +627,12 @@
 | BRAINSTORM-BROWSER-DESIGN-SECTIONS | 逐步呈现设计细节（Owns/Does NOT own/不变量/前后端契约）并获取审批 | Completed | 全部 4 个小节（边界与自治等级、核心架构模型与前后端契约、时序/协议/状态机、测试矩阵与不变量断言）均获用户审批通过 |
 | BRAINSTORM-BROWSER-DESIGN-DOC | 沉淀设计文档至 docs/plans/ 并提交 git | Completed | 成功落盘 docs/plans/2026-10-16-browser-preview-and-takeover-design.md 并准备 git 提交 |
 | BRAINSTORM-BROWSER-TRANSITION | 转换至实施计划制定（writing-plans） | Completed | 成功落盘实施方案 docs/plans/2026-10-16-browser-preview-and-takeover-plan.md 并分解为 6 大单流任务 |
-| BROWSER-TASK-1-CONTRACTS | [契约层] 浏览器流式与输入事件不可变 DTO 模型 (`stream.py`) | Pending | 待执行 |
-| BROWSER-TASK-2-INFRA-RELAY | [驱动中继] 原生 CDP 驱动与 Screencast 二进制帧流中继器 (`screencast_relay.py`) | Pending | 待执行 |
-| BROWSER-TASK-3-TRANSPORT | [网关通道] REST 会话发现与 WebSocket 双向流式通信插件 (`routes_browser.py`) | Pending | 待执行 |
-| BROWSER-TASK-4-ARBITRATION | [接管控制] 单写所有权仲裁状态机与无发声子代理守护 (`arbitration.py` & `subagent.py`) | Pending | 待执行 |
-| BROWSER-TASK-5-UI-PATCHES | [前端表现] LobeHub 聊天流预览卡片与右侧全功能抽屉补丁 (`BrowserViewerDrawer.tsx`) | Pending | 待执行 |
-| BROWSER-TASK-6-REGRESSION-E2E | [全量验收] 端到端全链路集成回归测试与架构门禁体检 (INV-01 ~ INV-06) | Pending | 待执行 |
+| BROWSER-TASK-1-CONTRACTS | [契约层] 浏览器流式与输入事件不可变 DTO 模型 (`stream.py`) | Completed | 落地 BrowserSessionSummary, BrowserInputEvent 等不可变模型，通过 test_browser_stream_contracts.py 4/4 passed，INV-BROWSER-01 达标，commit 73c5573c3 |
+| BROWSER-TASK-2-INFRA-RELAY | [驱动中继] 原生 CDP 驱动与 Screencast 二进制帧流中继器 (`screencast_relay.py`) | Completed | 落地 BrowserDriverPort 协议、CDPScreencastRelay 0x01 二进制包装与背压丢帧节流，4/4 单测全绿，INV-BROWSER-04 达标，commit 49de7d6d3 |
+| BROWSER-TASK-3-TRANSPORT | [网关通道] REST 会话发现与 WebSocket 双向流式通信插件 (`routes_browser.py`) | Completed | 落地 /lca-api/browser/sessions REST 端点与 /stream WebSocket 混合传输通道，test_browser_gateway_routes.py 2/2 全绿，INV-BROWSER-05 达标 |
+| BROWSER-TASK-4-ARBITRATION | [接管控制] 单写所有权仲裁状态机与无发声子代理守护 (`arbitration.py` & `subagent.py`) | Completed | 落地 BrowserArbitrationEngine 状态机，维护 INV-BROWSER-02/03，单测 10/10 全绿 |
+| BROWSER-TASK-5-UI-PATCHES | [前端表现] LobeHub 聊天流预览卡片与右侧全功能抽屉补丁 (`BrowserViewerDrawer.tsx`) | Completed | 落地 BrowserPreviewCard, BrowserViewerDrawer 补丁，通过 48/48 补丁校验，单测 2/2 全绿，INV-BROWSER-06 达标 |
+| BROWSER-TASK-6-REGRESSION-E2E | [全量验收] 端到端全链路集成回归测试与架构门禁体检 (INV-01 ~ INV-06) | Completed | 落地 test_browser_preview_and_takeover_e2e.py，浏览器全套测试 22/22 100% 全绿，ruff 0 报错，git diff --check clean，INV-01~06 全量覆盖 |
 | BRAINSTORM-DESLOP-100-QUESTIONS | 澄清「100次真实优化与去冗」的具体目标、执行载体与边界（单步提问） | Completed | 用户明确选定：基于 ADR-0293 与 improve-codebase-architecture 开启全新一轮 Raphy 架构加深与去冗循环，派生高质量真实优化故事集并单流交付 |
 | BRAINSTORM-DESLOP-100-APPROACHES | 提出 2-3 种大规模去冗与深度优化实施方案及权衡对比 | Completed | 用户明确确认选定方案 A（波次渐进 Raphy 循环，Batch-Wave Loop，每波 5~10 stories 动态评估与落地） |
 | BRAINSTORM-DESLOP-100-DESIGN-SECTIONS | 逐步呈现分节架构规范（边界/治理清单/执行流水线/测试不变量）并呈批 | Completed | §1 边界与自治、§2 核心架构模型与流水线时序、§3 不变量断言与测试矩阵全部获用户批准通过 |
