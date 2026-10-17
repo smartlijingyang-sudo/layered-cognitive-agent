@@ -31,26 +31,24 @@ from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import
 )
 from lca.contracts.routing import RouteSpec
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
-from lca.infrastructure.browser.cdp_driver import PlaywrightCDPDriver
+from lca.infrastructure.browser.cdp_driver import (
+    PlaywrightCDPDriver,
+    get_shared_browser_driver,
+)
 from lca.plugins.transport.webserver.handlers.cors.cors import cors_headers
 from lca.plugins.transport.webserver.route.register import register_routes
 
 logger = logging.getLogger(__name__)
 
-_GLOBAL_BROWSER_DRIVER: PlaywrightCDPDriver | None = None
-
 
 def get_browser_driver(target: Any) -> BrowserDriverPort:
     """从 Starlette app.state 或全局单例中解析浏览器驱动。"""
-    global _GLOBAL_BROWSER_DRIVER
     app = getattr(target, "app", target)
     state = getattr(app, "state", None)
     if state and hasattr(state, "browser_driver"):
         return state.browser_driver  # type: ignore[no-any-return]
+    return get_shared_browser_driver()
 
-    if _GLOBAL_BROWSER_DRIVER is None:
-        _GLOBAL_BROWSER_DRIVER = PlaywrightCDPDriver()
-    return _GLOBAL_BROWSER_DRIVER
 
 
 async def list_browser_sessions_endpoint(request: Request) -> Response:

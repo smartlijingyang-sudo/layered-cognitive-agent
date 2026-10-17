@@ -23,6 +23,8 @@ STANDARD_NAMESPACES: tuple[str, ...] = (
     "avatar",
     # ADR-0250/ADR-0256：新增 creator（Cordis 插件与预置包开发）工具域。
     "creator",
+    # Muse 规范 / ADR-0280：新增 browser（真实 Chromium 浏览器任务与页面交互）工具域。
+    "browser",
 )
 
 DEFAULT_NAMESPACE_DESCRIPTIONS: dict[str, str] = {
@@ -32,6 +34,7 @@ DEFAULT_NAMESPACE_DESCRIPTIONS: dict[str, str] = {
     "memory": "搜索与写入长期记忆",
     "skill": "技能的发现、安装与调用",
     "web": "联网搜索与网页抓取",
+    "browser": "真实 Chromium 浏览器：打开/访问网页、点击交互、截屏与实时会话预览",
     "agent": "助理管理、派发子任务、向用户提问",
     "ext": "第三方集成：连接与刷新外部服务",
     "lca": "运行时控制：handoff 轮静默结束",

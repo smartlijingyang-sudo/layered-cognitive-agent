@@ -262,13 +262,20 @@ class RunSessionWriter(RunSessionWriterProtocol):
         usage: TokenUsage | None,
     ) -> EventRef:
         session = self._require_session()
-        # INV-CAP-04: Deterministic widget fallback guard when model omits widget
+        # INV-CAP-04 / ADR-0280: Deterministic widget fallback guard when model omits widget
         if content is not None:
-            pending = extract_pending_intents_from_events(session.snapshot_events())
+            snapshot = session.snapshot_events()
+            pending = extract_pending_intents_from_events(snapshot)
             if pending:
                 content = ensure_intent_widget_in_assistant_message(
                     raw_model_content=content,
                     pending_intents=pending,
+                )
+            pending_browsers = extract_pending_browser_widgets_from_events(snapshot)
+            if pending_browsers:
+                content = ensure_browser_widget_in_assistant_message(
+                    raw_model_content=content,
+                    pending_widgets=pending_browsers,
                 )
         event = session.append(
             "surface/assistant_message",
@@ -495,7 +502,9 @@ def extract_pending_intents_from_events(
                         {
                             "intent_id": intent_id,
                             "app_name": meta.get("app_name") or data.get("app_name") or "Connector",
-                            "connection_id": meta.get("connection_id") or data.get("connection_id") or "",
+                            "connection_id": meta.get("connection_id")
+                            or data.get("connection_id")
+                            or "",
                             "mode": meta.get("mode") or data.get("mode") or "",
                         }
                     )
@@ -534,7 +543,9 @@ def ensure_intent_widget_in_assistant_message(
             mode = item.get("mode") or ""
         else:
             intent_id = getattr(item, "intent_id", None) or getattr(item, "intentId", None)
-            app_name = getattr(item, "app_name", "Connector") or getattr(item, "appName", "Connector")
+            app_name = getattr(item, "app_name", "Connector") or getattr(
+                item, "appName", "Connector"
+            )
             connection_id = getattr(item, "connection_id", "") or getattr(item, "connectionId", "")
             mode = getattr(item, "mode", "")
 
@@ -565,9 +576,110 @@ def ensure_intent_widget_in_assistant_message(
     return suffix
 
 
+_BROWSER_WIDGET_RE = re.compile(r"\[widget:browser_preview\?([^\]]+)\]")
+
+
+def _parse_browser_widget_qs(query: str) -> dict[str, str]:
+    """Parse a ``[widget:browser_preview?...]`` query string."""
+    qs = parse_qs(query)
+    return {
+        "sessionId": (qs.get("sessionId") or qs.get("session_id") or [""])[0],
+        "url": (qs.get("url") or [""])[0],
+        "title": (qs.get("title") or ["Web Page"])[0],
+        "status": (qs.get("status") or ["agent_running"])[0],
+    }
+
+
+def extract_pending_browser_widgets_from_events(
+    events: Sequence[Any],
+) -> list[dict[str, str]]:
+    """Extract unmounted browser preview widgets from session events (ADR-0280).
+
+    A browser preview is unmounted if emitted in tool_result but never appeared
+    in any preceding surface/assistant_message.
+    """
+    mounted_session_ids: set[str] = set()
+    tool_widgets: list[dict[str, str]] = []
+
+    for event in events:
+        event_type = getattr(event, "type", "")
+        data = getattr(event, "data", {}) or {}
+
+        if event_type == "surface/assistant_message":
+            content = data.get("content") or ""
+            for match in _BROWSER_WIDGET_RE.finditer(content):
+                sid = _parse_browser_widget_qs(match.group(1))["sessionId"]
+                if sid:
+                    mounted_session_ids.add(sid)
+
+        elif event_type in ("surface/tool_result", SURFACE_TOOL_RESULT_TYPE):
+            content = data.get("content") or ""
+            found = False
+            for match in _BROWSER_WIDGET_RE.finditer(content):
+                fields = _parse_browser_widget_qs(match.group(1))
+                if fields["sessionId"]:
+                    tool_widgets.append(fields)
+                    found = True
+
+            if not found:
+                payload = data.get("payload") if isinstance(data.get("payload"), dict) else data
+                sid = payload.get("session_id") or payload.get("sessionId")
+                url = payload.get("url")
+                if sid and url:
+                    tool_widgets.append(
+                        {
+                            "sessionId": str(sid),
+                            "url": str(url),
+                            "title": str(payload.get("title") or "Web Page"),
+                            "status": str(payload.get("status") or "agent_running"),
+                        }
+                    )
+
+    seen: set[str] = set()
+    unmounted: list[dict[str, str]] = []
+    for item in tool_widgets:
+        sid = item["sessionId"]
+        if sid not in mounted_session_ids and sid not in seen:
+            seen.add(sid)
+            unmounted.append(item)
+    return unmounted
+
+
+def ensure_browser_widget_in_assistant_message(
+    raw_model_content: str | None,
+    pending_widgets: Sequence[dict[str, str]] | None = None,
+) -> str:
+    """Ensure unmounted browser widgets are projected into assistant message (ADR-0280)."""
+    content = raw_model_content or ""
+    if not pending_widgets:
+        return content
+
+    widgets_to_append: list[str] = []
+    for item in pending_widgets:
+        sid = item.get("sessionId")
+        if not sid or sid in content:
+            continue
+        url = item.get("url") or ""
+        title = item.get("title") or "Web Page"
+        status = item.get("status") or "agent_running"
+        params = {"sessionId": sid, "url": url, "title": title, "status": status}
+        tag = f"[widget:browser_preview?{urlencode(params)}]"
+        widgets_to_append.append(tag)
+
+    if not widgets_to_append:
+        return content
+
+    suffix = "\n\n".join(widgets_to_append)
+    if content.strip():
+        return f"{content.rstrip()}\n\n{suffix}"
+    return suffix
+
+
 __all__ = [
     "RunSessionWriter",
     "SessionWriterUnboundError",
+    "ensure_browser_widget_in_assistant_message",
     "ensure_intent_widget_in_assistant_message",
+    "extract_pending_browser_widgets_from_events",
     "extract_pending_intents_from_events",
 ]

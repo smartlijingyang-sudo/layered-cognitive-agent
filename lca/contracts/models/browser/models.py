@@ -37,11 +37,13 @@ class BrowserActionResult(BaseModel):
 
     action_type: BrowserActionType
     success: bool
+    session_id: str | None = None
     url: str | None = None
     title: str | None = None
     text_content: str | None = None
     screenshot_artifact_id: str | None = None
     error: str | None = None
+
 
 
 class DesktopLock(BaseModel):

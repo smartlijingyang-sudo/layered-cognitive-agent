@@ -314,4 +314,25 @@ class PlaywrightCDPDriver(BrowserDriverPort):
                 await self._playwright.stop()
 
 
-__all__ = ["PlaywrightCDPDriver"]
+_SHARED_BROWSER_DRIVER: PlaywrightCDPDriver | None = None
+
+
+def get_shared_browser_driver() -> PlaywrightCDPDriver:
+    """获取进程级全局共享的 PlaywrightCDPDriver 单例。"""
+    global _SHARED_BROWSER_DRIVER
+    if _SHARED_BROWSER_DRIVER is None:
+        _SHARED_BROWSER_DRIVER = PlaywrightCDPDriver()
+    return _SHARED_BROWSER_DRIVER
+
+
+def set_shared_browser_driver(driver: PlaywrightCDPDriver | None) -> None:
+    """设置或重置全局共享驱动单例（主要用于测试与隔离注入）。"""
+    global _SHARED_BROWSER_DRIVER
+    _SHARED_BROWSER_DRIVER = driver
+
+
+__all__ = [
+    "PlaywrightCDPDriver",
+    "get_shared_browser_driver",
+    "set_shared_browser_driver",
+]

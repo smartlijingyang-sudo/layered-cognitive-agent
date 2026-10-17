@@ -23,6 +23,7 @@ from lca.infrastructure.tools import ask_user as ask_user_module
 from lca.infrastructure.tools import environment_awareness, lca_computer
 from lca.infrastructure.tools import web_search as web_search_module
 from lca.infrastructure.tools import write_file as write_file_module
+from lca.infrastructure.tools.browser.tools import build_browser_tools
 from lca.infrastructure.tools.lca import build_tools as build_lca_tools
 from lca.infrastructure.tools.skills.tool.set import build_operational_skill_tools
 
@@ -78,6 +79,7 @@ def build_default_tools(
 
     search_tools: list[Tool] = web_search_module.build_tools(search=search)
     hil_tools: list[Tool] = ask_user_module.build_tools()
+    browser_tools: list[Tool] = build_browser_tools()
     computer: list[Tool] = []
 
     if sandbox is None and fallback:
@@ -104,6 +106,7 @@ def build_default_tools(
         return [
             *search_tools,
             *hil_tools,
+            *browser_tools,
             *computer,
             *awareness_tools,
             *build_operational_skill_tools(
@@ -118,6 +121,7 @@ def build_default_tools(
     return [
         *search_tools,
         *hil_tools,
+        *browser_tools,
         *write_tools,
         *awareness_tools,
         *build_operational_skill_tools(sandbox=None, file_store=file_store, store=skill_store),
