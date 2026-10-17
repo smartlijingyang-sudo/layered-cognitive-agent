@@ -55,7 +55,7 @@ def _noop_observer(
     inputs: dict[PortName, Any],
     outputs: dict[PortName, Any],
 ) -> None:
-    return None
+    pass
 
 
 register_strategy(ObserveStrategy(observer=_noop_observer))

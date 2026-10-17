@@ -50,7 +50,6 @@ class TaskProgressProjection:
         # 不持有 caller state;fold 期间每次从空 init 重新走 events。
         # PR-A 仅暴露 ``current`` + ``confidence_history``,不引入
         # mutable projection state 概念。
-        return None
 
     def apply(self, event: SessionEvent) -> None:
         """Fold one Session event into the projection。
@@ -124,7 +123,6 @@ class TaskProgressProjection:
         # 我们没有显式记录 last_step_id(避免冗余);通过 append 时的 step_id
         # 也不在这里保留;Gate 需要 step_id 时用 Session 直接读 fold。
         # 本属性作为占位,避免调用方对命名误解;返回 None 走 no-step 路径。
-        return None
 
     def is_stuck(self, window: int = 5, threshold: float = 0.1) -> bool:
         """最近 K 步 confidence 下降 > threshold → stuck。

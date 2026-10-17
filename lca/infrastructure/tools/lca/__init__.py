@@ -47,7 +47,7 @@ class NothingToDoTool:
         )
 
     def validate(self, args: dict[str, Any]) -> str | None:
-        return None
+        pass
 
 
 def build_tools() -> list[Tool]:

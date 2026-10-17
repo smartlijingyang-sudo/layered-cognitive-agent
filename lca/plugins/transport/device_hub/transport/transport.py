@@ -75,7 +75,6 @@ class DeviceTransport(Sandbox):
 
     async def create_session(self, config: SessionConfig | None = None) -> SessionInfo | None:
         del config
-        return None
 
     async def run_in_session(
         self,

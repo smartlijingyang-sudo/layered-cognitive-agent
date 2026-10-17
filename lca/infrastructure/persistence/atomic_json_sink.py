@@ -36,7 +36,7 @@ class AtomicJsonFileSink(WriteBehindSink):
             _write_atomic(path, encoded)
 
     def close(self) -> None:
-        return
+        pass
 
 
 def _write_atomic(path: Path, encoded: str) -> None:

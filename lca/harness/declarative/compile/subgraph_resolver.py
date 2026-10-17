@@ -386,7 +386,6 @@ class BundleSubgraphResolver:
         ``PluginContextBackedRuntime`` 拿到 capability。
         """
         del factory, region
-        return None
 
 
 def _is_bundle_graph_v2(plan_ref: str) -> bool:

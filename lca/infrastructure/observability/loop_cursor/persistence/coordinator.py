@@ -103,11 +103,9 @@ class NullPersistenceCoordinator:
 
     def flush(self) -> None:
         """No-op。"""
-        return None
 
     def close(self) -> None:
         """No-op。"""
-        return None
 
     def restore(self, from_seq: int) -> Iterator[EventRecord]:
         """返回空迭代器。"""

@@ -133,7 +133,7 @@ class NullSpanHandle:
         return self
 
     def mark_error(self, message: str = "") -> None:
-        return None
+        pass
 
     def __exit__(self, _exc_type: Any, _exc: Any, _tb: Any) -> None:
-        return None
+        pass

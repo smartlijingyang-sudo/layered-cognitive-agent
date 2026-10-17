@@ -50,7 +50,7 @@ def build_default_invariant_checker() -> InvariantChecker:
                 )
 
         def check_unmount(self, name: str, meta: PluginMeta) -> None:
-            return None
+            pass
 
     return _DefaultInvariantChecker()
 

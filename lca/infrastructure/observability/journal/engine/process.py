@@ -38,10 +38,10 @@ class _BoundProcessJournal(JournalProjector):
         self._owner.publish(stamped)
 
     def flush(self) -> None:
-        return None
+        pass
 
     def close(self) -> None:
-        return None
+        pass
 
 
 __all__ = ["ProcessJournal"]

@@ -47,7 +47,6 @@ class TopologyGraphNodeExecutor(GraphNodeExecutor):
         """Preserve the declared topology marker without emitting a result."""
 
         del context
-        return None
 
 
 @plugin(

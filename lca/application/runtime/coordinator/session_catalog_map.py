@@ -226,7 +226,6 @@ def _map_approval_persisted(
     pairs). Recovery reads the journal fact directly, unaffected.
     """
     del data, parent
-    return None
 
 
 def _map_reaction_added(

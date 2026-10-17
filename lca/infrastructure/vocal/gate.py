@@ -40,7 +40,7 @@ class DirectVocalGate(VocalGateProtocol):
         pass
 
     def pending_widget_approval(self) -> WidgetApproval | None:
-        return None
+        pass
 
     def delivered_visible_texts(self) -> tuple[str, ...]:
         return tuple(str(v["content"]) for v in self._visible if v.get("content"))

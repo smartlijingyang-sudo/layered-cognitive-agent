@@ -37,10 +37,10 @@ class InMemoryJournalStore:
         return tuple(self._events[start:])
 
     def flush(self) -> None:
-        return None
+        pass
 
     def close(self) -> None:
-        return None
+        pass
 
     def __len__(self) -> int:
         return len(self._events)

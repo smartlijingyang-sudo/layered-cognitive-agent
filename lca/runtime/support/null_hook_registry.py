@@ -17,7 +17,6 @@ class NullHookRegistry(HookRegistry):
 
     async def trigger(self, event_name: str, state: AgentState, **kwargs: Any) -> None:
         del event_name, state, kwargs
-        return None
 
 
 __all__ = ["NullHookRegistry"]

@@ -394,7 +394,7 @@ class CognitiveAgent(AgentUnit):
             )
 
     async def cancel(self) -> None:
-        return None
+        pass
 
     @staticmethod
     def _enrich_run_context(ctx: RunContext | None) -> RunContext | None:

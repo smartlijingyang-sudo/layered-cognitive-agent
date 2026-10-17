@@ -285,7 +285,7 @@ def install_ctx_intercept_hook(
     if getattr(original, WRAP_INSTRUMENTED_ATTR, False):
 
         def _already_wrapped() -> None:
-            return None
+            pass
 
         return _already_wrapped
 
