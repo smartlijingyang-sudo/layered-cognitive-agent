@@ -24,6 +24,7 @@ from typing import Any, cast
 from lca.application.authoring.preset_authoring import PresetAuthoring
 from lca.contracts.harness.composition.plugin_meta import PluginMeta
 from lca.contracts.mechanisms.composition.composition import PluginMetaMissing
+from lca.contracts.models.core.execution.sandbox import SANDBOX_MOUNT_ROOT
 
 
 def resolve_plugin_path(path: str, *, assistant_home: Path | None = None) -> Path:
@@ -32,8 +33,8 @@ def resolve_plugin_path(path: str, *, assistant_home: Path | None = None) -> Pat
     if not p.is_file():
         if assistant_home is not None:
             # 沙箱挂载映射：沙箱内的 /mnt/data/... 物理对应 host 上的 assistant_home / workspace
-            if str(p).startswith("/mnt/data/"):
-                rel_mnt = str(p)[len("/mnt/data/") :]
+            if str(p).startswith(SANDBOX_MOUNT_ROOT + "/"):
+                rel_mnt = str(p)[len(SANDBOX_MOUNT_ROOT) + 1 :]
                 cand_mnt = assistant_home / "workspace" / rel_mnt
                 if cand_mnt.is_file():
                     return cand_mnt
