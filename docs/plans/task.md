@@ -627,9 +627,9 @@
 | BRAINSTORM-BROWSER-DESIGN-SECTIONS | 逐步呈现设计细节（Owns/Does NOT own/不变量/前后端契约）并获取审批 | Completed | 全部 4 个小节（边界与自治等级、核心架构模型与前后端契约、时序/协议/状态机、测试矩阵与不变量断言）均获用户审批通过 |
 | BRAINSTORM-BROWSER-DESIGN-DOC | 沉淀设计文档至 docs/plans/ 并提交 git | Completed | 成功落盘 docs/plans/2026-10-16-browser-preview-and-takeover-design.md 并准备 git 提交 |
 | BRAINSTORM-BROWSER-TRANSITION | 转换至实施计划制定（writing-plans） | Completed | 成功落盘实施方案 docs/plans/2026-10-16-browser-preview-and-takeover-plan.md 并分解为 6 大单流任务 |
-| BROWSER-TASK-1-CONTRACTS | [契约层] 浏览器流式与输入事件不可变 DTO 模型 (`stream.py`) | Pending | 待执行 |
-| BROWSER-TASK-2-INFRA-RELAY | [驱动中继] 原生 CDP 驱动与 Screencast 二进制帧流中继器 (`screencast_relay.py`) | Pending | 待执行 |
-| BROWSER-TASK-3-TRANSPORT | [网关通道] REST 会话发现与 WebSocket 双向流式通信插件 (`routes_browser.py`) | Pending | 待执行 |
+| BROWSER-TASK-1-CONTRACTS | [契约层] 浏览器流式与输入事件不可变 DTO 模型 (`stream.py`) | Completed | 落地 BrowserSessionSummary, BrowserInputEvent 等不可变模型，通过 test_browser_stream_contracts.py 4/4 passed，INV-BROWSER-01 达标，commit 73c5573c3 |
+| BROWSER-TASK-2-INFRA-RELAY | [驱动中继] 原生 CDP 驱动与 Screencast 二进制帧流中继器 (`screencast_relay.py`) | Completed | 落地 BrowserDriverPort 协议、CDPScreencastRelay 0x01 二进制包装与背压丢帧节流，4/4 单测全绿，INV-BROWSER-04 达标，commit 49de7d6d3 |
+| BROWSER-TASK-3-TRANSPORT | [网关通道] REST 会话发现与 WebSocket 双向流式通信插件 (`routes_browser.py`) | Completed | 落地 /lca-api/browser/sessions REST 端点与 /stream WebSocket 混合传输通道，test_browser_gateway_routes.py 2/2 全绿，INV-BROWSER-05 达标 |
 | BROWSER-TASK-4-ARBITRATION | [接管控制] 单写所有权仲裁状态机与无发声子代理守护 (`arbitration.py` & `subagent.py`) | Pending | 待执行 |
 | BROWSER-TASK-5-UI-PATCHES | [前端表现] LobeHub 聊天流预览卡片与右侧全功能抽屉补丁 (`BrowserViewerDrawer.tsx`) | Pending | 待执行 |
 | BROWSER-TASK-6-REGRESSION-E2E | [全量验收] 端到端全链路集成回归测试与架构门禁体检 (INV-01 ~ INV-06) | Pending | 待执行 |
