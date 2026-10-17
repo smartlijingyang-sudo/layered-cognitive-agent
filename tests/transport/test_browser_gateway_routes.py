@@ -9,11 +9,10 @@ from starlette.testclient import TestClient
 
 from lca.infrastructure.browser.cdp_driver import PlaywrightCDPDriver
 from lca.plugins.transport.webserver.routes_browser import (
-    close_browser_session_endpoint,
-    create_browser_session_endpoint,
-    get_browser_session_endpoint,
-    list_browser_sessions_endpoint,
-    navigate_browser_session_endpoint,
+    _WS_LCA_STREAM_PATH,
+    _WS_STREAM_PATH,
+    ROUTE_SPECS,
+    setup,
     stream_browser_session_ws,
 )
 
@@ -22,34 +21,10 @@ from lca.plugins.transport.webserver.routes_browser import (
 def test_app() -> Starlette:
     driver = PlaywrightCDPDriver()
     driver._init_cdp_for_session = AsyncMock()
-    app = Starlette(
-        routes=[
-            Route(
-                "/lca-api/browser/sessions",
-                list_browser_sessions_endpoint,
-                methods=["GET", "OPTIONS"],
-            ),
-            Route("/lca-api/browser/sessions", create_browser_session_endpoint, methods=["POST"]),
-            Route(
-                "/lca-api/browser/sessions/{session_id}",
-                get_browser_session_endpoint,
-                methods=["GET", "OPTIONS"],
-            ),
-            Route(
-                "/lca-api/browser/sessions/{session_id}/navigate",
-                navigate_browser_session_endpoint,
-                methods=["POST"],
-            ),
-            Route(
-                "/lca-api/browser/sessions/{session_id}",
-                close_browser_session_endpoint,
-                methods=["DELETE"],
-            ),
-            WebSocketRoute(
-                "/lca-api/browser/sessions/{session_id}/stream", stream_browser_session_ws
-            ),
-        ]
-    )
+    routes = [Route(spec.path, spec.handler, methods=list(spec.methods)) for spec in ROUTE_SPECS]
+    routes.append(WebSocketRoute(_WS_STREAM_PATH, stream_browser_session_ws))
+    routes.append(WebSocketRoute(_WS_LCA_STREAM_PATH, stream_browser_session_ws))
+    app = Starlette(routes=routes)
     app.state.browser_driver = driver
     return app
 
@@ -136,3 +111,54 @@ def test_browser_websocket_screencast_stream(test_app: Starlette) -> None:
 
     # 连接断开后验证客户端注销
     assert relay.client_count == 0
+
+
+def test_browser_sessions_direct_routes_and_options(test_app: Starlette) -> None:
+    """验证 /browser/* 原生短路径与 OPTIONS preflight。"""
+    client = TestClient(test_app)
+
+    # 1. OPTIONS 预检请求验证 CORS
+    opt_resp = client.options("/browser/sessions")
+    assert opt_resp.status_code == 204
+    assert opt_resp.headers.get("access-control-allow-methods") is not None
+
+    # 2. POST 创建会话
+    resp = client.post(
+        "/browser/sessions",
+        json={"session_id": "direct_sess_01", "initial_url": "https://news.ycombinator.com"},
+    )
+    assert resp.status_code == 201
+    assert resp.json()["session_id"] == "direct_sess_01"
+
+    # 3. GET 查询会话列表
+    list_resp = client.get("/browser/sessions")
+    assert list_resp.status_code == 200
+    sessions = list_resp.json()["sessions"]
+    assert any(s["session_id"] == "direct_sess_01" for s in sessions)
+
+    # 4. DELETE 关闭会话
+    del_resp = client.delete("/browser/sessions/direct_sess_01")
+    assert del_resp.status_code == 200
+    assert del_resp.json()["closed"] is True
+
+
+@pytest.mark.asyncio
+async def test_browser_routes_plugin_setup_contract() -> None:
+    """验证 lca-gateway-routes-browser 插件 setup 装配契约。"""
+    from unittest.mock import MagicMock
+
+    meta = getattr(setup, "meta", None)
+    assert meta is not None
+    assert meta["id"] == "lca-gateway-routes-browser"
+    assert meta["provides"] == []  # 确保为空，不破坏 plan binding
+    assert "route_registry" in meta["requires"]
+
+    mock_registry = MagicMock()
+    mock_ctx = MagicMock()
+    mock_ctx.require.return_value = mock_registry
+    mock_runtime = MagicMock()
+    mock_ctx._runtime.return_value = mock_runtime
+
+    await setup.setup(mock_ctx, {})
+    assert mock_registry.register_http.call_count >= 1
+    assert mock_registry.register_websocket.call_count == 2
