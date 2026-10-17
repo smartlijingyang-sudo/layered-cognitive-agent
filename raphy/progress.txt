@@ -1,5 +1,16 @@
 ## Codebase Patterns
 
+- **伪造结果钉进测试 = 把谎言变成契约（RA-146 认领）：**
+  interface 声称执行、实现伪造结果时，`assert result.success is True`
+  之类的测试钉的是伪造值。"The interface is the test surface"——
+  测不出真实行为的 interface 本身是错的；修法：删伪造分支、
+  走共享执行 seam，测试换 recording fake executor 钉住真实交互。
+- **assess prompt 的 smoke 命令会过期（2026-10-18 轮教训）：**
+  prompt 里写死的 `Agent(tools=[], llm=...)` 在新 API 下直接 TypeError
+  （缺 role/goal/backstory），导致每轮“运行时验证”必挂。prompt 是
+  raphy 自己的工具，按“修工具本身”原则在评估 commit 里直接修掉并
+  验证；API 再变时先修 prompt 再记 pattern。
+
 - **双胞胎收敛的 seam 选址：优先塞进"同类家园"而非新建模块（RA-139 实证）：**
   `_required_grant` 双胞胎收进 `access/approved_tools.py`（`canonical_tool_name`
   的同类授权探针家园）并包级导出——评估说的"新建公共函数"落到已有模块是
@@ -3910,3 +3921,28 @@ brain/reducer/memory/hub/standing_refresher 等键，待 RA-123 落地后再评�
   - Pin 测试是验收的一部分：上一轮只改了代码没加 pin 测试，按验收标准故事不算
     done —— 实现与 pin 测试必须同一次 commit 落盘。
 ---
+
+---
+
+## 2026-10-18 00:15 (CST) - assess round `raphy/arch-20261017-0001` (RA-146)
+
+- Basis: main tip `fcf050a63`, clean worktree `~/.lca-worktrees/raphy-20261017-0001`.
+  No raphy branches, no open stories (RA-001..RA-145 all pass; RA-132 dropped).
+- Friction walk (3 areas, read end-to-end): (A) browser subagent layer — found
+  the round's candidate; (B) `lca/plugins/tools/cordis_control/loader.py` — passes
+  deletion test, no friction; (C) `lca/infrastructure/tool_defer/tool_search.py` —
+  already converged by RA-018, no friction.
+- Runtime verification on the clean worktree: basic run COMPLETED, two sequential
+  runs COMPLETED, browser e2e (tool-call path)
+  `tests/scenario/browser/test_browser_preview_and_takeover_e2e.py` 1 passed. No P0.
+- Round tooling fix (inside `raphy/`, no product code): the assess prompt's smoke
+  command was stale (Agent API now requires role/goal/backstory; old form TypeErrors)
+  — fixed in `raphy/prompts/raphy-assess.md`, verified on this tip.
+- **Learnings for future iterations:**
+  - 主树脏时评估只读 main 基线：agy/grok 的未提交内容（本轮是 browser task 层）
+    不当成“已存在的代码”来评估；故事必须注明协调约束
+    （OPTIMIZE 前先 `git status` 确认无并发修改）。
+  - 凭借“存在测试”判断模块是否“有用”时先看测试钉住的是
+    行为还是伪造值——钉住伪造值的测试不计作存在证明。
+---
+

@@ -336,3 +336,167 @@ Environment: clean worktree at main tip `5319d969d`,
 `LoopObligationExceededError` out of `agent.run()`) is **verified fixed**
 on this tip: the loop driver now converts it to `Result(status=failed)`
 with `max_steps` honored. No P0 candidate this round.
+
+
+# Raphy Assessment — 2026-10-18 00:15 round (`raphy/arch-20261017-0001`)
+
+Basis: main tip `fcf050a63` (clean worktree at `~/.lca-worktrees/raphy-20261017-0001`).
+No raphy branches, no open stories (RA-001..RA-145 all pass; RA-132 dropped).
+3 hot areas read end-to-end; runtime verification on the clean worktree with
+`LLM_API_KEY=<redacted> A tooling fix to raphy's own machinery (inside `raphy/`)
+rode along in this commit — see "Round tooling" below. No product code outside
+`raphy/` touched.
+
+## Phase 1 — Explore
+
+### Hot-spot scan (`git log --oneline -40`)
+
+1. **Browser integration** (dominant): Muse browser task layer + CDP driver
+   (`f16373216`), circular-import fix (`59d223b05`), browser gateway routes
+   (`2046c6fe8`, `f0b795b56`), grok browser preview/takeover (`bf2faf54f`),
+   INV-01 browser-namespace pin 10->11 (`788097f21`), defer-policy pin tracking
+   ADR-0280 (`955565773`).
+2. **iter-quality / iter-tests**: approval shell fallthrough (`8c1624fc7`),
+   RecursiveRunner ForwardRef drop (`c0f852044`), SANDBOX_MOUNT_ROOT literal
+   (`f2ebefc59`).
+3. **cordis creator assistant** (`41e92781e`): dynamic bridge + preset
+   registration; cordis_control loader touched twice.
+
+In-flight uncommitted work on the main worktree (not in this tip):
+`lca/infrastructure/browser/cdp_driver.py`,
+`lca/infrastructure/tools/browser/{__init__,tools}.py`,
+`lca/contracts/models/browser/models.py`,
+`lca/plugins/transport/webserver/routes_browser.py`, browser lobehub patches,
+`lca/infrastructure/tool_defer/policy.py` (+ untracked
+`lca/infrastructure/tools/browser/task_store.py`) — assessed against the tip;
+any OPTIMIZE touching the browser task path must rebase/confirm against whatever
+lands there first.
+
+Hot areas chosen for the friction walk: (A) the browser subagent layer
+(`lca/infrastructure/browser/{subagent,arbitration,__init__}.py`,
+`lca/contracts/models/browser/stream.py`), (B) the cordis_control plugin loader
+(`lca/plugins/tools/cordis_control/loader.py`), (C) the defer tool-search tool
+(`lca/infrastructure/tool_defer/tool_search.py`).
+
+### Organic friction walk
+
+#### Area A — browser subagent layer
+
+1. **Bouncing between small modules?** No. `BrowserSubagent` (117L),
+   `BrowserArbitrationEngine` (87L), stream contracts (104L) are each
+   single-purpose; following "one browser action executes" stays within
+   `subagent.py`.
+2. **Shallow modules?** Yes — `BrowserSubagent.execute_action`: its docstring claims
+   real single-step execution under the desktop lock, but the body fabricates
+   outcomes: NAVIGATE → `title="Navigated Page"`, CLICK/TYPE → f-strings echoing
+   the input, SCREENSHOT → a fresh `art_screenshot` id with no artifact written.
+   The real execution lives in the browser tools/CDP path. The interface *claims*
+   execution; the implementation performs none. (This round's deepening candidate.)
+3. **Pure functions extracted for testability?** No.
+4. **Leaky seams?** The constructor's lazy
+   `from lca.infrastructure.tools.browser.tools import build_browser_tools`
+   (`59d223b05`) dodges a module cycle between `infrastructure.browser` and
+   `infrastructure.tools.browser`. Deferred import is the accepted idiom here
+   (per RA-032 notes); the deeper fix — constructor injection of the executor —
+   is folded into RA-146 rather than opened separately.
+5. **Testability?** `test_browser_subagent_action_execution_with_desktop_lock`
+   pins the fabrication (`assert result.success is True`, `assert result.url == ...`).
+   "The interface is the test surface": the test cannot exercise real behavior
+   through the interface because there is none behind it. Must be rewritten with
+   a recording fake executor when RA-146 lands.
+
+`BrowserArbitrationEngine`: clean 4-state machine
+(IDLE/AGENT_RUNNING/HUMAN_TAKEOVER/CLOSED), input gating per INV-BROWSER-03;
+no friction. `stream.py`: frozen pydantic contracts plus one pure function
+(`normalize_viewport_coordinates`, INV-BROWSER-06); no friction.
+
+#### Area B — cordis_control loader (143L)
+
+1–5. No friction. `resolve_plugin_path` has five fallback branches, but each
+concentrates a distinct resolution policy (sandbox-mount mapping → assistant_home
+mapping → direct workspace path); the deletion test says each branch earns its
+existence. The `sys.path.insert/remove` dance in `extract_plugin_factory` is the
+idiomatic dynamic-import ritual, bounded by `try/finally`. The helpers exist to
+keep the Tool class under the §8.2 250-line constitutional cap — the split is
+load-bearing, not shallow sprawl.
+
+#### Area C — tool_search (176L)
+
+Already converged by RA-018 (shared `_classify_args` arg-shape classifier;
+fail-kind classification per docs/specs/tool-failure-recovery.md §3). No new
+friction. The INV-01 namespace-count pins (`assert len(catalog_lines) == 11`) are
+test-tracking churn, not an architectural seam.
+
+### Runtime verification (clean worktree, tip `fcf050a63`)
+
+Note: the prompt's prescribed smoke command was stale — current `Agent()`
+requires `role`/`goal`/`backstory` (TypeError on the old form). Fixed in
+`raphy/prompts/raphy-assess.md` this round (see below); verification used the
+fixed form.
+
+- (a) basic run with `MockLLMAdapter`: COMPLETED.
+- (c) two sequential runs on one agent: both COMPLETED.
+- (b) tool-call path: `tests/scenario/browser/test_browser_preview_and_takeover_e2e.py`
+  (exercises the browser task layer with tools): 1 passed.
+- No crash/hang/silent-failure → no P0.
+
+### Duplication scan
+
+No new clusters. (tool_search arg classification already converged; namespace
+pins are count assertions, not a seam.)
+
+## Phase 2 — Self-grilling (RA-146)
+
+**Candidate: converge `BrowserSubagent.execute_action` onto the shared
+browser-task execution seam via constructor injection.**
+
+- **Constraints**: INV-05 (subagent must never hold vocal tools — the name-filter
+  stays, applied to injected tools); INV-06 (desktop-lock mutual exclusion +
+  TTL); INV-BROWSER-03 arbitration states (`start_agent_task` /
+  `release_to_agent` around execution); ADR-0248 §5.3 subagent architecture.
+  The behavior change is intended *only* in that fabricated results become real
+  executions — no consumer may depend on the fabricated strings.
+- **Dependencies**: callers constructing `BrowserSubagent(agent_id=...)` (grok
+  closed-loop tests, preview/takeover e2e) must pass an executor; the browser
+  tools/CDP seam (`build_browser_tools`, driver) is the natural executor source
+  — but it has **in-flight uncommitted work** (`task_store.py` untracked,
+  `tools.py` dirty): the OPTIMIZE round must `git status` first and
+  rebase/confirm against whatever lands.
+- **Shape of the deepened module**: `__init__(..., tools: list[Tool] | None =
+  None, action_executor: Callable[[BrowserAction], BrowserActionResult] | None =
+  None)`; `execute_action` keeps the lock/arbitration ritual and delegates
+  dispatch to the executor; the six fabricated `if action.action_type == ...`
+  branches are deleted; the lazy `build_browser_tools` import disappears (the
+  module cycle is gone — nothing in `infrastructure.browser` imports
+  `infrastructure.tools.browser` anymore).
+- **Test survival**: `test_inv_05_browser_subagent_vocal_isolation` unchanged
+  (filter applies to injected tools);
+  `test_browser_subagent_action_execution_with_desktop_lock` rewritten with a
+  recording fake executor asserting the delegated action + lock release;
+  `test_inv_06_desktop_lock_mutual_exclusion_and_ttl` untouched.
+- **Deletion test verdict**: deleting the fabricated branches concentrates all
+  real dispatch behind the executor seam — the stub code earns nothing;
+  verdict: delete.
+
+| Files | Problem | Solution | Benefits | Strength |
+|---|---|---|---|---|
+| `lca/infrastructure/browser/subagent.py`, `tests/infrastructure/browser/test_browser_subagent.py` | `execute_action` fabricates browser-action outcomes (hardcoded titles, f-string echoes) while the interface claims real execution; tests pin the fabrication; the constructor lazily imports `build_browser_tools` to dodge the 59d223b05 module cycle | Inject the action executor + filtered tool list via constructor; `execute_action` keeps the lock/arbitration ritual, delegates dispatch to the shared seam; delete fabricated branches and the lazy import | Locality: one real execution path instead of stub-vs-tools two-path reality; leverage: the subagent interface becomes testable through a recording fake ("the interface is the test surface"); the `infrastructure.browser ↔ tools.browser` cycle is eliminated at the source | Strong |
+
+Top recommendation: RA-146 first — it is the only friction-walk finding with
+real teeth (a module whose interface claims execution it never performs), it
+satisfies the diversity quota (shallow-module/testability gap, not duplication),
+and it removes the deferred-import cycle workaround as a side effect. Coordinate
+with the in-flight browser task work before implementing.
+
+## Phase 3 — Record
+
+- Story written: RA-146 (`passes: false`, P2).
+- Assessment: this file. Summary: progress.txt.
+- Round tooling (inside `raphy/`, no product code): fixed the stale
+  runtime-verification command in `raphy/prompts/raphy-assess.md` — the old
+  one-liner references the pre-`role`/`goal`/`backstory` `Agent()` API and fails
+  with TypeError; replaced with the verified multi-line form (verified on tip
+  `fcf050a63` in this round's clean worktree) and noted the clean-worktree
+  requirement when the main tree is dirty.
+
+Assessment complete: 1 story written, top is RA-146.

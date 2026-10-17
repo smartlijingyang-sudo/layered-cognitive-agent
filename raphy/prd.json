@@ -2150,6 +2150,22 @@
       "priority": "P2",
       "title": "One namespace-aware tool-name canonicalization seam (resolves RA-132's mangling trap)",
       "notes": "recover: 2026-10-15 01:45 round recovered uncommitted residue from interrupted round; added RA-132 regression pin tests."
+    },
+    {
+      "acceptanceCriteria": [
+        "BrowserSubagent.__init__ takes the filtered tool list and an action executor (BrowserAction -> BrowserActionResult) via constructor parameters; subagent.py no longer imports lca.infrastructure.tools.browser (the 59d223b05 lazy-import cycle disappears).",
+        "execute_action keeps the desktop-lock acquire/release ritual and the arbitration start_agent_task/release_to_agent calls, but delegates action dispatch to the injected executor; the six fabricated branches (NAVIGATE/CLICK/TYPE/SCREENSHOT/CLOSE/fallthrough) are deleted.",
+        "INV-05 vocal isolation still enforced on the injected tool list (send_message filtered); INV-06 lock semantics unchanged.",
+        "Tests: the fabrication-pinning test (test_browser_subagent_action_execution_with_desktop_lock) is rewritten with a recording fake executor asserting the delegated action + lock release; test_inv_05_browser_subagent_vocal_isolation stays green; `ruff check` clean.",
+        "Coordination: implement against the committed baseline; the browser task path (lca/infrastructure/tools/browser/) has in-flight uncommitted work (task_store.py) — the OPTIMIZE round must `git status` and rebase/confirm before touching."
+      ],
+      "branchName": "raphy/arch-20261017-0001",
+      "description": "As an LCA maintainer, I want one real browser-action execution path, because BrowserSubagent.execute_action (lca/infrastructure/browser/subagent.py) fabricates outcomes -- NAVIGATE returns title='Navigated Page', CLICK/TYPE return f-strings echoing the input, SCREENSHOT mints an artifact id without writing any artifact -- while its docstring claims real single-step execution under the desktop lock, and the real execution lives in the browser tools/CDP path: two execution paths, one of them a lie. The existing test pins the fabrication instead of behavior, so the interface cannot be tested through for real outcomes ('the interface is the test surface'). The constructor also lazily imports build_browser_tools to dodge the 59d223b05 module cycle between infrastructure.browser and infrastructure.tools.browser -- a leaked seam. Deepening: inject the executor + filtered tools via constructor (DI), keep the lock/arbitration ritual in execute_action, delete the fabricated branches, route dispatch through the shared execution seam; the lazy import and the cycle go away with it.",
+      "id": "RA-146",
+      "passes": false,
+      "priority": "P2",
+      "title": "Converge BrowserSubagent's fabricated action results onto the shared browser-task execution seam (constructor-injected executor)",
+      "notes": "Strength: Strong. Area A friction walk (browser subagent layer), fabricated-results interface + testability gap class; kills the 59d223b05 lazy-import cycle as a side effect. Evidence: subagent.py execute_action branches; pinning test tests/infrastructure/browser/test_browser_subagent.py::test_browser_subagent_action_execution_with_desktop_lock."
     }
   ]
 }
