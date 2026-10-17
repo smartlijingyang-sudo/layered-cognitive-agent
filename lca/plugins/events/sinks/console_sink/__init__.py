@@ -130,7 +130,7 @@ class ConsoleSink:
             log.exception("spine.console.write_event failed event_id=%s", event_id)
 
     def close(self) -> None:
-        return
+        pass
 
 
 @plugin(

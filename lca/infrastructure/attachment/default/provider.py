@@ -352,7 +352,6 @@ class DefaultAttachmentPromptRenderer:
 
 def install_attachment_default_plugins() -> None:  # pragma: no cover - hook
     """No-op stub; the real registration lives in the plugin loader PR-D."""
-    return None
 
 
 # Module-level convenience used by the existing seam glue:

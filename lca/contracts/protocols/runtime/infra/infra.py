@@ -54,7 +54,6 @@ class LLMAdapter(Protocol):
         拥有具体模型 id 的适配器返回它；纯委托 wrapper 可不覆写（默认
         ``None``，:func:`_model_label` 回退到 ``name`` / 类型名）。
         """
-        return None
 
 
 @runtime_checkable
@@ -78,7 +77,6 @@ class Tool(Protocol):
 
     def validate(self, args: dict[str, Any]) -> str | None:
         """可选前置校验：返回 None 表示合法，返回错误字符串表示非法。"""
-        return None  # pragma: no cover
 
 
 @runtime_checkable

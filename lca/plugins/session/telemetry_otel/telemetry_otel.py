@@ -329,7 +329,7 @@ class _NoOpExporter:
         return True
 
     def shutdown(self) -> None:
-        return None
+        pass
 
 
 def _ms_to_ns(ms: int) -> int:

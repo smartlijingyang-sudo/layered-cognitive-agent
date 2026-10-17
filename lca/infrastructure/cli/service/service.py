@@ -136,4 +136,3 @@ class Service(Protocol):
         Currently only ``KernelServeService`` overrides this (ADR-0213 PR-3:
         ``stack.heal`` drives ``spawner().run()`` directly).
         """
-        return None

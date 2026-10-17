@@ -39,13 +39,13 @@ class _NoopReader:
     """Langfuse placeholder：on_event/flush/close 全部空实现。"""
 
     def on_event(self, stamped: StampedEvent) -> None:
-        return None
+        pass
 
     def flush(self) -> None:
-        return None
+        pass
 
     def close(self) -> None:
-        return None
+        pass
 
 
 @plugin(

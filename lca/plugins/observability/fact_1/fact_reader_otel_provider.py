@@ -79,7 +79,6 @@ async def setup(ctx: PluginContext, config: Config) -> None:
     plugin id). The :class:`NamedRegistry` slot for ``fact_readers`` is
     registered but its ``otel`` factory is the no-op :func:`_make_otel_reader`.
     """
-    return None  # explicit no-op for static analysers
 
 
 def _make_otel_reader(
@@ -90,4 +89,3 @@ def _make_otel_reader(
 ) -> JournalProjector | None:
     """Stub reader (returns ``None``); Session observers own OTel."""
     del settings, tracer, unused
-    return None

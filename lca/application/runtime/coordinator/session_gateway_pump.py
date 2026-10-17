@@ -46,7 +46,7 @@ def _suppress_duplicate_event(
     _data: dict[str, Any],
     _parent: str | None,
 ) -> dict[str, Any] | None:
-    return None
+    pass
 
 
 def _convert_execution_point_event(

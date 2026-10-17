@@ -133,7 +133,7 @@ class LiveTail(JournalProjector):
             self._subscribers.pop(idx)
 
     def flush(self) -> None:
-        return None
+        pass
 
     async def subscribe(self, after_seq: int = 0) -> AsyncIterator[StampedEvent | LiveGap]:
         """Register first, then replay, then live — no drop window."""

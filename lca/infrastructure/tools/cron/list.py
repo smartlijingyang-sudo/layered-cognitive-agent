@@ -34,7 +34,6 @@ class CronListTool:
 
     def validate(self, args: dict[str, Any]) -> str | None:
         del args
-        return None
 
     async def execute(self, args: dict[str, Any]) -> Observation:
         del args

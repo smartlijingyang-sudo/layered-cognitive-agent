@@ -42,7 +42,7 @@ def _safe_logger() -> Any:
 
         class _Stub:
             def debug(self, *args: object, **kwargs: object) -> None:
-                return None
+                pass
 
         return _Stub()
 

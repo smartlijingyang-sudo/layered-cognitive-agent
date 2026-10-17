@@ -268,7 +268,6 @@ class DefaultFactGateway:
     def append_diagnostic(self, diag: Any) -> AppendReceipt | None:
         """诊断事实默认不落盘(no-op)。"""
         del diag
-        return None
 
 
 def append_catalog_bound(

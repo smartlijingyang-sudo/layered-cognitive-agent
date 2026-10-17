@@ -196,7 +196,7 @@ class NullStorage:
         del payload
 
     def close(self) -> None:
-        return None
+        pass
 
 
 class RoutingFileStorage:

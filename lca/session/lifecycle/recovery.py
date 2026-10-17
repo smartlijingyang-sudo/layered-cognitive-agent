@@ -168,7 +168,6 @@ def _resolve_pending(
     approved = event.data.get("approved")
     if not isinstance(approved, bool):
         raise SessionRecoveryError("approval.resolved.v1 requires a boolean approved flag")
-    return None
 
 
 __all__ = [

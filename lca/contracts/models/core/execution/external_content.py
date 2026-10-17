@@ -186,4 +186,3 @@ def assert_standing_writer_permitted(origin: ContentOrigin, path: str) -> None:
             f"refused: {path!r} is a standing file; external content is not a "
             f"legitimate writer ({_STANDING_WRITER_NOTE}). ADR-0292 C2-④."
         )
-    return None

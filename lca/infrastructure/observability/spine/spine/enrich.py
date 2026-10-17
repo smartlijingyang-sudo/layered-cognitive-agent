@@ -71,7 +71,6 @@ class EnrichResult:
 
 def _noop(*args: Any, **kwargs: Any) -> Any:
     del args, kwargs
-    return None
 
 
 _NO_OP_FN: Any = _noop
