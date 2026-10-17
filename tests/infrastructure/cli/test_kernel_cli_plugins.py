@@ -46,11 +46,13 @@ def test_kernel_plugins_lists_all_enabled(runner: CliRunner) -> None:
     # 2026-10-04: L2 89->90 (ADR-0283 think.context.summarize, deliberate);
     # 2026-10-09: L0 59->57 (RA-061 c498be636: archived the decorative debug
     # plugin seam lca-cli-debug-command-seam + lca-cli-debug-trace, deliberate)).
+    # 2026-10-17: L1 82->83 (browser gateway routes: lca-gateway-routes-browser
+    # registered by the browser preview/takeover feature, deliberate).
     # The catalog evolves intentionally (e.g. proactive three-layer
     # mechanism 14b0d5621); the --json cross-check test below guards
     # against real regressions, this one guards the human-readable form.
     assert "L0 (57)" in result.stdout, result.stdout
-    assert "L1 (82)" in result.stdout, result.stdout
+    assert "L1 (83)" in result.stdout, result.stdout
     assert "L2 (90)" in result.stdout, result.stdout
     # Sample plugin ids from each layer appear under their group.
     assert "lca-decision-classifier-seam" in result.stdout
