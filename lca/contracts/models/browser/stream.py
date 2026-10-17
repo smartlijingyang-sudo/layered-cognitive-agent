@@ -79,6 +79,20 @@ class BrowserSessionSummary(BaseModel):
     has_active_stream: bool = False
 
 
+def normalize_viewport_coordinates(
+    x: float,
+    y: float,
+    viewport_width: float,
+    viewport_height: float,
+) -> tuple[float, float]:
+    """将物理视口像素坐标归一化映射至 [0.0, 1.0] 闭区间 (INV-BROWSER-06)。"""
+    if viewport_width <= 0.0 or viewport_height <= 0.0:
+        return 0.0, 0.0
+    norm_x = max(0.0, min(1.0, float(x) / float(viewport_width)))
+    norm_y = max(0.0, min(1.0, float(y) / float(viewport_height)))
+    return round(norm_x, 6), round(norm_y, 6)
+
+
 __all__ = [
     "BrowserControlAction",
     "BrowserControlActionType",
@@ -86,4 +100,5 @@ __all__ = [
     "BrowserInputEventType",
     "BrowserSessionStatus",
     "BrowserSessionSummary",
+    "normalize_viewport_coordinates",
 ]

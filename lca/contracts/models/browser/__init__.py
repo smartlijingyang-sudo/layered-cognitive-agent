@@ -13,6 +13,7 @@ from lca.contracts.models.browser.stream import (
     BrowserInputEventType,
     BrowserSessionStatus,
     BrowserSessionSummary,
+    normalize_viewport_coordinates,
 )
 
 __all__ = [
@@ -26,4 +27,5 @@ __all__ = [
     "BrowserSessionStatus",
     "BrowserSessionSummary",
     "DesktopLock",
+    "normalize_viewport_coordinates",
 ]

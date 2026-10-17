@@ -631,7 +631,7 @@
 | BROWSER-TASK-2-INFRA-RELAY | [驱动中继] 原生 CDP 驱动与 Screencast 二进制帧流中继器 (`screencast_relay.py`) | Completed | 落地 BrowserDriverPort 协议、CDPScreencastRelay 0x01 二进制包装与背压丢帧节流，4/4 单测全绿，INV-BROWSER-04 达标，commit 49de7d6d3 |
 | BROWSER-TASK-3-TRANSPORT | [网关通道] REST 会话发现与 WebSocket 双向流式通信插件 (`routes_browser.py`) | Completed | 落地 /lca-api/browser/sessions REST 端点与 /stream WebSocket 混合传输通道，test_browser_gateway_routes.py 2/2 全绿，INV-BROWSER-05 达标 |
 | BROWSER-TASK-4-ARBITRATION | [接管控制] 单写所有权仲裁状态机与无发声子代理守护 (`arbitration.py` & `subagent.py`) | Completed | 落地 BrowserArbitrationEngine 状态机，维护 INV-BROWSER-02/03，单测 10/10 全绿 |
-| BROWSER-TASK-5-UI-PATCHES | [前端表现] LobeHub 聊天流预览卡片与右侧全功能抽屉补丁 (`BrowserViewerDrawer.tsx`) | Pending | 待执行 |
+| BROWSER-TASK-5-UI-PATCHES | [前端表现] LobeHub 聊天流预览卡片与右侧全功能抽屉补丁 (`BrowserViewerDrawer.tsx`) | Completed | 落地 BrowserPreviewCard, BrowserViewerDrawer 补丁，通过 48/48 补丁校验，单测 2/2 全绿，INV-BROWSER-06 达标 |
 | BROWSER-TASK-6-REGRESSION-E2E | [全量验收] 端到端全链路集成回归测试与架构门禁体检 (INV-01 ~ INV-06) | Pending | 待执行 |
 | BRAINSTORM-DESLOP-100-QUESTIONS | 澄清「100次真实优化与去冗」的具体目标、执行载体与边界（单步提问） | Completed | 用户明确选定：基于 ADR-0293 与 improve-codebase-architecture 开启全新一轮 Raphy 架构加深与去冗循环，派生高质量真实优化故事集并单流交付 |
 | BRAINSTORM-DESLOP-100-APPROACHES | 提出 2-3 种大规模去冗与深度优化实施方案及权衡对比 | Completed | 用户明确确认选定方案 A（波次渐进 Raphy 循环，Batch-Wave Loop，每波 5~10 stories 动态评估与落地） |
