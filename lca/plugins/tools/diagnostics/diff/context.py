@@ -22,8 +22,7 @@ class DiffContext(DiffContextTool):
 
     def diff(self, *, run_id: str, step: int = 0) -> ContextDiff:
         inspector = _load_inspector_from_jsonl(self._path)
-        events = inspector.events
-        events = [e for e in events if str(e.scope.run_id) == run_id]
+        events = [e for e in inspector.events if str(e.scope.run_id) == run_id]
         steps = sorted({e.scope.step for e in events})
         if not steps or step not in steps:
             return ContextDiff(run_id=run_id, step_a=step, step_b=step)
