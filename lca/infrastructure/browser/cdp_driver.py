@@ -14,6 +14,7 @@ from lca.contracts.models.browser.stream import (
     BrowserSessionSummary,
 )
 from lca.contracts.protocols.browser import BrowserDriverPort
+from lca.infrastructure.browser.arbitration import BrowserArbitrationEngine
 from lca.infrastructure.browser.screencast_relay import CDPScreencastRelay
 
 logger = logging.getLogger(__name__)
@@ -33,10 +34,12 @@ class PlaywrightCDPDriver(BrowserDriverPort):
         headless: bool = True,
         viewport_width: int = 1280,
         viewport_height: int = 800,
+        arbitration_engine: BrowserArbitrationEngine | None = None,
     ) -> None:
         self.headless = headless
         self.default_width = viewport_width
         self.default_height = viewport_height
+        self.arbitration_engine = arbitration_engine
         self._sessions: dict[str, BrowserSessionSummary] = {}
         self._relays: dict[str, CDPScreencastRelay] = {}
         self._pages: dict[str, Any] = {}
@@ -197,6 +200,11 @@ class PlaywrightCDPDriver(BrowserDriverPort):
 
     async def dispatch_input(self, session_id: str, event: BrowserInputEvent) -> bool:
         """向底层 CDP 注入鼠标或键盘事件。"""
+        if self.arbitration_engine is not None:
+            decision = self.arbitration_engine.evaluate_input(session_id, event)
+            if not decision.allowed:
+                return False
+
         cdp = self._cdp_sessions.get(session_id)
         if cdp is None:
             return True
