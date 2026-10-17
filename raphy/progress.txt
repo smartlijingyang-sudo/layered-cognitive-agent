@@ -3946,3 +3946,36 @@ brain/reducer/memory/hub/standing_refresher 等键，待 RA-123 落地后再评�
     行为还是伪造值——钉住伪造值的测试不计作存在证明。
 ---
 
+## 2026-10-18 01:08 CST - RA-146
+- What was implemented: BrowserSubagent 构造函数改为 DI（tools + action_executor
+  注入）；execute_action 保留桌面锁抢占/释放 + 仲裁 start/release 仪式，分发走
+  注入的 executor，六个伪造分支（NAVIGATE/CLICK/TYPE/SCREENSHOT/CLOSE/fallthrough）
+  全部删除；subagent.py 不再 import lca.infrastructure.tools.browser（59d223b05
+  lazy-import 循环消除）。新增 lca/infrastructure/tools/browser/executor.py::
+  build_browser_action_executor 作为生产 executor 源：BrowserAction ->
+  真实浏览器工具 execute -> Observation，从各工具 res.model_dump() payload
+  恢复真实 BrowserActionResult；无支撑工具的动作（TYPE/EXTRACT_TEXT）fail-closed
+  诚实失败。INV-05 过滤施加在注入工具集上；INV-06 锁语义不变。
+- Files changed:
+  - lca/infrastructure/browser/subagent.py（重写：DI + 删伪造分支 + 删 lazy import）
+  - lca/infrastructure/tools/browser/executor.py（新增：共享执行 seam）
+  - tests/infrastructure/browser/test_browser_subagent.py（重写：recording fake
+    executor 钉真实交互 + 未注入 fail-closed + 同步 executor 兼容）
+  - tests/infrastructure/tools/browser/test_browser_action_executor.py（新增：
+    seam 分发/结果恢复/fail-closed 4 用例）
+  - tests/infrastructure/browser/test_browser_subagent_purity.py、
+    tests/scenario/adr0248/test_grok_bot_production_closed_loop.py（inv_05）、
+    tests/scenario/browser/test_browser_preview_and_takeover_e2e.py（构造注入
+    build_browser_tools()，断言不变）
+- Tests: 9 passed（3 单元文件）+ 2 passed（inv_05 + e2e）；ruff check 全 clean。
+- **Learnings for future iterations:**
+  - DI 化后测试同时 import subagent 和 tools.browser 无 import-time 循环（已实证），
+    lazy import workaround 可直接删，不必留。
+  - executor 同步/异步兼容：inspect.isawaitable 分发，同时兼容评估写的同步签名
+    和真实 seam 的异步实现。
+  - 伪造值残留检查：grep 全仓 "Navigated Page" 等伪造字符串；cdp_driver.py:212
+    的同名字符串是真实路径的防御性 fallback，不属 RA-146 范围，未动。
+  - 协作：在途未提交改动在 tools/browser/（task_store.py 未跟踪、tools.py/
+    __init__.py 被改）→ 新 seam 放新文件 executor.py 而非改 tools.py，避免合入
+    摩擦；实现基线为 committed fcf050a63，主树未碰，合并顺延。
+---
