@@ -181,7 +181,10 @@ def test_inv_05_unloaded_namespace_wire_gate_blocking() -> None:
         block_obs = unexposed_tool_block_observation(decision, session)
         assert block_obs is not None
         assert block_obs.success is False
-        assert "namespace 'shell' is not loaded this turn" in (block_obs.error or "")
+        # RA-143 reworded the block message (more specific); intent unchanged.
+        assert "belongs to deferred namespace 'shell' which is not loaded this turn" in (
+            block_obs.error or ""
+        )
         assert "Call tool_search for its namespace before using it." in (block_obs.error or "")
     finally:
         reset_current_defer_session(token)
