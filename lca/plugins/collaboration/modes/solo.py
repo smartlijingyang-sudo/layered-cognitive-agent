@@ -47,8 +47,13 @@ _CREATOR_HOST_TOOLS = frozenset(
 
 
 def filter_solo_tools(tools: Sequence[Tool]) -> tuple[Tool, ...]:
-    """Drop Creator host-CWD primitives; keep the sandbox computer set."""
-    return tuple(tool for tool in tools if tool.name not in _CREATOR_HOST_TOOLS)
+    """Drop Creator host-CWD primitives; keep sandbox computer set and assistant-scoped creator tools."""
+    return tuple(
+        tool
+        for tool in tools
+        if tool.name not in _CREATOR_HOST_TOOLS
+        or (tool.name == "cordis_control" and getattr(tool, "_assistant_home", None) is not None)
+    )
 
 
 class Config(BaseModel):

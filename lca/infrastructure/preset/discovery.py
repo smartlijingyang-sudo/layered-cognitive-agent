@@ -162,6 +162,8 @@ class AssistantPresetDiscovery:
         """Dynamically load and adapt a plugin into a Tool instance."""
         plugin_file = preset_dir / "plugins" / f"{plugin.name}.py"
         if not plugin_file.is_file():
+            plugin_file = preset_dir / f"{plugin.name}.py"
+        if not plugin_file.is_file():
             return None
 
         module_name = f"lca_presets._autonomous.{preset_dir.name}.{plugin.name}"
@@ -174,12 +176,20 @@ class AssistantPresetDiscovery:
         spec.loader.exec_module(module)
 
         # 1. Check for factory
-        factory_fn = getattr(module, "factory", None) or getattr(module, f"{plugin.name}_factory", None)
+        factory_fn = getattr(module, "factory", None) or getattr(
+            module, f"{plugin.name}_factory", None
+        )
         target_fn: Any = None
         if factory_fn is not None and callable(factory_fn):
             target_fn = factory_fn()
         else:
             target_fn = getattr(module, plugin.name, None) or getattr(module, "run", None)
+            if target_fn is None:
+                for candidate in ("analyze", "execute", "handler", "main"):
+                    fn = getattr(module, candidate, None)
+                    if callable(fn):
+                        target_fn = fn
+                        break
 
         if target_fn is None:
             raise AttributeError(

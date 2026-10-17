@@ -130,14 +130,10 @@ class FileSystemPresetRepository(PresetRepositoryProtocol):
 
         candidates: list[tuple[PresetScope, Path]] = []
         if scope is not None:
-            candidates.append(
-                (scope, self._resolve_dir(preset_id, scope, assistant_home))
-            )
+            candidates.append((scope, self._resolve_dir(preset_id, scope, assistant_home)))
         else:
             if assistant_home is not None:
-                candidates.append(
-                    (PresetScope.PRIVATE, assistant_home / "presets" / preset_id)
-                )
+                candidates.append((PresetScope.PRIVATE, assistant_home / "presets" / preset_id))
             candidates.append((PresetScope.SHARED, self._shared_root / preset_id))
             candidates.append((PresetScope.PLATFORM, self._platform_root / preset_id))
 
@@ -230,7 +226,11 @@ class FileSystemPresetRepository(PresetRepositoryProtocol):
         preset_json_file = preset_dir / "preset.json"
         plugins_dir = preset_dir / "plugins"
 
-        if not bundle_file.is_file() and not preset_json_file.is_file() and not plugins_dir.is_dir():
+        if (
+            not bundle_file.is_file()
+            and not preset_json_file.is_file()
+            and not plugins_dir.is_dir()
+        ):
             return None
 
         # Load metadata if exists
@@ -260,7 +260,11 @@ class FileSystemPresetRepository(PresetRepositoryProtocol):
 
         assistant_id = meta.get("assistant_id")
         description = meta.get("description", "")
-        created_at = meta.get("created_at", 0.0)
+        raw_created = meta.get("created_at", 0.0)
+        try:
+            created_at = float(raw_created)
+        except (ValueError, TypeError):
+            created_at = 0.0
 
         # Load plugins
         plugins: list[AuthoredPlugin] = []
@@ -268,6 +272,27 @@ class FileSystemPresetRepository(PresetRepositoryProtocol):
 
         if plugins_dir.is_dir():
             for py_file in sorted(plugins_dir.glob("*.py")):
+                plugin_name = py_file.stem
+                code = py_file.read_text(encoding="utf-8")
+                p_meta = meta_plugins_dict.get(plugin_name, {})
+                caps = tuple(p_meta.get("capabilities", ()))
+                side_effects = p_meta.get("side_effects", "none")
+                policy_class = p_meta.get("policy_class", "execute")
+
+                plugins.append(
+                    AuthoredPlugin(
+                        name=plugin_name,
+                        code=code,
+                        path=str(py_file),
+                        capabilities=caps,
+                        side_effects=side_effects,
+                        policy_class=policy_class,
+                    )
+                )
+        elif preset_dir.is_dir():
+            for py_file in sorted(preset_dir.glob("*.py")):
+                if py_file.name.startswith("__") or py_file.name.startswith("test_"):
+                    continue
                 plugin_name = py_file.stem
                 code = py_file.read_text(encoding="utf-8")
                 p_meta = meta_plugins_dict.get(plugin_name, {})
@@ -319,7 +344,9 @@ class FileSystemPresetRepository(PresetRepositoryProtocol):
 
 def _atomic_write_text(file_path: Path, content: str) -> None:
     file_path.parent.mkdir(parents=True, exist_ok=True)
-    with tempfile.NamedTemporaryFile("w", dir=file_path.parent, delete=False, encoding="utf-8") as tf:
+    with tempfile.NamedTemporaryFile(
+        "w", dir=file_path.parent, delete=False, encoding="utf-8"
+    ) as tf:
         tf.write(content)
         temp_name = tf.name
     shutil.move(temp_name, file_path)

@@ -26,11 +26,35 @@ from lca.contracts.harness.composition.plugin_meta import PluginMeta
 from lca.contracts.mechanisms.composition.composition import PluginMetaMissing
 
 
-def load_plugin_source(path: str) -> tuple[str, str, int]:
-    """读 plugin 源；返回 ``(text, language, size_bytes)``。"""
+def resolve_plugin_path(path: str, *, assistant_home: Path | None = None) -> Path:
+    """解析 plugin 源码路径。若为相对路径且绑定 assistant_home，优先在其工作区下解析。"""
     p = Path(path)
     if not p.is_file():
-        raise FileNotFoundError(f"plugin 源码不存在：{path}")
+        if assistant_home is not None:
+            # 沙箱挂载映射：沙箱内的 /mnt/data/... 物理对应 host 上的 assistant_home / workspace
+            if str(p).startswith("/mnt/data/"):
+                rel_mnt = str(p)[len("/mnt/data/") :]
+                cand_mnt = assistant_home / "workspace" / rel_mnt
+                if cand_mnt.is_file():
+                    return cand_mnt
+                cand_direct = assistant_home / rel_mnt
+                if cand_direct.is_file():
+                    return cand_direct
+            if not p.is_absolute():
+                candidate = assistant_home / path
+                if candidate.is_file():
+                    return candidate
+                candidate_ws = assistant_home / "workspace" / path
+                if candidate_ws.is_file():
+                    return candidate_ws
+        if not p.is_file():
+            raise FileNotFoundError(f"plugin 源码不存在：{path}")
+    return p
+
+
+def load_plugin_source(path: str, *, assistant_home: Path | None = None) -> tuple[str, str, int]:
+    """读 plugin 源；返回 ``(text, language, size_bytes)``。"""
+    p = resolve_plugin_path(path, assistant_home=assistant_home)
     text = p.read_text(encoding="utf-8")
     language = "python" if p.suffix == ".py" else "text"
     return text, language, len(text.encode("utf-8"))
@@ -114,4 +138,5 @@ __all__ = [
     "ensure_plugin_on_disk",
     "extract_plugin_factory",
     "load_plugin_source",
+    "resolve_plugin_path",
 ]

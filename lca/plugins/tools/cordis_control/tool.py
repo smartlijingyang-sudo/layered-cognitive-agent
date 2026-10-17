@@ -23,7 +23,7 @@ MANIFEST = ToolManifest(
     api=(
         ToolApi(
             name="cordisControl",
-            description="Creator 控制面：inspect、author、validate、promote 四个受治理动作。",
+            description="Creator 控制面：inspect、author、validate、promote 四个受治理动作。用于 Cordis 自治扩展、插件与预置包开发。",
             parameters={
                 "type": "object",
                 "properties": {
@@ -51,7 +51,7 @@ MANIFEST = ToolManifest(
             # behaviour for any composite Creator action that has not
             # been individually audited as ``read``.
             effects="external",
-            namespace="core",
+            namespace="creator",
         ),
     ),
     meta=ToolMeta(
@@ -76,7 +76,13 @@ MANIFEST = ToolManifest(
             type="string",
             required=False,
             ui_hint="path",
-            description="author 时的 plugin 源码路径",
+            description="author 时的 plugin 源码路径（与 source 二选一）",
+        ),
+        "source": ParameterSpec(
+            type="string",
+            required=False,
+            ui_hint="code",
+            description="author 时的 plugin 源码文本（与 path 二选一）",
         ),
         "target_scope": ParameterSpec(
             type="string",
@@ -106,7 +112,7 @@ class CordisControlTool(Tool):
 
     name = "cordis_control"
     effect_kind: ClassVar[Literal["ephemeral", "persistent", "stateful_once"]] = "persistent"
-    namespace = "core"  # ADR-0256: 与 MANIFEST.api[0].namespace 一致
+    namespace = "creator"  # ADR-0250/ADR-0256: 与 MANIFEST.api[0].namespace 一致
     description = MANIFEST.api[0].description
     parameters: ClassVar[dict[str, Any]] = MANIFEST.api[0].parameters
     is_idempotent = False
@@ -127,6 +133,8 @@ class CordisControlTool(Tool):
         self._composer = composer
         self._caller_grant = tuple(caller_grant)
         self._actor_role = actor_role
+        if preset_root is None and assistant_home is not None:
+            preset_root = assistant_home / "presets"
         self._preset_root = preset_root
         self._on_mounted = on_mounted
         self._assistant_home = assistant_home
@@ -140,8 +148,13 @@ class CordisControlTool(Tool):
             return f"action {action!r} 非法；必须是 {list(ALLOWED_ACTIONS)}"
         if action in {"author", "validate", "promote"} and not args.get("name"):
             return f"action={action!r} 必填 name"
-        if action == "author" and not args.get("path"):
-            return "action='author' 必填 path（plugin 源码路径）"
+        if (
+            action == "author"
+            and not args.get("path")
+            and not args.get("source")
+            and not args.get("code")
+        ):
+            return "action='author' 必填 path（源码路径）或 source（源码文本）"
         if action != "promote" and any(
             key in args for key in ("target_scope", "rollback", "preset_id")
         ):
@@ -158,7 +171,11 @@ class CordisControlTool(Tool):
             if action == "inspect":
                 payload = self._creator.inspect(target=args.get("name"))
             elif action == "author":
-                payload = self._creator.author(name=args["name"], path=args["path"])
+                payload = self._creator.author(
+                    name=args["name"],
+                    path=args.get("path"),
+                    source=args.get("source") or args.get("code"),
+                )
             elif action == "validate":
                 payload = self._creator.validate(name=args["name"])
             else:

@@ -21,6 +21,8 @@ STANDARD_NAMESPACES: tuple[str, ...] = (
     "cron",
     # ADR-0269 §4：新增 avatar（头像生成与换装）工具域。
     "avatar",
+    # ADR-0250/ADR-0256：新增 creator（Cordis 插件与预置包开发）工具域。
+    "creator",
 )
 
 DEFAULT_NAMESPACE_DESCRIPTIONS: dict[str, str] = {
@@ -35,6 +37,7 @@ DEFAULT_NAMESPACE_DESCRIPTIONS: dict[str, str] = {
     "lca": "运行时控制：handoff 轮静默结束",
     "cron": "定时任务：创建、查看、更新、删除与即将到来列表",
     "avatar": "头像生成与换装：创建候选、激活、查询、清除与定时换装",
+    "creator": "Cordis 自治扩展与插件开发：审查、编写、校验与晋升插件或预置包",
 }
 
 DEFAULT_NAMESPACE_APPROVAL: dict[str, str] = {

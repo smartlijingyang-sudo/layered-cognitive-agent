@@ -16,8 +16,6 @@ import pathlib
 import re
 from typing import Any, ClassVar
 
-import pytest
-
 from lca.infrastructure.tool_defer.policy import STANDARD_NAMESPACES
 
 # 白名单即源码 SSOT，不手写第二份（共 11 域：
@@ -132,10 +130,10 @@ def test_b1_profile_reachable_tools_declare_namespace():
     assert sandbox_by_name["exportFile"] == "file"
     assert WRITE_MANIFEST.api[0].namespace == "file"
 
-    # creator 插件工具 → shell / file / core
+    # creator 插件工具 → shell / file / creator / core
     assert BASH_MANIFEST.api[0].namespace == "shell"
     assert FILE_WRITE_MANIFEST.api[0].namespace == "file"
-    assert CORDIS_MANIFEST.api[0].namespace == "core"
+    assert CORDIS_MANIFEST.api[0].namespace == "creator"
     assert PROFILE_APPLY_MANIFEST.api[0].namespace == "core"
     assert PROFILE_DIFF_MANIFEST.api[0].namespace == "core"
 

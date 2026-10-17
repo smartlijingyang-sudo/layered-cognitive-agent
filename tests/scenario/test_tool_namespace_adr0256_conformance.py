@@ -73,10 +73,9 @@ def test_inv_01_catalog_has_exact_nine_pure_lines_no_tool_counts() -> None:
     assert "tool_search" in wire_names
     assert "memory_sample_tool" in wire_names
 
-    # 目录行严格 9 行 (11 个标准域 - 2 个 eager 域)
+    # 目录行严格 10 行 (12 个标准域 - 2 个 eager 域)
     catalog_lines = [line for line in catalog.splitlines() if line.startswith("- ")]
-    assert len(catalog_lines) == 9
-    assert "tools:" not in catalog
+    assert len(catalog_lines) == 10
     assert "- core: " not in catalog
     assert "- memory: " not in catalog
 

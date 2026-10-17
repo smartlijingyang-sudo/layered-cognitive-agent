@@ -29,7 +29,9 @@ class DummySafeExecutor:
 
             raise ToolExecutionError(
                 f"工具 {tool.name} 未在 ToolPermissionManifest.allowed_tools 中授权",
-                Observation(observation_id="denied", success=False, payload=None, error="unauthorized"),
+                Observation(
+                    observation_id="denied", success=False, payload=None, error="unauthorized"
+                ),
             )
         return await tool.execute(args)
 
@@ -104,7 +106,9 @@ def test_unauthorized_dynamic_execution_blocked() -> None:
 
     from lca.contracts.models.core.execution.result import ToolExecutionError
 
-    with pytest.raises(ToolExecutionError, match=r"未在 ToolPermissionManifest.allowed_tools 中授权"):
+    with pytest.raises(
+        ToolExecutionError, match=r"未在 ToolPermissionManifest.allowed_tools 中授权"
+    ):
         asyncio.run(safe_executor.execute(tool, {}))
 
 
@@ -130,7 +134,7 @@ async def test_cordis_control_promote_auto_bridges(tmp_path: Path) -> None:
     preset_root.mkdir()
     plugin_path = preset_root / "dynamic_sum.py"
     plugin_path.write_text(
-        '''
+        """
 plugin_meta = {
     "name": "dynamic_sum",
     "layer": "behavior",
@@ -144,14 +148,19 @@ def factory():
     def _sum(items):
         return sum(items)
     return _sum
-''',
+""",
         encoding="utf-8",
     )
 
     with bind_journal():
         tool = build_cordis_control_tool(
             composer=composer,
-            caller_grant=("cordis_control.author", "cordis_control.validate", "cordis_control.promote", "tool_fs.read"),
+            caller_grant=(
+                "cordis_control.author",
+                "cordis_control.validate",
+                "cordis_control.promote",
+                "tool_fs.read",
+            ),
             actor_role="cordis-creator",
             preset_root=preset_root,
             tools_service=tools_service,
@@ -176,7 +185,9 @@ def factory():
 
         # 4. Verify immediate bridge into tools_service & safe_executor
         bridged_tool = tools_service.get("dynamic_sum")
-        assert bridged_tool is not None, "dynamic_sum should be bridged into ToolsService immediately"
+        assert bridged_tool is not None, (
+            "dynamic_sum should be bridged into ToolsService immediately"
+        )
         assert "dynamic_sum" in safe_executor.permission_manifest.allowed_tools
 
         # 5. Execute immediately through safe_executor
@@ -192,7 +203,9 @@ def factory():
         assert tools_service.get("dynamic_sum") is None
         assert "dynamic_sum" not in safe_executor.permission_manifest.allowed_tools
 
-        with pytest.raises(ToolExecutionError, match=r"未在 ToolPermissionManifest.allowed_tools 中授权"):
+        with pytest.raises(
+            ToolExecutionError, match=r"未在 ToolPermissionManifest.allowed_tools 中授权"
+        ):
             await safe_executor.execute(bridged_tool, {"items": [1, 2]})
 
 
@@ -208,7 +221,36 @@ async def test_bridge_unregister_tool_direct() -> None:
     assert "test_fn" in safe_executor.permission_manifest.allowed_tools
 
     # Unregister
-    DynamicToolBridge.unregister_tool("test_fn", tools_service=tools_service, safe_executor=safe_executor)
+    DynamicToolBridge.unregister_tool(
+        "test_fn", tools_service=tools_service, safe_executor=safe_executor
+    )
 
     assert tools_service.get("test_fn") is None
     assert "test_fn" not in safe_executor.permission_manifest.allowed_tools
+
+
+@pytest.mark.asyncio
+async def test_dynamic_tool_adapter_json_string_argument_unpacking() -> None:
+    """Validate that stringified JSON arrays and dicts from LLM are automatically unpacked."""
+    received_items: list[Any] = []
+
+    def process_data(items: list[int], meta: dict[str, Any]) -> int:
+        received_items.extend(items)
+        return sum(items) + meta.get("offset", 0)
+
+    tool = DynamicToolBridge.bridge_callable(
+        name="process_data",
+        func=process_data,
+        description="Process list and dict",
+    )
+
+    # Stringified JSON input mimicking OpenAI / LobeHub tool call args
+    res = await tool.execute(
+        {
+            "items": "[10, 20, 30]",
+            "meta": '{"offset": 5}',
+        }
+    )
+    assert res.success is True
+    assert res.payload == 65
+    assert received_items == [10, 20, 30]

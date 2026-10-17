@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import inspect
+import json
 from collections.abc import Callable
 from typing import Any, ClassVar, Literal
 
@@ -61,6 +62,22 @@ class DynamicPluginToolAdapter(Tool):
         """Execute the wrapped dynamic function with flexible argument unpacking."""
         obs_id = new_id("obs")
         try:
+            # Defensive normalization: unpack stringified JSON arrays/objects from LLM
+            normalized_args: dict[str, Any] = {}
+            for k, v in args.items():
+                if isinstance(v, str):
+                    s = v.strip()
+                    if (s.startswith("[") and s.endswith("]")) or (
+                        s.startswith("{") and s.endswith("}")
+                    ):
+                        try:
+                            normalized_args[k] = json.loads(s)
+                            continue
+                        except (json.JSONDecodeError, ValueError):
+                            pass
+                normalized_args[k] = v
+            args = normalized_args
+
             sig = inspect.signature(self._func)
             params = list(sig.parameters.values())
 
@@ -146,7 +163,9 @@ class DynamicToolBridge:
         """Wrap a plugin instance or factory output into a DynamicPluginToolAdapter."""
         target_fn = instance if callable(instance) else getattr(instance, "execute", None)
         if target_fn is None:
-            raise TypeError(f"Instance for plugin {name!r} is neither callable nor has an execute method")
+            raise TypeError(
+                f"Instance for plugin {name!r} is neither callable nor has an execute method"
+            )
 
         meta = meta or {}
         desc = meta.get("description") or getattr(target_fn, "__doc__", "") or f"Plugin tool {name}"

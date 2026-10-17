@@ -144,29 +144,35 @@ async def test_scenario_1_data_engineering_preset_creation(tmp_path: Path) -> No
         )
 
         # 1. Author
-        res_author = await control_tool.execute({
-            "action": "author",
-            "name": "funnel_analytics",
-            "path": str(scratch_file),
-        })
+        res_author = await control_tool.execute(
+            {
+                "action": "author",
+                "name": "funnel_analytics",
+                "path": str(scratch_file),
+            }
+        )
         assert res_author.success is True
         assert res_author.payload["artifact"]["state"] == "draft"
 
         # 2. Validate
-        res_val = await control_tool.execute({
-            "action": "validate",
-            "name": "funnel_analytics",
-        })
+        res_val = await control_tool.execute(
+            {
+                "action": "validate",
+                "name": "funnel_analytics",
+            }
+        )
         assert res_val.success is True
         assert res_val.payload["artifact"]["state"] == "verified"
 
         # 3. Promote to agent scope
-        res_promote = await control_tool.execute({
-            "action": "promote",
-            "name": "funnel_analytics",
-            "target_scope": "agent",
-            "preset_id": "clickstream_kit",
-        })
+        res_promote = await control_tool.execute(
+            {
+                "action": "promote",
+                "name": "funnel_analytics",
+                "target_scope": "agent",
+                "preset_id": "clickstream_kit",
+            }
+        )
         assert res_promote.success is True
         assert res_promote.payload["face"] == "promote"
 
@@ -222,20 +228,24 @@ async def test_scenario_2_same_session_zero_restart_trigger(tmp_path: Path) -> N
         )
 
         # Execute promote lifecycle
-        r1 = await control_tool.execute({
-            "action": "author",
-            "name": "funnel_analytics",
-            "path": str(scratch_file),
-        })
+        r1 = await control_tool.execute(
+            {
+                "action": "author",
+                "name": "funnel_analytics",
+                "path": str(scratch_file),
+            }
+        )
         assert r1.success is True
         r2 = await control_tool.execute({"action": "validate", "name": "funnel_analytics"})
         assert r2.success is True
-        r3 = await control_tool.execute({
-            "action": "promote",
-            "name": "funnel_analytics",
-            "target_scope": "agent",
-            "preset_id": "clickstream_kit",
-        })
+        r3 = await control_tool.execute(
+            {
+                "action": "promote",
+                "name": "funnel_analytics",
+                "target_scope": "agent",
+                "preset_id": "clickstream_kit",
+            }
+        )
         assert r3.success is True
 
         # Zero-restart verification: tool is in tools_service & safe_executor allowed_tools
@@ -251,7 +261,9 @@ async def test_scenario_2_same_session_zero_restart_trigger(tmp_path: Path) -> N
 
         # Invariant check: C5 monotone authorization boundary
         unauthorized = DynamicToolBridge.bridge_callable("rogue_tool", lambda: "hack")
-        with pytest.raises(ToolExecutionError, match=r"未在 ToolPermissionManifest.allowed_tools 中授权"):
+        with pytest.raises(
+            ToolExecutionError, match=r"未在 ToolPermissionManifest.allowed_tools 中授权"
+        ):
             await safe_executor.execute(unauthorized, {})
 
 
@@ -422,20 +434,24 @@ async def test_scenario_5_hot_upgrade_and_safe_rollback(tmp_path: Path) -> None:
         )
 
         # 1. Mount v1
-        r_a1 = await control_tool.execute({
-            "action": "author",
-            "name": "funnel_analytics",
-            "path": str(v1_file),
-        })
+        r_a1 = await control_tool.execute(
+            {
+                "action": "author",
+                "name": "funnel_analytics",
+                "path": str(v1_file),
+            }
+        )
         assert r_a1.success is True
         r_v1 = await control_tool.execute({"action": "validate", "name": "funnel_analytics"})
         assert r_v1.success is True
-        res_v1 = await control_tool.execute({
-            "action": "promote",
-            "name": "funnel_analytics",
-            "target_scope": "agent",
-            "preset_id": "clickstream_kit",
-        })
+        res_v1 = await control_tool.execute(
+            {
+                "action": "promote",
+                "name": "funnel_analytics",
+                "target_scope": "agent",
+                "preset_id": "clickstream_kit",
+            }
+        )
         assert res_v1.success is True
 
         # Test v1 output
@@ -448,27 +464,33 @@ async def test_scenario_5_hot_upgrade_and_safe_rollback(tmp_path: Path) -> None:
         assert "total_dropoff" not in obs_v1.payload
 
         # 2. Hot upgrade to v2: retire v1 and mount enhanced v2
-        res_retire = await control_tool.execute({
-            "action": "promote",
-            "name": "funnel_analytics",
-            "rollback": True,
-        })
+        res_retire = await control_tool.execute(
+            {
+                "action": "promote",
+                "name": "funnel_analytics",
+                "rollback": True,
+            }
+        )
         assert res_retire.success is True
 
-        r_a2 = await control_tool.execute({
-            "action": "author",
-            "name": "funnel_analytics",
-            "path": str(v2_file),
-        })
+        r_a2 = await control_tool.execute(
+            {
+                "action": "author",
+                "name": "funnel_analytics",
+                "path": str(v2_file),
+            }
+        )
         assert r_a2.success is True
         r_v2 = await control_tool.execute({"action": "validate", "name": "funnel_analytics"})
         assert r_v2.success is True
-        res_v2 = await control_tool.execute({
-            "action": "promote",
-            "name": "funnel_analytics",
-            "target_scope": "agent",
-            "preset_id": "clickstream_kit",
-        })
+        res_v2 = await control_tool.execute(
+            {
+                "action": "promote",
+                "name": "funnel_analytics",
+                "target_scope": "agent",
+                "preset_id": "clickstream_kit",
+            }
+        )
         assert res_v2.success is True
 
         # Test v2 hot replaced output
@@ -480,18 +502,22 @@ async def test_scenario_5_hot_upgrade_and_safe_rollback(tmp_path: Path) -> None:
         assert obs_v2.payload["total_dropoff"] == 90
 
         # 3. Safe Rollback
-        res_rollback = await control_tool.execute({
-            "action": "promote",
-            "name": "funnel_analytics",
-            "rollback": True,
-        })
+        res_rollback = await control_tool.execute(
+            {
+                "action": "promote",
+                "name": "funnel_analytics",
+                "rollback": True,
+            }
+        )
         assert res_rollback.success is True
         assert res_rollback.payload["artifact"]["state"] == "retired"
 
         # SafeExecutor & ToolsService synchronization check on retirement (C5 capability revocation)
         assert tools_service.get("funnel_analytics") is None
         assert "funnel_analytics" not in safe_executor.permission_manifest.allowed_tools
-        with pytest.raises(ToolExecutionError, match=r"未在 ToolPermissionManifest.allowed_tools 中授权"):
+        with pytest.raises(
+            ToolExecutionError, match=r"未在 ToolPermissionManifest.allowed_tools 中授权"
+        ):
             await safe_executor.execute(tool_v2, {"counts": [100, 50, 10]})
 
         # Journal contains PluginUnmounted fact
@@ -499,3 +525,71 @@ async def test_scenario_5_hot_upgrade_and_safe_rollback(tmp_path: Path) -> None:
         unmounted_events = [e for e in events if isinstance(e, PluginUnmounted)]
         assert len(unmounted_events) >= 1
         assert unmounted_events[-1].plugin_name == "funnel_analytics"
+
+
+@pytest.mark.asyncio
+async def test_scenario_6_tool_search_discovery_and_solo_filter(tmp_path: Path) -> None:
+    """Scenario 6: tool_search discovery under 'creator' namespace, solo filter, and relative paths."""
+    from lca.infrastructure.tool_defer.policy import DeferPolicy
+    from lca.infrastructure.tool_defer.session import ToolDeferSession
+    from lca.infrastructure.tool_defer.tool_search import ToolSearchTool
+    from lca.plugins.collaboration.modes.solo import filter_solo_tools
+
+    assistant_home = tmp_path / "assistants" / "asst_creator_01"
+    assistant_home.mkdir(parents=True)
+    ws_dir = assistant_home / "workspace"
+    ws_dir.mkdir(parents=True)
+    relative_code = ws_dir / "my_metric.py"
+    _write_funnel_source(relative_code)
+
+    ctx = Context()
+    composer = CordisComposer(ctx, invariant_checker=build_default_invariant_checker())
+    scoped_tool = build_cordis_control_tool(
+        composer=composer,
+        caller_grant=("analytics.funnel",),
+        actor_role="arch-creator",
+        assistant_home=assistant_home,
+    )
+
+    # 1. Namespace is "creator"
+    assert scoped_tool.namespace == "creator"
+
+    # 2. Solo mode filtering: scoped tool is KEPT, unconfined host tool is DROPPED
+    unconfined_tool = build_cordis_control_tool(
+        composer=composer,
+        caller_grant=("analytics.funnel",),
+        actor_role="host-creator",
+        assistant_home=None,
+    )
+    assert filter_solo_tools([scoped_tool]) == (scoped_tool,)
+    assert filter_solo_tools([unconfined_tool]) == ()
+
+    # 3. Tool defer discovery via tool_search
+    defer_session = ToolDeferSession(DeferPolicy.default())
+    search_tool = ToolSearchTool()
+    defer_session.update_turn([search_tool, scoped_tool])
+
+    # 3a. Search by query 'cordis_control'
+    hits = defer_session.search_catalog("cordis_control")
+    assert any(h["namespace"] == "creator" for h in hits)
+
+    # 3b. Search by query '插件'
+    hits_zh = defer_session.search_catalog("插件")
+    assert any(h["namespace"] == "creator" for h in hits_zh)
+
+    # 3c. Load namespace 'creator'
+    loaded = defer_session.load_namespace("creator")
+    assert loaded["namespace"] == "creator"
+    tool_names = [t["function"]["name"] for t in loaded["tools"]]
+    assert "cordis_control" in tool_names
+
+    # 4. Author using relative path inside workspace
+    res = await scoped_tool.execute(
+        {
+            "action": "author",
+            "name": "my_metric",
+            "path": "workspace/my_metric.py",
+        }
+    )
+    assert res.success is True
+    assert res.payload["face"] == "author"

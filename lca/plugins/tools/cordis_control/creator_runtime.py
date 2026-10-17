@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Iterable
+from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from lca.contracts.atoms.artifact.state import ArtifactState
@@ -24,7 +25,11 @@ from lca.plugins.tools.cordis_control.creator_artifacts import (
     with_artifact,
 )
 from lca.plugins.tools.cordis_control.creator_promotion import promote
-from lca.plugins.tools.cordis_control.loader import extract_plugin_factory, load_plugin_source
+from lca.plugins.tools.cordis_control.loader import (
+    extract_plugin_factory,
+    load_plugin_source,
+    resolve_plugin_path,
+)
 
 if TYPE_CHECKING:
     from lca.plugins.tools.cordis_control.tool import CordisControlTool
@@ -92,25 +97,42 @@ class CreatorRuntime:
             "event_seq": stamped.seq if stamped else None,
         }
 
-    def author(self, *, name: str, path: str) -> dict[str, Any]:
-        source, language, size = load_plugin_source(path)
+    def author(
+        self,
+        *,
+        name: str,
+        path: str | None = None,
+        source: str | None = None,
+    ) -> dict[str, Any]:
+        asst_home = getattr(self._tool, "_assistant_home", None)
+        if not path and source:
+            target_dir = (asst_home / "workspace") if asst_home is not None else Path(".")
+            target_dir.mkdir(parents=True, exist_ok=True)
+            draft_file = target_dir / f"{name}.py"
+            draft_file.write_text(source, encoding="utf-8")
+            path = str(draft_file)
+        if not path:
+            raise ValueError("author 必须提供 path 或 source")
+        resolved_p = resolve_plugin_path(path, assistant_home=asst_home)
+        resolved_path = str(resolved_p)
+        source_text, language, size = load_plugin_source(resolved_path, assistant_home=asst_home)
         factory, metadata = extract_plugin_factory(
-            source_path=path,
-            source_text=source,
+            source_path=resolved_path,
+            source_text=source_text,
             plugin_name=name,
             preset_root=self._tool._preset_root,
         )
         artifact = make_capability_artifact(
             name,
-            source,
+            source_text,
             scope=Scope.RUN,
             grants=self._tool._caller_grant,
-            metadata={"path": path, "language": language, "plugin_meta": dict(metadata)},
+            metadata={"path": resolved_path, "language": language, "plugin_meta": dict(metadata)},
         )
         self._authored[name] = AuthoredPlugin(
             artifact=artifact,
-            source=source,
-            path=path,
+            source=source_text,
+            path=resolved_path,
             language=language,
             factory=factory,
             metadata=dict(metadata),

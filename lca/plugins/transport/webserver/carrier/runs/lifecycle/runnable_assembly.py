@@ -26,6 +26,7 @@ from lca.contracts.protocols.runtime.infra.infra import MachineResolver, Tool
 from lca.contracts.protocols.session.run.mode import RunModeRegistryProtocol
 from lca.infrastructure.llm_adapter.model_override import ModelOverridingLLMAdapter
 from lca.infrastructure.observability import BoundObservability
+from lca.infrastructure.runtime_plane.capability_bindings import current_tools_service
 from lca.plugins.transport.webserver.handlers.runs.session.session.session import RunSession
 
 if TYPE_CHECKING:
@@ -290,6 +291,7 @@ def tools_from_scope(
         )
 
         policy = _load_tools_policy(Path(home_path))
+        allow = policy[0] if policy is not None else frozenset()
         deny = policy[1] if policy is not None else frozenset()
 
         discovery = AssistantPresetDiscovery(home_path)
@@ -302,6 +304,37 @@ def tools_from_scope(
                 if t.name not in existing_names and not bool(_tool_matching_names(t) & deny)
             ]
             filtered = (*filtered, *kept_discovered)
+
+        if "cordis_control" not in deny and (not allow or "cordis_control" in allow):
+            existing_names = {t.name for t in filtered}
+            if "cordis_control" not in existing_names:
+                from lca.infrastructure.assistant.io import load_grants
+                from lca.plugins.composer.composition.cordis_composer import (
+                    CordisComposer,
+                    build_default_invariant_checker,
+                )
+                from lca.plugins.tools.cordis_control import build_cordis_control_tool
+
+                asst_home = Path(home_path)
+                grants = tuple(load_grants(asst_home))
+                composer = CordisComposer(
+                    scope, invariant_checker=build_default_invariant_checker()
+                )
+                tools_service = current_tools_service()
+                if tools_service is None and scope is not None:
+                    try:
+                        tools_service = require_capability(scope, "tools")
+                    except MissingCapabilityError:
+                        tools_service = None
+                scoped_control_tool = build_cordis_control_tool(
+                    composer=composer,
+                    caller_grant=grants,
+                    actor_role=assistant_id,
+                    preset_root=asst_home / "presets",
+                    assistant_home=asst_home,
+                    tools_service=tools_service,
+                )
+                filtered = (*filtered, scoped_control_tool)
 
     return filtered
 
