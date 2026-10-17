@@ -354,9 +354,12 @@ class MemorySensorRegistry:
         gated: dict[str, tuple[list[Percept], list[NoRecall]]] = {}
         pool: list[tuple[float, str, Percept]] = []
         for name, items in raw.items():
-            percepts = [i for i in items if isinstance(i, _PERCEPT_TYPES)]
+            percepts = [
+                i
+                for i in items
+                if isinstance(i, _PERCEPT_TYPES) and i.confidence >= MIN_CONFIDENCE
+            ]
             norc = [i for i in items if isinstance(i, NoRecall)]
-            percepts = [p for p in percepts if p.confidence >= MIN_CONFIDENCE]
             gated[name] = (percepts, norc)
             pool.extend((p.confidence, name, p) for p in percepts)
         # 3) token 预算：全局按 confidence 从高到低截断
