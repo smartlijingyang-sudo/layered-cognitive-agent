@@ -24,9 +24,16 @@ def canonical_tool_name(name: str) -> str:
     ``execute_code`` → ``executeCode``；``executeCode`` 保持原样。LLM 视提示
     上下文随机发射 snake_case 或 camelCase，审批记录与放行检查都用规范形，
     避免「批准了 execute_code，模型改叫 executeCode 又触发审批」的循环。
+
+    命名空间感知（RA-145）：先按 ``.`` 切出命名空间，只对裸工具名归一化，
+    永不跨分隔符 mangling —— ``mcp_corp.do_thing`` → ``mcp_corp.doThing``
+   （而不是 ``mcpCorp.doThing``，后者什么都匹配不上，是 RA-132 的陷阱）。
     """
     if not name:
         return name
+    if "." in name:
+        namespace, _, tool_name = name.partition(".")
+        return f"{namespace}.{canonical_tool_name(tool_name)}"
     if "_" in name:
         parts = name.split("_")
         camel = parts[0] + "".join(p.capitalize() for p in parts[1:] if p)

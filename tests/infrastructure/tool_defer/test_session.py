@@ -258,3 +258,36 @@ def test_contextvar_default_none_set_reset() -> None:
     finally:
         reset_current_defer_session(token)
     assert current_defer_session() is None
+# --- RA-142: session-owned tool->namespace / visible-set seams --------------
+
+
+def test_namespace_of_tool_hit() -> None:
+    session = _session()
+    session.update_turn(_tools())
+    assert session.namespace_of_tool("tool_search") == "core"
+    assert session.namespace_of_tool("core_a") == "core"
+    assert session.namespace_of_tool("b_two") == "web"
+
+
+def test_namespace_of_tool_unknown_returns_none() -> None:
+    session = _session()
+    session.update_turn(_tools())
+    assert session.namespace_of_tool("nope") is None
+    # before any turn view the map is empty (not an AttributeError)
+    assert _session().namespace_of_tool("tool_search") is None
+
+
+def test_namespace_of_tool_rebuilt_each_turn() -> None:
+    session = _session()
+    session.update_turn(_tools())
+    assert session.namespace_of_tool("b_one") == "web"
+    session.update_turn((FakeTool("tool_search", namespace="core"),))
+    assert session.namespace_of_tool("b_one") is None
+    assert session.namespace_of_tool("tool_search") == "core"
+
+
+def test_turn_visible_tool_names_matches_wire() -> None:
+    session = _session()
+    session.update_turn(_tools())
+    wire, _catalog = session.render_turn()
+    assert session.turn_visible_tool_names() == set(_wire_names(wire))

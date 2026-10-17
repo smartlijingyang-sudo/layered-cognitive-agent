@@ -15,13 +15,16 @@ import pytest
 
 from lca.cognition.body.tools.tool_wire_gate import unexposed_tool_block_observation
 from lca.contracts.atoms.enums.enums import ActionType
+from lca.contracts.atoms.semantic.keys import (
+    FAILURE_KIND,
+    OBS_RESULT_KIND,
+    TOOL_WIRE_INVALID,
+    TOOL_WIRE_REASON,
+    TOOL_WIRE_STATUS,
+)
 from lca.contracts.models.core.execution.decision import Decision, ToolCall
 from lca.infrastructure.tool_defer.policy import DeferPolicy
-from lca.infrastructure.tool_defer.session import (
-    ToolDeferSession,
-    reset_current_defer_session,
-    set_current_defer_session,
-)
+from lca.infrastructure.tool_defer.session import ToolDeferSession
 
 
 @dataclass
@@ -51,6 +54,8 @@ DESCRIPTIONS = {
 
 @pytest.fixture
 def defer_session() -> Any:
+    # RA-144: the gate takes the session explicitly; the fixture no longer
+    # publishes the ambient ContextVar.
     session = ToolDeferSession(DeferPolicy(namespace_descriptions=DESCRIPTIONS))
     tools = (
         FakeTool("tool_search", namespace="core"),
@@ -58,9 +63,7 @@ def defer_session() -> Any:
         FakeTool("memory_search", namespace="memory"),
     )
     session.update_turn(tools)
-    token = set_current_defer_session(session)
-    yield session
-    reset_current_defer_session(token)
+    return session
 
 
 def _decision(*tool_names: str) -> Decision:
@@ -83,7 +86,7 @@ def test_c1_call_to_unloaded_namespace_is_blocked(defer_session: Any):
     ``memory`` 自 ADR-0260 起是 eager 域,``memory_search`` 首 turn 就在 wire
     上;这里用仍为 deferred 的 ``file`` 域工具 ``readFile`` 验证拒绝路径。
     """
-    obs = unexposed_tool_block_observation(_decision("readFile"))
+    obs = unexposed_tool_block_observation(_decision("readFile"), defer_session)
     assert obs is not None
     assert obs.success is False
     assert "tool_search" in obs.error
@@ -93,12 +96,12 @@ def test_c1_call_to_unloaded_namespace_is_blocked(defer_session: Any):
 
 def test_c2_call_to_loaded_namespace_passes(defer_session: Any):
     defer_session.load_namespace("file")
-    assert unexposed_tool_block_observation(_decision("readFile")) is None
+    assert unexposed_tool_block_observation(_decision("readFile"), defer_session) is None
 
 
 def test_c3_eager_namespace_needs_no_load(defer_session: Any):
     """tool_search 是 eager 域,首 turn 直接调用不被拒."""
-    assert unexposed_tool_block_observation(_decision("tool_search")) is None
+    assert unexposed_tool_block_observation(_decision("tool_search"), defer_session) is None
 
 
 def test_c4_blocked_call_can_retry_after_load(defer_session: Any):
@@ -107,11 +110,11 @@ def test_c4_blocked_call_can_retry_after_load(defer_session: Any):
     回归 run_747963254987:无名 tool call 直接杀死了整个 run.
     """
     decision = _decision("readFile")
-    blocked = unexposed_tool_block_observation(decision)
+    blocked = unexposed_tool_block_observation(decision, defer_session)
     assert blocked is not None and blocked.success is False
     # 模型按指引加载后重试,同一 decision 放行,run 继续.
     defer_session.load_namespace("file")
-    assert unexposed_tool_block_observation(decision) is None
+    assert unexposed_tool_block_observation(decision, defer_session) is None
     assert "file" in defer_session.loaded_namespaces
 
 
@@ -128,16 +131,12 @@ def test_snake_case_names_the_real_namespace_then_passes_once_loaded():
             FakeTool("writeFile", namespace="file"),
         )
     )
-    token = set_current_defer_session(session)
-    try:
-        blocked = unexposed_tool_block_observation(_decision("write_file"))
-        assert blocked is not None and blocked.success is False
-        assert "namespace 'file'" in blocked.error
-        assert "namespace 'deferred'" not in blocked.error
-        session.load_namespace("file")
-        assert unexposed_tool_block_observation(_decision("write_file")) is None
-    finally:
-        reset_current_defer_session(token)
+    blocked = unexposed_tool_block_observation(_decision("write_file"), session)
+    assert blocked is not None and blocked.success is False
+    assert "namespace 'file'" in blocked.error
+    assert "namespace 'deferred'" not in blocked.error
+    session.load_namespace("file")
+    assert unexposed_tool_block_observation(_decision("write_file"), session) is None
 
 
 def test_f2_truncated_argument_value_is_rejected():
@@ -171,3 +170,23 @@ def test_f3_duplicate_emissions_in_one_turn_deduplicated():
     projection = project_llm_response(LLMResponse(text="", tool_calls=[*dupes, other]))
     names = [(c.tool_name, c.arguments.get("path")) for c in projection.tool_calls]
     assert names == [("listFiles", "/home/lichao"), ("listFiles", "/var/data")]
+def test_ra143_unexposed_block_uses_shared_extra_contract(defer_session: Any):
+    """RA-143: the unexposed gate builds through _wire_block_observation.
+
+    The blocked-Observation `extra` key set must match the single
+    constructor seam's contract; the model-facing text keeps the
+    tool_search instruction and the namespace name.
+    """
+    obs = unexposed_tool_block_observation(_decision("readFile"), defer_session)
+    assert obs is not None
+    assert obs.success is False
+    assert set(obs.extra or {}) == {
+        FAILURE_KIND,
+        OBS_RESULT_KIND,
+        TOOL_WIRE_STATUS,
+        TOOL_WIRE_REASON,
+    }
+    assert obs.extra[TOOL_WIRE_STATUS] == TOOL_WIRE_INVALID
+    assert obs.extra[TOOL_WIRE_REASON] == "namespace_not_loaded"
+    assert "tool_search" in (obs.error or "")
+    assert "file" in (obs.error or "")

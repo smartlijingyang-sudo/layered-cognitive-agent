@@ -56,6 +56,7 @@ class ToolDeferSession:
         self._eager_tools: set[str] = set()
         self._namespaces: tuple[ToolNamespace, ...] = ()
         self._specs: dict[str, dict[str, Any]] = {}  # tool name -> wire spec
+        self._tool_to_namespace: dict[str, str] = {}  # tool name -> namespace (turn view)
 
     @property
     def policy(self) -> DeferPolicy:
@@ -70,6 +71,31 @@ class ToolDeferSession:
     def namespaces(self) -> tuple[ToolNamespace, ...]:
         """This turn's namespace view (turn order)."""
         return self._namespaces
+
+    def namespace_of_tool(self, name: str) -> str | None:
+        """Owning namespace for *name* in this turn's view; None when unknown.
+
+        Session-owned seam ("two = real"): the namespaces-tuple traversal
+        lives only here. Callers ask the session instead of hand-deriving
+        ``{tool_name: namespace}`` from ``self.namespaces``.
+        """
+        return self._tool_to_namespace.get(name)
+
+    def turn_visible_tool_names(self) -> set[str]:
+        """Tool names on this turn's wire projection (the model's visible set).
+
+        The wire-spec dict shape is owned by ``_tool_to_spec``; only this
+        module reads it back, so callers never parse
+        ``spec["function"]["name"]`` themselves.
+        """
+        wire, _catalog = self.render_turn()
+        names: set[str] = set()
+        for spec in wire:
+            function = spec.get("function") if isinstance(spec, dict) else None
+            name = function.get("name") if isinstance(function, dict) else ""
+            if isinstance(name, str) and name:
+                names.add(name)
+        return names
 
     def update_turn(self, tools: Sequence[Tool]) -> None:
         """Refresh the per-turn view after fork filtering/wrapping.
@@ -120,6 +146,12 @@ class ToolDeferSession:
         )
         self._specs = {tool.name: _tool_to_spec(tool) for tool in tools}
         self._eager_tools = {tool.name for tool in tools if getattr(tool, "eager", False)}
+        # Single place the tool->namespace map is (re)built: the session
+        # owns the namespaces-tuple traversal; callers ask via
+        # ``namespace_of_tool`` instead of re-deriving it.
+        self._tool_to_namespace = {
+            tname: namespace for namespace, tool_names in grouped.items() for tname in tool_names
+        }
 
     def _describe(self, namespace: str, tool_names: list[str]) -> str:
         override = self._policy.namespace_descriptions.get(namespace)

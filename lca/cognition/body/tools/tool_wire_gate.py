@@ -8,6 +8,10 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from lca.infrastructure.tool_defer.session import ToolDeferSession
 
 from lca.contracts.atoms.enums.enums import MemoryRecordKind
 from lca.contracts.atoms.ids.ids import new_id
@@ -106,57 +110,52 @@ def tool_wire_block_observation(decision: Decision) -> Observation | None:
     )
 
 
-def unexposed_tool_block_observation(decision: Decision) -> Observation | None:
+def unexposed_tool_block_observation(
+    decision: Decision,
+    defer_session: ToolDeferSession | None = None,
+) -> Observation | None:
     """Refuse a call whose schema was not on this turn's tool list.
 
     Defer hides a namespace until ``tool_search`` loads it. The registry
     still holds the tool. Executing a name the model was not given is the
     fail-closed side of that hide. No defer session means the legacy full list.
+
+    The defer session is an explicit parameter (RA-144): the action boundary
+    reads the ambient ContextVar and passes it in, so this gate stays a pure
+    function of its inputs. ``None`` falls back to the ambient read for
+    legacy callers.
     """
+    session = defer_session
+    if session is None:
+        from lca.infrastructure.tool_defer.session import current_defer_session
 
-    from lca.infrastructure.tool_defer.session import current_defer_session
-
-    session = current_defer_session()
+        session = current_defer_session()
     if session is None or not session.policy.enabled or not session.namespaces:
         return None
-    wire, _catalog = session.render_turn()
-    visible: set[str] = set()
-    for spec in wire:
-        function = spec.get("function") if isinstance(spec, dict) else None
-        name = function.get("name") if isinstance(function, dict) else ""
-        if isinstance(name, str) and name:
-            visible.add(name)
-
-    tool_to_ns: dict[str, str] = {}
-    for ns_obj in session.namespaces:
-        for tname in ns_obj.tool_names:
-            tool_to_ns[tname] = ns_obj.name
+    # Session-owned seams (RA-142): the gate asks instead of re-deriving.
+    visible = session.turn_visible_tool_names()
 
     for tc in decision.tool_calls:
         resolved = tc.tool_name
-        if resolved not in visible and resolved not in tool_to_ns:
-            alternate = canonical_tool_name(resolved)
-            if alternate != resolved and (alternate in visible or alternate in tool_to_ns):
-                resolved = alternate
+        alternate = canonical_tool_name(resolved)
+        if resolved not in visible and alternate in visible:
+            resolved = alternate
         if resolved in visible:
             continue
-        ns_name = tool_to_ns.get(resolved, "deferred")
-        return Observation(
-            observation_id=new_id("obs"),
-            success=False,
-            payload=None,
-            error=(
-                f"tool {tc.tool_name} belongs to deferred namespace '{ns_name}' "
-                "which is not loaded this turn. "
-                "Call tool_search for its namespace before using it."
+        ns_name = (
+            session.namespace_of_tool(resolved)
+            or (session.namespace_of_tool(alternate) if alternate != resolved else None)
+            or "deferred"
+        )
+        return _wire_block_observation(
+            status=TOOL_WIRE_INVALID,
+            reason="namespace_not_loaded",
+            tool_name=tc.tool_name,
+            call_id=tc.call_id,
+            middle_parts=(
+                f"tool {tc.tool_name} belongs to deferred namespace '{ns_name}' which is not loaded this turn",
             ),
-            tool_call_id=tc.call_id,
-            extra={
-                FAILURE_KIND: FAILURE_KIND_TOOL_WIRE,
-                OBS_RESULT_KIND: MemoryRecordKind.TOOL_RESULT,
-                TOOL_WIRE_STATUS: TOOL_WIRE_INVALID,
-                TOOL_WIRE_REASON: "namespace_not_loaded",
-            },
+            guidance="Call tool_search for its namespace before using it.",
         )
     return None
 

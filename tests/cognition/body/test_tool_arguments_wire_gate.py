@@ -218,7 +218,8 @@ def test_unloaded_namespace_is_not_executable() -> None:
         hidden = unexposed_tool_block_observation(
             _decision(
                 ToolCall(call_id="c1", tool_name="run_command", arguments={"command": "find /tmp"})
-            )
+            ),
+            session,
         )
         assert hidden is not None
         assert hidden.success is False
@@ -227,7 +228,8 @@ def test_unloaded_namespace_is_not_executable() -> None:
         visible = unexposed_tool_block_observation(
             _decision(
                 ToolCall(call_id="c2", tool_name="tool_search", arguments={"namespace": "shell"})
-            )
+            ),
+            session,
         )
         assert visible is None
     finally:

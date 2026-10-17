@@ -2096,6 +2096,60 @@
       "passes": true,
       "priority": 3,
       "title": "Converge agt_* -> asst_* binding resolution onto one seam"
+    },
+    {
+      "acceptanceCriteria": [
+        "`ToolDeferSession` exposes a seam (e.g. `namespace_of_tool(name) -> str | None`) backed by one internal map built in `update_turn`; unknown tool returns None, never raises.",
+        "`NamespaceApprovalStrategy.evaluate` and `unexposed_tool_block_observation` no longer hand-iterate `session.namespaces`/`ns.tool_names`; the lazy `current_defer_session` import inside `NamespaceApprovalStrategy.evaluate` stays lazy (import-cycle constraint).",
+        "The unexposed gate's visible-set derivation no longer parses wire-spec dicts; it asks the session (e.g. `turn_visible_tool_names()`), since the session owns the wire shape.",
+        "Existing `tests/scenario/test_wire_gate_namespace.py` (C1-C4) and `test_namespace_approval_strategy.py` stay green; new seam-level test: map hit / miss / unknown; `ruff check` clean."
+      ],
+      "branchName": "raphy/arch-20261014-2245",
+      "description": "As an LCA maintainer, I want the tool->namespace question answered by one session-owned seam instead of two hand-rolled loops, because `NamespaceApprovalStrategy.evaluate` (approval_engine.py:260-265) and `unexposed_tool_block_observation` (tool_wire_gate.py:128-133) both derive `{tool_name: namespace}` from `session.namespaces` with verbatim-shape loops ('two = real'), leaking the session's internal tuple shape across the seam. A third reader, the unexposed gate, additionally parses wire-spec dicts (`spec.get('function').get('name')`) to recover the visible tool set, while the wire shape is owned by `session._tool_to_spec`. Any new caller re-implements the traversal, and a change to the session's internal shape breaks both silently.",
+      "id": "RA-142",
+      "passes": true,
+      "priority": "P1",
+      "title": "Converge the two hand-rolled tool->namespace maps onto a session-owned seam"
+    },
+    {
+      "acceptanceCriteria": [
+        "`unexposed_tool_block_observation` builds its Observation via `_wire_block_observation` with `status=TOOL_WIRE_INVALID`, `reason='namespace_not_loaded'`, the namespace message in `middle_parts`, and the 'Call tool_search for its namespace before using it.' instruction passed as the `guidance` override (the shorten/split default guidance is wrong for this gate).",
+        "The model-facing error text stays byte-equivalent (memory/history pins it); the `extra` key set matches the other two gates exactly.",
+        "Existing `tests/scenario/test_wire_gate_namespace.py` (C1-C4, F2-F3) stays green; new assertion: the unexposed block carries the same `extra` key set as the other gates; `ruff check` clean."
+      ],
+      "branchName": "raphy/arch-20261014-2245",
+      "description": "As an LCA maintainer, I want the unexposed-namespace gate to build its blocking Observation through `_wire_block_observation`, because the constructor's own docstring declares it the 'Single constructor seam for wire-gate blocking Observations' whose guidance text is 'single-sourced here so the product text cannot drift between gates', yet `unexposed_tool_block_observation` bypasses it and hand-duplicates the `extra` key contract (FAILURE_KIND, OBS_RESULT_KIND, TOOL_WIRE_STATUS, TOOL_WIRE_REASON). If the constructor gains a key, the unexposed gate silently diverges.",
+      "id": "RA-143",
+      "passes": true,
+      "priority": "P1",
+      "title": "Route unexposed_tool_block_observation through the _wire_block_observation constructor seam"
+    },
+    {
+      "acceptanceCriteria": [
+        "`unexposed_tool_block_observation(decision, defer_session=None)` accepts the session explicitly; `None` falls back to the ambient `current_defer_session()` read, preserving the exact legacy early-return semantics (`session is None or not policy.enabled or not namespaces` -> legacy full-list path).",
+        "The sole caller (`action_handlers.py:240`, `UseToolOperation`) reads the ContextVar once at the boundary and passes the session in; the lazy import moves to that boundary.",
+        "Existing `tests/scenario/test_wire_gate_namespace.py` C1-C4 pass with the session passed explicitly (the fixture can drop the ContextVar plumbing for the direct-call cases); `ruff check` clean."
+      ],
+      "branchName": "raphy/arch-20261014-2245",
+      "description": "As an LCA maintainer, I want `unexposed_tool_block_observation` to take the defer session as an explicit parameter, because the `tool_wire_gate` module docstring claims it is a 'pure-function module', yet the gate lazily imports `current_defer_session` inside its body and reads the ambient ContextVar. The interface `(decision) -> Observation | None` lies about its inputs ('the interface is the test surface' fails): the gate is only testable through a ContextVar fixture, and the real decision input (this turn's defer view) hides in the call rather than the signature.",
+      "id": "RA-144",
+      "passes": true,
+      "priority": "P2",
+      "title": "Make the defer-session dependency of the unexposed gate explicit (restore the pure-function contract)"
+    },
+    {
+      "acceptanceCriteria": [
+        "One shared seam (e.g. in `approved_tools.py`, the '同类家园' per RA-139) performs separator-aware canonicalization: namespaced names (`mcp_corp.do_thing`, `cron.update`-style dotted names) are preserved across the separator while the bare name is normalized; the private twin in the batch executor is deleted.",
+        "Regression pin for RA-132's trap: namespaced snake/camel pairs round-trip to the same bare-name canonical form and never mangle the namespace part; bare names behave exactly as today.",
+        "Existing approval/batch-executor tests stay green; `ruff check` clean."
+      ],
+      "branchName": "raphy/arch-20261014-2245",
+      "description": "As an LCA maintainer, I want one shared, namespace-aware tool-name canonicalization seam, because `_canonicalise_tool_name` (private, `tool_batch_executor.py`) and `canonical_tool_name` (public, `approved_tools.py`) are twin snake<->camel normalizers for the same reason (the LLM emits either case style; the registry keeps one), and both cross the namespace separator: `mcp_corp.do_thing` becomes `mcpCorp.doThing`, which matches nothing -- a silent lookup/match failure. RA-132 was dropped for exactly this mangling; the need is real ('two = real'), the shape was wrong. The seam must split the namespace separator first and canonicalize only the bare tool name, never across it.",
+      "id": "RA-145",
+      "passes": true,
+      "priority": "P2",
+      "title": "One namespace-aware tool-name canonicalization seam (resolves RA-132's mangling trap)",
+      "notes": "recover: 2026-10-15 01:45 round recovered uncommitted residue from interrupted round; added RA-132 regression pin tests."
     }
   ]
 }
