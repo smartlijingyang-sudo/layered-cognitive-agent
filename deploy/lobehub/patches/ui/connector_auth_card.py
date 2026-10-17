@@ -171,6 +171,7 @@ def apply(ctx: PatchContext) -> bool:
         "              <ConnectorAuthCard\n"
         "                appName={connectorAuthProps.appName}\n"
         "                authUrl={connectorAuthProps.authUrl}\n"
+        "                intentId={connectorAuthProps.intentId}\n"
         "                connectionId={connectorAuthProps.connectionId}\n"
         "              />\n"
         "            )}"
