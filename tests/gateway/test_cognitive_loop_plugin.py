@@ -25,6 +25,9 @@ def test_cognitive_driver_factory_rejects_missing_mode_registry() -> None:
 def test_cognitive_driver_factory_uses_declared_mode_registry() -> None:
     mode_registry = object()
 
-    driver = _cognitive_driver_factory(_Context({RUN_MODE_REGISTRY.key: mode_registry}))
+    driver = _cognitive_driver_factory(
+        _Context({RUN_MODE_REGISTRY.key: mode_registry, "llm_resolver": object()})
+    )
 
     assert driver._assembler._mode_registry is mode_registry
+    assert driver._llm_resolver is not None
