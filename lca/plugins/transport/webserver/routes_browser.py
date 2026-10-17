@@ -229,7 +229,7 @@ _WS_LCA_STREAM_PATH = "/lca-api/browser/sessions/{session_id}/stream"
 
 @plugin(
     id="lca-gateway-routes-browser",
-    provides=("capability:browser.stream",),
+    provides=(),
     requires=("route_registry",),
     layer="L1",
     kind=PluginKind.PROVIDER,
