@@ -3,16 +3,15 @@
 from __future__ import annotations
 
 import logging
-from typing import Any, ClassVar
+from typing import TYPE_CHECKING, Any, ClassVar
 
 from lca.contracts.atoms.ids.ids import new_id
 from lca.contracts.models.browser.models import BrowserActionResult, BrowserActionType
 from lca.contracts.models.core.execution.decision import Observation
 from lca.contracts.protocols import Tool
-from lca.infrastructure.browser.cdp_driver import (
-    PlaywrightCDPDriver,
-    get_shared_browser_driver,
-)
+
+if TYPE_CHECKING:
+    from lca.infrastructure.browser.cdp_driver import PlaywrightCDPDriver
 
 logger = logging.getLogger(__name__)
 
@@ -55,7 +54,11 @@ class BrowserNavigateTool(Tool):
         self._driver = driver
 
     def _get_driver(self) -> PlaywrightCDPDriver:
-        return self._driver or get_shared_browser_driver()
+        if self._driver is not None:
+            return self._driver
+        from lca.infrastructure.browser.cdp_driver import get_shared_browser_driver
+
+        return get_shared_browser_driver()
 
     def validate(self, args: dict[str, Any]) -> str | None:
         if not args.get("url") or not isinstance(args["url"], str):
@@ -235,7 +238,11 @@ class BrowserCloseTool(Tool):
         self._driver = driver
 
     def _get_driver(self) -> PlaywrightCDPDriver:
-        return self._driver or get_shared_browser_driver()
+        if self._driver is not None:
+            return self._driver
+        from lca.infrastructure.browser.cdp_driver import get_shared_browser_driver
+
+        return get_shared_browser_driver()
 
     def validate(self, args: dict[str, Any]) -> str | None:
         if not args.get("session_id") or not isinstance(args["session_id"], str):

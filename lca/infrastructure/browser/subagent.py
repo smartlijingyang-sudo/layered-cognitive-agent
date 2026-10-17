@@ -11,7 +11,6 @@ from lca.contracts.models.browser.models import (
 from lca.contracts.protocols import Tool
 from lca.infrastructure.browser.arbitration import BrowserArbitrationEngine
 from lca.infrastructure.computer.desktop_lock import DesktopLockCoordinator
-from lca.infrastructure.tools.browser.tools import build_browser_tools
 
 
 class BrowserSubagent:
@@ -33,6 +32,8 @@ class BrowserSubagent:
         self.lock_manager = lock_manager
         self.arbitration_engine = arbitration_engine
         # 严格过滤工具集：严禁声带发声工具
+        from lca.infrastructure.tools.browser.tools import build_browser_tools
+
         self._tools: list[Tool] = [
             tool for tool in build_browser_tools() if getattr(tool, "name", "") != "send_message"
         ]
