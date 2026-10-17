@@ -55,6 +55,8 @@ def test_defer_policy_standard_namespaces() -> None:
         "cron",
         "avatar",
         "creator",
+        # ADR-0280: browser (real Chromium browser tasks and page interaction).
+        "browser",
     }
     assert "shell" in policy.namespace_approval
     assert policy.namespace_approval["shell"] == "require_approval"
