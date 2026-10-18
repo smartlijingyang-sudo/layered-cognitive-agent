@@ -1,5 +1,13 @@
 ## Codebase Patterns
 
+- **排他宣称 + silent else = 叙事≠实现（RA-148 实证）：**
+  docstring 写"只通过 X"时，先 grep 实现里有没有 `else` 走另一条 seam。
+  `WebSearchExecutor` 宣称只走 SearchService（Definition），`search=None`
+  时静默走 infra `web_search`（单活派发 vs 有序 fallback、可观测打点、失败
+  语义全不同）。修法二选一（RA-115 规则）：删 else fail-closed，或声明双路径
+  + 把实际走的 seam 写进 Observation.extra（叙事 == 实现）。else 分支若有
+  独立消费者（ambient fallback 撑 standalone 场景）就别删——叙事错了修叙事。
+
 - **伪造结果钉进测试 = 把谎言变成契约（RA-146 认领）：**
   interface 声称执行、实现伪造结果时，`assert result.success is True`
   之类的测试钉的是伪造值。"The interface is the test surface"——
@@ -4041,3 +4049,71 @@ brain/reducer/memory/hub/standing_refresher 等键，待 RA-123 落地后再评�
   - `_RECENT_SEARCH_RESULTS` 是进程级缓存：citation 引用解析依赖"同进程先 search"；
     跨进程/重启后引用失效是已知语义，acceptance 里已用 fail-closed 覆盖，
     不算 bug。
+
+
+## 2026-10-19 01:45 CST - assess (1 candidate: RA-148)
+
+- Basis: main tip `0a024decf`（RA-147 已合 main，仓库只剩 main）。
+- Hot areas: (A) `lca/cognition/proactive/worthiness.py`（249L 逐行读完——
+  纯函数门，downgrade-only 合并诚实，docstring 的 fail-closed/fail-open
+  划分与代码逐行对得上，未立案，诚实模块范例）；(B)
+  `lca/application/api/api.py`（334L 门面读完——`run()` 的 capability
+  bindings set/reset 在 finally 里归还，无泄漏，未立案）；(C) web_search
+  双 seam（`tools/web_search/__init__.py` + `capability/search/search.py` +
+  `search/service/service.py` + `tools/default/set.py` + `plugins/act/tools/provider.py`，
+  逐行读完 → 立案）。
+- Runtime verification: mock LLM smoke RUN1/RUN2 均为 completed，无 P0。
+- Story: **RA-148**（Worth exploring, P2）——`WebSearchExecutor` docstring
+  宣称"只通过 SearchService（Definition）发请求"，`search=None` 时静默走
+  infra `web_search`（另一套 provider 策略：单活派发 vs 有序 fallback、
+  可观测打点、失败语义全不同）；接口无法区分哪条 seam 执行；
+  kernel degrade-to-None 纪律被违反（search=None 没跳过工具而是静默换
+  backend）；零测试覆盖派发决策。RA-115 同类（叙事≠实现）+ 可测试性缺口。
+  修法二选一：(a) 删 else 分支 fail-closed；(b) 显式声明双路径 + 暴露实际
+  seam + 测试钉住。叙事必须等于实现。
+- **Learnings for future iterations:**
+  - "叙事≠实现" hunting 可系统化：grep docstring 里的"只通过/唯一"类排他
+    宣称，再读实现看有没有 silent else 分支——RA-115（5-gate）、RA-148
+   （web_search）同形状；加入 assess 固定动作。
+  - capability Definition seam + infra module fn 双 `web_search` 的并存是
+    "kernel ctx 平面 vs infrastructure 平面"分层的自然产物；评估时先问
+    "第二条 seam 的消费者是谁"（这里是 browser tools RA-147 + web_search
+    工具的 else 分支），再判是重复还是分工——别一看到双胞胎就收敛。
+  - worthiness.py 是"docstring 诚实纪律成立时"的正面样本：REJECTED 短路
+    在 downgrade 合并之前、downgrade-only 永不升级，逐行可验；以后 assess
+    怀疑叙事时按这个标准逐行对。
+
+
+## 2026-10-19 02:05 CST - RA-148
+
+- What was implemented: `WebSearchExecutor` 的静默双派发收敛为**显式声明的双路径**
+  （评估选项 b）。docstring 从"只通过 SearchService（Definition）发请求"改写为双路径
+  声明（search 给了走 kernel Definition seam 单活派发；None 走 infra ambient
+  web_search 有序 fallback）；`search()` 按实际走的 seam 写
+  `Observation.extra["search_seam"]`（`"definition"` | `"ambient"`），成功/失败
+  两个 Observation 都带标记（校验失败路径不走 seam，无标记）；工具
+  name/namespace/parameters 契约不变；SearchService 仍是 kernel seam
+  （ctx.search 拥有者，无 composition root 内联实例化）。
+- Files changed:
+  - lca/infrastructure/tools/web_search/__init__.py（docstring 重写 + seam
+    变量 + 两个 Observation 加 extra 标记）
+  - tests/infrastructure/tools/test_web_search_dispatch.py（新：3 测试钉住
+    definition 路径 / ambient 路径 / ambient 失败路径的 seam 标记）
+  - raphy/prd.json（RA-148 passes=true）
+- Tests: 新测试 3 passed；回归 tests/unit/infrastructure/search/
+  test_search_providers.py 4 passed；`ruff check` clean、`ruff format --check`
+  clean。tests/scenario/plugin/test_plugin_alignment.py 3 failed 经干净
+  worktree（main）复验证实为 pre-existing（`tests/scenario/lca/` 镜像树缺失，
+  FileNotFoundError，与本轮改动无关）。
+- **Learnings for future iterations:**
+  - 修法二选一时先跑 deletion test：else 分支有独立消费者（无 kernel 的
+    standalone 场景靠 ambient fallback 出搜索），删掉是破坏不是收敛——
+    叙事错了就修叙事（RA-115 "删掉承诺也是诚实解"的另一半），别为了字面
+    契合删有用的 fallback。
+  - monkeypatch 点选跟导入方式走：`tools/web_search/__init__.py` 是模块级
+    `from ... import web_search`，测试必须 patch 工具模块命名空间
+    （`lca.infrastructure.tools.web_search.web_search`），patch service 模块
+    源头够不着已绑定的名字——RA-147 的"patch service 模块"经验只适用于
+    函数级延迟导入。
+  - pre-existing 红的验证纪律：`git worktree add ~/.lca-worktrees/<name> main`
+    跑同一文件，红一样即与本轮无关；结论写进 progress，不默默跳过。

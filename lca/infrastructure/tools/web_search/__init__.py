@@ -59,7 +59,18 @@ MANIFEST = ToolManifest(
 
 
 class WebSearchExecutor:
-    """search seam Consumer — 只通过 SearchService（Definition）发请求。"""
+    """search seam Consumer — 双路径声明（叙事 == 实现，RA-148）：
+
+    - ``search`` 给了 SearchService（kernel Definition seam，ctx.search 的拥有者）
+      时走它：单活 provider 派发（ProviderDispatch.current()）。
+    - ``search`` 为 None 时走 infrastructure 的 ambient ``web_search``
+      （``lca/infrastructure/search/service/service.py``）：按
+      ``configured_provider_ids()`` 有序 fallback，用于无 kernel 上下文的
+      独立场景。
+
+    实际走的 seam 写进 ``Observation.extra["search_seam"]``
+    （``"definition"`` | ``"ambient"``）——接口层面可区分、可测试。
+    """
 
     def __init__(self, search: SearchService | None = None) -> None:
         self._search = search
@@ -84,8 +95,10 @@ class WebSearchExecutor:
         range_s = str(time_range) if isinstance(time_range, str) and time_range.strip() else None
 
         if self._search is not None:
+            seam = "definition"
             result = await self._search.web_search(query, topic=topic_s, time_range=range_s)
         else:
+            seam = "ambient"
             result = await web_search(query, topic=topic_s, time_range=range_s)
         latency_ms = int((time.monotonic() - start) * 1000)
         content = format_search_content(result)
@@ -102,6 +115,7 @@ class WebSearchExecutor:
                     "state": state,
                 },
                 latency_ms=latency_ms,
+                extra={"search_seam": seam},
             )
 
         return Observation(
@@ -110,6 +124,7 @@ class WebSearchExecutor:
             payload={"text": content, "query": query, "state": state},
             error=result.error or "search failed",
             latency_ms=latency_ms,
+            extra={"search_seam": seam},
         )
 
 
