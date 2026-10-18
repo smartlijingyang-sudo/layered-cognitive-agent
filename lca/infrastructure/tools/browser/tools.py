@@ -22,19 +22,16 @@ from lca.infrastructure.tools.browser.driver_tool import (
     _DriverInjectedTool,
     browser_preview_widget_tag,
 )
-from lca.infrastructure.tools.browser.task_store import get_shared_task_store
+from lca.infrastructure.tools.browser.task_store import (
+    get_shared_citation_store,
+    get_shared_task_store,
+)
 
 if TYPE_CHECKING:
     from lca.infrastructure.browser.arbitration import BrowserArbitrationEngine
     from lca.infrastructure.browser.cdp_driver import PlaywrightCDPDriver
 
 logger = logging.getLogger(__name__)
-
-
-# 最近搜索结果缓存：citation_id -> {"title": str, "url": str, "snippet": str}。
-# 由 BrowserSearchTool.execute 在真实搜索成功后填充，供
-# BrowserLookupCitationUrlTool.execute 做真实引用解析（RA-147）。
-_RECENT_SEARCH_RESULTS: dict[str, dict[str, str]] = {}
 
 
 def _normalize_url(url: str) -> str:
@@ -132,15 +129,14 @@ class BrowserSearchTool(Tool):
             )
 
         search_id = new_id("bsearch")
+        citation_store = get_shared_citation_store()
         results = []
         for i, hit in enumerate(response.results, start=1):
             citation_id = f"cit_{search_id}_{i}"
             snippet = (hit.content or "")[:400]
-            _RECENT_SEARCH_RESULTS[citation_id] = {
-                "title": hit.title,
-                "url": hit.url,
-                "snippet": snippet,
-            }
+            # RA-152: 引用缓存走 task store seam 的 SearchCitationStore（LRU 有界），
+            # 不再是模块全局无界 dict。
+            citation_store.put(citation_id, title=hit.title, url=hit.url, snippet=snippet)
             results.append(
                 {
                     "citation_id": citation_id,
@@ -341,7 +337,7 @@ class BrowserLookupCitationUrlTool(Tool):
             )
         # RA-147: 只解析真实搜索产生过的引用；未知引用 fail-closed，
         # 绝不返回伪造 URL。
-        hit = _RECENT_SEARCH_RESULTS.get(cid)
+        hit = get_shared_citation_store().get(cid)
         if hit is None:
             return Observation(
                 observation_id=new_id("obs"),

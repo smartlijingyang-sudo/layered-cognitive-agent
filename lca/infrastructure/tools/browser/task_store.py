@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import time
+from collections import OrderedDict
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -22,7 +23,6 @@ class BrowserTaskRecord:
     current_url: str | None = None
     title: str | None = None
     payment_approved: bool = False
-    captcha_preference: str = "solve"
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -129,3 +129,48 @@ _SHARED_TASK_STORE = BrowserTaskStore()
 def get_shared_task_store() -> BrowserTaskStore:
     """SSOT singleton accessor for browser task store."""
     return _SHARED_TASK_STORE
+
+
+class SearchCitationStore:
+    """搜索引用缓存（RA-152）：citation_id -> {"title", "url", "snippet"}。
+
+    前身为 tools.py 的模块全局无界 dict `_RECENT_SEARCH_RESULTS`
+    （BrowserSearchTool 写、BrowserLookupCitationUrlTool 读，无驱逐、无上限、
+    无归属 seam）。按"双胞胎收敛优先塞进同类家园"（RA-139）落在此 task store
+    seam，不新建模块。
+
+    OrderedDict LRU + 条目上限：写/读都刷新 recency，最久未用先被驱逐；
+    进程重启即清空 —— citation_id 只在单进程生命周期内有效。
+    """
+
+    DEFAULT_MAX_ENTRIES = 512
+
+    def __init__(self, max_entries: int = DEFAULT_MAX_ENTRIES) -> None:
+        self._max_entries = max_entries
+        self._entries: OrderedDict[str, dict[str, str]] = OrderedDict()
+
+    def put(self, citation_id: str, title: str, url: str, snippet: str) -> None:
+        self._entries[citation_id] = {"title": title, "url": url, "snippet": snippet}
+        self._entries.move_to_end(citation_id)
+        while len(self._entries) > self._max_entries:
+            self._entries.popitem(last=False)
+
+    def get(self, citation_id: str) -> dict[str, str] | None:
+        hit = self._entries.get(citation_id)
+        if hit is not None:
+            self._entries.move_to_end(citation_id)
+        return hit
+
+    def clear(self) -> None:
+        self._entries.clear()
+
+    def __len__(self) -> int:
+        return len(self._entries)
+
+
+_SHARED_CITATION_STORE = SearchCitationStore()
+
+
+def get_shared_citation_store() -> SearchCitationStore:
+    """SSOT singleton accessor for the search citation cache."""
+    return _SHARED_CITATION_STORE

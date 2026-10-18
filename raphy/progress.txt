@@ -4206,3 +4206,14 @@ brain/reducer/memory/hub/standing_refresher 等键，待 RA-123 落地后再评�
   - helper 抽取后用断言验字节一致（旧 f-string vs 新调用），比"肉眼像"可靠；这是零行为变化类 story 的标准自证。
 - **实现与评估差异：** 评估说 widget 重复在 open/spawn/transfer 三处，实现时 spawn 的那处已被 RA-149 删掉，实际收敛 open+transfer 两处；其余与评估一致（同类家园 driver_tool.py、懒导入保留、包内私有不进 __init__.py 导出）。
 ---
+
+## [2026-10-19 07:19] - RA-152
+- 删 BrowserTaskRecord.captcha_preference 死字段（task_store.py:25）：全仓 `record.captcha_preference` / `captcha_preference=` 零读写（定义仅 1 次），真状态只在 BrowserTaskStore._captcha_preferences（scope 键 all_tasks/site:/task:）；顺带查了 update_task(**kwargs) 的 hasattr 动态写入路径（零调用，安全）。
+- _RECENT_SEARCH_RESULTS 模块全局无界 dict 收敛进 task store seam：task_store.py 新增 SearchCitationStore（OrderedDict LRU，默认上限 512，写/读都刷新 recency，最久未用先驱逐）+ get_shared_citation_store() 共享单例；BrowserSearchTool 写、BrowserLookupCitationUrlTool 读都走它；citation_id 格式 cit_<search_id>_<i> 不变。
+- Files changed: lca/infrastructure/tools/browser/task_store.py（删字段 + SearchCitationStore）；lca/infrastructure/tools/browser/tools.py（删全局、search/lookup 走 store）；tests/contracts/browser/test_browser_muse_full_suite.py（4 个新测试：死字段不存在断言、scope 优先级 task>site>all_tasks+默认值、LRU 驱逐+读刷新+重写不膨胀、全局已收敛断言）。
+- Tests: 4 new ra152 tests pass；tests/contracts/browser + tests/scenario/browser + tests/infrastructure/browser 56 passed；ruff check clean。
+- **Learnings for future iterations:**
+  - LRU 驱逐语义：读也要 move_to_end（真 LRU），测试里钉"读刷新 recency"，否则退化为 FIFO。
+  - 删 dataclass 死字段前，除了 grep 读写，还要查 hasattr 动态写入形状（本轮 update_task(**kwargs)）——零调用才算真死。
+- **实现与评估差异：** 评估把"引用缓存家园（store seam vs 单独模块）"留作判断点；实现按 RA-139 pattern（双胞胎收敛优先塞进同类家园）落在 task_store.py 内，不新建模块。citation 上限取 512（单进程搜索会话量级，进程重启即清空的语义不变）。
+---

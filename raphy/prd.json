@@ -2250,7 +2250,7 @@
         "ruff check clean; existing captcha/search/lookup tests stay green."
       ],
       "priority": "P2",
-      "passes": false,
+      "passes": true,
       "branchName": "raphy/arch-20261019-0447",
       "notes": "Strength: Worth exploring. Field deletion is uncontroversial; the citation-cache home (store seam vs separate module) is a judgment call."
     },
