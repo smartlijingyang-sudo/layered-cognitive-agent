@@ -497,7 +497,7 @@ def parse_step_evidence(
             local_f = Path(clean_p)
             if not local_f.is_file() and "/" in clean_p:
                 parts = clean_p.split("/")
-                for i in range(len(parts)):
+                for i, _ in enumerate(parts):
                     candidate_p = Path("/".join(parts[i:]))
                     if candidate_p.is_file():
                         local_f = candidate_p
