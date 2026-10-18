@@ -2182,6 +2182,21 @@
       "passes": true,
       "branchName": "raphy/arch-20261018-2258",
       "notes": "Strength: Strong. Area A friction walk (browser 13-tool suite), fabricated-results interface + testability gap class; RA-146's twin in the adjacent module. Evidence: tools.py BrowserSearchTool.execute canned results, BrowserLookupCitationUrlTool example.com/ref fabrication, BrowserDeepResearchTool fake 'running' status; pinning test test_muse_lightweight_search_and_citation. Real seam: lca/infrastructure/search/service.py."
+    },
+    {
+      "id": "RA-148",
+      "title": "Converge web_search tool's silent dual-dispatch onto the declared SearchService seam",
+      "description": "As an LCA maintainer, I want the web_search tool to route through exactly one declared search seam, because WebSearchExecutor (lca/infrastructure/tools/web_search/__init__.py) declares itself a 'search seam Consumer -- only through SearchService (Definition)', yet when search=None its search() method silently falls back to the infrastructure module-level web_search (lca/infrastructure/search/service/service.py) -- a different seam with a different provider strategy: SearchService.web_search dispatches a single active ProviderDispatch ('current()', RuntimeError when no provider registered, no observability marking, no fallback chain), while infra web_search tries configured_provider_ids() in order with per-provider fallback, fires mark_web_search_attempt scope observability, and returns SearchResponse(error=...) gracefully. Through the identical Tool.execute interface a caller cannot tell which seam executed the query, which providers were tried, or which failure semantics apply. It also breaks the kernel degrade-to-None discipline: _g2a_factory (lca/plugins/act/tools/provider.py) degrades a wrong-shaped b.search to None expecting 'build_default_tools skips the corresponding tools', but web_search tools are built regardless and silently swap backends instead of being skipped. Same class as RA-115 (narrative vs implementation mismatch), plus a testability gap: zero tests cover the dispatch decision.",
+      "acceptanceCriteria": [
+        "One declared seam, narrative == implementation (RA-115 rule). Either (a) delete the silent else branch: when search is None, WebSearchExecutor returns a fail-closed Observation (success=False, honest error such as 'no search backend configured'), matching the existing docstring claim; or (b) keep both paths but declare the fallback explicitly in the docstring, expose which seam executed each call (e.g. via Observation extra / reason text), and pin both paths with tests.",
+        "Whichever direction: SearchService remains the kernel seam (owns ctx.search; providers registered via the lca-search-provider plugin). No SearchService() inline instantiation in the composition root (tests/scenario/plugin/test_plugin_alignment.py guard must stay green).",
+        "Tests: new tests pin the dispatch decision (search=None vs SearchService provided) through the tool interface; the silent dual-dispatch is either gone or declared+tested. tests/unit/infrastructure/search/test_search_providers.py (infra fallback chain) unaffected; ruff check clean.",
+        "Behavior compatibility: browser/tools.py direct use of infra web_search (RA-147) unchanged; the infra web_search seam itself stays (multi-consumer). Tool name/namespace/parameters of the web_search tool unchanged."
+      ],
+      "priority": "P2",
+      "passes": false,
+      "branchName": "raphy/arch-20261019-0145",
+      "notes": "Strength: Worth exploring. Fix direction (fail-closed vs declared dual-path) is a judgment call; kernel plugin wiring implications deserve care."
     }
   ]
 }
