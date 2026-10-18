@@ -702,8 +702,8 @@
 | BRAINSTORM-STOCHASTIC-DECOUPLE-DESIGN-DOC | 沉淀设计文档至 docs/plans/ 并提交 git | Completed | 成功落盘 docs/plans/2026-10-18-stochastic-decision-brain-and-stealth-actuator-decoupling-design.md 并提交 git |
 | BRAINSTORM-STOCHASTIC-DECOUPLE-TRANSITION | 转换至实施计划制定（writing-plans） | Completed | 成功落盘 docs/plans/2026-10-18-stochastic-decision-brain-and-stealth-actuator-decoupling-plan.md 并分解为 6 大单流任务 |
 | DECOUPLE-TASK-1 | [黑板与事件总线] 强类型 SessionBlackboard 与异步事件模型 (Blackboard & Events) | Completed | SessionBlackboard 线程安全黑板、BlackboardSnapshot 不可变快照与 EventBus 落地，6/6 单测全绿，commit 936f825 |
-| DECOUPLE-TASK-2 | [决策调度层] 纯数学二阶马尔可夫与效用修正大脑 (StochasticDecisionBrain) | In Progress | 正在编写马尔可夫效用与时长采样测试断言 |
-| DECOUPLE-TASK-3 | [微内核场景编排] 场景插件统一契约与 5 大单文件插件 (SceneSkillRegistry & Plugins) | Pending | 待执行 |
+| DECOUPLE-TASK-2 | [决策调度层] 纯数学二阶马尔可夫与效用修正大脑 (StochasticDecisionBrain) | Completed | 二阶马尔可夫矩阵、链式效用修饰器、对数正态时长采样与 8% 分心中断引擎落地，7/7 单测全绿，commit 07c62c5 |
+| DECOUPLE-TASK-3 | [微内核场景编排] 场景插件统一契约与 5 大单文件插件 (SceneSkillRegistry & Plugins) | Completed | SceneSkill 统一契约、SceneSkillRegistry 注册中心与 5 大核心独立插件（for_you/search_interact/notify/graph_manage/rest_idle）落地，4/4 单测全绿，commit 1b450b6 |
 | DECOUPLE-TASK-4 | [物理执行层与铁律收敛] StealthActuator 拟真底座与 NavigationRouter (StealthActuator) | Pending | 待执行 |
 | DECOUPLE-TASK-5 | [全量替换与旁路自愈] 彻底切除旧版 scenarios.py/roulette.py，组装生产 Pilot (Pilot Assembly) | Pending | 待执行 |
 | DECOUPLE-TASK-6 | [可视化监控与全链路门禁] FastAPI 实时双屏 WebSocket 与前端大盘集成 (Telemetry & HUD) | Pending | 待执行 |
