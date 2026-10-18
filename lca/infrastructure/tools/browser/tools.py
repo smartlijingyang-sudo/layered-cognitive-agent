@@ -18,10 +18,7 @@ from lca.contracts.atoms.ids.ids import new_id
 from lca.contracts.models.browser.models import BrowserActionResult, BrowserActionType
 from lca.contracts.models.core.execution.decision import Observation
 from lca.contracts.protocols import Tool
-from lca.infrastructure.tools.browser.task_store import (
-    BrowserTaskRecord,
-    get_shared_task_store,
-)
+from lca.infrastructure.tools.browser.task_store import get_shared_task_store
 
 if TYPE_CHECKING:
     from lca.infrastructure.browser.arbitration import BrowserArbitrationEngine
@@ -382,14 +379,14 @@ class BrowserLookupCitationUrlTool(Tool):
 # =====================================================================
 
 class BrowserSpawnTaskTool(Tool):
-    """开一个全新的 live Chromium 异步任务（Muse 核心任务层）。"""
+    """浏览器异步任务派发工具：派发后端尚未实现，调用 fail-closed（Muse 核心任务层占位）。"""
 
     name: ClassVar[str] = "browser_spawn_task"
     namespace: ClassVar[str] = "browser"
     description: ClassVar[str] = (
-        "开一个全新的 live Chromium 异步任务。必填 task：完整自包含的任务书。"
-        "worker 看不到对话上下文，必须包含目标、已知条件、约束与成功标准。"
-        "只返回回执 {browser_task_id}，禁止轮询或 sleep 等待，结果经 handoff 自动回流。"
+        "浏览器异步任务派发工具（任务书参数契约保留）。"
+        "【未实现】异步派发后端尚未实现：调用将返回错误，不会启动后台任务；"
+        "不要承诺后台执行或 handoff 结果回流。"
     )
     parameters: ClassVar[dict[str, Any]] = {
         "type": "object",
@@ -433,60 +430,20 @@ class BrowserSpawnTaskTool(Tool):
         return get_shared_browser_driver()
 
     async def execute(self, args: dict[str, Any]) -> Observation:
-        task_text = str(args["task"])
-        raw_url = args.get("initial_url")
-        initial_url = _normalize_url(str(raw_url)) if raw_url else "about:blank"
-        session_id = str(args.get("session_id") or new_id("brw"))
-        task_id = new_id("btask")
-
-        # 调度并初始化 Chromium Session
-        driver = self._get_driver()
-        title = "Browser Task"
-        final_url = initial_url
-        try:
-            summary = await driver.create_session(session_id=session_id, initial_url=initial_url)
-            title = summary.title or "Browser Task"
-            final_url = summary.url or initial_url
-        except Exception as e:
-            logger.warning("[BrowserSpawnTaskTool] Driver warning: %s", e)
-
-        # 登记到共享任务存储
-        record = BrowserTaskRecord(
-            task_id=task_id,
-            task_description=task_text,
-            session_id=session_id,
-            status="running",
-            initial_url=final_url,
-            current_url=final_url,
-            title=title,
-        )
-        task_store = get_shared_task_store()
-        task_store.register_task(record)
-        task_store.add_timeline_step(task_id, "spawn", f"Task spawned: {task_text[:80]}")
-
-        widget_tag = f"[widget:browser_preview?sessionId={session_id}&url={final_url}&title={title}&status=agent_running]"
-        text_content = (
-            f"已派发异步浏览器任务 `{task_id}`。\n"
-            f"任务会话：{session_id}，目标：{final_url}\n\n"
-            f"{widget_tag}\n\n"
-            f"提示：任务在后台异步执行中，请结束本轮发言等待 handoff 结果回流，无需轮询等待。"
-        )
-
-        res = BrowserActionResult(
-            action_type=BrowserActionType.SPAWN,
-            success=True,
-            session_id=session_id,
-            task_id=task_id,
-            url=final_url,
-            title=title,
-            text_content=text_content,
-            details={"browser_task_id": task_id, "session_id": session_id, "status": "running"},
+        # RA-149: 没有真实的异步派发后端（无 worker loop、无 handoff producer，
+        # task_description 全仓零消费者），诚实 fail-closed。绝不返回"已派发/running"的伪造回执。
+        task_text = str(args.get("task") or "")
+        logger.warning(
+            "[BrowserSpawnTaskTool] async spawn backend not implemented (task=%r)",
+            task_text[:80],
         )
         return Observation(
             observation_id=new_id("obs"),
-            success=True,
-            payload={**res.model_dump(), "widget_tag": widget_tag, "browser_task_id": task_id},
+            success=False,
+            payload=None,
+            error="浏览器异步任务派发尚未实现：browser_spawn_task 当前无法派发真实后台任务（无 worker 后端、无 handoff 回流接线）",
         )
+
 
 
 class BrowserSteerTaskTool(Tool):

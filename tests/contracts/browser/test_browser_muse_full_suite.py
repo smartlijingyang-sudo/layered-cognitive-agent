@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import pytest
 
-from lca.infrastructure.browser.cdp_driver import PlaywrightCDPDriver
 from lca.infrastructure.tools.browser import (
     BrowserCloseTaskTool,
     BrowserDeepResearchTool,
@@ -142,23 +141,44 @@ async def test_muse_find_tool() -> None:
 
 
 @pytest.mark.asyncio
-async def test_muse_task_lifecycle_spawn_steer_peek_close() -> None:
-    """测试核心任务层生命周期：spawn -> steer -> peek -> list -> close。"""
-    driver = PlaywrightCDPDriver()
-    spawn_tool = BrowserSpawnTaskTool(driver=driver)
+async def test_muse_spawn_task_fail_closed() -> None:
+    """RA-149: 无真实异步派发后端（无 worker loop、无 handoff producer）时 fail-closed，不伪造"running"回执。"""
+    spawn_tool = BrowserSpawnTaskTool()
+    obs = await spawn_tool.execute({
+        "task": "访问 muse.ai 并测试登录页面",
+        "initial_url": "https://muse.ai",
+        "session_id": "brw_muse_test_failclosed",
+    })
+    assert obs.success is False
+    assert obs.error is not None
+    assert "尚未实现" in obs.error
+    assert obs.payload is None
+
+
+@pytest.mark.asyncio
+async def test_muse_task_lifecycle_steer_peek_close() -> None:
+    """RA-149: 核心任务层生命周期（store 直接登记 -> steer -> peek -> list -> close）；spawn 工具本身已 fail-closed。"""
+    from lca.contracts.atoms.ids.ids import new_id
+    from lca.infrastructure.tools.browser.task_store import (
+        BrowserTaskRecord,
+        get_shared_task_store,
+    )
 
     task_desc = "目标：访问 muse.ai 并测试登录页面；约束：不输入敏感密码；成功标准：看到登录按钮"
-    spawn_obs = await spawn_tool.execute({
-        "task": task_desc,
-        "initial_url": "https://muse.ai",
-        "session_id": "brw_muse_test_1",
-    })
-    assert spawn_obs.success is True
-    task_id = spawn_obs.payload["browser_task_id"]
-    session_id = spawn_obs.payload["session_id"]
+    task_id = new_id("btask")
+    session_id = "brw_muse_test_1"
+    store = get_shared_task_store()
+    store.register_task(BrowserTaskRecord(
+        task_id=task_id,
+        task_description=task_desc,
+        session_id=session_id,
+        status="running",
+        initial_url="https://muse.ai",
+        current_url="https://muse.ai",
+        title="Browser Task",
+    ))
+    store.add_timeline_step(task_id, "spawn", f"Task spawned: {task_desc[:80]}")
     assert task_id.startswith("btask_")
-    assert session_id == "brw_muse_test_1"
-    assert "[widget:browser_preview" in spawn_obs.payload["widget_tag"]
 
     # 验证 peek_task
     peek_tool = BrowserPeekTaskTool()

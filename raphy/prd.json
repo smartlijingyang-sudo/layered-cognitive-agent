@@ -2208,7 +2208,7 @@
         "Tool name/namespace/parameters unchanged. CAPTCHA preference, steer/peek/close/transfer tools unaffected."
       ],
       "priority": "P1",
-      "passes": false,
+      "passes": true,
       "branchName": "raphy/arch-20261019-0447",
       "notes": "Strength: Strong. Evidence complete (zero-consumer grep); RA-147/RA-148 precedents directly apply. Top recommendation this round."
     },

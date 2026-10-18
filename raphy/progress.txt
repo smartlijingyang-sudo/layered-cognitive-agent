@@ -1,5 +1,12 @@
 ## Codebase Patterns
 
+- **fail-closed 改造后场景测试供数改走 seam（RA-149 实证）：**
+  工具 fail-closed 后，原来经该工具链条供数的场景测试不要删覆盖——改由底层
+  seam（本轮：共享任务存储 register_task + add_timeline_step）直接登记供数，
+  下游工具链（steer/peek/list/close/transfer）的覆盖完整保留；同时检查删伪造
+  分支后闲置的 import（本轮 BrowserTaskRecord）。
+
+
 - **spawn/handoff 叙事必须有生产者才成立（RA-149 实证）：**
   "任务在后台异步执行…结果经 handoff 自动回流"这类叙事，评估时先 grep
   消费侧：task_description 有没有 reader、handoff 有没有 producer。零消费者
@@ -4172,3 +4179,12 @@ brain/reducer/memory/hub/standing_refresher 等键，待 RA-123 落地后再评�
     工具层的成功断言是 bug；seam 在 liveness 检查，不在 session 创建。
   - repo-wide grep 在 252 上很慢（>10s 会 background），评估里做 2-3 个
     精准 grep 即可，用 `lca/` 限定目录别全仓扫。
+
+## [2026-10-19 06:07] - RA-149
+- BrowserSpawnTaskTool.execute 改为 fail-closed：删掉"建 session + 登记 record + 返回 running 回执"的伪造派发，调用直接返回 success=False 的诚实错误（"浏览器异步任务派发尚未实现"）；docstring/description 不再承诺后台执行/handoff 回流；工具名/命名空间/参数契约不变。__init__/_get_driver 原样保留（RA-151 收敛）。
+- Files changed: lca/infrastructure/tools/browser/tools.py（execute fail-closed + 清理 BrowserTaskRecord 闲置 import）；tests/contracts/browser/test_browser_muse_full_suite.py（原 spawn 钉回执测试拆成 test_muse_spawn_task_fail_closed 钉错误 + 生命周期测试改由 store 直接登记）；tests/scenario/browser/test_browser_lifecycle_scenarios.py（Scenario C/F 改由 store 直接登记，Scenario C 描述同步更新）。
+- **Learnings for future iterations:**
+  - fail-closed 改造后，原来"经该工具链条供数"的场景测试不要删覆盖——改由 seam（这里是共享任务存储）直接登记供数，工具链（steer/peek/list/close/transfer）覆盖完整保留。
+  - 删伪造分支时顺带检查 import：BrowserTaskRecord 在 tools.py 只剩 spawn 用，删掉防 F401。
+- **实现与评估差异：** 评估给 (a)/(b) 两选项，实现选 (a) fail-closed（RA-147 已为同类问题立先例，全仓无 worker 后端）；额外做了评估没写的两处：spawn 的 session 创建副作用一并移除（fail-closed 不做任何事），以及 BrowserTaskRecord 的 import 清理。
+---
