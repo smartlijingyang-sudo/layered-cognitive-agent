@@ -39,7 +39,7 @@ def test_cognition_does_not_import_banned(banned: str) -> None:
     """扫描 lca/cognition/**.py 源码,确保不直接 import 被禁模块。"""
     offenders: list[str] = []
     if not COGNITION_DIR.exists():
-        return
+        pytest.skip("cognition dir missing; banned-import scan not evaluated")
     for py in COGNITION_DIR.rglob("*.py"):
         text = py.read_text(encoding="utf-8")
         if _BANNED_REGEX.search(text):

@@ -24,7 +24,6 @@ from lca.contracts.protocols.declarative.declarative_2.declarative_phase_graph i
 )
 from lca.contracts.protocols.state.delta_handler import DeltaHandler, DeltaHandlerRegistry
 from lca.harness.declarative.execute.dispatch import RegistryEffectDispatcher
-from lca.runtime.support.runtime_bindings import RuntimePhaseCapabilities
 from lca.plugins.act.action.handlers_provider import (
     DefaultActionHandlerRegistry,
     InMemoryActionHandlerRegistry,
@@ -39,6 +38,7 @@ from lca.plugins.act.effect.handlers_provider import (
     InMemoryEffectHandlerRegistry,
 )
 from lca.runtime._overflow_0.idempotency_fixtures import InMemoryFixtureIdempotencyStore
+from lca.runtime.support.runtime_bindings import RuntimePhaseCapabilities
 
 REPO = Path(__file__).resolve().parents[2]
 
@@ -251,7 +251,7 @@ def test_runtime_gateway_does_not_construct_handlers_by_name() -> None:
 
     gateway_path = REPO / "lca" / "harness" / "declarative" / "execute" / "dispatch.py"
     if not gateway_path.exists():
-        return
+        pytest.skip("declarative dispatch.py missing; gate not evaluated")
     source = gateway_path.read_text(encoding="utf-8")
     tree = ast.parse(source)
     for node in tree.body:
@@ -297,7 +297,7 @@ def test_declarative_execution_uses_registry_dispatch() -> None:
 def test_runtime_binding_has_one_declarative_driver_construction_path() -> None:
     """Fresh and resumed Turns must share one closed runtime assembly seam."""
 
-    binding_path = REPO / "lca" / "runtime" / "runtime_bindings.py"
+    binding_path = REPO / "lca" / "runtime" / "support" / "runtime_bindings.py"
     tree = ast.parse(binding_path.read_text(encoding="utf-8"))
     binding_class = next(
         node
@@ -317,7 +317,7 @@ def test_runtime_binding_has_one_declarative_driver_construction_path() -> None:
         "factory so fresh and resumed Turns cannot drift."
     )
 
-    runtime_path = REPO / "lca" / "runtime" / "runtime_loop.py"
+    runtime_path = REPO / "lca" / "runtime" / "loop" / "runtime_loop.py"
     assert "DeclarativeRuntimeDriver" not in runtime_path.read_text(encoding="utf-8")
 
 
@@ -328,9 +328,9 @@ def test_runtime_loop_does_not_construct_handlers_by_name() -> None:
     execution module.  This preserves one runtime interface for every plan.
     """
 
-    runtime_path = REPO / "lca" / "runtime" / "runtime_loop.py"
+    runtime_path = REPO / "lca" / "runtime" / "loop" / "runtime_loop.py"
     if not runtime_path.exists():
-        return
+        pytest.skip("runtime_loop.py missing; gate not evaluated")
     source = runtime_path.read_text(encoding="utf-8")
     tree = ast.parse(source)
     runtime_class = next(

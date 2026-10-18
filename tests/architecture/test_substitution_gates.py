@@ -33,6 +33,8 @@ import ast
 from collections.abc import Iterable
 from pathlib import Path
 
+import pytest
+
 REPO = Path(__file__).resolve().parents[2]
 
 # ── Paths under test ─────────────────────────────────────────────────
@@ -236,7 +238,7 @@ def test_interpreter_does_not_branch_on_control_slot_names() -> None:
 
     tree = _parse(INTERPRETER_PATH)
     if tree is None:
-        return  # interpreter file does not yet exist; skip
+        pytest.skip("interpreter file missing or unparsable; gate not evaluated")
     findings = _format(_control_slot_string_dispatches(tree), INTERPRETER_PATH)
     assert not findings, (
         "Interpreter branches on control slot name strings — substitution "
@@ -252,7 +254,7 @@ def test_interpreter_fallback_does_not_branch_on_control_slot_names() -> None:
 
     tree = _parse(INTERPRETER_FALLBACK)
     if tree is None:
-        return  # file missing; skip silently (legacy path may be removed)
+        pytest.skip("legacy interpreter path missing or unparsable; gate not evaluated")
     findings = _format(_control_slot_string_dispatches(tree), INTERPRETER_FALLBACK)
     assert not findings, (
         "Harness interpreter branches on control slot name strings:\n  - " + "\n  - ".join(findings)
@@ -264,7 +266,7 @@ def test_interpreter_does_not_branch_on_phase_names() -> None:
 
     tree = _parse(INTERPRETER_PATH)
     if tree is None:
-        return
+        pytest.skip("interpreter file missing or unparsable; gate not evaluated")
     findings = _format(_phase_string_dispatches(tree), INTERPRETER_PATH)
     assert not findings, (
         "Interpreter branches on phase name strings — substitution test "
@@ -281,7 +283,7 @@ def test_graph_traversal_does_not_dispatch_on_node_type() -> None:
 
     tree = _parse(GRAPH_STRATEGY_PATH)
     if tree is None:
-        return
+        pytest.skip("graph strategy file missing or unparsable; gate not evaluated")
     findings = _format(_graph_node_type_dispatches(tree), GRAPH_STRATEGY_PATH)
     assert not findings, (
         "Graph traversal dispatches on concrete NodeType values — substitution test "
@@ -320,7 +322,7 @@ def test_team_transport_does_not_directly_construct_team_backends() -> None:
 
     tree = _parse(TEAM_TRANSPORT_PATH)
     if tree is None:
-        return
+        pytest.skip("team transport file missing or unparsable; gate not evaluated")
     findings = _format(_direct_team_constructions(tree), TEAM_TRANSPORT_PATH)
     assert not findings, (
         "team_transport.py directly constructs team backends:\n  - " + "\n  - ".join(findings)
@@ -332,7 +334,7 @@ def test_gateway_does_not_branch_on_mode_keys() -> None:
 
     tree = _parse(GATEWAY_MODE_PATH)
     if tree is None:
-        return
+        pytest.skip("gateway mode file missing or unparsable; gate not evaluated")
     findings = _format(_mode_string_dispatches(tree), GATEWAY_MODE_PATH)
     assert not findings, (
         "modes_catalog.py branches on mode name strings — substitution "
@@ -355,7 +357,7 @@ def test_loop_driver_does_not_branch_on_mode_keys() -> None:
 
     text = _read(GATEWAY_LOOP_PATH)
     if not text:
-        return
+        pytest.skip("gateway loop file missing; gate not evaluated")
     tree = ast.parse(text)
     findings: list[tuple[int, str]] = []
     target_modes = {"solo", "team", "auto", "cordis-creator"}
