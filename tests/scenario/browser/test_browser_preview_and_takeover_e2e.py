@@ -117,6 +117,10 @@ def test_e2e_browser_preview_and_takeover_lifecycle(e2e_system):
     assert summary_data["session_id"] == session_id
     assert summary_data["url"] == "https://example.com"
 
+    # RA-150: fixture 只 mock 了 _init_cdp_for_session；补一个 mock CDP 会话，
+    # 让"接管后放行派发"的断言走真实 CDP 路径（无 CDP 时 dispatch_input 返回 False）。
+    driver._cdp_sessions[session_id] = AsyncMock()
+
     # 验证 INV-BROWSER-01 模型不可变性
     summary = BrowserSessionSummary.model_validate(summary_data)
     with pytest.raises(ValidationError):

@@ -4188,3 +4188,12 @@ brain/reducer/memory/hub/standing_refresher 等键，待 RA-123 落地后再评�
   - 删伪造分支时顺带检查 import：BrowserTaskRecord 在 tools.py 只剩 spawn 用，删掉防 F401。
 - **实现与评估差异：** 评估给 (a)/(b) 两选项，实现选 (a) fail-closed（RA-147 已为同类问题立先例，全仓无 worker 后端）；额外做了评估没写的两处：spawn 的 session 创建副作用一并移除（fail-closed 不做任何事），以及 BrowserTaskRecord 的 import 清理。
 ---
+
+## [2026-10-19 06:29] - RA-150
+- PlaywrightCDPDriver.dispatch_input 无-CDP 分支改为 fail-closed：`self._cdp_sessions.get(session_id) is None` 时记 warning 日志并返回 False（与 arbitration 拒绝同语义），不再伪造"已派发"成功；docstring 同步。
+- Files changed: lca/infrastructure/browser/cdp_driver.py（无-CDP 分支 return False+日志）；tests/infrastructure/browser/test_browser_arbitration.py（新增无-CDP fail-closed 钉子测试，caplog 断言日志）；tests/scenario/browser/test_browser_lifecycle_scenarios.py（Scenario D 注入 mock CDP session）；tests/scenario/browser/test_browser_preview_and_takeover_e2e.py（e2e 注入 mock CDP session）。
+- **Learnings for future iterations:**
+  - 改 fail-open->fail-closed 前，先数清哪些测试断言了旧行为：本轮 scenario D / e2e 的"接管后派发 True"断言用的 fake/mock 根本不填充 _cdp_sessions，走的正是 bug 分支——不是"mocked-CDP 测试"，不能留。修法是注入 mock CDP session 让断言走真实 CDP 路径，场景意图保留。
+  - 基线先行：252 上 Chromium 真能启动，所以 arbitration 测试的 True 断言依赖的是真实 _cdp_sessions，改后保持绿——先跑基线再动手，少猜。
+- **实现与评估差异：** 评估的"return False+日志"实现完全一致；额外做了两处：scenario D/e2e 的 mock CDP session 注入（见上），以及新测试用 caplog 把日志行也钉住。
+---

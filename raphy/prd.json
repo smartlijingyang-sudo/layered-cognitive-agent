@@ -2222,7 +2222,7 @@
         "routes_browser.py input handler may surface the False to the viewport as 'not connected' feedback — optional, not required for this story."
       ],
       "priority": "P1",
-      "passes": false,
+      "passes": true,
       "branchName": "raphy/arch-20261019-0447",
       "notes": "Strength: Strong. Same fabricated-success class as RA-147; human input path makes the silent drop worse than agent-side. One-line fix, directly testable."
     },

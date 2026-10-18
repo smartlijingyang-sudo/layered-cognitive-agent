@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import asyncio
 from collections.abc import Callable
+from unittest.mock import AsyncMock
 
 import pytest
 from starlette.applications import Starlette
@@ -398,6 +399,8 @@ def test_scenario_human_takeover_roundtrip() -> None:
     )
     sid = "scn_takeover"
     install_fake_page(driver, sid, page)
+    # RA-150: fake page 只写 _pages；补一个 mock CDP 会话，让"接管后放行派发"的断言走真实 CDP 路径。
+    driver._cdp_sessions[sid] = AsyncMock()
     app = make_app(driver)
     app.state.browser_driver = driver
     client = TestClient(app)
