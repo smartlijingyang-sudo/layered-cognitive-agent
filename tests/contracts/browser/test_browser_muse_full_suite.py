@@ -11,6 +11,7 @@ from lca.infrastructure.tools.browser import (
     BrowserGetCaptchaPreferenceTool,
     BrowserListTasksTool,
     BrowserLookupCitationUrlTool,
+    BrowserOpenTool,
     BrowserPeekTaskTool,
     BrowserSearchTool,
     BrowserSetCaptchaPreferenceTool,
@@ -360,3 +361,99 @@ def test_ra152_citation_cache_lives_in_task_store_seam() -> None:
     store.clear()
 
 
+# =====================================================================
+# RA-153: "已在真实浏览器中打开"断言过 has_page 门
+# =====================================================================
+
+
+class _Ra153FakeDriver:
+    """RA-153: 可控 liveness 的假 driver —— 复现 resilient（无 page）/ live 两种会话。"""
+
+    def __init__(self, *, live: bool) -> None:
+        self._live = live
+
+    def has_page(self, session_id: str) -> bool:
+        return self._live
+
+    async def get_session(self, session_id: str):
+        return None
+
+    async def create_session(self, session_id: str, initial_url: str = "about:blank"):
+        from lca.contracts.models.browser.stream import BrowserSessionStatus, BrowserSessionSummary
+
+        return BrowserSessionSummary(
+            session_id=session_id,
+            run_id="run-ra153",
+            url=initial_url,
+            title="Example Page",
+            status=BrowserSessionStatus.IDLE,
+            viewport_width=1280,
+            viewport_height=800,
+            has_active_stream=False,
+        )
+
+    async def navigate(self, session_id: str, url: str):
+        raise AssertionError("no pre-existing session in this fake")
+
+    async def extract_text(self, session_id: str) -> str:
+        return "visible body text" if self._live else ""
+
+
+@pytest.mark.asyncio
+async def test_ra153_open_tool_no_live_page_honest_wording() -> None:
+    """RA-153: resilient 会话（无 live page）时工具绝不宣称"已在真实浏览器中打开"。
+
+    success 语义：resilient 是合法部署状态（无 Chromium 也不崩溃），
+    这不是错误 —— success=True，但措辞必须诚实，details.live_page=False 机器可判。
+    """
+    tool = BrowserOpenTool(driver=_Ra153FakeDriver(live=False))
+    obs = await tool.execute({"url": "https://example.com"})
+    assert obs.success is True
+    text = obs.payload["text_content"]
+    assert "已在真实浏览器中" not in text
+    assert "session created, no live page" in text
+    assert obs.payload["details"]["live_page"] is False
+    assert "[widget:browser_preview" not in text  # 无页面可预览，不挂卡片
+
+
+@pytest.mark.asyncio
+async def test_ra153_open_tool_live_page_keeps_real_open_wording() -> None:
+    """RA-153: 有 live page 时原有"真实浏览器打开"措辞与预览卡片保持不变。"""
+    tool = BrowserOpenTool(driver=_Ra153FakeDriver(live=True))
+    obs = await tool.execute({"url": "https://example.com"})
+    assert obs.success is True
+    text = obs.payload["text_content"]
+    assert "已在真实浏览器中打开页面" in text
+    assert obs.payload["details"]["live_page"] is True
+    assert "[widget:browser_preview" in text
+
+
+@pytest.mark.asyncio
+async def test_ra153_navigate_goto_failure_no_fabricated_title() -> None:
+    """RA-153: driver.navigate() 里 page.goto 失败后不再伪造 "Navigated Page" 标题。"""
+    from lca.contracts.models.browser.stream import BrowserSessionStatus, BrowserSessionSummary
+    from lca.infrastructure.browser.cdp_driver import PlaywrightCDPDriver
+
+    driver = PlaywrightCDPDriver()
+    sid = "ra153-goto-fail"
+    driver._sessions[sid] = BrowserSessionSummary(
+        session_id=sid,
+        run_id="run-ra153",
+        url="https://example.com",
+        title="Old Title",
+        status=BrowserSessionStatus.IDLE,
+        viewport_width=1280,
+        viewport_height=800,
+        has_active_stream=False,
+    )
+
+    class _FailingPage:
+        async def goto(self, url, **kwargs):
+            raise RuntimeError("net::ERR_CONNECTION_REFUSED")
+
+    driver._pages[sid] = _FailingPage()
+    summary = await driver.navigate(sid, "https://example.com/other")
+    # goto 失败：保留导航前的已有标题，不伪造 "Navigated Page"
+    assert summary.title == "Old Title"
+    assert summary.title != "Navigated Page"
+    assert summary.url == "https://example.com/other"

@@ -2264,7 +2264,7 @@
         "Resilient mode itself stays (no-Chromium deployments must not crash)."
       ],
       "priority": "P2",
-      "passes": false,
+      "passes": true,
       "branchName": "raphy/arch-20261019-0447",
       "notes": "Strength: Worth exploring. Resilient sessions are expected in some deployments; the honest-wording granularity is the judgment call."
     }

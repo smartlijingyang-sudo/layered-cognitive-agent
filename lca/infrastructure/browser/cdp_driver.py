@@ -311,7 +311,10 @@ class PlaywrightCDPDriver(BrowserDriverPort):
                 return reopened
 
         page = self._pages.get(session_id)
-        title = "Navigated Page"
+        # RA-153: 导航失败时不伪造 "Navigated Page" 标题。title 在 contracts 里是
+        # 必填 str（BrowserSessionSummary，改 contract 超出本轮 scope），所以
+        # goto 失败时保留导航前的已有标题 —— 不宣称一次并未确认发生的成功导航。
+        title = summary.title
         if page is not None:
             try:
                 await page.goto(url, timeout=20000, wait_until="domcontentloaded")

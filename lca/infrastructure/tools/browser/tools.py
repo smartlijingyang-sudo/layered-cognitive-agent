@@ -238,16 +238,32 @@ class BrowserOpenTool(_DriverInjectedTool):
 
         title = summary.title or "Web Page"
         final_url = summary.url or url
-        widget_tag = browser_preview_widget_tag(session_id, final_url, title, "agent_running")
-        try:
-            page_text = await driver.extract_text(session_id)
-        except Exception as e:
-            logger.warning("[BrowserOpenTool] extract_text error: %s", e)
-            page_text = ""
-        text_content = f"已在真实浏览器中打开页面：{title} ({final_url})\n\n"
-        if page_text:
-            text_content += f"页面内容预览：\n{page_text[:800]}\n\n"
-        text_content += widget_tag
+        # RA-153: "已在真实浏览器中打开页面"断言要过 has_page 门 —— resilient
+        # 会话（session record 无 page）是 driver 层的合法状态，但工具层绝不
+        # 在此状态下宣称真实打开。
+        live_page = driver.has_page(session_id)
+        if live_page:
+            widget_tag = browser_preview_widget_tag(
+                session_id, final_url, title, "agent_running"
+            )
+            try:
+                page_text = await driver.extract_text(session_id)
+            except Exception as e:
+                logger.warning("[BrowserOpenTool] extract_text error: %s", e)
+                page_text = ""
+            text_content = f"已在真实浏览器中打开页面：{title} ({final_url})\n\n"
+            if page_text:
+                text_content += f"页面内容预览：\n{page_text[:800]}\n\n"
+            text_content += widget_tag
+        else:
+            # 无 live page：诚实措辞，不挂预览卡片（没有页面可预览）。
+            # success 语义：resilient 模式是合法部署状态（无 Chromium 也不崩溃），
+            # 这不是错误；调用方凭 text_content 与 details.live_page 区分。
+            widget_tag = ""
+            text_content = (
+                f"浏览器会话已创建（session {session_id}），但当前无可用的真实浏览器页面 "
+                f"(session created, no live page)；目标：{title} ({final_url})。\n"
+            )
 
         res = BrowserActionResult(
             action_type=BrowserActionType.NAVIGATE,
@@ -256,6 +272,7 @@ class BrowserOpenTool(_DriverInjectedTool):
             url=final_url,
             title=title,
             text_content=text_content,
+            details={"live_page": live_page},
         )
         return Observation(
             observation_id=new_id("obs"),

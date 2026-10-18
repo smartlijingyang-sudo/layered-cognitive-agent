@@ -4217,3 +4217,14 @@ brain/reducer/memory/hub/standing_refresher 等键，待 RA-123 落地后再评�
   - 删 dataclass 死字段前，除了 grep 读写，还要查 hasattr 动态写入形状（本轮 update_task(**kwargs)）——零调用才算真死。
 - **实现与评估差异：** 评估把"引用缓存家园（store seam vs 单独模块）"留作判断点；实现按 RA-139 pattern（双胞胎收敛优先塞进同类家园）落在 task_store.py 内，不新建模块。citation 上限取 512（单进程搜索会话量级，进程重启即清空的语义不变）。
 ---
+
+## [2026-10-19 07:21] - RA-153
+- BrowserOpenTool.execute 宣称"已在真实浏览器中打开页面"前先过 driver.has_page() 门：无 live page（resilient 会话）时改用诚实措辞"浏览器会话已创建（session …），但当前无可用的真实浏览器页面 (session created, no live page)"，不挂预览卡片；success 语义：resilient 是合法部署状态（无 Chromium 也不崩溃），保持 success=True，details.live_page=False 机器可判。有 page 时原措辞/卡片不变。
+- PlaywrightCDPDriver.navigate()：page.goto 失败后不再返回 title="Navigated Page" 的伪造 summary，改为保留导航前的已有标题（title 在 contracts 是必填 str，改 contract 超出本轮 scope；保留旧标题同样诚实——不宣称未确认的成功导航）。
+- Files changed: lca/infrastructure/tools/browser/tools.py（BrowserOpenTool has_page 门 + 诚实措辞）；lca/infrastructure/browser/cdp_driver.py（navigate 去伪造 title）；tests/contracts/browser/test_browser_muse_full_suite.py（3 个新测试：no-page 诚实措辞+success 语义+无卡片、live 路径措辞不变、goto 失败标题保留）。
+- Tests: 3 new ra153 tests pass；tests/contracts/browser + tests/scenario/browser + tests/infrastructure/browser 56 passed；ruff check clean。
+- **Learnings for future iterations:**
+  - "诚实"不等于"把字段置空"：title 是 contracts 必填 str 时，保留旧值比伪造新值诚实，改 contract 是另一类 story 的 scope。
+  - 工具层 success 语义要显式文档化：resilient 无 page 不是错误（success=True），诚实措辞 + details.live_page 让调用方自己分支——fail-open 和 fail-closed 之外的第三条路。
+- **实现与评估差异：** 评估给 RA-115 二选一，实现选 (a)（工具断言 has_page + 诚实措辞）；goto 失败的 title 处理评估没写死，实现因 contract 必填 str 选择保留旧标题；额外加了 details.live_page 机器可判字段。
+---
