@@ -687,10 +687,18 @@
 | BRAINSTORM-X-OP-SSOT-DESIGN-SECTIONS | 逐步呈现设计细节（Owns/Does NOT own/数据流与设计模式/不变量断言）并获取审批 | Completed | 全部 3 个设计小节（边界自治、核心加固、断言矩阵）均获用户批准 |
 | BRAINSTORM-X-OP-SSOT-DESIGN-DOC | 沉淀设计文档至 docs/plans/ 并提交 git | Completed | 成功落盘 docs/plans/2026-10-18-x-operator-ssot-config-and-prompt-architecture-design.md 并已提交 git |
 | BRAINSTORM-X-OP-SSOT-TRANSITION | 转换至实施计划制定（writing-plans） | Completed | 成功落盘 docs/plans/2026-10-18-x-operator-ssot-config-and-prompt-architecture-plan.md 并分解为 6 大单流任务 |
-| STUDIO-TASK-1-CONTRACTS | [契约与持久化] SSOT 领域契约收敛、数值边界门禁与原子持久化单写锁强化 (`growth_config.py`, `router_trace.py`, 历史快照) | Pending | 待执行 |
-| STUDIO-TASK-2-HOT-RELOAD | [热生效广播] 进程内响应式 ConfigChangeBus 广播与 CognitivePipeline / Pilot 零重启秒级刷新 | Pending | 待执行 |
-| STUDIO-TASK-3-SOULS-MATRIX | [拟人矩阵] 16-Soul 独立 Prompt 覆盖、开关隔离与不可变深拷贝防污染 | Pending | 待执行 |
-| STUDIO-TASK-4-STUDIO-UI | [表现层中枢] 前端 2026 Bento-grid 双轨 Mechanism Studio (6 大板块表单 + 内部机制透视 + Live 组装预览) | Pending | 待执行 |
+| STUDIO-TASK-1-CONTRACTS | [契约与持久化] SSOT 领域契约收敛、数值边界门禁与原子持久化单写锁强化 (`growth_config.py`, `router_trace.py`, 历史快照) | Completed | 落地原子临时写 + `os.replace`、历史快照自动归档（`data/config_history/`）、数值物理边界约束与回滚重置函数，3/3 单测全绿，commit d9204ce |
+| STUDIO-TASK-2-HOT-RELOAD | [热生效广播] 进程内响应式 ConfigChangeBus 广播与 CognitivePipeline / Pilot 零重启秒级刷新 | Completed | 落地单例 ConfigChangeBus、CognitivePipeline 动态装配与 Pilot 每日限额内存自适应刷新，2/2 单测全绿，commit ad1e20c |
+| STUDIO-TASK-3-SOULS-MATRIX | [拟人矩阵] 16-Soul 独立 Prompt 覆盖、开关隔离与不可变深拷贝防污染 | Completed | SoulDefinition 扩展 priority 与 enabled 字段，get_effective_soul_catalog 强化深拷贝隔离与 tone/banned 动态映射，2/2 单测全绿，commit 5d54192 |
+| STUDIO-TASK-4-STUDIO-UI | [表现层中枢] 前端 2026 Bento-grid 双轨 Mechanism Studio (6 大板块表单 + 内部机制透视 + Live 组装预览) | In Progress | 正在开发前端双轨组件 StudioConfigPanel 与 StudioMechanismInsight |
 | STUDIO-TASK-5-COCKPIT-WIRING | [解耦与连通] 驾驶舱子 Tab 接入 Studio 与顶栏导航直达，彻底清理写死的 Mock 数组与假象卡片 | Pending | 待执行 |
 | STUDIO-TASK-6-CONFORMANCE-E2E | [全量门禁体检] INV-SSOT-01 至 INV-SSOT-06 全套自动化测试套件与端到端闭环验证 | Pending | 待执行 |
+| BRAINSTORM-STOCHASTIC-DECOUPLE-CONTEXT | 探索项目上下文与 78KB scenarios.py / ActionRoulette 痛点 | Completed | 已深度排查 pilot.py, roulette.py, scenarios.py，确立四层解耦（生理节律->马尔可夫效用大脑->场景微内核插件->拟真执行底座）根治路线 |
+| BRAINSTORM-STOCHASTIC-DECOUPLE-QUESTIONS | 澄清演进策略与重构路线（单步提问） | Completed | 用户选定全量原子重构路线：彻底废除旧版 ActionRoulette 与 78KB scenarios.py 面条脚本，采用业界顶尖第一性原理方案 |
+| BRAINSTORM-STOCHASTIC-DECOUPLE-APPROACHES | 提炼 2-3 种具体架构方案与权衡对比 | Completed | 提炼方案 A（声明式黑板微内核）、方案 B（状态图流）、方案 C（集中控制器），用户明确选定方案 A |
+| BRAINSTORM-STOCHASTIC-DECOUPLE-SECTION-1 | 逐步呈现设计细节 1：边界划分、自治等级与顶级四层解耦契约架构 | Completed | 边界 Owns/Does NOT own、DRAFT 自治等级与四大分层契约模型已获用户审批通过 |
+| BRAINSTORM-STOCHASTIC-DECOUPLE-SECTION-2 | 逐步呈现设计细节 2：核心组件数据流、马尔可夫效用引擎与微内核插件设计模式 | Completed | 数据流闭环、马尔可夫效用计算公式、对数正态时长与微内核 SceneSkill 插件契约已获用户审批通过 |
+| BRAINSTORM-STOCHASTIC-DECOUPLE-SECTION-3 | 逐步呈现设计细节 3：测试不变量断言、零DOM污染HUD与自愈熔断防线 | Completed | 测试不变量断言矩阵（INV-01~07）、零DOM污染透明HUD与确定性回放调试设计已获用户审批通过 |
+| BRAINSTORM-STOCHASTIC-DECOUPLE-DESIGN-DOC | 沉淀设计文档至 docs/plans/ 并提交 git | Completed | 成功落盘 docs/plans/2026-10-18-stochastic-decision-brain-and-stealth-actuator-decoupling-design.md 并提交 git |
+| BRAINSTORM-STOCHASTIC-DECOUPLE-TRANSITION | 转换至实施计划制定（writing-plans） | In Progress | 正在调用 writing-plans 生成结构化落地实施计划 |
 
