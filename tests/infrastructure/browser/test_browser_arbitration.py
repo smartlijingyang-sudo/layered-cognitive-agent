@@ -98,3 +98,28 @@ async def test_driver_with_arbitration_blocks_input():
     engine.start_agent_task(session_id)
     dispatched = await driver.dispatch_input(session_id, click_event)
     assert dispatched is False
+@pytest.mark.asyncio
+async def test_dispatch_input_no_cdp_session_fails_closed(caplog) -> None:
+    """RA-150: 无 CDP 会话的 resilient 会话上 dispatch_input 返回 False 并记日志，不伪造派发成功。"""
+    import logging
+    from unittest.mock import AsyncMock
+
+    from lca.infrastructure.browser.cdp_driver import PlaywrightCDPDriver
+
+    driver = PlaywrightCDPDriver()
+    # resilient 会话：session record 存在，但 _init_cdp_for_session 未产生真实 CDP 会话
+    driver._init_cdp_for_session = AsyncMock()
+    session_id = "sess_no_cdp"
+    await driver.create_session(session_id)
+    assert driver._cdp_sessions.get(session_id) is None
+
+    click_event = BrowserInputEvent(
+        type=BrowserInputEventType.MOUSE_DOWN,
+        x=100.0,
+        y=200.0,
+        button="left",
+    )
+    with caplog.at_level(logging.WARNING, logger="lca.infrastructure.browser.cdp_driver"):
+        dispatched = await driver.dispatch_input(session_id, click_event)
+    assert dispatched is False
+    assert any("no CDP session" in r.message for r in caplog.records)

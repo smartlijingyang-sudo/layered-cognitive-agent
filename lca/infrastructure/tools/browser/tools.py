@@ -18,8 +18,12 @@ from lca.contracts.atoms.ids.ids import new_id
 from lca.contracts.models.browser.models import BrowserActionResult, BrowserActionType
 from lca.contracts.models.core.execution.decision import Observation
 from lca.contracts.protocols import Tool
+from lca.infrastructure.tools.browser.driver_tool import (
+    _DriverInjectedTool,
+    browser_preview_widget_tag,
+)
 from lca.infrastructure.tools.browser.task_store import (
-    BrowserTaskRecord,
+    get_shared_citation_store,
     get_shared_task_store,
 )
 
@@ -28,12 +32,6 @@ if TYPE_CHECKING:
     from lca.infrastructure.browser.cdp_driver import PlaywrightCDPDriver
 
 logger = logging.getLogger(__name__)
-
-
-# 最近搜索结果缓存：citation_id -> {"title": str, "url": str, "snippet": str}。
-# 由 BrowserSearchTool.execute 在真实搜索成功后填充，供
-# BrowserLookupCitationUrlTool.execute 做真实引用解析（RA-147）。
-_RECENT_SEARCH_RESULTS: dict[str, dict[str, str]] = {}
 
 
 def _normalize_url(url: str) -> str:
@@ -131,15 +129,14 @@ class BrowserSearchTool(Tool):
             )
 
         search_id = new_id("bsearch")
+        citation_store = get_shared_citation_store()
         results = []
         for i, hit in enumerate(response.results, start=1):
             citation_id = f"cit_{search_id}_{i}"
             snippet = (hit.content or "")[:400]
-            _RECENT_SEARCH_RESULTS[citation_id] = {
-                "title": hit.title,
-                "url": hit.url,
-                "snippet": snippet,
-            }
+            # RA-152: 引用缓存走 task store seam 的 SearchCitationStore（LRU 有界），
+            # 不再是模块全局无界 dict。
+            citation_store.put(citation_id, title=hit.title, url=hit.url, snippet=snippet)
             results.append(
                 {
                     "citation_id": citation_id,
@@ -171,7 +168,7 @@ class BrowserSearchTool(Tool):
         return Observation(observation_id=new_id("obs"), success=True, payload=res.model_dump())
 
 
-class BrowserOpenTool(Tool):
+class BrowserOpenTool(_DriverInjectedTool):
     """抓页面文本 / 在真实浏览器中打开（Muse 轻量与实时双模入口）。"""
 
     name: ClassVar[str] = "browser_open"
@@ -209,16 +206,6 @@ class BrowserOpenTool(Tool):
     effect_kind: ClassVar[Literal["ephemeral", "persistent", "stateful_once"]] = "ephemeral"
     default_timeout_s: ClassVar[int] = 30
 
-    def __init__(self, driver: PlaywrightCDPDriver | None = None) -> None:
-        self._driver = driver
-
-    def _get_driver(self) -> PlaywrightCDPDriver:
-        if self._driver is not None:
-            return self._driver
-        from lca.infrastructure.browser.cdp_driver import get_shared_browser_driver
-
-        return get_shared_browser_driver()
-
     def validate(self, args: dict[str, Any]) -> str | None:
         if not args.get("url") and not args.get("url_id"):
             return "url 或 url_id 至少提供一项"
@@ -251,16 +238,32 @@ class BrowserOpenTool(Tool):
 
         title = summary.title or "Web Page"
         final_url = summary.url or url
-        widget_tag = f"[widget:browser_preview?sessionId={session_id}&url={final_url}&title={title}&status=agent_running]"
-        try:
-            page_text = await driver.extract_text(session_id)
-        except Exception as e:
-            logger.warning("[BrowserOpenTool] extract_text error: %s", e)
-            page_text = ""
-        text_content = f"已在真实浏览器中打开页面：{title} ({final_url})\n\n"
-        if page_text:
-            text_content += f"页面内容预览：\n{page_text[:800]}\n\n"
-        text_content += widget_tag
+        # RA-153: "已在真实浏览器中打开页面"断言要过 has_page 门 —— resilient
+        # 会话（session record 无 page）是 driver 层的合法状态，但工具层绝不
+        # 在此状态下宣称真实打开。
+        live_page = driver.has_page(session_id)
+        if live_page:
+            widget_tag = browser_preview_widget_tag(
+                session_id, final_url, title, "agent_running"
+            )
+            try:
+                page_text = await driver.extract_text(session_id)
+            except Exception as e:
+                logger.warning("[BrowserOpenTool] extract_text error: %s", e)
+                page_text = ""
+            text_content = f"已在真实浏览器中打开页面：{title} ({final_url})\n\n"
+            if page_text:
+                text_content += f"页面内容预览：\n{page_text[:800]}\n\n"
+            text_content += widget_tag
+        else:
+            # 无 live page：诚实措辞，不挂预览卡片（没有页面可预览）。
+            # success 语义：resilient 模式是合法部署状态（无 Chromium 也不崩溃），
+            # 这不是错误；调用方凭 text_content 与 details.live_page 区分。
+            widget_tag = ""
+            text_content = (
+                f"浏览器会话已创建（session {session_id}），但当前无可用的真实浏览器页面 "
+                f"(session created, no live page)；目标：{title} ({final_url})。\n"
+            )
 
         res = BrowserActionResult(
             action_type=BrowserActionType.NAVIGATE,
@@ -269,6 +272,7 @@ class BrowserOpenTool(Tool):
             url=final_url,
             title=title,
             text_content=text_content,
+            details={"live_page": live_page},
         )
         return Observation(
             observation_id=new_id("obs"),
@@ -277,7 +281,7 @@ class BrowserOpenTool(Tool):
         )
 
 
-class BrowserFindTool(Tool):
+class BrowserFindTool(_DriverInjectedTool):
     """在已打开的页面内查找字符串（Muse 轻量层）。"""
 
     name: ClassVar[str] = "browser_find"
@@ -295,16 +299,6 @@ class BrowserFindTool(Tool):
     is_idempotent: ClassVar[bool] = True
     effect_kind: ClassVar[Literal["ephemeral", "persistent", "stateful_once"]] = "ephemeral"
     default_timeout_s: ClassVar[int] = 15
-
-    def __init__(self, driver: PlaywrightCDPDriver | None = None) -> None:
-        self._driver = driver
-
-    def _get_driver(self) -> PlaywrightCDPDriver:
-        if self._driver is not None:
-            return self._driver
-        from lca.infrastructure.browser.cdp_driver import get_shared_browser_driver
-
-        return get_shared_browser_driver()
 
     async def execute(self, args: dict[str, Any]) -> Observation:
         query = str(args.get("query", ""))
@@ -360,7 +354,7 @@ class BrowserLookupCitationUrlTool(Tool):
             )
         # RA-147: 只解析真实搜索产生过的引用；未知引用 fail-closed，
         # 绝不返回伪造 URL。
-        hit = _RECENT_SEARCH_RESULTS.get(cid)
+        hit = get_shared_citation_store().get(cid)
         if hit is None:
             return Observation(
                 observation_id=new_id("obs"),
@@ -381,15 +375,15 @@ class BrowserLookupCitationUrlTool(Tool):
 # 2. 实时浏览器任务层（6 个核心工具，异步委托、任务自包含、权限收敛）
 # =====================================================================
 
-class BrowserSpawnTaskTool(Tool):
-    """开一个全新的 live Chromium 异步任务（Muse 核心任务层）。"""
+class BrowserSpawnTaskTool(_DriverInjectedTool):
+    """浏览器异步任务派发工具：派发后端尚未实现，调用 fail-closed（Muse 核心任务层占位）。"""
 
     name: ClassVar[str] = "browser_spawn_task"
     namespace: ClassVar[str] = "browser"
     description: ClassVar[str] = (
-        "开一个全新的 live Chromium 异步任务。必填 task：完整自包含的任务书。"
-        "worker 看不到对话上下文，必须包含目标、已知条件、约束与成功标准。"
-        "只返回回执 {browser_task_id}，禁止轮询或 sleep 等待，结果经 handoff 自动回流。"
+        "浏览器异步任务派发工具（任务书参数契约保留）。"
+        "【未实现】异步派发后端尚未实现：调用将返回错误，不会启动后台任务；"
+        "不要承诺后台执行或 handoff 结果回流。"
     )
     parameters: ClassVar[dict[str, Any]] = {
         "type": "object",
@@ -422,71 +416,21 @@ class BrowserSpawnTaskTool(Tool):
     effect_kind: ClassVar[Literal["ephemeral", "persistent", "stateful_once"]] = "persistent"
     default_timeout_s: ClassVar[int] = 30
 
-    def __init__(self, driver: PlaywrightCDPDriver | None = None) -> None:
-        self._driver = driver
-
-    def _get_driver(self) -> PlaywrightCDPDriver:
-        if self._driver is not None:
-            return self._driver
-        from lca.infrastructure.browser.cdp_driver import get_shared_browser_driver
-
-        return get_shared_browser_driver()
-
     async def execute(self, args: dict[str, Any]) -> Observation:
-        task_text = str(args["task"])
-        raw_url = args.get("initial_url")
-        initial_url = _normalize_url(str(raw_url)) if raw_url else "about:blank"
-        session_id = str(args.get("session_id") or new_id("brw"))
-        task_id = new_id("btask")
-
-        # 调度并初始化 Chromium Session
-        driver = self._get_driver()
-        title = "Browser Task"
-        final_url = initial_url
-        try:
-            summary = await driver.create_session(session_id=session_id, initial_url=initial_url)
-            title = summary.title or "Browser Task"
-            final_url = summary.url or initial_url
-        except Exception as e:
-            logger.warning("[BrowserSpawnTaskTool] Driver warning: %s", e)
-
-        # 登记到共享任务存储
-        record = BrowserTaskRecord(
-            task_id=task_id,
-            task_description=task_text,
-            session_id=session_id,
-            status="running",
-            initial_url=final_url,
-            current_url=final_url,
-            title=title,
-        )
-        task_store = get_shared_task_store()
-        task_store.register_task(record)
-        task_store.add_timeline_step(task_id, "spawn", f"Task spawned: {task_text[:80]}")
-
-        widget_tag = f"[widget:browser_preview?sessionId={session_id}&url={final_url}&title={title}&status=agent_running]"
-        text_content = (
-            f"已派发异步浏览器任务 `{task_id}`。\n"
-            f"任务会话：{session_id}，目标：{final_url}\n\n"
-            f"{widget_tag}\n\n"
-            f"提示：任务在后台异步执行中，请结束本轮发言等待 handoff 结果回流，无需轮询等待。"
-        )
-
-        res = BrowserActionResult(
-            action_type=BrowserActionType.SPAWN,
-            success=True,
-            session_id=session_id,
-            task_id=task_id,
-            url=final_url,
-            title=title,
-            text_content=text_content,
-            details={"browser_task_id": task_id, "session_id": session_id, "status": "running"},
+        # RA-149: 没有真实的异步派发后端（无 worker loop、无 handoff producer，
+        # task_description 全仓零消费者），诚实 fail-closed。绝不返回"已派发/running"的伪造回执。
+        task_text = str(args.get("task") or "")
+        logger.warning(
+            "[BrowserSpawnTaskTool] async spawn backend not implemented (task=%r)",
+            task_text[:80],
         )
         return Observation(
             observation_id=new_id("obs"),
-            success=True,
-            payload={**res.model_dump(), "widget_tag": widget_tag, "browser_task_id": task_id},
+            success=False,
+            payload=None,
+            error="浏览器异步任务派发尚未实现：browser_spawn_task 当前无法派发真实后台任务（无 worker 后端、无 handoff 回流接线）",
         )
+
 
 
 class BrowserSteerTaskTool(Tool):
@@ -750,7 +694,7 @@ class BrowserTransferTaskTool(Tool):
                 arbitration.release_to_agent(session_id)
 
         status_tag = "human_takeover" if target == "human_takeover" else "agent_running"
-        widget_tag = f"[widget:browser_preview?sessionId={session_id}&url=about:blank&title=Live%20Browser&status={status_tag}]"
+        widget_tag = browser_preview_widget_tag(session_id, "about:blank", "Live%20Browser", status_tag)
         text_content = (
             f"已将浏览器控制权切换为：**{target}**。\n"
             f"原因：{reason}\n\n"
@@ -935,7 +879,7 @@ class BrowserNavigateTool(BrowserOpenTool):
     description: ClassVar[str] = "在真实 Chromium 浏览器中打开指定网页，实时加载页面并生成预览卡片。"
 
 
-class BrowserClickTool(Tool):
+class BrowserClickTool(_DriverInjectedTool):
     """浏览器点击元素工具。"""
 
     name: ClassVar[str] = "browser_click"
@@ -952,16 +896,6 @@ class BrowserClickTool(Tool):
     is_idempotent: ClassVar[bool] = False
     effect_kind: ClassVar[Literal["ephemeral", "persistent", "stateful_once"]] = "ephemeral"
     default_timeout_s: ClassVar[int] = 30
-
-    def __init__(self, driver: PlaywrightCDPDriver | None = None) -> None:
-        self._driver = driver
-
-    def _get_driver(self) -> PlaywrightCDPDriver:
-        if self._driver is not None:
-            return self._driver
-        from lca.infrastructure.browser.cdp_driver import get_shared_browser_driver
-
-        return get_shared_browser_driver()
 
     def validate(self, args: dict[str, Any]) -> str | None:
         if not args.get("selector") or not isinstance(args["selector"], str):
@@ -991,7 +925,7 @@ class BrowserClickTool(Tool):
         return Observation(observation_id=new_id("obs"), success=clicked, payload=res.model_dump())
 
 
-class BrowserScreenshotTool(Tool):
+class BrowserScreenshotTool(_DriverInjectedTool):
     """浏览器截屏工具。"""
 
     name: ClassVar[str] = "browser_screenshot"
@@ -1006,16 +940,6 @@ class BrowserScreenshotTool(Tool):
     is_idempotent: ClassVar[bool] = True
     effect_kind: ClassVar[Literal["ephemeral", "persistent", "stateful_once"]] = "ephemeral"
     default_timeout_s: ClassVar[int] = 30
-
-    def __init__(self, driver: PlaywrightCDPDriver | None = None) -> None:
-        self._driver = driver
-
-    def _get_driver(self) -> PlaywrightCDPDriver:
-        if self._driver is not None:
-            return self._driver
-        from lca.infrastructure.browser.cdp_driver import get_shared_browser_driver
-
-        return get_shared_browser_driver()
 
     async def execute(self, args: dict[str, Any]) -> Observation:
         session_id = str(args.get("session_id") or "")
@@ -1052,7 +976,7 @@ class BrowserScreenshotTool(Tool):
         return Observation(observation_id=new_id("obs"), success=True, payload=res.model_dump())
 
 
-class BrowserCloseTool(Tool):
+class BrowserCloseTool(_DriverInjectedTool):
     """浏览器会话关闭工具。"""
 
     name: ClassVar[str] = "browser_close"
@@ -1068,16 +992,6 @@ class BrowserCloseTool(Tool):
     is_idempotent: ClassVar[bool] = True
     effect_kind: ClassVar[Literal["ephemeral", "persistent", "stateful_once"]] = "ephemeral"
     default_timeout_s: ClassVar[int] = 10
-
-    def __init__(self, driver: PlaywrightCDPDriver | None = None) -> None:
-        self._driver = driver
-
-    def _get_driver(self) -> PlaywrightCDPDriver:
-        if self._driver is not None:
-            return self._driver
-        from lca.infrastructure.browser.cdp_driver import get_shared_browser_driver
-
-        return get_shared_browser_driver()
 
     def validate(self, args: dict[str, Any]) -> str | None:
         if not args.get("session_id") or not isinstance(args["session_id"], str):

@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import pytest
 
-from lca.infrastructure.browser.cdp_driver import PlaywrightCDPDriver
 from lca.infrastructure.tools.browser import (
     BrowserCloseTaskTool,
     BrowserDeepResearchTool,
@@ -12,6 +11,7 @@ from lca.infrastructure.tools.browser import (
     BrowserGetCaptchaPreferenceTool,
     BrowserListTasksTool,
     BrowserLookupCitationUrlTool,
+    BrowserOpenTool,
     BrowserPeekTaskTool,
     BrowserSearchTool,
     BrowserSetCaptchaPreferenceTool,
@@ -19,6 +19,12 @@ from lca.infrastructure.tools.browser import (
     BrowserSteerTaskTool,
     BrowserTransferTaskTool,
     build_browser_tools,
+)
+from lca.infrastructure.tools.browser.task_store import (
+    BrowserTaskRecord,
+    BrowserTaskStore,
+    SearchCitationStore,
+    get_shared_citation_store,
 )
 from lca.infrastructure.tools.default.set import build_default_tools
 
@@ -142,23 +148,44 @@ async def test_muse_find_tool() -> None:
 
 
 @pytest.mark.asyncio
-async def test_muse_task_lifecycle_spawn_steer_peek_close() -> None:
-    """测试核心任务层生命周期：spawn -> steer -> peek -> list -> close。"""
-    driver = PlaywrightCDPDriver()
-    spawn_tool = BrowserSpawnTaskTool(driver=driver)
+async def test_muse_spawn_task_fail_closed() -> None:
+    """RA-149: 无真实异步派发后端（无 worker loop、无 handoff producer）时 fail-closed，不伪造"running"回执。"""
+    spawn_tool = BrowserSpawnTaskTool()
+    obs = await spawn_tool.execute({
+        "task": "访问 muse.ai 并测试登录页面",
+        "initial_url": "https://muse.ai",
+        "session_id": "brw_muse_test_failclosed",
+    })
+    assert obs.success is False
+    assert obs.error is not None
+    assert "尚未实现" in obs.error
+    assert obs.payload is None
+
+
+@pytest.mark.asyncio
+async def test_muse_task_lifecycle_steer_peek_close() -> None:
+    """RA-149: 核心任务层生命周期（store 直接登记 -> steer -> peek -> list -> close）；spawn 工具本身已 fail-closed。"""
+    from lca.contracts.atoms.ids.ids import new_id
+    from lca.infrastructure.tools.browser.task_store import (
+        BrowserTaskRecord,
+        get_shared_task_store,
+    )
 
     task_desc = "目标：访问 muse.ai 并测试登录页面；约束：不输入敏感密码；成功标准：看到登录按钮"
-    spawn_obs = await spawn_tool.execute({
-        "task": task_desc,
-        "initial_url": "https://muse.ai",
-        "session_id": "brw_muse_test_1",
-    })
-    assert spawn_obs.success is True
-    task_id = spawn_obs.payload["browser_task_id"]
-    session_id = spawn_obs.payload["session_id"]
+    task_id = new_id("btask")
+    session_id = "brw_muse_test_1"
+    store = get_shared_task_store()
+    store.register_task(BrowserTaskRecord(
+        task_id=task_id,
+        task_description=task_desc,
+        session_id=session_id,
+        status="running",
+        initial_url="https://muse.ai",
+        current_url="https://muse.ai",
+        title="Browser Task",
+    ))
+    store.add_timeline_step(task_id, "spawn", f"Task spawned: {task_desc[:80]}")
     assert task_id.startswith("btask_")
-    assert session_id == "brw_muse_test_1"
-    assert "[widget:browser_preview" in spawn_obs.payload["widget_tag"]
 
     # 验证 peek_task
     peek_tool = BrowserPeekTaskTool()
@@ -259,3 +286,174 @@ def test_muse_constitution_contract_in_templates() -> None:
     assert "browser_open" in content
     assert "browser_search" in content
     assert "browser_deep_research" in content
+
+
+# =====================================================================
+# RA-152: 浏览器 task-store 状态收敛
+# =====================================================================
+
+
+def test_ra152_browser_task_record_has_no_captcha_preference() -> None:
+    """RA-152: BrowserTaskRecord.captcha_preference 死字段已删除。
+
+    该字段全仓零读写（定义 1 次 + 零读取零写入）；真正的验证码状态只住在
+    BrowserTaskStore._captcha_preferences（scope 键 all_tasks/site:/task:）。
+    """
+    record = BrowserTaskRecord(
+        task_id="t1", task_description="d", session_id="s1"
+    )
+    assert not hasattr(record, "captcha_preference")
+
+
+def test_ra152_captcha_preference_scope_priority() -> None:
+    """RA-152: get_captcha_preference scope 优先级语义 task > site > all_tasks 不变。"""
+    store = BrowserTaskStore()
+    store.set_captcha_preference("ask", scope_kind="all_tasks", statement="global")
+    store.set_captcha_preference("user_handles", scope_kind="site", scope_value="amazon.com", statement="s")
+    store.set_captcha_preference("solve", scope_kind="task", scope_value="task-1", statement="t")
+
+    assert store.get_captcha_preference()["choice"] == "ask"
+    assert store.get_captcha_preference(site="amazon.com")["choice"] == "user_handles"
+    assert store.get_captcha_preference(site="other.com")["choice"] == "ask"
+    assert store.get_captcha_preference(site="amazon.com", task_id="task-1")["choice"] == "solve"
+    assert store.get_captcha_preference(task_id="task-1")["choice"] == "solve"
+    assert store.get_captcha_preference(site="amazon.com", task_id="task-9")["choice"] == "user_handles"
+
+    # 默认值：什么都没设时为 solve
+    assert BrowserTaskStore().get_captcha_preference()["choice"] == "solve"
+
+
+def test_ra152_citation_store_lru_eviction() -> None:
+    """RA-152: SearchCitationStore LRU 有界 —— 最久未用（写/读都刷新）先被驱逐。"""
+    store = SearchCitationStore(max_entries=3)
+    store.put("cit_a", title="A", url="https://a.example", snippet="sa")
+    store.put("cit_b", title="B", url="https://b.example", snippet="sb")
+    store.put("cit_c", title="C", url="https://c.example", snippet="sc")
+
+    # 读刷新 recency：a 被访问后，b 成为最久未用
+    assert store.get("cit_a") is not None
+    store.put("cit_d", title="D", url="https://d.example", snippet="sd")
+
+    assert len(store) == 3
+    assert store.get("cit_b") is None  # 最久未用被驱逐
+    assert store.get("cit_a")["url"] == "https://a.example"
+    assert store.get("cit_c")["url"] == "https://c.example"
+    assert store.get("cit_d")["url"] == "https://d.example"
+
+    # 同 id 重复写入刷新且不膨胀
+    store.put("cit_d", title="D2", url="https://d2.example", snippet="sd2")
+    assert len(store) == 3
+    assert store.get("cit_d")["title"] == "D2"
+
+
+def test_ra152_citation_cache_lives_in_task_store_seam() -> None:
+    """RA-152: _RECENT_SEARCH_RESULTS 模块全局已收敛进 task store seam。
+
+    搜索写 / 引用读经共享 SearchCitationStore；tools 模块不再持有该全局。
+    """
+    import lca.infrastructure.tools.browser.tools as tools_module
+
+    assert not hasattr(tools_module, "_RECENT_SEARCH_RESULTS")
+    store = get_shared_citation_store()
+    store.clear()
+    store.put("cit_seam_1", title="T", url="https://seam.example/x", snippet="s")
+    assert store.get("cit_seam_1")["url"] == "https://seam.example/x"
+    store.clear()
+
+
+# =====================================================================
+# RA-153: "已在真实浏览器中打开"断言过 has_page 门
+# =====================================================================
+
+
+class _Ra153FakeDriver:
+    """RA-153: 可控 liveness 的假 driver —— 复现 resilient（无 page）/ live 两种会话。"""
+
+    def __init__(self, *, live: bool) -> None:
+        self._live = live
+
+    def has_page(self, session_id: str) -> bool:
+        return self._live
+
+    async def get_session(self, session_id: str):
+        return None
+
+    async def create_session(self, session_id: str, initial_url: str = "about:blank"):
+        from lca.contracts.models.browser.stream import BrowserSessionStatus, BrowserSessionSummary
+
+        return BrowserSessionSummary(
+            session_id=session_id,
+            run_id="run-ra153",
+            url=initial_url,
+            title="Example Page",
+            status=BrowserSessionStatus.IDLE,
+            viewport_width=1280,
+            viewport_height=800,
+            has_active_stream=False,
+        )
+
+    async def navigate(self, session_id: str, url: str):
+        raise AssertionError("no pre-existing session in this fake")
+
+    async def extract_text(self, session_id: str) -> str:
+        return "visible body text" if self._live else ""
+
+
+@pytest.mark.asyncio
+async def test_ra153_open_tool_no_live_page_honest_wording() -> None:
+    """RA-153: resilient 会话（无 live page）时工具绝不宣称"已在真实浏览器中打开"。
+
+    success 语义：resilient 是合法部署状态（无 Chromium 也不崩溃），
+    这不是错误 —— success=True，但措辞必须诚实，details.live_page=False 机器可判。
+    """
+    tool = BrowserOpenTool(driver=_Ra153FakeDriver(live=False))
+    obs = await tool.execute({"url": "https://example.com"})
+    assert obs.success is True
+    text = obs.payload["text_content"]
+    assert "已在真实浏览器中" not in text
+    assert "session created, no live page" in text
+    assert obs.payload["details"]["live_page"] is False
+    assert "[widget:browser_preview" not in text  # 无页面可预览，不挂卡片
+
+
+@pytest.mark.asyncio
+async def test_ra153_open_tool_live_page_keeps_real_open_wording() -> None:
+    """RA-153: 有 live page 时原有"真实浏览器打开"措辞与预览卡片保持不变。"""
+    tool = BrowserOpenTool(driver=_Ra153FakeDriver(live=True))
+    obs = await tool.execute({"url": "https://example.com"})
+    assert obs.success is True
+    text = obs.payload["text_content"]
+    assert "已在真实浏览器中打开页面" in text
+    assert obs.payload["details"]["live_page"] is True
+    assert "[widget:browser_preview" in text
+
+
+@pytest.mark.asyncio
+async def test_ra153_navigate_goto_failure_no_fabricated_title() -> None:
+    """RA-153: driver.navigate() 里 page.goto 失败后不再伪造 "Navigated Page" 标题。"""
+    from lca.contracts.models.browser.stream import BrowserSessionStatus, BrowserSessionSummary
+    from lca.infrastructure.browser.cdp_driver import PlaywrightCDPDriver
+
+    driver = PlaywrightCDPDriver()
+    sid = "ra153-goto-fail"
+    driver._sessions[sid] = BrowserSessionSummary(
+        session_id=sid,
+        run_id="run-ra153",
+        url="https://example.com",
+        title="Old Title",
+        status=BrowserSessionStatus.IDLE,
+        viewport_width=1280,
+        viewport_height=800,
+        has_active_stream=False,
+    )
+
+    class _FailingPage:
+        async def goto(self, url, **kwargs):
+            raise RuntimeError("net::ERR_CONNECTION_REFUSED")
+
+    driver._pages[sid] = _FailingPage()
+    summary = await driver.navigate(sid, "https://example.com/other")
+    # goto 失败：保留导航前的已有标题，不伪造 "Navigated Page"
+    assert summary.title == "Old Title"
+    assert summary.title != "Navigated Page"
+    assert summary.url == "https://example.com/other"

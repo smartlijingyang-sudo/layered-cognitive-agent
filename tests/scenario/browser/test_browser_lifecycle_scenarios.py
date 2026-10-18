@@ -4,7 +4,7 @@ These scenarios drive the full browser stack end to end with a deterministic in-
 fake page, so they run anywhere without launching Chromium:
 - Scenario A: open a browser and confirm the page exposes real content.
 - Scenario B: operate the live page (type, click, screenshot) through the browser subagent.
-- Scenario C: asynchronous browser task lifecycle (spawn / list / peek / steer / close).
+- Scenario C: browser task lifecycle via the task store (list / peek / steer / close); browser_spawn_task fails closed (RA-149).
 - Scenario D: human takeover roundtrip over REST + WebSocket (screencast + input arbitration).
 - Scenario E: CAPTCHA preference persistence.
 - Scenario F: full agent-to-human-to-agent roundtrip across tools and arbitration.
@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import asyncio
 from collections.abc import Callable
+from unittest.mock import AsyncMock
 
 import pytest
 from starlette.applications import Starlette
@@ -45,7 +46,6 @@ from lca.infrastructure.tools.browser.tools import (
     BrowserPeekTaskTool,
     BrowserScreenshotTool,
     BrowserSetCaptchaPreferenceTool,
-    BrowserSpawnTaskTool,
     BrowserSteerTaskTool,
     BrowserTransferTaskTool,
 )
@@ -335,22 +335,30 @@ async def test_scenario_operate_browser_type_click_screenshot() -> None:
 
 @pytest.mark.asyncio
 async def test_scenario_browser_task_lifecycle() -> None:
-    driver = PlaywrightCDPDriver()
-    page = _FakeDomPage(title="Muse", body_text="task page", url="about:blank")
-    sid = "scn_task"
-    install_fake_page(driver, sid, page)
-
-    spawn_tool = BrowserSpawnTaskTool(driver=driver)
-    spawn_obs = await spawn_tool.execute(
-        {
-            "task": "访问站点并确认登录按钮存在",
-            "initial_url": "https://example.com",
-            "session_id": sid,
-        }
+    # RA-149: browser_spawn_task 已 fail-closed（无异步派发后端），场景直接向
+    # 共享任务存储登记任务记录，覆盖 list / peek / steer / close 工具链。
+    from lca.contracts.atoms.ids.ids import new_id
+    from lca.infrastructure.tools.browser.task_store import (
+        BrowserTaskRecord,
+        get_shared_task_store,
     )
-    assert spawn_obs.success is True
-    task_id = spawn_obs.payload["browser_task_id"]
-    assert spawn_obs.payload["session_id"] == sid
+
+    sid = "scn_task"
+    task_id = new_id("btask")
+    task_desc = "访问站点并确认登录按钮存在"
+    store = get_shared_task_store()
+    store.register_task(
+        BrowserTaskRecord(
+            task_id=task_id,
+            task_description=task_desc,
+            session_id=sid,
+            status="running",
+            initial_url="https://example.com",
+            current_url="https://example.com",
+            title="Browser Task",
+        )
+    )
+    store.add_timeline_step(task_id, "spawn", f"Task spawned: {task_desc[:80]}")
 
     list_tool = BrowserListTasksTool()
     list_obs = await list_tool.execute({})
@@ -391,6 +399,8 @@ def test_scenario_human_takeover_roundtrip() -> None:
     )
     sid = "scn_takeover"
     install_fake_page(driver, sid, page)
+    # RA-150: fake page 只写 _pages；补一个 mock CDP 会话，让"接管后放行派发"的断言走真实 CDP 路径。
+    driver._cdp_sessions[sid] = AsyncMock()
     app = make_app(driver)
     app.state.browser_driver = driver
     client = TestClient(app)
@@ -480,22 +490,31 @@ async def test_scenario_captcha_preference_flow() -> None:
 
 @pytest.mark.asyncio
 async def test_scenario_agent_to_human_to_agent_roundtrip() -> None:
-    arbitration = BrowserArbitrationEngine()
-    driver = PlaywrightCDPDriver(arbitration_engine=arbitration)
-    page = _FakeDomPage(title="Muse", body_text="task page", url="about:blank")
-    sid = "scn_full"
-    install_fake_page(driver, sid, page)
-
-    spawn_tool = BrowserSpawnTaskTool(driver=driver)
-    spawn_obs = await spawn_tool.execute(
-        {
-            "task": "完成注册流程，遇到验证码转交人工",
-            "initial_url": "https://example.com",
-            "session_id": sid,
-        }
+    # RA-149: browser_spawn_task 已 fail-closed（无异步派发后端），场景直接向
+    # 共享任务存储登记任务记录，覆盖 transfer / steer 与仲裁状态机。
+    from lca.contracts.atoms.ids.ids import new_id
+    from lca.infrastructure.tools.browser.task_store import (
+        BrowserTaskRecord,
+        get_shared_task_store,
     )
-    assert spawn_obs.success is True
-    task_id = spawn_obs.payload["browser_task_id"]
+
+    arbitration = BrowserArbitrationEngine()
+    sid = "scn_full"
+    task_id = new_id("btask")
+    task_desc = "完成注册流程，遇到验证码转交人工"
+    store = get_shared_task_store()
+    store.register_task(
+        BrowserTaskRecord(
+            task_id=task_id,
+            task_description=task_desc,
+            session_id=sid,
+            status="running",
+            initial_url="https://example.com",
+            current_url="https://example.com",
+            title="Browser Task",
+        )
+    )
+    store.add_timeline_step(task_id, "spawn", f"Task spawned: {task_desc[:80]}")
 
     # Agent starts running -> transfer to human takeover.
     arbitration.start_agent_task(sid)

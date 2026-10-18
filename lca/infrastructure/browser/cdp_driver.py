@@ -311,7 +311,10 @@ class PlaywrightCDPDriver(BrowserDriverPort):
                 return reopened
 
         page = self._pages.get(session_id)
-        title = "Navigated Page"
+        # RA-153: 导航失败时不伪造 "Navigated Page" 标题。title 在 contracts 里是
+        # 必填 str（BrowserSessionSummary，改 contract 超出本轮 scope），所以
+        # goto 失败时保留导航前的已有标题 —— 不宣称一次并未确认发生的成功导航。
+        title = summary.title
         if page is not None:
             try:
                 await page.goto(url, timeout=20000, wait_until="domcontentloaded")
@@ -403,7 +406,7 @@ class PlaywrightCDPDriver(BrowserDriverPort):
         return text.lower().count(query.lower())
 
     async def dispatch_input(self, session_id: str, event: BrowserInputEvent) -> bool:
-        """向底层 CDP 注入鼠标或键盘事件。"""
+        """向底层 CDP 注入鼠标或键盘事件；无 CDP 会话时返回 False。"""
         if self.arbitration_engine is not None:
             decision = self.arbitration_engine.evaluate_input(session_id, event)
             if not decision.allowed:
@@ -411,7 +414,13 @@ class PlaywrightCDPDriver(BrowserDriverPort):
 
         cdp = self._cdp_sessions.get(session_id)
         if cdp is None:
-            return True
+            # RA-150: 无 CDP 会话时输入无处可送，fail-closed 返回 False 并记日志，
+            # 与 arbitration 拒绝同语义；绝不伪造"已派发"成功。
+            logger.warning(
+                "[PlaywrightCDPDriver] dispatch_input dropped: no CDP session for %s",
+                session_id,
+            )
+            return False
 
         try:
             summary = self._sessions.get(session_id)
