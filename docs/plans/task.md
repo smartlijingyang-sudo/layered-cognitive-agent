@@ -700,5 +700,11 @@
 | BRAINSTORM-STOCHASTIC-DECOUPLE-SECTION-2 | 逐步呈现设计细节 2：核心组件数据流、马尔可夫效用引擎与微内核插件设计模式 | Completed | 数据流闭环、马尔可夫效用计算公式、对数正态时长与微内核 SceneSkill 插件契约已获用户审批通过 |
 | BRAINSTORM-STOCHASTIC-DECOUPLE-SECTION-3 | 逐步呈现设计细节 3：测试不变量断言、零DOM污染HUD与自愈熔断防线 | Completed | 测试不变量断言矩阵（INV-01~07）、零DOM污染透明HUD与确定性回放调试设计已获用户审批通过 |
 | BRAINSTORM-STOCHASTIC-DECOUPLE-DESIGN-DOC | 沉淀设计文档至 docs/plans/ 并提交 git | Completed | 成功落盘 docs/plans/2026-10-18-stochastic-decision-brain-and-stealth-actuator-decoupling-design.md 并提交 git |
-| BRAINSTORM-STOCHASTIC-DECOUPLE-TRANSITION | 转换至实施计划制定（writing-plans） | In Progress | 正在调用 writing-plans 生成结构化落地实施计划 |
+| BRAINSTORM-STOCHASTIC-DECOUPLE-TRANSITION | 转换至实施计划制定（writing-plans） | Completed | 成功落盘 docs/plans/2026-10-18-stochastic-decision-brain-and-stealth-actuator-decoupling-plan.md 并分解为 6 大单流任务 |
+| DECOUPLE-TASK-1 | [黑板与事件总线] 强类型 SessionBlackboard 与异步事件模型 (Blackboard & Events) | Pending | 待执行 |
+| DECOUPLE-TASK-2 | [决策调度层] 纯数学二阶马尔可夫与效用修正大脑 (StochasticDecisionBrain) | Pending | 待执行 |
+| DECOUPLE-TASK-3 | [微内核场景编排] 场景插件统一契约与 5 大单文件插件 (SceneSkillRegistry & Plugins) | Pending | 待执行 |
+| DECOUPLE-TASK-4 | [物理执行层与铁律收敛] StealthActuator 拟真底座与 NavigationRouter (StealthActuator) | Pending | 待执行 |
+| DECOUPLE-TASK-5 | [全量替换与旁路自愈] 彻底切除旧版 scenarios.py/roulette.py，组装生产 Pilot (Pilot Assembly) | Pending | 待执行 |
+| DECOUPLE-TASK-6 | [可视化监控与全链路门禁] FastAPI 实时双屏 WebSocket 与前端大盘集成 (Telemetry & HUD) | Pending | 待执行 |
 
