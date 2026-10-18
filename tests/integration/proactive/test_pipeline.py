@@ -283,7 +283,7 @@ def test_disabled_policy_silent_no_session_event():
         sched.release_lock()
 
 
-def test_requested_with_verified_ref_delivers_chat(caplog):
+def test_requested_with_verified_ref_delivers_chat():
     """requested + 合法 request_ref（job:<id> 背书）→ 必达。"""
     tmp = Path(tempfile.mkdtemp())
     job = ProactiveJob(

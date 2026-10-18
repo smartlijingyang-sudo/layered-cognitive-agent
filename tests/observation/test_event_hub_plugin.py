@@ -137,7 +137,7 @@ def test_dispatch_silently_skips_unknown_ep() -> None:
     assert captured == []
 
 
-def test_dispatch_silently_skips_event_with_no_record(caplog: pytest.LogCaptureFixture) -> None:
+def test_dispatch_silently_skips_event_with_no_record() -> None:
     """When session_event_to_event_record returns None, dispatch is a no-op."""
 
     def observer_enter(**kw: Any) -> None:
