@@ -2236,7 +2236,7 @@
         "No new public API surface beyond the package-internal base; build_browser_tools output list unchanged."
       ],
       "priority": "P2",
-      "passes": false,
+      "passes": true,
       "branchName": "raphy/arch-20261019-0447",
       "notes": "Strength: Strong (RA-136 precedent: verbatim twins, here x6). Pure mechanical convergence; zero test risk."
     },

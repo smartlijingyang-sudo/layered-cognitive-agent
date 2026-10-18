@@ -18,6 +18,10 @@ from lca.contracts.atoms.ids.ids import new_id
 from lca.contracts.models.browser.models import BrowserActionResult, BrowserActionType
 from lca.contracts.models.core.execution.decision import Observation
 from lca.contracts.protocols import Tool
+from lca.infrastructure.tools.browser.driver_tool import (
+    _DriverInjectedTool,
+    browser_preview_widget_tag,
+)
 from lca.infrastructure.tools.browser.task_store import get_shared_task_store
 
 if TYPE_CHECKING:
@@ -168,7 +172,7 @@ class BrowserSearchTool(Tool):
         return Observation(observation_id=new_id("obs"), success=True, payload=res.model_dump())
 
 
-class BrowserOpenTool(Tool):
+class BrowserOpenTool(_DriverInjectedTool):
     """抓页面文本 / 在真实浏览器中打开（Muse 轻量与实时双模入口）。"""
 
     name: ClassVar[str] = "browser_open"
@@ -206,16 +210,6 @@ class BrowserOpenTool(Tool):
     effect_kind: ClassVar[Literal["ephemeral", "persistent", "stateful_once"]] = "ephemeral"
     default_timeout_s: ClassVar[int] = 30
 
-    def __init__(self, driver: PlaywrightCDPDriver | None = None) -> None:
-        self._driver = driver
-
-    def _get_driver(self) -> PlaywrightCDPDriver:
-        if self._driver is not None:
-            return self._driver
-        from lca.infrastructure.browser.cdp_driver import get_shared_browser_driver
-
-        return get_shared_browser_driver()
-
     def validate(self, args: dict[str, Any]) -> str | None:
         if not args.get("url") and not args.get("url_id"):
             return "url 或 url_id 至少提供一项"
@@ -248,7 +242,7 @@ class BrowserOpenTool(Tool):
 
         title = summary.title or "Web Page"
         final_url = summary.url or url
-        widget_tag = f"[widget:browser_preview?sessionId={session_id}&url={final_url}&title={title}&status=agent_running]"
+        widget_tag = browser_preview_widget_tag(session_id, final_url, title, "agent_running")
         try:
             page_text = await driver.extract_text(session_id)
         except Exception as e:
@@ -274,7 +268,7 @@ class BrowserOpenTool(Tool):
         )
 
 
-class BrowserFindTool(Tool):
+class BrowserFindTool(_DriverInjectedTool):
     """在已打开的页面内查找字符串（Muse 轻量层）。"""
 
     name: ClassVar[str] = "browser_find"
@@ -292,16 +286,6 @@ class BrowserFindTool(Tool):
     is_idempotent: ClassVar[bool] = True
     effect_kind: ClassVar[Literal["ephemeral", "persistent", "stateful_once"]] = "ephemeral"
     default_timeout_s: ClassVar[int] = 15
-
-    def __init__(self, driver: PlaywrightCDPDriver | None = None) -> None:
-        self._driver = driver
-
-    def _get_driver(self) -> PlaywrightCDPDriver:
-        if self._driver is not None:
-            return self._driver
-        from lca.infrastructure.browser.cdp_driver import get_shared_browser_driver
-
-        return get_shared_browser_driver()
 
     async def execute(self, args: dict[str, Any]) -> Observation:
         query = str(args.get("query", ""))
@@ -378,7 +362,7 @@ class BrowserLookupCitationUrlTool(Tool):
 # 2. 实时浏览器任务层（6 个核心工具，异步委托、任务自包含、权限收敛）
 # =====================================================================
 
-class BrowserSpawnTaskTool(Tool):
+class BrowserSpawnTaskTool(_DriverInjectedTool):
     """浏览器异步任务派发工具：派发后端尚未实现，调用 fail-closed（Muse 核心任务层占位）。"""
 
     name: ClassVar[str] = "browser_spawn_task"
@@ -418,16 +402,6 @@ class BrowserSpawnTaskTool(Tool):
     is_idempotent: ClassVar[bool] = False
     effect_kind: ClassVar[Literal["ephemeral", "persistent", "stateful_once"]] = "persistent"
     default_timeout_s: ClassVar[int] = 30
-
-    def __init__(self, driver: PlaywrightCDPDriver | None = None) -> None:
-        self._driver = driver
-
-    def _get_driver(self) -> PlaywrightCDPDriver:
-        if self._driver is not None:
-            return self._driver
-        from lca.infrastructure.browser.cdp_driver import get_shared_browser_driver
-
-        return get_shared_browser_driver()
 
     async def execute(self, args: dict[str, Any]) -> Observation:
         # RA-149: 没有真实的异步派发后端（无 worker loop、无 handoff producer，
@@ -707,7 +681,7 @@ class BrowserTransferTaskTool(Tool):
                 arbitration.release_to_agent(session_id)
 
         status_tag = "human_takeover" if target == "human_takeover" else "agent_running"
-        widget_tag = f"[widget:browser_preview?sessionId={session_id}&url=about:blank&title=Live%20Browser&status={status_tag}]"
+        widget_tag = browser_preview_widget_tag(session_id, "about:blank", "Live%20Browser", status_tag)
         text_content = (
             f"已将浏览器控制权切换为：**{target}**。\n"
             f"原因：{reason}\n\n"
@@ -892,7 +866,7 @@ class BrowserNavigateTool(BrowserOpenTool):
     description: ClassVar[str] = "在真实 Chromium 浏览器中打开指定网页，实时加载页面并生成预览卡片。"
 
 
-class BrowserClickTool(Tool):
+class BrowserClickTool(_DriverInjectedTool):
     """浏览器点击元素工具。"""
 
     name: ClassVar[str] = "browser_click"
@@ -909,16 +883,6 @@ class BrowserClickTool(Tool):
     is_idempotent: ClassVar[bool] = False
     effect_kind: ClassVar[Literal["ephemeral", "persistent", "stateful_once"]] = "ephemeral"
     default_timeout_s: ClassVar[int] = 30
-
-    def __init__(self, driver: PlaywrightCDPDriver | None = None) -> None:
-        self._driver = driver
-
-    def _get_driver(self) -> PlaywrightCDPDriver:
-        if self._driver is not None:
-            return self._driver
-        from lca.infrastructure.browser.cdp_driver import get_shared_browser_driver
-
-        return get_shared_browser_driver()
 
     def validate(self, args: dict[str, Any]) -> str | None:
         if not args.get("selector") or not isinstance(args["selector"], str):
@@ -948,7 +912,7 @@ class BrowserClickTool(Tool):
         return Observation(observation_id=new_id("obs"), success=clicked, payload=res.model_dump())
 
 
-class BrowserScreenshotTool(Tool):
+class BrowserScreenshotTool(_DriverInjectedTool):
     """浏览器截屏工具。"""
 
     name: ClassVar[str] = "browser_screenshot"
@@ -963,16 +927,6 @@ class BrowserScreenshotTool(Tool):
     is_idempotent: ClassVar[bool] = True
     effect_kind: ClassVar[Literal["ephemeral", "persistent", "stateful_once"]] = "ephemeral"
     default_timeout_s: ClassVar[int] = 30
-
-    def __init__(self, driver: PlaywrightCDPDriver | None = None) -> None:
-        self._driver = driver
-
-    def _get_driver(self) -> PlaywrightCDPDriver:
-        if self._driver is not None:
-            return self._driver
-        from lca.infrastructure.browser.cdp_driver import get_shared_browser_driver
-
-        return get_shared_browser_driver()
 
     async def execute(self, args: dict[str, Any]) -> Observation:
         session_id = str(args.get("session_id") or "")
@@ -1009,7 +963,7 @@ class BrowserScreenshotTool(Tool):
         return Observation(observation_id=new_id("obs"), success=True, payload=res.model_dump())
 
 
-class BrowserCloseTool(Tool):
+class BrowserCloseTool(_DriverInjectedTool):
     """浏览器会话关闭工具。"""
 
     name: ClassVar[str] = "browser_close"
@@ -1025,16 +979,6 @@ class BrowserCloseTool(Tool):
     is_idempotent: ClassVar[bool] = True
     effect_kind: ClassVar[Literal["ephemeral", "persistent", "stateful_once"]] = "ephemeral"
     default_timeout_s: ClassVar[int] = 10
-
-    def __init__(self, driver: PlaywrightCDPDriver | None = None) -> None:
-        self._driver = driver
-
-    def _get_driver(self) -> PlaywrightCDPDriver:
-        if self._driver is not None:
-            return self._driver
-        from lca.infrastructure.browser.cdp_driver import get_shared_browser_driver
-
-        return get_shared_browser_driver()
 
     def validate(self, args: dict[str, Any]) -> str | None:
         if not args.get("session_id") or not isinstance(args["session_id"], str):

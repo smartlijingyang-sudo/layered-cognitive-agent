@@ -4197,3 +4197,12 @@ brain/reducer/memory/hub/standing_refresher 等键，待 RA-123 落地后再评�
   - 基线先行：252 上 Chromium 真能启动，所以 arbitration 测试的 True 断言依赖的是真实 _cdp_sessions，改后保持绿——先跑基线再动手，少猜。
 - **实现与评估差异：** 评估的"return False+日志"实现完全一致；额外做了两处：scenario D/e2e 的 mock CDP session 注入（见上），以及新测试用 caplog 把日志行也钉住。
 ---
+
+## [2026-10-19 06:48] - RA-151
+- 新建 lca/infrastructure/tools/browser/driver_tool.py：_DriverInjectedTool(Tool) 基类收敛 6 处逐字 __init__(driver)/_get_driver()（懒导入保留在函数内，防导入循环），6 个类（open/find/spawn/click/screenshot/close）改继承；[widget:browser_preview?...] f-string 抽成 browser_preview_widget_tag helper（open/transfer 共用，字节一致已验证）。
+- Files changed: lca/infrastructure/tools/browser/driver_tool.py（新建）；lca/infrastructure/tools/browser/tools.py（6 类改继承、删 54 行样板、2 处 widget 改调 helper）。
+- **Learnings for future iterations:**
+  - 纯机械收敛 story 也要先数引用：删样板前确认 PlaywrightCDPDriver 在 tools.py 还有 build_browser_tools 的引用，TYPE_CHECKING import 不用动；BrowserNavigateTool 继承 BrowserOpenTool 且 build 时位置传参，基类 __init__(self, driver=None) 天然兼容。
+  - helper 抽取后用断言验字节一致（旧 f-string vs 新调用），比"肉眼像"可靠；这是零行为变化类 story 的标准自证。
+- **实现与评估差异：** 评估说 widget 重复在 open/spawn/transfer 三处，实现时 spawn 的那处已被 RA-149 删掉，实际收敛 open+transfer 两处；其余与评估一致（同类家园 driver_tool.py、懒导入保留、包内私有不进 __init__.py 导出）。
+---
