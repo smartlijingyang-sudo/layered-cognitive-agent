@@ -2166,6 +2166,22 @@
       "priority": "P2",
       "title": "Converge BrowserSubagent's fabricated action results onto the shared browser-task execution seam (constructor-injected executor)",
       "notes": "Strength: Strong. Area A friction walk (browser subagent layer), fabricated-results interface + testability gap class; kills the 59d223b05 lazy-import cycle as a side effect. Evidence: subagent.py execute_action branches; pinning test tests/infrastructure/browser/test_browser_subagent.py::test_browser_subagent_action_execution_with_desktop_lock."
+    },
+    {
+      "id": "RA-147",
+      "title": "Converge browser_search / browser_lookup_citation_url / browser_deep_research fabricated success onto the real search seam or fail-closed",
+      "description": "As an LCA maintainer, I want the browser 13-tool suite's lightweight/research tools to stop fabricating success, because BrowserSearchTool.execute returns canned \"Search Results for: {query}\" with success=True without calling anything, BrowserLookupCitationUrlTool.execute returns resolved_url=https://example.com/ref/{cid} (a URL that does not exist) with success=True, and BrowserDeepResearchTool.execute returns \"research started / status: running\" with success=True while dispatching nothing -- no worker, no handoff wiring. Meanwhile a real search seam sits two directories away at lca/infrastructure/search/service.py (web_search, any_search_provider_available, format_search_content; exa/searxng/tavily providers). The lie is pinned as contract by tests/contracts/browser/test_browser_muse_full_suite.py::test_muse_lightweight_search_and_citation, which asserts success=True on the canned output and feeds the fabricated citation_id into the lookup tool. Same class as RA-146: the interface claims execution, the implementation fabricates results, and the test pins the fabrication instead of behavior.",
+      "acceptanceCriteria": [
+        "BrowserSearchTool.execute routes the query through lca/infrastructure/search/service.py::web_search when any_search_provider_available() is true, mapping SearchResponse hits to citation_id/title/url/snippet results; when no provider is configured it returns success=False with an honest error (no canned results). Tool name/namespace/parameters unchanged (ADR-0248 §5.3 / ADR-0280 contract).",
+        "BrowserLookupCitationUrlTool.execute resolves citation_id against real search results (e.g. a recent-results cache populated by the search service); unknown or unresolvable citation_id returns success=False -- the https://example.com/ref/{cid} fabrication is deleted.",
+        "BrowserDeepResearchTool.execute either dispatches a real research worker with handoff wiring or returns success=False ('deep research worker not implemented'); the fake 'status: running' claim without dispatch is deleted.",
+        "Tests: test_muse_lightweight_search_and_citation is rewritten to pin honest behavior (fail-closed without provider, or a recording fake search service asserting the query reaches web_search); no test asserts success=True on fabricated payloads; `ruff check` clean.",
+        "Coordination: the browser tools area (lca/infrastructure/tools/browser/) had agy activity on 2026-10-17/18 and a raphy merge (RA-146) on 2026-10-18; the OPTIMIZE round must `git log`/`git status` for concurrent changes before touching."
+      ],
+      "priority": "P1",
+      "passes": true,
+      "branchName": "raphy/arch-20261018-2258",
+      "notes": "Strength: Strong. Area A friction walk (browser 13-tool suite), fabricated-results interface + testability gap class; RA-146's twin in the adjacent module. Evidence: tools.py BrowserSearchTool.execute canned results, BrowserLookupCitationUrlTool example.com/ref fabrication, BrowserDeepResearchTool fake 'running' status; pinning test test_muse_lightweight_search_and_citation. Real seam: lca/infrastructure/search/service.py."
     }
   ]
 }

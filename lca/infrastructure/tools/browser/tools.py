@@ -30,6 +30,12 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
+# 最近搜索结果缓存：citation_id -> {"title": str, "url": str, "snippet": str}。
+# 由 BrowserSearchTool.execute 在真实搜索成功后填充，供
+# BrowserLookupCitationUrlTool.execute 做真实引用解析（RA-147）。
+_RECENT_SEARCH_RESULTS: dict[str, dict[str, str]] = {}
+
+
 def _normalize_url(url: str) -> str:
     """自动补齐缺少协议的 URL，默认补齐 https://。"""
     cleaned = url.strip()
@@ -80,21 +86,73 @@ class BrowserSearchTool(Tool):
             query = str(raw_query.get("query", ""))
         else:
             query = str(raw_query or "")
+        query = query.strip()
+        if not query:
+            return Observation(
+                observation_id=new_id("obs"),
+                success=False,
+                payload=None,
+                error="搜索 query 为空",
+            )
+
+        verticals = args.get("verticals") or []
+        topic = str(verticals[0]) if verticals else None
+
+        # RA-147: 走真实搜索 seam；无可用 provider 时 fail-closed，绝不伪造结果。
+        # 函数内导入：避免 infrastructure.search 与 tools.browser 的导入时循环。
+        from lca.infrastructure.search.service.service import (
+            any_search_provider_available,
+            web_search,
+        )
+
+        if not any_search_provider_available():
+            return Observation(
+                observation_id=new_id("obs"),
+                success=False,
+                payload=None,
+                error="未配置可用的搜索 provider，无法执行网页搜索",
+            )
+        try:
+            response = await web_search(query, topic=topic)
+        except Exception as exc:
+            logger.warning("[BrowserSearchTool] web_search failed: %s", exc)
+            return Observation(
+                observation_id=new_id("obs"),
+                success=False,
+                payload=None,
+                error=f"网页搜索执行异常: {exc}",
+            )
+        if not response.ok:
+            return Observation(
+                observation_id=new_id("obs"),
+                success=False,
+                payload=None,
+                error=f"网页搜索失败: {response.error or '无结果'}",
+            )
 
         search_id = new_id("bsearch")
-        verticals = args.get("verticals") or []
-
-        # 模拟/抓取轻量搜索结果与 Citation
-        results = [
-            {
-                "citation_id": f"cit_{search_id}_1",
-                "title": f"Search Results for: {query}",
-                "snippet": f"Overview and references matching '{query}' across web indexes.",
-                "url": f"https://www.google.com/search?q={query}",
+        results = []
+        for i, hit in enumerate(response.results, start=1):
+            citation_id = f"cit_{search_id}_{i}"
+            snippet = (hit.content or "")[:400]
+            _RECENT_SEARCH_RESULTS[citation_id] = {
+                "title": hit.title,
+                "url": hit.url,
+                "snippet": snippet,
             }
-        ]
+            results.append(
+                {
+                    "citation_id": citation_id,
+                    "title": hit.title,
+                    "snippet": snippet,
+                    "url": hit.url,
+                }
+            )
 
-        text_content = f"搜索完成 [{search_id}]：找到 {len(results)} 条相关线索。\n"
+        text_content = (
+            f"搜索完成 [{search_id}]（provider: {response.provider}）："
+            f"找到 {len(results)} 条相关线索。\n"
+        )
         for r in results:
             text_content += f"- [{r['citation_id']}] {r['title']} ({r['url']}): {r['snippet']}\n"
 
@@ -102,7 +160,13 @@ class BrowserSearchTool(Tool):
             action_type=BrowserActionType.SEARCH,
             success=True,
             text_content=text_content,
-            details={"search_id": search_id, "query": query, "verticals": verticals, "results": results},
+            details={
+                "search_id": search_id,
+                "query": query,
+                "verticals": verticals,
+                "provider": response.provider,
+                "results": results,
+            },
         )
         return Observation(observation_id=new_id("obs"), success=True, payload=res.model_dump())
 
@@ -286,12 +350,29 @@ class BrowserLookupCitationUrlTool(Tool):
     default_timeout_s: ClassVar[int] = 10
 
     async def execute(self, args: dict[str, Any]) -> Observation:
-        cid = str(args["citation_id"])
+        cid = str(args.get("citation_id") or "")
+        if not cid:
+            return Observation(
+                observation_id=new_id("obs"),
+                success=False,
+                payload=None,
+                error="citation_id 必填",
+            )
+        # RA-147: 只解析真实搜索产生过的引用；未知引用 fail-closed，
+        # 绝不返回伪造 URL。
+        hit = _RECENT_SEARCH_RESULTS.get(cid)
+        if hit is None:
+            return Observation(
+                observation_id=new_id("obs"),
+                success=False,
+                payload=None,
+                error=f"未找到引用 {cid}：请先用 browser_search 搜索后再解析",
+            )
         res = BrowserActionResult(
             action_type=BrowserActionType.SEARCH,
             success=True,
             text_content=f"Citation {cid} resolved.",
-            details={"citation_id": cid, "resolved_url": f"https://example.com/ref/{cid}", "title": f"Source {cid}"},
+            details={"citation_id": cid, "resolved_url": hit["url"], "title": hit["title"]},
         )
         return Observation(observation_id=new_id("obs"), success=True, payload=res.model_dump())
 
@@ -824,23 +905,22 @@ class BrowserDeepResearchTool(Tool):
     default_timeout_s: ClassVar[int] = 30
 
     async def execute(self, args: dict[str, Any]) -> Observation:
-        mission = str(args["mission"])
-        slug = str(args["slug"])
-        mission_id = new_id("rmiss")
-
-        text_content = (
-            f"已启动深度研究任务 `{slug}` [{mission_id}]。\n"
-            f"调研任务书：{mission}\n\n"
-            f"提示：研究智能体已在独立登出沙箱中开始联网研判，结果将附带来源报告通过 handoff 送回。"
+        # RA-147: 当前没有真实的深度研究 worker 后端（无派发目标、无 handoff
+        # 接线），诚实 fail-closed。绝不返回"已启动/running"的伪造回执。
+        mission = str(args.get("mission") or "")
+        slug = str(args.get("slug") or "")
+        logger.warning(
+            "[BrowserDeepResearchTool] deep research worker not implemented "
+            "(mission=%r slug=%r)",
+            mission[:80],
+            slug,
         )
-
-        res = BrowserActionResult(
-            action_type=BrowserActionType.DEEP_RESEARCH,
-            success=True,
-            text_content=text_content,
-            details={"mission_id": mission_id, "slug": slug, "status": "running"},
+        return Observation(
+            observation_id=new_id("obs"),
+            success=False,
+            payload=None,
+            error="深度研究 worker 尚未实现：browser_deep_research 当前无法派发真实研究任务",
         )
-        return Observation(observation_id=new_id("obs"), success=True, payload=res.model_dump())
 
 
 # =====================================================================

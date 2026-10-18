@@ -3979,3 +3979,65 @@ brain/reducer/memory/hub/standing_refresher 等键，待 RA-123 落地后再评�
     __init__.py 被改）→ 新 seam 放新文件 executor.py 而非改 tools.py，避免合入
     摩擦；实现基线为 committed fcf050a63，主树未碰，合并顺延。
 ---
+
+---
+
+## 2026-10-18 22:58 CST - assess (1 candidate: RA-147)
+
+- Basis: main tip `f3f6ba97d`（本轮先合了 RA-146：`merge: raphy/arch-20261017-0001`，
+  subagent.py 冲突走"哪个版本更正确"解决——显式 executor 优先（raphy），
+  driver 直驱真执行保留（HEAD），两者皆无 fail-closed；37 测试 + ruff 全绿；
+  merge-base 双向校验无 lost update；分支/worktree 已删）。
+- Hot areas: (A) browser 13-tool 套件 `lca/infrastructure/tools/browser/tools.py`
+  1075 行逐类读完；(B) `parse_step_evidence`/`ActivityIntentNamer`（单模块、
+  deletion test 不通过，未立案）；(C) memory sense gate（`lca/cognition/memory/`
+  ralph Round 2 冻结区，禁区跳过）。
+- Runtime verification: mock LLM smoke RUN1/RUN2 均为 completed；browser e2e
+  在 merge 验证批次里通过。无 P0 crash/hang。
+- Story: **RA-147**（Strong, P1）——`browser_search` 返回罐头搜索结果、
+  `browser_lookup_citation_url` 返回 `https://example.com/ref/{cid}` 假 URL、
+  `browser_deep_research` 谎称"running"但零派发；真实搜索 seam
+  （`lca/infrastructure/search/service.py`，exa/searxng/tavily）闲置；
+  `test_muse_lightweight_search_and_citation` 把伪造钉成契约。修法：走真实
+  seam 或 fail-closed，重写钉伪造的测试。RA-146 在相邻模块的双胞胎。
+- Secondary（未立案）：6 个 `_get_driver` 逐字重复（纯 duplication，最弱类）；
+  `BrowserNavigateTool` 纯改名 alias（deletion test 边缘）。
+- **Learnings for future iterations:**
+  - 伪造 hunting 可系统化：grep `example.com` + `success=True` 在 tools 层扫一遍，
+    RA-146/RA-147 都是这个形状；下次 assess 把这一 grep 加入固定动作。
+  - "有真实 seam 闲置 + 工具手写伪造" 是比"无 seam"更强的立案信号（RA-147）——
+    评估时先查同类家园有没有现成 seam（`lca/infrastructure/search/`），再判伪造。
+  - merge 冲突涉及"伪造 vs 真执行"语义时，裁决轴是诚实性不是代码量：真执行的
+    旧路径（driver 直驱）保留，伪造的 fallback（driver=None 时 success=True）删除。
+
+---
+
+## 2026-10-18 23:20 CST - RA-147
+
+- What was implemented: browser 13-tool 套件里三个伪造成功的工具收敛到真实
+  seam / fail-closed：`BrowserSearchTool.execute` 改走
+  `lca/infrastructure/search/service.py::web_search`（`any_search_provider_available()`
+  守卫，无 provider / 异常 / 失败全部诚实返回 success=False），结果映射为
+  citation_id 并写入模块级 `_RECENT_SEARCH_RESULTS` 缓存；
+  `BrowserLookupCitationUrlTool.execute` 只解析缓存中真实存在过的引用，未知引用
+  fail-closed，删除 `https://example.com/ref/{cid}` 伪造；
+  `BrowserDeepResearchTool.execute` 直接 fail-closed（无真实 worker 后端，
+  删除"已启动/running"伪造回执）。工具 name/namespace/parameters 契约不变；
+  search service 的导入为函数内延迟导入（防 tools.browser ↔ search 导入循环）。
+- Files changed:
+  - lca/infrastructure/tools/browser/tools.py（3 个 execute 重写 + `_RECENT_SEARCH_RESULTS` 缓存）
+  - tests/contracts/browser/test_browser_muse_full_suite.py（重写两个钉伪造的测试：
+    无 provider fail-closed、recording fake search service 断言真实 URL 流转 +
+    未知引用 fail-closed、deep research fail-closed）
+- Tests: `test_browser_muse_full_suite.py` 10 passed；回归
+  `tests/infrastructure/browser/` + `tests/infrastructure/tools/browser/` 23 passed；
+  `ruff check` 全 clean。
+- **Learnings for future iterations:**
+  - 伪造 hunting 固定动作生效：grep `example.com` + `success=True` 在 tools 层扫，
+    RA-146/RA-147 同形状连中两元；已记入 assess pattern。
+  - monkeypatch 点选在 service 模块的函数上（`search_service.web_search`），配合
+    工具内的函数级延迟导入，测试无需碰工具内部实现——延迟导入同时服务于
+    防循环和可测试性，一举两得。
+  - `_RECENT_SEARCH_RESULTS` 是进程级缓存：citation 引用解析依赖"同进程先 search"；
+    跨进程/重启后引用失效是已知语义，acceptance 里已用 fail-closed 覆盖，
+    不算 bug。

@@ -70,21 +70,65 @@ def test_default_tools_exports_all_muse_tools() -> None:
 
 
 @pytest.mark.asyncio
-async def test_muse_lightweight_search_and_citation() -> None:
-    """测试轻量层搜索与引用解析（无需启动真实浏览器）。"""
+async def test_muse_lightweight_search_no_provider_fails_closed(monkeypatch) -> None:
+    """RA-147: 无可用搜索 provider 时 fail-closed，绝不伪造搜索结果。"""
+    import lca.infrastructure.search.service.service as search_service
+
+    monkeypatch.setattr(search_service, "any_search_provider_available", lambda: False)
+    search_tool = BrowserSearchTool()
+    obs = await search_tool.execute({"primary_query": "Python asyncio tutorial", "verticals": ["news"]})
+    assert obs.success is False
+    assert obs.error is not None
+    assert "provider" in obs.error
+
+
+@pytest.mark.asyncio
+async def test_muse_lightweight_search_and_citation(monkeypatch) -> None:
+    """RA-147: 搜索走真实搜索 seam；citation 解析返回真实 URL；未知引用 fail-closed。"""
+    import lca.infrastructure.search.service.service as search_service
+    from lca.infrastructure.search.models.models import SearchHit, SearchResponse
+
+    monkeypatch.setattr(search_service, "any_search_provider_available", lambda: True)
+
+    async def fake_web_search(query, *, topic=None, time_range=None):
+        return SearchResponse(
+            query=query,
+            provider="fake",
+            results=(
+                SearchHit(
+                    title="Asyncio Docs",
+                    url="https://docs.python.org/3/library/asyncio.html",
+                    content="asyncio tutorial",
+                ),
+            ),
+        )
+
+    monkeypatch.setattr(search_service, "web_search", fake_web_search)
+
     search_tool = BrowserSearchTool()
     obs = await search_tool.execute({"primary_query": "Python asyncio tutorial", "verticals": ["news"]})
     assert obs.success is True
     assert obs.payload is not None
     assert obs.payload["action_type"] == "search"
     results = obs.payload["details"]["results"]
-    assert len(results) > 0
+    assert len(results) == 1
+    assert results[0]["url"] == "https://docs.python.org/3/library/asyncio.html"
+    assert "google.com/search" not in results[0]["url"]
     citation_id = results[0]["citation_id"]
 
     lookup_tool = BrowserLookupCitationUrlTool()
     lookup_obs = await lookup_tool.execute({"citation_id": citation_id})
     assert lookup_obs.success is True
     assert lookup_obs.payload["details"]["citation_id"] == citation_id
+    assert (
+        lookup_obs.payload["details"]["resolved_url"]
+        == "https://docs.python.org/3/library/asyncio.html"
+    )
+
+    # 未搜索过的引用 → 诚实失败，不返回伪造 URL
+    unknown_obs = await lookup_tool.execute({"citation_id": "cit_does_not_exist_1"})
+    assert unknown_obs.success is False
+    assert unknown_obs.error is not None
 
 
 @pytest.mark.asyncio
@@ -187,16 +231,15 @@ async def test_muse_captcha_preference_persistence() -> None:
 
 @pytest.mark.asyncio
 async def test_muse_deep_research_launch() -> None:
-    """测试深度研究任务派发与回执。"""
+    """RA-147: 无真实 deep-research worker 后端时 fail-closed，不伪造"running"回执。"""
     research_tool = BrowserDeepResearchTool()
     obs = await research_tool.execute({
         "mission": "深度调研 2026 年最新开源 Agent 浏览器架构演进",
         "slug": "agent-browser-arch",
     })
-    assert obs.success is True
-    assert obs.payload["details"]["slug"] == "agent-browser-arch"
-    assert obs.payload["details"]["status"] == "running"
-    assert "已启动深度研究任务" in obs.payload["text_content"]
+    assert obs.success is False
+    assert obs.error is not None
+    assert "尚未实现" in obs.error
 
 
 def test_muse_constitution_contract_in_templates() -> None:
