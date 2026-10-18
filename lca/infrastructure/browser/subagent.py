@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import logging
+from typing import TYPE_CHECKING
+
 from lca.contracts.atoms.ids.ids import new_id
 from lca.contracts.models.browser.models import (
     BrowserAction,
@@ -11,6 +14,11 @@ from lca.contracts.models.browser.models import (
 from lca.contracts.protocols import Tool
 from lca.infrastructure.browser.arbitration import BrowserArbitrationEngine
 from lca.infrastructure.computer.desktop_lock import DesktopLockCoordinator
+
+if TYPE_CHECKING:
+    from lca.infrastructure.browser.cdp_driver import PlaywrightCDPDriver
+
+logger = logging.getLogger(__name__)
 
 
 class BrowserSubagent:
@@ -27,10 +35,12 @@ class BrowserSubagent:
         agent_id: str = "browser_subagent",
         lock_manager: DesktopLockCoordinator | None = None,
         arbitration_engine: BrowserArbitrationEngine | None = None,
+        driver: PlaywrightCDPDriver | None = None,
     ) -> None:
         self.agent_id = agent_id
         self.lock_manager = lock_manager
         self.arbitration_engine = arbitration_engine
+        self.driver = driver
         # 严格过滤工具集：严禁声带发声工具
         from lca.infrastructure.tools.browser.tools import build_browser_tools
 
@@ -68,6 +78,25 @@ class BrowserSubagent:
         try:
             # 2. 执行浏览器动作
             if action.action_type == BrowserActionType.NAVIGATE:
+                if self.driver is not None:
+                    try:
+                        summary = await self.driver.navigate(
+                            session_id, action.url or "about:blank"
+                        )
+                        return BrowserActionResult(
+                            action_type=action.action_type,
+                            success=True,
+                            session_id=session_id,
+                            url=summary.url,
+                            title=summary.title,
+                        )
+                    except Exception as exc:
+                        logger.warning("[BrowserSubagent] live navigate failed: %s", exc)
+                        return BrowserActionResult(
+                            action_type=action.action_type,
+                            success=False,
+                            error=str(exc),
+                        )
                 return BrowserActionResult(
                     action_type=action.action_type,
                     success=True,
@@ -75,12 +104,42 @@ class BrowserSubagent:
                     title="Navigated Page",
                 )
             if action.action_type == BrowserActionType.CLICK:
+                if self.driver is not None:
+                    clicked = False
+                    if action.selector:
+                        try:
+                            clicked = await self.driver.click(session_id, action.selector)
+                        except Exception as exc:
+                            logger.warning("[BrowserSubagent] live click failed: %s", exc)
+                            clicked = False
+                    return BrowserActionResult(
+                        action_type=action.action_type,
+                        success=clicked,
+                        text_content=f"Clicked selector: {action.selector}",
+                        details={"live": clicked},
+                    )
                 return BrowserActionResult(
                     action_type=action.action_type,
                     success=True,
                     text_content=f"Clicked selector: {action.selector}",
                 )
             if action.action_type == BrowserActionType.TYPE:
+                if self.driver is not None:
+                    typed = False
+                    if action.selector:
+                        try:
+                            typed = await self.driver.type_text(
+                                session_id, action.selector, action.text or ""
+                            )
+                        except Exception as exc:
+                            logger.warning("[BrowserSubagent] live type failed: %s", exc)
+                            typed = False
+                    return BrowserActionResult(
+                        action_type=action.action_type,
+                        success=typed,
+                        text_content=f"Typed text into {action.selector}",
+                        details={"live": typed},
+                    )
                 return BrowserActionResult(
                     action_type=action.action_type,
                     success=True,
@@ -88,12 +147,60 @@ class BrowserSubagent:
                 )
             if action.action_type == BrowserActionType.SCREENSHOT:
                 art_id = new_id("art_screenshot")
+                if self.driver is not None:
+                    try:
+                        shot = await self.driver.take_screenshot(session_id)
+                    except Exception as exc:
+                        logger.warning("[BrowserSubagent] live screenshot failed: %s", exc)
+                        shot = None
+                    if shot is not None:
+                        return BrowserActionResult(
+                            action_type=action.action_type,
+                            success=True,
+                            screenshot_artifact_id=art_id,
+                            details={"live": True, "screenshot_bytes": len(shot)},
+                        )
+                    return BrowserActionResult(
+                        action_type=action.action_type,
+                        success=False,
+                        screenshot_artifact_id=art_id,
+                        details={"live": False},
+                    )
                 return BrowserActionResult(
                     action_type=action.action_type,
                     success=True,
                     screenshot_artifact_id=art_id,
                 )
+            if action.action_type == BrowserActionType.EXTRACT_TEXT:
+                if self.driver is not None:
+                    try:
+                        text = await self.driver.extract_text(session_id)
+                    except Exception as exc:
+                        logger.warning("[BrowserSubagent] live extract failed: %s", exc)
+                        text = ""
+                    return BrowserActionResult(
+                        action_type=action.action_type,
+                        success=True,
+                        text_content=text or "",
+                        details={"live": bool(text)},
+                    )
+                return BrowserActionResult(
+                    action_type=action.action_type,
+                    success=True,
+                    text_content=f"Executed action {action.action_type}",
+                )
             if action.action_type == BrowserActionType.CLOSE:
+                if self.driver is not None:
+                    try:
+                        closed = await self.driver.close_session(session_id)
+                    except Exception as exc:
+                        logger.warning("[BrowserSubagent] live close failed: %s", exc)
+                        closed = False
+                    return BrowserActionResult(
+                        action_type=action.action_type,
+                        success=closed,
+                        session_id=session_id,
+                    )
                 return BrowserActionResult(
                     action_type=action.action_type,
                     success=True,

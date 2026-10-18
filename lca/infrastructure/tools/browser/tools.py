@@ -10,6 +10,7 @@ Plus legacy/convenience tools: browser_navigate, browser_click, browser_screensh
 
 from __future__ import annotations
 
+import base64
 import logging
 from typing import TYPE_CHECKING, Any, ClassVar, Literal
 
@@ -186,7 +187,15 @@ class BrowserOpenTool(Tool):
         title = summary.title or "Web Page"
         final_url = summary.url or url
         widget_tag = f"[widget:browser_preview?sessionId={session_id}&url={final_url}&title={title}&status=agent_running]"
-        text_content = f"已在真实浏览器中打开页面：{title} ({final_url})\n\n{widget_tag}"
+        try:
+            page_text = await driver.extract_text(session_id)
+        except Exception as e:
+            logger.warning("[BrowserOpenTool] extract_text error: %s", e)
+            page_text = ""
+        text_content = f"已在真实浏览器中打开页面：{title} ({final_url})\n\n"
+        if page_text:
+            text_content += f"页面内容预览：\n{page_text[:800]}\n\n"
+        text_content += widget_tag
 
         res = BrowserActionResult(
             action_type=BrowserActionType.NAVIGATE,
@@ -222,15 +231,37 @@ class BrowserFindTool(Tool):
     effect_kind: ClassVar[Literal["ephemeral", "persistent", "stateful_once"]] = "ephemeral"
     default_timeout_s: ClassVar[int] = 15
 
+    def __init__(self, driver: PlaywrightCDPDriver | None = None) -> None:
+        self._driver = driver
+
+    def _get_driver(self) -> PlaywrightCDPDriver:
+        if self._driver is not None:
+            return self._driver
+        from lca.infrastructure.browser.cdp_driver import get_shared_browser_driver
+
+        return get_shared_browser_driver()
+
     async def execute(self, args: dict[str, Any]) -> Observation:
         query = str(args.get("query", ""))
         session_id = str(args.get("session_id") or "")
+        case_sensitive = bool(args.get("case_sensitive", False))
+        matches = await self._get_driver().find_text(
+            session_id, query, case_sensitive=case_sensitive
+        )
+        if matches > 0:
+            text_content = f"已在页面检索 '{query}'，找到 {matches} 处匹配。"
+        else:
+            text_content = f"页面中未找到 '{query}' 的匹配。"
         res = BrowserActionResult(
             action_type=BrowserActionType.FIND,
             success=True,
             session_id=session_id or None,
-            text_content=f"已在页面检索 '{query}'，找到相关内容匹配项。",
-            details={"query": query, "matches_count": 1},
+            text_content=text_content,
+            details={
+                "query": query,
+                "matches_count": matches,
+                "case_sensitive": case_sensitive,
+            },
         )
         return Observation(observation_id=new_id("obs"), success=True, payload=res.model_dump())
 
@@ -820,6 +851,13 @@ class BrowserClickTool(Tool):
     def __init__(self, driver: PlaywrightCDPDriver | None = None) -> None:
         self._driver = driver
 
+    def _get_driver(self) -> PlaywrightCDPDriver:
+        if self._driver is not None:
+            return self._driver
+        from lca.infrastructure.browser.cdp_driver import get_shared_browser_driver
+
+        return get_shared_browser_driver()
+
     def validate(self, args: dict[str, Any]) -> str | None:
         if not args.get("selector") or not isinstance(args["selector"], str):
             return "selector 必填"
@@ -830,13 +868,22 @@ class BrowserClickTool(Tool):
         if err is not None:
             return Observation(observation_id=new_id("obs"), success=False, payload=None, error=err)
         session_id = str(args.get("session_id") or "")
+        selector = args["selector"]
+        clicked = await self._get_driver().click(session_id, selector)
+        if clicked:
+            text_content = f"已点击元素 `{selector}`。"
+        else:
+            text_content = (
+                f"无法点击元素 `{selector}`：会话 {session_id} 没有可操作的活动浏览器页面。"
+            )
         res = BrowserActionResult(
             action_type=BrowserActionType.CLICK,
-            success=True,
+            success=clicked,
             session_id=session_id or None,
-            text_content=f"Clicked: {args['selector']}",
+            text_content=text_content,
+            details={"selector": selector, "live": clicked},
         )
-        return Observation(observation_id=new_id("obs"), success=True, payload=res.model_dump())
+        return Observation(observation_id=new_id("obs"), success=clicked, payload=res.model_dump())
 
 
 class BrowserScreenshotTool(Tool):
@@ -858,14 +905,44 @@ class BrowserScreenshotTool(Tool):
     def __init__(self, driver: PlaywrightCDPDriver | None = None) -> None:
         self._driver = driver
 
+    def _get_driver(self) -> PlaywrightCDPDriver:
+        if self._driver is not None:
+            return self._driver
+        from lca.infrastructure.browser.cdp_driver import get_shared_browser_driver
+
+        return get_shared_browser_driver()
+
     async def execute(self, args: dict[str, Any]) -> Observation:
         session_id = str(args.get("session_id") or "")
         art_id = new_id("art_screenshot")
+        shot = await self._get_driver().take_screenshot(session_id)
+        if shot is None:
+            text_content = f"无法截屏：会话 {session_id} 没有活动浏览器页面。"
+            res = BrowserActionResult(
+                action_type=BrowserActionType.SCREENSHOT,
+                success=False,
+                session_id=session_id or None,
+                screenshot_artifact_id=art_id,
+                text_content=text_content,
+                details={"live": False},
+            )
+            return Observation(
+                observation_id=new_id("obs"), success=False, payload=res.model_dump()
+            )
+        text_content = (
+            f"已捕获会话 {session_id} 的 JPEG 截图（{len(shot)} 字节），artifact_id={art_id}。"
+        )
         res = BrowserActionResult(
             action_type=BrowserActionType.SCREENSHOT,
             success=True,
             session_id=session_id or None,
             screenshot_artifact_id=art_id,
+            text_content=text_content,
+            details={
+                "live": True,
+                "screenshot_bytes": len(shot),
+                "screenshot_base64": base64.b64encode(shot).decode("ascii"),
+            },
         )
         return Observation(observation_id=new_id("obs"), success=True, payload=res.model_dump())
 

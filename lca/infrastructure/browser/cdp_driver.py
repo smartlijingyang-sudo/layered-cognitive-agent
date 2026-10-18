@@ -337,6 +337,70 @@ class PlaywrightCDPDriver(BrowserDriverPort):
         await self.push_snapshot(session_id)
         return updated
 
+    async def click(self, session_id: str, selector: str) -> bool:
+        """Click a CSS/XPath selector in the live page for a session."""
+        page = self._pages.get(session_id)
+        if page is None:
+            return False
+        try:
+            await page.locator(selector).click(timeout=10000)
+            return True
+        except Exception as exc:
+            logger.warning("[PlaywrightCDPDriver] click failed for %s: %s", session_id, exc)
+            return False
+
+    async def type_text(self, session_id: str, selector: str, text: str) -> bool:
+        """Fill text into a live page input; falls back to click + keyboard typing."""
+        page = self._pages.get(session_id)
+        if page is None:
+            return False
+        locator = page.locator(selector)
+        try:
+            await locator.fill(text, timeout=10000)
+            return True
+        except Exception:
+            try:
+                await locator.click(timeout=5000)
+                await page.keyboard.type(text)
+                return True
+            except Exception as exc:
+                logger.warning("[PlaywrightCDPDriver] type failed for %s: %s", session_id, exc)
+                return False
+
+    async def extract_text(self, session_id: str) -> str:
+        """Return the visible body text of the live page (empty string when not live)."""
+        page = self._pages.get(session_id)
+        if page is None:
+            return ""
+        try:
+            return (await page.locator("body").inner_text()) or ""
+        except Exception as exc:
+            logger.warning("[PlaywrightCDPDriver] extract_text failed for %s: %s", session_id, exc)
+            return ""
+
+    async def take_screenshot(self, session_id: str) -> bytes | None:
+        """Capture a JPEG screenshot of the live page; None when not live."""
+        page = self._pages.get(session_id)
+        if page is None:
+            return None
+        try:
+            shot = await page.screenshot(type="jpeg", quality=70)
+            return bytes(shot) if shot else None
+        except Exception as exc:
+            logger.warning("[PlaywrightCDPDriver] screenshot failed for %s: %s", session_id, exc)
+            return None
+
+    async def find_text(self, session_id: str, query: str, case_sensitive: bool = False) -> int:
+        """Count occurrences of query in the live page body text (0 when not live)."""
+        if not query:
+            return 0
+        text = await self.extract_text(session_id)
+        if not text:
+            return 0
+        if case_sensitive:
+            return text.count(query)
+        return text.lower().count(query.lower())
+
     async def dispatch_input(self, session_id: str, event: BrowserInputEvent) -> bool:
         """向底层 CDP 注入鼠标或键盘事件。"""
         if self.arbitration_engine is not None:
