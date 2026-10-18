@@ -686,5 +686,11 @@
 | BRAINSTORM-X-OP-SSOT-APPROACHES | 提炼 2-3 种配置化与机制透视架构方案及权衡对比 | Completed | 用户审核并明确选定方案 A（分层领域驱动架构 DDD Layered SSOT & Reactive Mechanism Studio） |
 | BRAINSTORM-X-OP-SSOT-DESIGN-SECTIONS | 逐步呈现设计细节（Owns/Does NOT own/数据流与设计模式/不变量断言）并获取审批 | Completed | 全部 3 个设计小节（边界自治、核心加固、断言矩阵）均获用户批准 |
 | BRAINSTORM-X-OP-SSOT-DESIGN-DOC | 沉淀设计文档至 docs/plans/ 并提交 git | Completed | 成功落盘 docs/plans/2026-10-18-x-operator-ssot-config-and-prompt-architecture-design.md 并已提交 git |
-| BRAINSTORM-X-OP-SSOT-TRANSITION | 转换至实施计划制定（writing-plans） | In Progress | 正在调用 writing-plans 技能生成详细可执行计划 |
+| BRAINSTORM-X-OP-SSOT-TRANSITION | 转换至实施计划制定（writing-plans） | Completed | 成功落盘 docs/plans/2026-10-18-x-operator-ssot-config-and-prompt-architecture-plan.md 并分解为 6 大单流任务 |
+| STUDIO-TASK-1-CONTRACTS | [契约与持久化] SSOT 领域契约收敛、数值边界门禁与原子持久化单写锁强化 (`growth_config.py`, `router_trace.py`, 历史快照) | Pending | 待执行 |
+| STUDIO-TASK-2-HOT-RELOAD | [热生效广播] 进程内响应式 ConfigChangeBus 广播与 CognitivePipeline / Pilot 零重启秒级刷新 | Pending | 待执行 |
+| STUDIO-TASK-3-SOULS-MATRIX | [拟人矩阵] 16-Soul 独立 Prompt 覆盖、开关隔离与不可变深拷贝防污染 | Pending | 待执行 |
+| STUDIO-TASK-4-STUDIO-UI | [表现层中枢] 前端 2026 Bento-grid 双轨 Mechanism Studio (6 大板块表单 + 内部机制透视 + Live 组装预览) | Pending | 待执行 |
+| STUDIO-TASK-5-COCKPIT-WIRING | [解耦与连通] 驾驶舱子 Tab 接入 Studio 与顶栏导航直达，彻底清理写死的 Mock 数组与假象卡片 | Pending | 待执行 |
+| STUDIO-TASK-6-CONFORMANCE-E2E | [全量门禁体检] INV-SSOT-01 至 INV-SSOT-06 全套自动化测试套件与端到端闭环验证 | Pending | 待执行 |
 
