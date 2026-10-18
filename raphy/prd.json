@@ -2194,9 +2194,9 @@
         "Behavior compatibility: browser/tools.py direct use of infra web_search (RA-147) unchanged; the infra web_search seam itself stays (multi-consumer). Tool name/namespace/parameters of the web_search tool unchanged."
       ],
       "priority": "P2",
-      "passes": false,
+      "passes": true,
       "branchName": "raphy/arch-20261019-0145",
-      "notes": "Strength: Worth exploring. Fix direction (fail-closed vs declared dual-path) is a judgment call; kernel plugin wiring implications deserve care."
+      "notes": "Strength: Worth exploring. Fix direction (fail-closed vs declared dual-path) is a judgment call; kernel plugin wiring implications deserve care. Implemented 2026-10-19: chose declared-dual-path (option b); Observation.extra['search_seam'] = 'definition'|'ambient'; 3 new tests pin the dispatch."
     }
   ]
 }
