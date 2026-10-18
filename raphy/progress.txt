@@ -3979,3 +3979,33 @@ brain/reducer/memory/hub/standing_refresher 等键，待 RA-123 落地后再评�
     __init__.py 被改）→ 新 seam 放新文件 executor.py 而非改 tools.py，避免合入
     摩擦；实现基线为 committed fcf050a63，主树未碰，合并顺延。
 ---
+
+---
+
+## 2026-10-18 22:58 CST - assess (1 candidate: RA-147)
+
+- Basis: main tip `f3f6ba97d`（本轮先合了 RA-146：`merge: raphy/arch-20261017-0001`，
+  subagent.py 冲突走"哪个版本更正确"解决——显式 executor 优先（raphy），
+  driver 直驱真执行保留（HEAD），两者皆无 fail-closed；37 测试 + ruff 全绿；
+  merge-base 双向校验无 lost update；分支/worktree 已删）。
+- Hot areas: (A) browser 13-tool 套件 `lca/infrastructure/tools/browser/tools.py`
+  1075 行逐类读完；(B) `parse_step_evidence`/`ActivityIntentNamer`（单模块、
+  deletion test 不通过，未立案）；(C) memory sense gate（`lca/cognition/memory/`
+  ralph Round 2 冻结区，禁区跳过）。
+- Runtime verification: mock LLM smoke RUN1/RUN2 均为 completed；browser e2e
+  在 merge 验证批次里通过。无 P0 crash/hang。
+- Story: **RA-147**（Strong, P1）——`browser_search` 返回罐头搜索结果、
+  `browser_lookup_citation_url` 返回 `https://example.com/ref/{cid}` 假 URL、
+  `browser_deep_research` 谎称"running"但零派发；真实搜索 seam
+  （`lca/infrastructure/search/service.py`，exa/searxng/tavily）闲置；
+  `test_muse_lightweight_search_and_citation` 把伪造钉成契约。修法：走真实
+  seam 或 fail-closed，重写钉伪造的测试。RA-146 在相邻模块的双胞胎。
+- Secondary（未立案）：6 个 `_get_driver` 逐字重复（纯 duplication，最弱类）；
+  `BrowserNavigateTool` 纯改名 alias（deletion test 边缘）。
+- **Learnings for future iterations:**
+  - 伪造 hunting 可系统化：grep `example.com` + `success=True` 在 tools 层扫一遍，
+    RA-146/RA-147 都是这个形状；下次 assess 把这一 grep 加入固定动作。
+  - "有真实 seam 闲置 + 工具手写伪造" 是比"无 seam"更强的立案信号（RA-147）——
+    评估时先查同类家园有没有现成 seam（`lca/infrastructure/search/`），再判伪造。
+  - merge 冲突涉及"伪造 vs 真执行"语义时，裁决轴是诚实性不是代码量：真执行的
+    旧路径（driver 直驱）保留，伪造的 fallback（driver=None 时 success=True）删除。
