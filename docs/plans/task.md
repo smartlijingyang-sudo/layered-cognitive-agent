@@ -677,3 +677,14 @@
 | BRAINSTORM-X-OP-TRANSITION | 转换至实施计划制定（writing-plans） | Completed | 成功落盘 docs/plans/2026-10-18-stealth-browser-unit-and-flow-testing-plan.md 并提交 git (commit 65ee41f) |
 | STEALTH-EXEC-FULL-SUITE | 单流执行与全量测试闭环（单测/靶场测试/动线流程/熔断状态机） | Completed | 6大单流任务全数完成，63/63 测试 100% 全绿（耗时 46.21s），靶场与风控动线不变量 0 违例，代码门禁 clean |
 | STEALTH-HARDEN-AUDIT-TARGETS | [防检测加固与靶场验收] 落实 2D 高斯点击落点、Client Hints 版本自洽、WebRTC 防漏与四大反爬靶场实测验收 | Completed | 1. 高斯落点升级：BiometricMotor.sample_gaussian_box_point 截断正态分布；2. 客户端提示对齐：sec-ch-ua 与 Chromium 153 动态同频；3. WebRTC防漏：注入 --enforce-webrtc-ip-permission-check；4. 四大靶场实测全部绿灯：Brotector 0 检出、WebRTC 候选空集、Canvas 跨会话 100% 幂等哈希、319 次 mousemove 贝塞尔轨迹全数 isTrusted=True 并输出可视画布截图与报告 |
+| X-POLICY-BRAINSTORM-CONTEXT | 探索并完成与 X 最新三大政策合规自检清单的差距分析与上下文梳理 | Completed | 已完成底层驱动、指纹、动力学、风险熔断、文本去套话与音视频管线排查，梳理出 3 大核心差距（媒体pHash重构、视觉水印拦截、人类废动作拟真） |
+| X-POLICY-BRAINSTORM-QUESTION | 澄清实施目标、加固重心与工程边界（单步提问） | Completed | 用户明确选定【全链路立体加固】（媒体反 pHash 二创 + 人类废动作/10:1读写比 + 碎片化断联会话与作息校准，全面达成 100% 满分达标） |
+| X-POLICY-BRAINSTORM-APPROACHES | 提炼 2-3 种模块化优雅架构方案及权衡对比 | Completed | 提炼 A/B/C 三种方案，用户明确选定方案 A（领域自治分层中间件管线） |
+| X-POLICY-BRAINSTORM-DESIGN | 逐步呈现模块化设计细节（Owns/Does NOT own/不变量断言/测试闭环）并获取审批 | Completed | 全部 3 个设计小节（边界自治、媒体脱敏二创、废动作与碎片会话）均获用户批准 |
+| BRAINSTORM-X-OP-SSOT-CONTEXT | 深度梳理 x-operator 内部机制、SSOT 数据结构、Prompt 链路及现有硬编码现状 | Completed | 已排查 /home/lichao/tools/x-operator 架构：定位 growth_config.py, router_trace.py, pipeline.py, souls.py, StrategyAndPromptsCard.tsx 硬编码与 mock 现状 |
+| BRAINSTORM-X-OP-SSOT-QUESTIONS | 澄清模块板块划分、动态生效机制与架构表现层定位（单步提问） | Completed | 用户明确选定【顶级 SSOT 配置与机制透视中枢】方案，划分为 6 大业务板块，双栏布局（左侧动态热编辑生效，右侧深度拆解内部运行机制、调用链与输入输出） |
+| BRAINSTORM-X-OP-SSOT-APPROACHES | 提炼 2-3 种配置化与机制透视架构方案及权衡对比 | Completed | 用户审核并明确选定方案 A（分层领域驱动架构 DDD Layered SSOT & Reactive Mechanism Studio） |
+| BRAINSTORM-X-OP-SSOT-DESIGN-SECTIONS | 逐步呈现设计细节（Owns/Does NOT own/数据流与设计模式/不变量断言）并获取审批 | Completed | 全部 3 个设计小节（边界自治、核心加固、断言矩阵）均获用户批准 |
+| BRAINSTORM-X-OP-SSOT-DESIGN-DOC | 沉淀设计文档至 docs/plans/ 并提交 git | Completed | 成功落盘 docs/plans/2026-10-18-x-operator-ssot-config-and-prompt-architecture-design.md 并已提交 git |
+| BRAINSTORM-X-OP-SSOT-TRANSITION | 转换至实施计划制定（writing-plans） | In Progress | 正在调用 writing-plans 技能生成详细可执行计划 |
+
