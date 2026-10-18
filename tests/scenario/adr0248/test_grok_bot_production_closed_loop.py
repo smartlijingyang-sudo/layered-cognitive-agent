@@ -32,6 +32,7 @@ from lca.infrastructure.runtime_plane.capability_bindings import (
     reset_capability_bindings,
     set_capability_bindings,
 )
+from lca.infrastructure.tools.browser.tools import build_browser_tools
 from lca.infrastructure.vocal.exceptions import VocalGateAlreadyBlockedError
 from lca.infrastructure.vocal.gate import DirectVocalGate, GatedVocalGate
 from lca.infrastructure.vocal.settle_guard import VocalSettleGuard
@@ -136,7 +137,7 @@ async def test_inv_04_box_sandbox_isolation_and_containment(tmp_path):
 
 def test_inv_05_browser_subagent_vocal_isolation():
     """INV-05: 浏览器子代理工具集物理剔除 send_message，绝对零发声能力。"""
-    subagent = BrowserSubagent(agent_id="browser_sub_1")
+    subagent = BrowserSubagent(agent_id="browser_sub_1", tools=build_browser_tools())
     tool_names = [t.name for t in subagent.get_tools()]
     assert "send_message" not in tool_names
     assert "browser_navigate" in tool_names

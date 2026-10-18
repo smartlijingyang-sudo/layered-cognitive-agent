@@ -28,6 +28,7 @@ from lca.contracts.models.browser.stream import (
 from lca.infrastructure.browser.arbitration import BrowserArbitrationEngine
 from lca.infrastructure.browser.cdp_driver import PlaywrightCDPDriver
 from lca.infrastructure.browser.subagent import BrowserSubagent
+from lca.infrastructure.tools.browser.tools import build_browser_tools
 from lca.plugins.transport.webserver.routes_browser import (
     close_browser_session_endpoint,
     create_browser_session_endpoint,
@@ -43,7 +44,11 @@ def e2e_system():
     arbitration = BrowserArbitrationEngine()
     driver = PlaywrightCDPDriver(arbitration_engine=arbitration)
     driver._init_cdp_for_session = AsyncMock()
-    subagent = BrowserSubagent(agent_id="e2e_browser_worker", arbitration_engine=arbitration)
+    subagent = BrowserSubagent(
+        agent_id="e2e_browser_worker",
+        tools=build_browser_tools(),
+        arbitration_engine=arbitration,
+    )
 
     app = Starlette(
         routes=[
