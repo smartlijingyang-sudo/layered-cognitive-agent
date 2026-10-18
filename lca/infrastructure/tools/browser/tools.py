@@ -24,6 +24,7 @@ from lca.infrastructure.tools.browser.task_store import (
 )
 
 if TYPE_CHECKING:
+    from lca.infrastructure.browser.arbitration import BrowserArbitrationEngine
     from lca.infrastructure.browser.cdp_driver import PlaywrightCDPDriver
 
 logger = logging.getLogger(__name__)
@@ -629,6 +630,22 @@ class BrowserTransferTaskTool(Tool):
     effect_kind: ClassVar[Literal["ephemeral", "persistent", "stateful_once"]] = "persistent"
     default_timeout_s: ClassVar[int] = 15
 
+    def __init__(
+        self,
+        arbitration_engine: BrowserArbitrationEngine | None = None,
+    ) -> None:
+        self._arbitration_engine = arbitration_engine
+
+    def _get_arbitration(self) -> BrowserArbitrationEngine | None:
+        if self._arbitration_engine is not None:
+            return self._arbitration_engine
+        try:
+            from lca.infrastructure.browser.cdp_driver import get_shared_browser_driver
+
+            return getattr(get_shared_browser_driver(), "arbitration_engine", None)
+        except Exception:
+            return None
+
     async def execute(self, args: dict[str, Any]) -> Observation:
         target = str(args.get("target") or "human_takeover")
         task_id = args.get("browser_task_id")
@@ -642,6 +659,14 @@ class BrowserTransferTaskTool(Tool):
                 task.status = target
                 session_id = task.session_id
                 task_store.add_timeline_step(task_id, "transfer", f"Transfer to {target}: {reason}")
+
+        # 驱动仲裁状态机：human_takeover 放行人工输入，agent 交还控制权给 AI。
+        arbitration = self._get_arbitration()
+        if arbitration is not None:
+            if target == "human_takeover":
+                arbitration.request_human_takeover(session_id, reason=reason)
+            else:
+                arbitration.release_to_agent(session_id)
 
         status_tag = "human_takeover" if target == "human_takeover" else "agent_running"
         widget_tag = f"[widget:browser_preview?sessionId={session_id}&url=about:blank&title=Live%20Browser&status={status_tag}]"
@@ -1001,6 +1026,7 @@ class BrowserCloseTool(Tool):
 
 def build_browser_tools(driver: PlaywrightCDPDriver | None = None) -> list[Tool]:
     """构建 Muse 13 大工具 + 兼容扩展集合。"""
+    arbitration = getattr(driver, "arbitration_engine", None) if driver is not None else None
     return [
         # 1. 轻量层 (4)
         BrowserSearchTool(),
@@ -1013,7 +1039,7 @@ def build_browser_tools(driver: PlaywrightCDPDriver | None = None) -> list[Tool]
         BrowserListTasksTool(),
         BrowserPeekTaskTool(),
         BrowserCloseTaskTool(),
-        BrowserTransferTaskTool(),
+        BrowserTransferTaskTool(arbitration_engine=arbitration),
         # 3. CAPTCHA 偏好 (2)
         BrowserSetCaptchaPreferenceTool(),
         BrowserGetCaptchaPreferenceTool(),

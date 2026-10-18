@@ -118,7 +118,8 @@ class PlaywrightCDPDriver(BrowserDriverPort):
                     e,
                 )
 
-            return summary
+            # 返回可能已被 _init_cdp_for_session 更新的实时摘要（含真实页面标题）。
+            return self._sessions[session_id]
 
     async def _init_cdp_for_session(self, session_id: str, url: str) -> None:
         """内部初始化 CDP 会话并开启 Screencast 帧监听。"""
