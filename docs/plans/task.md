@@ -704,7 +704,7 @@
 | DECOUPLE-TASK-1 | [黑板与事件总线] 强类型 SessionBlackboard 与异步事件模型 (Blackboard & Events) | Completed | SessionBlackboard 线程安全黑板、BlackboardSnapshot 不可变快照与 EventBus 落地，6/6 单测全绿，commit 936f825 |
 | DECOUPLE-TASK-2 | [决策调度层] 纯数学二阶马尔可夫与效用修正大脑 (StochasticDecisionBrain) | Completed | 二阶马尔可夫矩阵、链式效用修饰器、对数正态时长采样与 8% 分心中断引擎落地，7/7 单测全绿，commit 07c62c5 |
 | DECOUPLE-TASK-3 | [微内核场景编排] 场景插件统一契约与 5 大单文件插件 (SceneSkillRegistry & Plugins) | Completed | SceneSkill 统一契约、SceneSkillRegistry 注册中心与 5 大核心独立插件（for_you/search_interact/notify/graph_manage/rest_idle）落地，4/4 单测全绿，commit 1b450b6 |
-| DECOUPLE-TASK-4 | [物理执行层与铁律收敛] StealthActuator 拟真底座与 NavigationRouter (StealthActuator) | Pending | 待执行 |
-| DECOUPLE-TASK-5 | [全量替换与旁路自愈] 彻底切除旧版 scenarios.py/roulette.py，组装生产 Pilot (Pilot Assembly) | Pending | 待执行 |
-| DECOUPLE-TASK-6 | [可视化监控与全链路门禁] FastAPI 实时双屏 WebSocket 与前端大盘集成 (Telemetry & HUD) | Pending | 待执行 |
+| DECOUPLE-TASK-4 | [物理执行层与铁律收敛] StealthActuator 拟真底座与 NavigationRouter (StealthActuator) | Completed | NavigationRouter 强制零 page.goto 哨兵拦截、SPA 原生 Tab 点击与 StealthActuator 动力学底座落地，4/4 单测全绿，commit 7b11f84 |
+| DECOUPLE-TASK-5 | [全量替换与旁路自愈] 彻底切除旧版 scenarios.py/roulette.py，组装生产 Pilot (Pilot Assembly) | Completed | Pilot 成功装配四大解耦组件，单步执行优先走大脑与场景微内核，CLI replay-decision 离线推演闭环，3/3 单测全绿，commit ae9bd17 |
+| DECOUPLE-TASK-6 | [可视化监控与全链路门禁] FastAPI 实时双屏 WebSocket 与前端大盘集成 (Telemetry & HUD) | Completed | FastAPI WebSocket 广播端点（/api/telemetry/ws）、前端双屏 HUD 组件与沙盘实时联通闭环，全套 28/28 不变量单测 100% 全绿，Vite 编译 0 报错，commit e39c0eb |
 
