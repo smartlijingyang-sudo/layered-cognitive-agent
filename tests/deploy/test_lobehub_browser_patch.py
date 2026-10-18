@@ -44,3 +44,15 @@ def test_browser_patches_registered_in_engine():
     assert res.returncode == 0
     assert "browser_preview_card" in res.stdout
     assert "browser_viewer_drawer" in res.stdout
+
+
+def test_drawer_open_reads_event_detail():
+    text = (
+        __import__("pathlib")
+        .Path("deploy/lobehub/patches/ui/BrowserViewerDrawer.tsx")
+        .read_text(encoding="utf-8")
+    )
+    assert "const detail = customEvent.detail" in text
+    assert "let targetSid = sid;" not in text
+    assert "detail.sessionId" in text
+    assert "detail.url" in text

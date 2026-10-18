@@ -27,7 +27,7 @@ protected_files = ["CONSTITUTION.md", "SOUL.md", "IDENTITY.md", "USER.md"]
 # (CONSTITUTION 23646 + SOUL 6642 + IDENTITY 173 + USER 244). 32000 fits
 # them whole with headroom; further growth drops whole sections with a
 # warning instead of silent mid-sentence cuts.
-protected_budget_chars = 32000
+protected_budget_chars = 38000
 people_dir = "memory/people"
 people_index = "INDEX.md"
 groups_dir = "memory/groups"
@@ -39,7 +39,7 @@ home_override = "memory/contextfiles.toml"
 # files total ~4185 chars). Tier 1 is outside any budget.
 # NOTE: ~36000 chars ~= 9-18k tokens per turn for the backstory. Lower these
 # numbers (or trim the standing files) to cut cost; drops stay section-atomic.
-backstory_budget_chars = 36000
+backstory_budget_chars = 44000
 agents_file = "AGENTS.md"
 agents_heading = "## 工作约定（AGENTS.md）"
 projection_file = "MEMORY.md"

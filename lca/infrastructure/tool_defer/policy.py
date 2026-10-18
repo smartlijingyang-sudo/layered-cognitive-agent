@@ -34,7 +34,7 @@ DEFAULT_NAMESPACE_DESCRIPTIONS: dict[str, str] = {
     "memory": "搜索与写入长期记忆",
     "skill": "技能的发现、安装与调用",
     "web": "联网搜索与网页抓取",
-    "browser": "真实 Chromium 浏览器：打开/访问网页、点击交互、截屏与实时会话预览",
+    "browser": "真实 Chromium 浏览器：搜索、抓文本、异步任务调度（spawn/steer/list/peek/close/transfer）、验证码偏好与深度研究",
     "agent": "助理管理、派发子任务、向用户提问",
     "ext": "第三方集成：连接与刷新外部服务",
     "lca": "运行时控制：handoff 轮静默结束",

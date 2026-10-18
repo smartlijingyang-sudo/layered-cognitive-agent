@@ -9,25 +9,40 @@ const { Text } = Typography;
 
 export interface BrowserCanvasProps {
   sessionId: string;
+  url?: string;
   status: string;
   onTakeoverRequest?: () => void;
   className?: string;
   style?: React.CSSProperties;
 }
 
-const styles = createStaticStyles(({ css, cssVar }) => {
+const styles = createStaticStyles(({ css }) => {
   return {
     container: css`
       position: relative;
       width: 100%;
       height: 100%;
       min-height: 480px;
-      background: #111;
+      background: #fff;
       overflow: hidden;
       display: flex;
       align-items: center;
       justify-content: center;
       border-radius: 8px;
+    `,
+    empty: css`
+      position: absolute;
+      inset: 0;
+      z-index: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      color: #595959;
+      font-size: 13px;
+      line-height: 1.6;
+      pointer-events: none;
     `,
     canvas: css`
       display: block;
@@ -40,9 +55,8 @@ const styles = createStaticStyles(({ css, cssVar }) => {
       position: absolute;
       top: 12px;
       right: 12px;
-      background: rgba(0, 0, 0, 0.7);
-      backdrop-filter: blur(8px);
-      border: 1px solid rgba(255, 255, 255, 0.15);
+      background: #fff;
+      border: 1px solid #e5e5e5;
       border-radius: 8px;
       padding: 8px 12px;
       display: flex;
@@ -54,10 +68,11 @@ const styles = createStaticStyles(({ css, cssVar }) => {
       position: absolute;
       bottom: 12px;
       left: 12px;
-      background: rgba(0, 0, 0, 0.65);
+      background: #fff;
+      border: 1px solid #e5e5e5;
       padding: 4px 10px;
       border-radius: 6px;
-      color: rgba(255, 255, 255, 0.65);
+      color: #595959;
       font-size: 11px;
       font-family: monospace;
       pointer-events: none;
@@ -67,6 +82,7 @@ const styles = createStaticStyles(({ css, cssVar }) => {
 
 export const BrowserCanvas: React.FC<BrowserCanvasProps> = memo(({
   sessionId,
+  url,
   status,
   onTakeoverRequest,
   className,
@@ -76,6 +92,7 @@ export const BrowserCanvas: React.FC<BrowserCanvasProps> = memo(({
   const wsRef = useRef<WebSocket | null>(null);
   const [fps, setFps] = useState<number>(0);
   const [connected, setConnected] = useState<boolean>(false);
+  const [hasFrame, setHasFrame] = useState<boolean>(false);
   const frameCountRef = useRef<number>(0);
   const lastFpsTimeRef = useRef<number>(Date.now());
 
@@ -83,11 +100,13 @@ export const BrowserCanvas: React.FC<BrowserCanvasProps> = memo(({
 
   // 连接 WebSocket 双向流
   useEffect(() => {
+    setHasFrame(false);
     if (!sessionId) return;
 
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     const host = window.location.host;
-    const wsUrl = `${protocol}//${host}/lca-api/browser/sessions/${sessionId}/stream`;
+    const query = url ? `?url=${encodeURIComponent(url)}` : '';
+    const wsUrl = `${protocol}//${host}/lca-api/browser/sessions/${sessionId}/stream${query}`;
 
     const ws = new WebSocket(wsUrl);
     ws.binaryType = 'arraybuffer';
@@ -130,6 +149,12 @@ export const BrowserCanvas: React.FC<BrowserCanvasProps> = memo(({
               const ctx = canvas.getContext('2d');
               if (ctx) {
                 ctx.drawImage(imgBitmap, 0, 0);
+                setHasFrame(true);
+                try {
+                  sessionStorage.setItem(`lca_browser_drawer_auto_opened_${sessionId}`, '1');
+                } catch {
+                  // private mode
+                }
               }
             }
             imgBitmap.close();
@@ -158,7 +183,7 @@ export const BrowserCanvas: React.FC<BrowserCanvasProps> = memo(({
       ws.close();
       wsRef.current = null;
     };
-  }, [sessionId]);
+  }, [sessionId, url]);
 
   // 发送上行键鼠事件 (INV-BROWSER-06 归一化坐标)
   const sendInputEvent = useCallback((type: string, e: React.MouseEvent<HTMLCanvasElement>) => {
@@ -206,10 +231,12 @@ export const BrowserCanvas: React.FC<BrowserCanvasProps> = memo(({
 
   return (
     <div className={styles.container} style={style}>
-      {!connected && (
-        <div style={{ textAlign: 'center', color: 'rgba(255,255,255,0.45)' }}>
-          <Spin size="large" />
-          <div style={{ marginTop: 12 }}>Connecting to CDP Screencast Stream...</div>
+      {!hasFrame && (
+        <div className={styles.empty}>
+          {!connected && <Spin size="large" />}
+          <div style={{ marginTop: connected ? 0 : 12 }}>
+            {connected ? '页面还没有画面' : '正在连接浏览器画面'}
+          </div>
         </div>
       )}
 

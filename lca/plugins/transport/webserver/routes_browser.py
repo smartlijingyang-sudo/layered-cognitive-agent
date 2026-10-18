@@ -31,10 +31,7 @@ from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import
 )
 from lca.contracts.routing import RouteSpec
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
-from lca.infrastructure.browser.cdp_driver import (
-    PlaywrightCDPDriver,
-    get_shared_browser_driver,
-)
+from lca.infrastructure.browser.cdp_driver import get_shared_browser_driver
 from lca.plugins.transport.webserver.handlers.cors.cors import cors_headers
 from lca.plugins.transport.webserver.route.register import register_routes
 
@@ -48,7 +45,6 @@ def get_browser_driver(target: Any) -> BrowserDriverPort:
     if state and hasattr(state, "browser_driver"):
         return state.browser_driver  # type: ignore[no-any-return]
     return get_shared_browser_driver()
-
 
 
 async def list_browser_sessions_endpoint(request: Request) -> Response:
@@ -131,16 +127,23 @@ async def stream_browser_session_ws(websocket: WebSocket) -> None:
     session_id = websocket.path_params.get("session_id", "")
     driver = get_browser_driver(websocket)
 
-    relay = driver.get_relay(session_id)
-    if relay is None:
-        await driver.create_session(session_id=session_id)
-        relay = driver.get_relay(session_id)
+    hint = str(websocket.query_params.get("url") or "")
+    summary = await driver.get_session(session_id)
+    has_page_fn = getattr(driver, "has_page", None)
+    has_page = bool(has_page_fn(session_id)) if has_page_fn is not None else False
+    if summary is None or not has_page:
+        target = hint or (summary.url if summary is not None and summary.url else "about:blank")
+        await driver.navigate(session_id, target)
 
+    relay = driver.get_relay(session_id)
     if relay is None:
         await websocket.close(code=1011)
         return
 
     relay.register_client(websocket)
+    push_snapshot = getattr(driver, "push_snapshot", None)
+    if push_snapshot is not None:
+        await push_snapshot(session_id)
 
     try:
         while True:

@@ -32,7 +32,7 @@ const styles = createStaticStyles(({ css, cssVar }) => {
       align-items: center;
       gap: 8px;
       padding: 8px 12px;
-      background: ${cssVar.colorBgElevated};
+      background: #fff;
       border-bottom: 1px solid ${cssVar.colorBorderSecondary};
       border-radius: 8px 8px 0 0;
     `,
@@ -72,7 +72,7 @@ export const BrowserToolbar: React.FC<BrowserToolbarProps> = memo(({
 
       <Input
         size="small"
-        prefix={<GlobalOutlined style={{ color: 'rgba(255,255,255,0.45)' }} />}
+        prefix={<GlobalOutlined />}
         value={currentUrl}
         onChange={(e) => setCurrentUrl(e.target.value)}
         onPressEnter={handleUrlSubmit}

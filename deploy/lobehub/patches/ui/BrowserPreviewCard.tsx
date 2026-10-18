@@ -23,6 +23,7 @@ export interface BrowserPreviewCardPayload {
 export interface BrowserPreviewCardProps {
   content?: string;
   payload?: BrowserPreviewCardPayload;
+  tools?: any[];
   className?: string;
   style?: React.CSSProperties;
 }
@@ -64,13 +65,14 @@ const styles = createStaticStyles(({ css, cssVar }) => {
       white-space: nowrap;
     `,
     previewBox: css`
-      background: #111;
+      background: #fff;
+      border: 1px solid #e5e5e5;
       border-radius: 6px;
       height: 120px;
       display: flex;
       align-items: center;
       justify-content: center;
-      color: rgba(255, 255, 255, 0.45);
+      color: ${cssVar.colorTextSecondary};
       font-size: 12px;
       margin-bottom: 10px;
       cursor: pointer;
@@ -80,29 +82,112 @@ const styles = createStaticStyles(({ css, cssVar }) => {
   };
 });
 
+function previewSessionId(url: string): string {
+  let hash = 0;
+  for (let i = 0; i < url.length; i += 1) {
+    hash = (hash * 31 + url.charCodeAt(i)) >>> 0;
+  }
+  return `brw_preview_${hash.toString(16)}`;
+}
+
 export const BrowserPreviewCard: React.FC<BrowserPreviewCardProps> = memo(({
   content,
   payload: directPayload,
+  tools,
   className,
   style,
 }) => {
-  // 从 Markdown 内容中解析 [widget:browser_preview?sessionId=...&url=...]
+  const [sessions, setSessions] = React.useState<
+    { sessionId: string; url: string; title: string }[]
+  >([]);
+
+  // Live sessions are matched to this card by URL. The list order is not
+  // the page the user asked to open.
+  React.useEffect(() => {
+    let cancelled = false;
+    const fetchSessions = async () => {
+      try {
+        const res = await fetch('/lca-api/browser/sessions');
+        if (!res.ok) return;
+        const data = await res.json();
+        if (cancelled || !Array.isArray(data.sessions)) return;
+        setSessions(
+          data.sessions.map((row: { session_id?: string; url?: string; title?: string }) => ({
+            sessionId: row.session_id || '',
+            url: row.url || '',
+            title: row.title || '',
+          })),
+        );
+      } catch {
+        // ignore
+      }
+    };
+    fetchSessions();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // 从 Markdown 内容 或 tools 中解析
   const parsedPayload = useMemo(() => {
     if (directPayload) return directPayload;
-    if (!content) return null;
 
-    const match = content.match(/\[widget:browser_preview\?([^\]]+)\]/);
-    if (!match) return null;
+    if (content) {
+      const match = content.match(/\[widget:browser_preview\?([^\]]+)\]/);
+      if (match) {
+        const params = new URLSearchParams(match[1]);
+        return {
+          sessionId: params.get('sessionId') || '',
+          url: params.get('url') || 'about:blank',
+          title: params.get('title') || 'Browser Tab',
+          status: params.get('status') || 'idle',
+          runId: params.get('runId') || undefined,
+        } as BrowserPreviewCardPayload;
+      }
+    }
 
-    const params = new URLSearchParams(match[1]);
-    return {
-      sessionId: params.get('sessionId') || 'default',
-      url: params.get('url') || 'about:blank',
-      title: params.get('title') || 'Browser Tab',
-      status: params.get('status') || 'idle',
-      runId: params.get('runId') || undefined,
-    } as BrowserPreviewCardPayload;
-  }, [content, directPayload]);
+    if (tools && Array.isArray(tools)) {
+      const browserTool = tools.find((t: any) =>
+        t?.apiName &&
+        [
+          'browser_open',
+          'browser_navigate',
+          'browser_spawn_task',
+          'browser_steer_task',
+          'browser_transfer_task',
+        ].includes(t.apiName),
+      );
+      if (browserTool) {
+        let args: any = {};
+        try {
+          args =
+            typeof browserTool.arguments === 'string'
+              ? JSON.parse(browserTool.arguments)
+              : browserTool.arguments || {};
+        } catch {
+          args = {};
+        }
+        const requestedUrl = args.url || args.initial_url || '';
+        const matched = sessions.find((row) => row.url && requestedUrl && row.url === requestedUrl);
+        const u = requestedUrl || matched?.url || '';
+        const sid =
+          args.sessionId ||
+          args.session_id ||
+          matched?.sessionId ||
+          (u ? previewSessionId(u) : '');
+        const t = args.title || (matched?.url === u ? matched.title : '') || u || 'Browser Tab';
+        if (!sid && !u) return null;
+        return {
+          sessionId: sid,
+          url: u,
+          title: t,
+          status: 'agent_running',
+        } as BrowserPreviewCardPayload;
+      }
+    }
+
+    return null;
+  }, [content, directPayload, tools, sessions]);
 
   const payload = parsedPayload;
 
@@ -123,9 +208,29 @@ export const BrowserPreviewCard: React.FC<BrowserPreviewCardProps> = memo(({
     }
   }, [payload]);
 
+  // 当收到有效的真实浏览器会话时，自动唤起一次右侧栏抽屉（对齐 Grok/Muse 实时视口体验）
+  React.useEffect(() => {
+    if (!payload?.sessionId) return;
+    const sid = payload.sessionId;
+    const storageKey = `lca_browser_drawer_auto_opened_${sid}`;
+    if (typeof window !== 'undefined') {
+      try {
+        if (!sessionStorage.getItem(storageKey)) {
+          const timer = setTimeout(() => {
+            handleOpenDrawer(false);
+          }, 400);
+          return () => clearTimeout(timer);
+        }
+      } catch {
+        handleOpenDrawer(false);
+      }
+    }
+  }, [payload?.sessionId, handleOpenDrawer]);
+
   if (!payload) return null;
 
   const isTakeover = payload.status === 'human_takeover';
+
 
   return (
     <div className={styles.card} style={style}>

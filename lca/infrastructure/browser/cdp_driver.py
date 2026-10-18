@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import logging
+import os
 from typing import Any
 
 from lca.contracts.models.browser.stream import (
@@ -18,6 +19,40 @@ from lca.infrastructure.browser.arbitration import BrowserArbitrationEngine
 from lca.infrastructure.browser.screencast_relay import CDPScreencastRelay
 
 logger = logging.getLogger(__name__)
+
+
+def choose_chromium_proxy(env_server: str, *, mihomo_open: bool) -> str:
+    """Pick a proxy Chrome can actually CONNECT through.
+
+    The process proxy on port 7890 accepts curl and resets Chrome
+    (``net::ERR_CONNECTION_CLOSED``). When mihomo is listening on 7891, use that.
+    """
+    if env_server.rstrip("/").endswith(":7890") and mihomo_open:
+        return "http://127.0.0.1:7891"
+    return env_server
+
+
+def _mihomo_proxy_open() -> bool:
+    import socket
+
+    try:
+        with socket.create_connection(("127.0.0.1", 7891), timeout=0.2):
+            return True
+    except OSError:
+        return False
+
+
+def _chromium_proxy() -> dict[str, str] | None:
+    """Chromium does not use the process proxy unless launch sets it."""
+    server = os.environ.get("https_proxy") or os.environ.get("HTTPS_PROXY") or ""
+    if not server:
+        return None
+    server = choose_chromium_proxy(server, mihomo_open=_mihomo_proxy_open())
+    proxy = {"server": server}
+    bypass = os.environ.get("NO_PROXY") or os.environ.get("no_proxy") or ""
+    if bypass:
+        proxy["bypass"] = bypass
+    return proxy
 
 
 class PlaywrightCDPDriver(BrowserDriverPort):
@@ -96,6 +131,9 @@ class PlaywrightCDPDriver(BrowserDriverPort):
                     "headless": self.headless,
                     "args": ["--disable-gpu", "--no-sandbox"],
                 }
+                proxy = _chromium_proxy()
+                if proxy is not None:
+                    launch_kwargs["proxy"] = proxy
                 from pathlib import Path
 
                 candidates = [
@@ -117,6 +155,17 @@ class PlaywrightCDPDriver(BrowserDriverPort):
                 except Exception:
                     launch_kwargs.pop("executable_path", None)
                     self._browser = await self._playwright.chromium.launch(**launch_kwargs)
+            elif self._browser is not None and not self._browser.is_connected():
+                self._pages.clear()
+                self._cdp_sessions.clear()
+                relaunch: dict[str, Any] = {
+                    "headless": self.headless,
+                    "args": ["--disable-gpu", "--no-sandbox"],
+                }
+                proxy = _chromium_proxy()
+                if proxy is not None:
+                    relaunch["proxy"] = proxy
+                self._browser = await self._playwright.chromium.launch(**relaunch)
 
             context = await self._browser.new_context(
                 viewport={"width": self.default_width, "height": self.default_height}
@@ -153,10 +202,12 @@ class PlaywrightCDPDriver(BrowserDriverPort):
             if url and url != "about:blank":
                 title = "Page"
                 try:
-                    await page.goto(url, timeout=5000)
+                    await page.goto(url, timeout=20000, wait_until="domcontentloaded")
                     title = await page.title()
                 except Exception as goto_err:
-                    logger.debug("[PlaywrightCDPDriver] page.goto timeout/error: %s", goto_err)
+                    logger.warning(
+                        "[PlaywrightCDPDriver] page.goto failed for %s: %s", url, goto_err
+                    )
 
                 if session_id in self._sessions:
                     old = self._sessions[session_id]
@@ -171,7 +222,7 @@ class PlaywrightCDPDriver(BrowserDriverPort):
                         has_active_stream=True,
                     )
         except (ImportError, Exception) as exc:
-            logger.debug("[PlaywrightCDPDriver] CDP init skipped: %s", exc)
+            logger.warning("[PlaywrightCDPDriver] CDP init skipped: %s", exc)
 
     async def get_session(self, session_id: str) -> BrowserSessionSummary | None:
         return self._sessions.get(session_id)
@@ -202,17 +253,67 @@ class PlaywrightCDPDriver(BrowserDriverPort):
             self._sessions.pop(session_id, None)
             return True
 
+    def has_page(self, session_id: str) -> bool:
+        """True when this session still has a live Playwright page."""
+        page = self._pages.get(session_id)
+        if page is None:
+            return False
+        is_closed = getattr(page, "is_closed", None)
+        if callable(is_closed) and is_closed():
+            self._pages.pop(session_id, None)
+            self._cdp_sessions.pop(session_id, None)
+            return False
+        return True
+
+    async def _open_missing_page(self, session_id: str, url: str) -> None:
+        """Recreate the page for a session record whose browser page is gone."""
+        async with self._lock:
+            if self.has_page(session_id):
+                return
+            if session_id not in self._relays:
+                self._relays[session_id] = CDPScreencastRelay(session_id=session_id)
+            await self._init_cdp_for_session(session_id, url)
+
+    async def push_snapshot(self, session_id: str) -> bool:
+        """Send one JPEG of the current page to connected preview clients.
+
+        Headless Chrome often emits no further screencast frames after the
+        first ones were dropped because no viewer was connected yet.
+        """
+        page = self._pages.get(session_id)
+        relay = self._relays.get(session_id)
+        if page is None or relay is None or relay.client_count == 0:
+            return False
+        try:
+            jpeg = await page.screenshot(type="jpeg", quality=70)
+        except Exception as exc:
+            logger.warning("[PlaywrightCDPDriver] snapshot failed for %s: %s", session_id, exc)
+            return False
+        if not isinstance(jpeg, (bytes, bytearray)) or not jpeg:
+            return False
+        return await relay.emit_frame(bytes(jpeg))
+
     async def navigate(self, session_id: str, url: str) -> BrowserSessionSummary:
         """控制指定会话导航至目标网页。"""
         summary = self._sessions.get(session_id)
         if summary is None:
             summary = await self.create_session(session_id=session_id, initial_url=url)
+            if self.has_page(session_id):
+                await self.push_snapshot(session_id)
+                return summary
+
+        if self._pages.get(session_id) is None:
+            await self._open_missing_page(session_id, url)
+            reopened = self._sessions.get(session_id)
+            if reopened is not None and self.has_page(session_id):
+                await self.push_snapshot(session_id)
+                return reopened
 
         page = self._pages.get(session_id)
         title = "Navigated Page"
         if page is not None:
             try:
-                await page.goto(url)
+                await page.goto(url, timeout=20000, wait_until="domcontentloaded")
                 title = await page.title()
             except Exception as e:
                 logger.warning("[PlaywrightCDPDriver] Navigation error: %s", e)
@@ -233,6 +334,7 @@ class PlaywrightCDPDriver(BrowserDriverPort):
         if relay:
             await relay.emit_metadata({"url": url, "title": title})
 
+        await self.push_snapshot(session_id)
         return updated
 
     async def dispatch_input(self, session_id: str, event: BrowserInputEvent) -> bool:

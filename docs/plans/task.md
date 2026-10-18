@@ -664,3 +664,16 @@
 | MUSE-BROWSER-TASK-4-DETERMINISTIC-FALLBACK | [网关保底] run_session_writer.py 落地 ADR-0280 browser_preview 微件确定性保底投影 | Completed | 落地 extract_pending_browser_widgets 与 ensure_browser_widget，大模型正文漏写时自动追加微件标签，单测全绿 |
 | MUSE-BROWSER-TASK-5-REGRESSION-AND-TESTS | [单测矩阵] 编写契约、驱动、装配及网关保底完整单测与回归套件 | Completed | 落地 test_browser_integration_and_fallback.py，28/28 浏览器全套测试 100% 全绿，ruff check/format clean，git diff 干净 |
 | MUSE-BROWSER-TASK-6-LIVE-VERIFY | [真实复测] 内核平滑重启并在真实多轮会话提问，验证浏览器端到端自动打开与卡片交互 | Completed | 内核健康重启（:8765）；真实 run_1a4b94813de5 全流程验证：模型感知 browser 域并调用 tool_search，连续执行 browser_open（打开 news.ycombinator.com，分配 brw_e1f043d649b2，用时 2.6s）与 browser_screenshot，成功抓取 Hacker News 首页并向用户总结，GET /lca-api/browser/sessions 确认会话存活并推流 |
+| MUSE-FULL-TASK-1-DRAWER-AUTO-OPEN | [前端增强] BrowserPreviewCard 挂载自动触发 lca:open_browser_drawer 平滑展开右侧栏 | Completed | BrowserPreviewCard.tsx 挂载 useEffect 与 sessionStorage 防重自动 dispatch lca:open_browser_drawer，并通过 patch_lobehub.py 成功编译应用至 lobehub-ui |
+| MUSE-FULL-TASK-2-PROMPT-RULES | [提示词全流程] CONSTITUTION 模板与当前助理注入 Muse 官方环境声明、路由规则与三条铁律 | Completed | 模板与 asst_2dfe13259514 注入 Muse 环境声明、三大铁律（异步/自包含/权限收敛）、路由决策树（Search vs Fetch vs Live）、deep_research 与偏好契约，layout.toml 上调 protected_budget_chars 至 38000 |
+| MUSE-FULL-TASK-3-TOOLS-13-MATRIX | [工具全流程] tools.py 完整复刻 Muse 13 大工具全矩阵（轻量层/任务层/深度研究） | Completed | 落地 task_store.py 与 tools.py 完整 13 大工具矩阵（轻量层 4 个、核心任务层 6 个、CAPTCHA 偏好 2 个、研究层 1 个）加兼容扩展，并在 build_default_tools 全量挂载 |
+| MUSE-FULL-TASK-4-REGRESSION-TESTS | [单测与门禁] 13 大工具与自动展开契约测试，全套回归与代码风格门禁 | Completed | 落地 test_browser_muse_full_suite.py，20/20 浏览器全套单测 100% 全绿，ruff check clean，git diff --check clean |
+| MUSE-FULL-TASK-5-LIVE-VERIFICATION | [端到端复测] 重启内核并在前端真实会话验证右侧栏自动滑出与完整工具流 | Completed | 内核平滑重启（pid=1207787，:8765/health 正常），50/50 前端补丁同步就绪，CONSTITUTION 与 13 大工具全流程对齐生效，20/20 浏览器全套单测 100% 通过 |
+| BRAINSTORM-X-OP-CONTEXT | 深度梳理 x-operator 拟人浏览器架构（驱动/指纹/动力学/HITL/锁/深水反风控）与现有单测现状 | Completed | 已基于 /home/lichao/tools/x-operator 源码排查 6 大核心模块与 51 个通过测试，定位待补强不变量与深层防Bot断言 |
+| BRAINSTORM-X-OP-QUESTIONS | 澄清单元测试与流程测试的核心测试范围、验证深度与环境边界（单步提问） | Completed | 用户明确选定方案 A（分层立体加固：离线物理不变量单测 + 权威反Bot靶场流程测试 + 完整拟人动线 Dry-Run） |
+| BRAINSTORM-X-OP-APPROACHES | 提炼 2-3 种具体测试覆盖与机制加固方案及权衡对比 | Completed | 提炼方案 A/B/C 并获用户确认选定方案 A |
+| BRAINSTORM-X-OP-DESIGN-SECTIONS | 逐步呈现设计细节（Owns/Does NOT own/物理不变量断言/全流程测试拓扑）并获取审批 | Completed | 全部 3 个设计小节（边界自治、核心加固、断言矩阵）均获用户审核通过 |
+| BRAINSTORM-X-OP-DESIGN-DOC | 沉淀设计文档至 docs/plans/ 并提交 git | Completed | 成功落盘 docs/plans/2026-10-18-stealth-browser-unit-and-flow-testing-design.md 并提交 git (commit 5580c0c) |
+| BRAINSTORM-X-OP-TRANSITION | 转换至实施计划制定（writing-plans） | Completed | 成功落盘 docs/plans/2026-10-18-stealth-browser-unit-and-flow-testing-plan.md 并提交 git (commit 65ee41f) |
+| STEALTH-EXEC-FULL-SUITE | 单流执行与全量测试闭环（单测/靶场测试/动线流程/熔断状态机） | Completed | 6大单流任务全数完成，63/63 测试 100% 全绿（耗时 46.21s），靶场与风控动线不变量 0 违例，代码门禁 clean |
+| STEALTH-HARDEN-AUDIT-TARGETS | [防检测加固与靶场验收] 落实 2D 高斯点击落点、Client Hints 版本自洽、WebRTC 防漏与四大反爬靶场实测验收 | Completed | 1. 高斯落点升级：BiometricMotor.sample_gaussian_box_point 截断正态分布；2. 客户端提示对齐：sec-ch-ua 与 Chromium 153 动态同频；3. WebRTC防漏：注入 --enforce-webrtc-ip-permission-check；4. 四大靶场实测全部绿灯：Brotector 0 检出、WebRTC 候选空集、Canvas 跨会话 100% 幂等哈希、319 次 mousemove 贝塞尔轨迹全数 isTrusted=True 并输出可视画布截图与报告 |

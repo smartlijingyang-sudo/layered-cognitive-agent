@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from enum import StrEnum
+from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -16,6 +17,13 @@ class BrowserActionType(StrEnum):
     SCREENSHOT = "screenshot"
     EXTRACT_TEXT = "extract_text"
     CLOSE = "close"
+    SPAWN = "spawn"
+    STEER = "steer"
+    SEARCH = "search"
+    FIND = "find"
+    DEEP_RESEARCH = "deep_research"
+    CAPTCHA_PREFERENCE = "captcha_preference"
+    TRANSFER = "transfer"
 
 
 class BrowserAction(BaseModel):
@@ -38,10 +46,12 @@ class BrowserActionResult(BaseModel):
     action_type: BrowserActionType
     success: bool
     session_id: str | None = None
+    task_id: str | None = None
     url: str | None = None
     title: str | None = None
     text_content: str | None = None
     screenshot_artifact_id: str | None = None
+    details: dict[str, Any] | None = None
     error: str | None = None
 
 

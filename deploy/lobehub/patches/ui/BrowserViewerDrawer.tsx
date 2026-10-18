@@ -16,14 +16,14 @@ export interface BrowserDrawerEventDetail {
   takeover?: boolean;
 }
 
-const styles = createStaticStyles(({ css, cssVar }) => {
+const styles = createStaticStyles(({ css }) => {
   return {
     drawerBody: css`
       display: flex;
       flex-direction: column;
       height: 100%;
       padding: 0 !important;
-      background: #141414;
+      background: #fff;
       overflow: hidden;
     `,
     canvasContainer: css`
@@ -48,12 +48,24 @@ export const BrowserViewerDrawer: React.FC = memo(() => {
   useEffect(() => {
     const handleOpen = (e: Event) => {
       const customEvent = e as CustomEvent<BrowserDrawerEventDetail>;
-      if (customEvent.detail) {
-        const { sessionId: sid, url: u, title: t, status: s, takeover } = customEvent.detail;
-        setSessionId(sid);
-        if (u) setUrl(u);
-        if (t) setTitle(t);
-        setStatus(takeover ? 'human_takeover' : s || 'idle');
+      const detail = customEvent.detail;
+      if (detail) {
+        const targetSid = detail.sessionId;
+        if (!targetSid || targetSid === 'default') {
+          fetch('/lca-api/browser/sessions')
+            .then((res) => res.json())
+            .then((data) => {
+              if (data.sessions && data.sessions.length > 0) {
+                setSessionId(data.sessions[0].session_id);
+              }
+            })
+            .catch(() => {});
+        } else {
+          setSessionId(targetSid);
+        }
+        if (detail.url) setUrl(detail.url);
+        if (detail.title) setTitle(detail.title);
+        setStatus(detail.takeover ? 'human_takeover' : detail.status || 'idle');
         setOpen(true);
       }
     };
@@ -101,7 +113,7 @@ export const BrowserViewerDrawer: React.FC = memo(() => {
       destroyOnClose={false}
       classNames={{ body: styles.drawerBody }}
       styles={{
-        header: { borderBottom: '1px solid rgba(255,255,255,0.1)', padding: '12px 16px' },
+        header: { padding: '12px 16px' },
       }}
     >
       <div className={styles.canvasContainer}>
@@ -116,6 +128,7 @@ export const BrowserViewerDrawer: React.FC = memo(() => {
           {sessionId && (
             <BrowserCanvas
               sessionId={sessionId}
+              url={url}
               status={status}
               onTakeoverRequest={() => handleToggleTakeover(true)}
               style={{ width: '100%', height: '100%' }}
