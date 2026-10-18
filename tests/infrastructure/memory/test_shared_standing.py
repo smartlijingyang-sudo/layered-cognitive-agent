@@ -57,8 +57,8 @@ def test_packaged_layout_declares_three_tiers() -> None:
         "IDENTITY.md",
         "USER.md",
     )
-    assert layout.protected_budget_chars == 32000
-    assert layout.backstory_budget_chars == 36000
+    assert layout.protected_budget_chars == 38000
+    assert layout.backstory_budget_chars == 44000
     assert set(layout.protected_files) <= set(layout.standing_files)
     assert not set(layout.platform_files) & set(layout.standing_files)
 
@@ -69,7 +69,7 @@ def test_home_override_keeps_tiers_when_absent(tmp_path: Path) -> None:
     layout = layout_for_home(str(home))
     assert layout.platform_files == ("PLATFORM.md",)
     assert layout.protected_files == packaged_layout().protected_files
-    assert layout.protected_budget_chars == 32000
+    assert layout.protected_budget_chars == 38000
     assert layout.people_dir == "notes/people"
 
 
@@ -84,7 +84,7 @@ def test_broken_override_keeps_packaged_tiers(tmp_path: Path) -> None:
     _write(home / "memory", "contextfiles.toml", "platform_files = [unclosed\n")
     layout = layout_for_home(str(home))
     assert layout.platform_files == ("PLATFORM.md",)
-    assert layout.protected_budget_chars == 32000
+    assert layout.protected_budget_chars == 38000
 
 
 def test_read_layout_rejects_platform_overlap() -> None:
@@ -109,7 +109,7 @@ def test_read_layout_rejects_protected_budget_above_total() -> None:
     text = (_REPO / "lca" / "infrastructure" / "memory" / "contextfiles" / "layout.toml").read_text(
         encoding="utf-8"
     )
-    broken = text.replace("protected_budget_chars = 32000", "protected_budget_chars = 99999")
+    broken = text.replace("protected_budget_chars = 38000", "protected_budget_chars = 99999")
     with pytest.raises(ValueError):
         read_layout(broken)
 
