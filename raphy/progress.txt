@@ -1,5 +1,27 @@
 ## Codebase Patterns
 
+- **spawn/handoff 叙事必须有生产者才成立（RA-149 实证）：**
+  "任务在后台异步执行…结果经 handoff 自动回流"这类叙事，评估时先 grep
+  消费侧：task_description 有没有 reader、handoff 有没有 producer。零消费者
+  = 伪造派发（反例 RA-147 deep_research：无后端就诚实 fail-closed）。
+  叙事里的每个动作主语，都要在代码里找到执行者。
+
+- **human 输入路径的 fail-open 比 agent 侧更危险（RA-150 实证）：**
+  `dispatch_input` 在 routes_browser.py:170 是人机视口唯一输入路径；
+  无 CDP 时 `return True` = 用户点击被静默吞掉。resilient-mode 的
+  "优雅降级"不能一路降级到"报告成功"——降级要降到 fail-closed
+  （返回 False），至少让上游知道输入没送达。
+
+- **"已在真实浏览器中"断言要过 has_page 门（RA-153 实证）：**
+  driver 的 resilient mode（session record 无 page）是合法设计，但工具层
+  宣称"真实打开"前必须校验 liveness。resilience 和 honesty 的 seam 在
+  has_page，不在"建了 session 就算成功"。
+
+- **grep 消费侧查死字段：字段"零读写"即可判死（RA-152 方法论）：**
+  删字段前不只查调用方，要查 `record.field` 全仓零读写（本轮
+  BrowserTaskRecord.captcha_preference：定义 1 次 + 零读写 = 死字段；
+  真状态在 store 级 `_captcha_preferences`）。
+
 - **排他宣称 + silent else = 叙事≠实现（RA-148 实证）：**
   docstring 写"只通过 X"时，先 grep 实现里有没有 `else` 走另一条 seam。
   `WebSearchExecutor` 宣称只走 SearchService（Definition），`search=None`
@@ -4117,3 +4139,36 @@ brain/reducer/memory/hub/standing_refresher 等键，待 RA-123 落地后再评�
     函数级延迟导入。
   - pre-existing 红的验证纪律：`git worktree add ~/.lca-worktrees/<name> main`
     跑同一文件，红一样即与本轮无关；结论写进 progress，不默默跳过。
+
+---
+
+## Round — assess (2026-10-19 04:47, branch raphy/arch-20261019-0447)
+
+- 按硬化版 `raphy-assess.md` 执行：读 SKILL 深ening 词汇 / CONTEXT.md /
+  `git log -40`（热点：browser 13-tool 套件 de18490a0/c0be39af2；
+  x-operator SSOT studio 与 stochastic brain 是纯 docs/plans，无代码不碰）/
+  progress.txt 顶部 Patterns（禁区 + learnings）。
+- friction walk 读透 3 区：A) `lca/infrastructure/tools/browser/tools.py`
+  （1155 行全读）；B) `lca/infrastructure/browser/cdp_driver.py`（505 行
+  全读）；C) `task_store.py`（131 行全读）+ `contracts/models/browser/models.py`
+  （71 行全读）。五问逐区作答（见 assessment.md）。
+- 运行时验证（必做，已执行；环境=本轮干净分支，main tip）：
+  MockLLMAdapter smoke (a) run completed、(c) 同一 agent 双 run
+  completed/completed；(b) e2e tests/scenario/browser/
+  test_browser_preview_and_takeover_e2e.py 1 passed。无 crash/hang/
+  静默失败，无新 P0/P1。
+- duplication scan（friction walk 之后）：6 个 tool 类逐字重复
+  `__init__(driver)`+`_get_driver()` 懒导入样板（tools.py:215/302/428/
+  959/1013/1075）→ RA-151；widget_tag f-string ×3 → RA-151 附带；
+  其余无字面簇。quota 满足（5 story 仅 1 纯重复类）。
+- 5 stories：RA-149（Strong，spawn 伪造派发，Top）、RA-150（Strong，
+  dispatch_input 无 CDP 静默 True）、RA-151（Strong，6×样板）、
+  RA-152（Worth exploring，captcha 双态+引用缓存无界）、RA-153
+  （Worth exploring，resilient 下"真实打开"伪造）。
+- **Learnings for future iterations:**
+  - 叙事类 story 的评估证据是"消费侧 grep"：先找执行者/生产者/reader，
+    找不到再下"伪造"结论——比读实现本身更快定性。
+  - resilient/fail-open 设计评估时分两层看：driver 层的降级是 feature，
+    工具层的成功断言是 bug；seam 在 liveness 检查，不在 session 创建。
+  - repo-wide grep 在 252 上很慢（>10s 会 background），评估里做 2-3 个
+    精准 grep 即可，用 `lca/` 限定目录别全仓扫。

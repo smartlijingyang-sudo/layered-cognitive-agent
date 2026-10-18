@@ -2197,6 +2197,76 @@
       "passes": true,
       "branchName": "raphy/arch-20261019-0145",
       "notes": "Strength: Worth exploring. Fix direction (fail-closed vs declared dual-path) is a judgment call; kernel plugin wiring implications deserve care. Implemented 2026-10-19: chose declared-dual-path (option b); Observation.extra['search_seam'] = 'definition'|'ambient'; 3 new tests pin the dispatch."
+    },
+    {
+      "id": "RA-149",
+      "title": "Converge BrowserSpawnTaskTool's async-execution/handoff narrative onto reality (fail-closed or real task-runner seam)",
+      "description": "As an LCA maintainer, I want browser_spawn_task to either really dispatch async work or honestly say it cannot, because BrowserSpawnTaskTool (lca/infrastructure/tools/browser/tools.py) tells the model '只返回回执 {browser_task_id}，禁止轮询或 sleep 等待，结果经 handoff 自动回流' and returns text '已派发异步浏览器任务 … 任务在后台异步执行中，请结束本轮发言等待 handoff 结果回流' — yet its execute() only creates a Chromium session and registers a BrowserTaskRecord, then returns a 'running' receipt. Verified by repo-wide grep: task_description has ZERO consumers anywhere (subagent.py never touches the task store; the only task-store readers are tools.py itself for list/peek/steer/close/transfer), there is no worker loop, and no handoff producer exists. The model is instructed to end its turn and wait for a handoff that can never arrive — a behavioral-level fabrication, same class as RA-147 (deep_research fail-closed for 'no dispatch target, no handoff wiring') and RA-115/RA-148 (narrative vs implementation).",
+      "acceptanceCriteria": [
+        "Narrative == implementation (RA-115 rule), pick one direction: (a) fail-closed — spawn returns an honest error Observation ('异步派发后端未实现'), mirroring BrowserDeepResearchTool's RA-147 handling, and the tool description/result text stops promising background execution/handoff backflow; or (b) real seam — a BrowserTaskRunner consumes task_description via BrowserSubagent + arbitration, writes timeline steps, and a handoff producer is wired.",
+        "Whichever direction: no silent 'running' receipts. If (a), existing spawn tests that pin the receipt are rewritten to pin the fail-closed error; if (b), new tests pin runner consumption through the tool interface (spawn → timeline steps appear; handoff produced). Test files under tests/scenario/browser/ updated accordingly; ruff check clean.",
+        "Tool name/namespace/parameters unchanged. CAPTCHA preference, steer/peek/close/transfer tools unaffected."
+      ],
+      "priority": "P1",
+      "passes": false,
+      "branchName": "raphy/arch-20261019-0447",
+      "notes": "Strength: Strong. Evidence complete (zero-consumer grep); RA-147/RA-148 precedents directly apply. Top recommendation this round."
+    },
+    {
+      "id": "RA-150",
+      "title": "Make PlaywrightCDPDriver.dispatch_input fail-closed when no CDP session exists",
+      "description": "As an LCA maintainer, I want dispatch_input to report failure when there is no live page, because PlaywrightCDPDriver.dispatch_input (lca/infrastructure/browser/cdp_driver.py) returns True when self._cdp_sessions.get(session_id) is None — no CDP session, no page, the input is dropped — yet reports success. This is the SOLE input path for the human live-preview viewport (lca/plugins/transport/webserver/routes_browser.py:170 calls driver.dispatch_input(session_id, event)): a user click on a dead session is silently swallowed and reported as dispatched. Same fabricated-success class as RA-147. The arbitration gate ordering is correct (evaluated first); only the missing-CDP branch lies.",
+      "acceptanceCriteria": [
+        "dispatch_input returns False (with a log line) when no CDP session exists for the session_id, matching the semantics of an arbitration denial. No behavior change for the live path (CDP present).",
+        "New test pins the no-CDP branch through the driver interface (dispatch on a session record without a page returns False). Existing dispatch tests (mocked CDP) stay green; ruff check clean.",
+        "routes_browser.py input handler may surface the False to the viewport as 'not connected' feedback — optional, not required for this story."
+      ],
+      "priority": "P1",
+      "passes": false,
+      "branchName": "raphy/arch-20261019-0447",
+      "notes": "Strength: Strong. Same fabricated-success class as RA-147; human input path makes the silent drop worse than agent-side. One-line fix, directly testable."
+    },
+    {
+      "id": "RA-151",
+      "title": "Extract the six verbatim _get_driver lazy-import boilerplates into one base tool module",
+      "description": "As an LCA maintainer, I want one home for the driver-injection seam, because six tool classes in lca/infrastructure/tools/browser/tools.py (BrowserOpenTool :215, BrowserFindTool :302, BrowserSpawnTaskTool :428, BrowserClickTool :959, BrowserScreenshotTool :1013, BrowserCloseTool :1075) each carry a near-verbatim __init__(self, driver=None) + _get_driver() that lazy-imports get_shared_browser_driver. Per the RA-136 'two = real' precedent, six verbatim copies are a Strong signal. The lazy import exists to avoid an import-time cycle (noted in BrowserSearchTool); a base class must keep it lazy, not hoist it to module top. Bonus: the [widget:browser_preview?...] f-string is repeated in open/spawn/transfer — same helper opportunity.",
+      "acceptanceCriteria": [
+        "New _DriverInjectedTool(Tool) base module inside lca/infrastructure/tools/browser/ (same-kind home, RA-139 style) holding __init__(driver) + _get_driver() with the lazy import preserved; the six classes inherit. widget_tag f-string extracted to a small helper.",
+        "Zero behavior change: constructor-injection and singleton-fallback tests pass unchanged; ruff check clean.",
+        "No new public API surface beyond the package-internal base; build_browser_tools output list unchanged."
+      ],
+      "priority": "P2",
+      "passes": false,
+      "branchName": "raphy/arch-20261019-0447",
+      "notes": "Strength: Strong (RA-136 precedent: verbatim twins, here x6). Pure mechanical convergence; zero test risk."
+    },
+    {
+      "id": "RA-152",
+      "title": "Converge browser task-store state: delete dead captcha_preference field, bound the citation cache",
+      "description": "As an LCA maintainer, I want one declared home for browser preference/citation state, because (1) BrowserTaskRecord.captcha_preference (task_store.py:25) is never read or written anywhere in the repo (full-repo grep: one definition, zero reads/writes) while the real captcha state lives in BrowserTaskStore._captcha_preferences keyed by scope (all_tasks/site:/task:) — a dead twin of the same concept inviting future misreads; (2) _RECENT_SEARCH_RESULTS in tools.py (:36) is a module-global unbounded dict: the 'citation' concept is written by BrowserSearchTool (:138) and read by BrowserLookupCitationUrlTool (:363) via module namespace rather than any module — no eviction, no TTL, no owner, and process restarts silently invalidate citation_ids the lookup tool's error text tells users to rely on.",
+      "acceptanceCriteria": [
+        "record.captcha_preference dead field deleted (honest fix); scope-priority semantics (task>site>all_tasks) in get_captcha_preference unchanged and pinned by tests.",
+        "_RECENT_SEARCH_RESULTS converged into a deep module (e.g. SearchCitationStore inside the task store seam, OrderedDict LRU with a bound); search-write/lookup-read go through it; new test pins eviction behavior. citation_id format cit_<search_id>_<i> unchanged.",
+        "ruff check clean; existing captcha/search/lookup tests stay green."
+      ],
+      "priority": "P2",
+      "passes": false,
+      "branchName": "raphy/arch-20261019-0447",
+      "notes": "Strength: Worth exploring. Field deletion is uncontroversial; the citation-cache home (store seam vs separate module) is a judgment call."
+    },
+    {
+      "id": "RA-153",
+      "title": "Gate 'opened in a real browser' claims on driver.has_page() for resilient sessions",
+      "description": "As an LCA maintainer, I want honesty about browser liveness, because PlaywrightCDPDriver has a legitimate resilient mode: when Playwright cannot launch, create_session still returns a session record with no page. But BrowserOpenTool (tools.py) never checks driver.has_page() and reports '已在真实浏览器中打开页面' on such sessions; likewise navigate() returns title='Navigated Page' after a failed page.goto, letting the tool claim a real open. In a no-Chromium deployment the tool fabricates 'real browser' success. Resilience is a driver-layer feature; the false success claim is a tool-layer bug — the seam between them is the liveness check.",
+      "acceptanceCriteria": [
+        "RA-115 two options: (a) tools assert has_page() before claiming a real open and use honest wording ('session created, no live page') when not live; or (b) liveness folded into BrowserSessionSummary status and tools word per status. Pick one; narrative == implementation.",
+        "New test pins the no-page wording through the tool interface (mock driver without page → honest text, success semantics documented); live-path tests unchanged; ruff check clean.",
+        "Resilient mode itself stays (no-Chromium deployments must not crash)."
+      ],
+      "priority": "P2",
+      "passes": false,
+      "branchName": "raphy/arch-20261019-0447",
+      "notes": "Strength: Worth exploring. Resilient sessions are expected in some deployments; the honest-wording granularity is the judgment call."
     }
   ]
 }
