@@ -2323,6 +2323,62 @@
       "passes": true,
       "branchName": "raphy/arch-20261019-0745",
       "notes": "Strength: Worth exploring. Vocabulary-sanctioned two = real; RA-151 precedent for the same-family home. Duplication-class story (kept secondary per the diversity quota). DONE 2026-10-19: driver_tool.py 新增 _UnimplementedTool(Tool)（RA-151 的 _DriverInjectedTool 同类家园）：execute 持有 warn + fail-closed Observation 仪式，子类只声明 _log_tag/_not_implemented_error + _log_detail(args)。BrowserSpawnTaskTool/BrowserDeepResearchTool 改继承基类，error 文案逐字不变（测试钉的“尚未实现”/payload None 全过）；deep research 类 docstring 补声明未实现；_UnimplementedTool.__init__ 兼容 driver=None（build_browser_tools 历史上传 driver 构造 spawn）。三套件 58 passed, ruff clean。"
+    },
+    {
+      "id": "RA-158",
+      "title": "Fail-closed on silently-ignored browser tool params (url_id/outlink_idx/line_start/user_requested_screenshot)",
+      "description": "As an LCA maintainer, I want browser tools to stop lying about their interface, because BrowserOpenTool declares url_id ('此前 search 或 open 返回的页面 ID 或搜索会话 ID'), outlink_idx and line_start in its schema, yet execute never reads outlink_idx/line_start and str()-ifies url_id into a garbage URL ('https://5' for an integer page id) while reporting success; BrowserLookupCitationUrlTool declares url_id but never reads it; BrowserSteerTaskTool declares user_requested_screenshot but never reads it. Narrative != implementation (RA-148 class). A whole-repo grep proves zero in-repo producers of these params, so the LLM is the only caller and fail-closed is compat-safe.",
+      "acceptanceCriteria": [
+        "BrowserOpenTool.validate rejects outlink_idx/line_start with a named fail-closed error; url_id is honored only when it parses as a URL, otherwise a fail-closed Observation ('url_id 页面 ID 解析尚未实现，请直接传 url') -- the tool never navigates to a synthesized 'https://<id>'.",
+        "BrowserLookupCitationUrlTool: presence of url_id yields a fail-closed error instead of silent ignore.",
+        "BrowserSteerTaskTool: user_requested_screenshot presence no longer silently ignored -- the steer instruction is still applied and details explicitly declares the screenshot request unhandled (narrative == implementation, RA-148 second option).",
+        "New tests pin the three fail-closed paths plus the steer details declaration; all existing browser suites stay green; ruff check clean."
+      ],
+      "priority": "P1",
+      "passes": false,
+      "branchName": "raphy/arch-20261019-2245",
+      "notes": "Strength: Strong. Friction-walk finding (Area B): mechanical schema-vs-execute scan with false positives eliminated; 'the interface is the test surface' -- the LLM-facing contract currently promises page-ID resolution it cannot deliver."
+    },
+    {
+      "id": "RA-159",
+      "title": "Give StateSnapshot an explicit paused_at field; stop overloading created_at in the resume path",
+      "description": "As an LCA maintainer, I want pause time to have its own name in the contracts layer, because StateSnapshot.created_at currently carries two meanings: snapshot creation time on normal paths and the WAITING_INPUT pause moment on the resume path (resume_point_to_state_snapshot overwrites it when point.paused_at is set). _paused_seconds_since's correctness rides on an if-branch in point.py plus a docstring handshake in runtime_loop.py, and the recent 1188c7b97 wall-clock fix sits on top of this overload. Any other created_at reader on the resume path silently gets the wrong semantics.",
+      "acceptanceCriteria": [
+        "StateSnapshot gains 'paused_at: datetime | None = None'; created_at keeps its single 'snapshot creation time' semantics on every path.",
+        "resume_point_to_state_snapshot writes paused_at from point.paused_at and no longer touches created_at.",
+        "_paused_seconds_since reads snapshot.paused_at (None -> 0.0 seconds); the old-bundle docstring workaround is deleted.",
+        "Tests: paused_at round-trips through the snapshot; a snapshot without paused_at yields 0 seconds (old-bundle compat); the DefaultReducer budget shift is still driven by paused_at; existing resume-point round-trip tests stay green; ruff check clean."
+      ],
+      "priority": "P1",
+      "passes": false,
+      "branchName": "raphy/arch-20261019-2245",
+      "notes": "Strength: Strong. Friction-walk finding (Area A, Q4 leak #1): a contracts-layer seam lying about field semantics; deletion test passes -- pause semantics gets its own name instead of parasitizing created_at."
+    },
+    {
+      "id": "RA-160",
+      "title": "Extract the shared defer-policy derivation used by run entry and bind_resume_capabilities",
+      "description": "As an LCA maintainer, I want the defer-policy derivation to live in one place, because bind_resume_capabilities hand-mirrors the create-run policy derivation ('Mirror the create-run policy (ADR-0248)' comment + inline DeferPolicy.for_vocal_mode(vocal_mode) recompute). Every for_vocal_mode evolution requires manual sync on the resume side; the recent loaded_namespaces seed was synced by hand this time, but the mechanism is still human sync with no adapter converging the two call sites.",
+      "acceptanceCriteria": [
+        "One pure function (e.g. defer_policy_for_run) in the tool_defer policy home, with explicit inputs; the run-entry policy creation site and bind_resume_capabilities both call it; the hand-mirror derivation in bind_resume_capabilities is deleted.",
+        "Zero behavior change: ADR-0248 vocal-mode eager semantics untouched; existing defer policy tests stay green; ruff check clean."
+      ],
+      "priority": "P2",
+      "passes": false,
+      "branchName": "raphy/arch-20261019-2245",
+      "notes": "Strength: Worth exploring. Friction-walk finding (Area A, Q4 leak #2). Implementer must first grep the run-entry policy creation site; direction (a) per assessment (shared pure function), not (b) (policy into bundle, which entangles with the two-channel question)."
+    },
+    {
+      "id": "RA-161",
+      "title": "Extend validate_bundle's load contract to cover loaded_namespaces",
+      "description": "As an LCA maintainer, I want validate_bundle to actually be the one place that decides what a resume bundle may contain, because it currently lets the loaded_namespaces key bypass the load contract: _restore_from_bundle does bundle.get('loaded_namespaces') or () with no type check, so a corrupt bundle carrying a string silently becomes frozenset('abc') -> {'a','b','c'} instead of failing. The seam's docstring claims sole authority it does not exercise.",
+      "acceptanceCriteria": [
+        "validate_bundle rejects a bundle whose loaded_namespaces is present but not list[str] (returns None -> the existing 404 path); an absent key remains valid (pre-2026-10-19 bundles keep working via the existing 'or ()' default).",
+        "New tests: wrong-typed loaded_namespaces (str, dict) -> None; missing key -> valid; existing resume bundle tests stay green; ruff check clean."
+      ],
+      "priority": "P2",
+      "passes": false,
+      "branchName": "raphy/arch-20261019-2245",
+      "notes": "Strength: Worth exploring. Friction-walk finding (Area A, Q5 open check, confirmed this round): the load seam's fail-closed philosophy extended to the one key that currently bypasses it."
     }
   ]
 }

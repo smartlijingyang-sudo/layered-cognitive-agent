@@ -4299,3 +4299,18 @@ brain/reducer/memory/hub/standing_refresher 等键，待 RA-123 落地后再评�
   - 收基类前先查生产构造点：`build_browser_tools` 里 `BrowserSpawnTaskTool(driver)` 传 driver —— 基类 `__init__` 必须兼容收下（收下不用 + 注释说明），否则生产构造点炸。
   - honesty 契约的测试钉点（success=False、error 含"尚未实现"、payload None）在 test_browser_muse_full_suite.py——改仪式前先读测试的断言集合，确认哪些是语义 pin。
 ---
+
+## [2026-10-19 22:45 轮] - ASSESS（4 stories：RA-158/159/160/161）
+
+- 评估方法：热点 `git log -40`（tool_defer/HITL 用户 PR #47/#48 + browser 工具簇 RA-147~157 余热）；摩擦漫步拆两路只读——Area A（tool_defer 全包 + HITL resume 恢复链，子任务）/ Area B（browser tools 工具簇，协调者亲自机械扫描+误报剔除）；运行时验证沿用 10-14 脚本改 worktree 路径，4 场景全 PASS（failures=0），无新增 P0。
+- RA-158（Strong，browser）：schema 声明但 execute 零读取的参数——open 的 outlink_idx/line_start、lookup 的 url_id、steer 的 user_requested_screenshot；且 open 把整数 url_id `str()` 拼成 `https://5` 导航还报成功。全仓零内部 producer（LLM 唯一调用方）→ fail-closed 零兼容风险。修法已定：open/lookup 硬 fail-closed，steer 走"受理+details 声明未处理"（叙事==实现）。
+- RA-159（Strong，resume）：`StateSnapshot.created_at` 在 resume 路径被重载为暂停时刻（contracts 层双语义）；修法：加显式 `paused_at: datetime | None` 字段，resume_point_to_state_snapshot 写它，`_paused_seconds_since` 读它，旧 bundle（无 paused_at）→ 0 秒零迁移风险。
+- RA-160（Worth exploring）：`bind_resume_capabilities` 手工镜像 create-run 的 `DeferPolicy.for_vocal_mode` 推导；修法：抽共用纯函数（方向 a），实现时先 grep 定位 run entry 创建处。
+- RA-161（Worth exploring）：`validate_bundle` 不校验 `loaded_namespaces`（本轮读函数体确认），`frozenset("abc")` 式静默错义；修法：present 时必须 list[str] 否则判 corrupt，absent 仍允许（兼容 10-19 前老 bundle）。
+- 记录但不开：resume 双通道（类型化 point vs 无类型 bundle dict，需先定层边界）；任务存储生产侧零 producer（产品缺口，ADR 级）；`_tool_to_spec` 双胞胎（刻意 duplication，不对抗）。
+- **Learnings for future iterations:**
+  - 机械扫描"声明参数 vs execute 读取"时，先用宽松正则扫、再用精确匹配剔误报（schema 嵌套 key 如 scope.kind、verticals.items 会误报；`args.get("x", default)` 带默认值形态第一版正则漏掉）。
+  - 工具类"声明但不用"的参数，先全仓 grep producer：零 producer → fail-closed 随便做；有 producer → 先读 producer 的期望再定修法。
+  - fail-closed 哲学下 absent vs present-but-wrong 要区别对待：老 bundle 兼容要求 absent 放行，只对 present-but-wrong 判 corrupt（RA-161）。
+  - assess 轮读大文件用"子任务只读拆分 + 协调者亲自核关键断言"的分工：子任务给广度，协调者对要开 story 的每个断言亲自 grep 验证（如本轮亲自验证了 url_id 零 producer、validate_bundle 函数体）。
+---
