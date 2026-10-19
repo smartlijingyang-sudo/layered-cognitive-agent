@@ -43,6 +43,17 @@ def _normalize_url(url: str) -> str:
     return cleaned
 
 
+def _looks_like_url(value: str) -> bool:
+    """RA-158: 判断一个值是否具备 URL 形态。
+
+    纯数字是页面 ID / 搜索会话 ID 的形态（str() 后拼进 URL 会变成
+    "https://5" 这种垃圾导航）；其他一律沿用 _normalize_url 的旧路径
+    （裸域名如 muse.ai 照旧可用）。
+    """
+    cleaned = value.strip()
+    return bool(cleaned) and not cleaned.isdigit()
+
+
 # =====================================================================
 # 1. 轻量层（4 个工具，无真实浏览器或纯文本抓取，低成本、快速）
 # =====================================================================
@@ -208,8 +219,19 @@ class BrowserOpenTool(_DriverInjectedTool):
     default_timeout_s: ClassVar[int] = 30
 
     def validate(self, args: dict[str, Any]) -> str | None:
-        if not args.get("url") and not args.get("url_id"):
+        # RA-158: schema 里声明但实现不支持的参数必须 fail-closed，绝不静默忽略。
+        if args.get("outlink_idx") is not None:
+            return "暂不支持 outlink_idx：请直接用 url 打开目标页面"
+        if args.get("line_start") is not None:
+            return "暂不支持 line_start：请直接用 url 打开目标页面"
+        url = args.get("url")
+        url_id = args.get("url_id")
+        if not url and url_id is None:
             return "url 或 url_id 至少提供一项"
+        if not url and not _looks_like_url(str(url_id)):
+            # url_id 声明为"页面 ID 或搜索会话 ID"，但本实现没有页面 ID 注册表；
+            # 纯数字 ID 若 str() 后拼进 URL 会变成 https://5 这种垃圾导航并谎报成功。
+            return "url_id 页面 ID 解析尚未实现，请直接传 url"
         return None
 
     async def execute(self, args: dict[str, Any]) -> Observation:
@@ -344,7 +366,16 @@ class BrowserLookupCitationUrlTool(Tool):
     effect_kind: ClassVar[Literal["ephemeral", "persistent", "stateful_once"]] = "ephemeral"
     default_timeout_s: ClassVar[int] = 10
 
+    def validate(self, args: dict[str, Any]) -> str | None:
+        # RA-158: url_id（搜索会话 ID）声明了但实现从不读取，静默忽略等于撒谎。
+        if args.get("url_id") is not None:
+            return "暂不支持 url_id：引用解析只认 citation_id，请只传 citation_id"
+        return None
+
     async def execute(self, args: dict[str, Any]) -> Observation:
+        err = self.validate(args)
+        if err is not None:
+            return Observation(observation_id=new_id("obs"), success=False, payload=None, error=err)
         cid = str(args.get("citation_id") or "")
         if not cid:
             return Observation(
@@ -446,7 +477,10 @@ class BrowserSteerTaskTool(Tool):
                 "type": "object",
                 "description": "可选：用户批准购买后传入的钱包/支付批准参数",
             },
-            "user_requested_screenshot": {"type": "boolean", "description": "追加或撤回截图需求"},
+            "user_requested_screenshot": {
+                "type": "boolean",
+                "description": "追加或撤回截图需求（暂不支持：传入会被记录但忽略，见返回 details）",
+            },
         },
         "required": ["browser_task_id", "task"],
     }
@@ -458,6 +492,7 @@ class BrowserSteerTaskTool(Tool):
         task_id = str(args["browser_task_id"])
         instruction = str(args["task"])
         wallet = args.get("wallet_payment")
+        screenshot_req = args.get("user_requested_screenshot")
 
         task_store = get_shared_task_store()
         task = task_store.get_task(task_id)
@@ -476,13 +511,17 @@ class BrowserSteerTaskTool(Tool):
 
         task_store.add_timeline_step(task_id, "steer", instruction)
 
+        details: dict[str, Any] = {"browser_task_id": task_id, "status": "running", "instruction": instruction}
+        if screenshot_req is not None:
+            # RA-158: 截图需求实现不支持——指令照常受理，但在 details 里诚实声明未处理，不静默吞掉。
+            details["user_requested_screenshot"] = "unsupported_ignored"
         res = BrowserActionResult(
             action_type=BrowserActionType.STEER,
             success=True,
             session_id=task.session_id,
             task_id=task_id,
             text_content=f"已向任务 {task_id} 注入指令，任务已恢复运行。",
-            details={"browser_task_id": task_id, "status": "running", "instruction": instruction},
+            details=details,
         )
         return Observation(observation_id=new_id("obs"), success=True, payload=res.model_dump())
 

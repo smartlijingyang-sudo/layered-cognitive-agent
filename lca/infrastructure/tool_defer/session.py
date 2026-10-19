@@ -375,9 +375,29 @@ def current_defer_session() -> ToolDeferSession | None:
     return _defer_session.get()
 
 
+def new_defer_session(
+    vocal_mode: str | None,
+    *,
+    loaded_namespaces: Sequence[str] = (),
+) -> ToolDeferSession:
+    """Build the per-run defer session for a vocal mode (RA-160).
+
+    Single home for the "vocal mode -> defer session" derivation shared by the
+    create-run path and the resume-rebind path (``bind_resume_capabilities``):
+    gated vocal mode keeps the ``agent`` namespace eager so the run's vocal
+    contract and visible tool schema agree (ADR-0248). The resume path passes
+    the pause-time loaded set as the seed; create-run passes nothing.
+    """
+    return ToolDeferSession(
+        DeferPolicy.for_vocal_mode(vocal_mode or "direct"),
+        loaded_namespaces=loaded_namespaces,
+    )
+
+
 __all__ = [
     "ToolDeferSession",
     "current_defer_session",
+    "new_defer_session",
     "reset_current_defer_session",
     "set_current_defer_session",
 ]

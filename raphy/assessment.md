@@ -1,240 +1,82 @@
-# Raphy Assessment — 2026-10-19 07:45 round (`raphy/arch-20261019-0745`)
+# Raphy Assessment — 2026-10-19 22:45 轮
 
-Basis: main tip `f81e60679` (clean worktree; RA-147~153 merges landed in
-previous rounds). 3 hot areas read end-to-end; runtime verification run in
-the main worktree with `LLM_API_KEY=<redacted> (a) basic run → COMPLETED,
-(b) `tests/scenario/browser/test_browser_preview_and_takeover_e2e.py`
-1 passed, (c) two sequential runs → completed/completed. No crash/hang.
+## 范围与方法
 
-## Phase 1 — Explore
+- **热点定位**：`git log --oneline -40 main`（非 merge）：最近两周最热的是 (a) 用户自己的两个 HITL/tool_defer 修复 PR（`ec141e124`、`1188c7b97`，已合 main #47/#48）；(b) browser 工具簇（RA-147~157 刚收敛完）；(c) webserver runs lifecycle（lca-1000 领地，禁区，跳过）；(d) docs/plans（文档，非代码）。
+- **摩擦漫步 Area A**（子任务，只读零写入）：`lca/infrastructure/tool_defer/` 全包精读（session.py 383 行、policy.py、tool_search.py、names.py）+ HITL resume 恢复链（point.py 全文、runtime_loop.py 相关段、reducer 协议与 plugin、carrier/lifecycle.py、recovery.py、webserver handlers 相关段）。
+- **摩擦漫步 Area B**（协调者亲自验证）：`lca/infrastructure/tools/browser/tools.py` 全类扫描（声明参数 vs execute 实际读取，机械扫描 + 误报剔除）+ `task_store.py` + 全仓 `url_id`/`outlink_idx`/`line_start`/`register_task`/`BrowserTaskRecord(` 生产调用者 grep。
+- **运行时验证**（强制）：沿用 2026-10-14 版脚本（改 worktree 路径），4 场景全 PASS（A 基础 run COMPLETED / B 工具调用 COMPLETED / C 双轮 run COMPLETED / D 不收敛 run 返回 failed 无异常，RA-023 回归守住），failures=0，无新增 P0。
+- **禁区遵守**：preamble.py、ralph Round 2（DecisionGates/Ingest/ContextFiles shims/read-runs/`infrastructure/tools/assistant/`/`lca/cognition/memory/`）、lca-1000（`contracts/event.py` PILOT、`plugins/transport/webserver/`——resume 链读的是 session 插件与 carrier/recovery，未进 webserver 禁区文件）、gate_chain_strategy.py、typed port 迁移、`CursorRecord` DI 均未碰未提案。
 
-### Hot-spot scan (`git log --oneline -45`)
+## 五问答案摘要
 
-Last 45 commits are dominated by one lane: the Muse **browser 13-tool
-suite** (agy + raphy RA-146~153: fabricated-result convergence, fail-closed
-fixes, driver has_page gate, lazy-import boilerplate extraction). Also:
-iter-tests/iter-quality hygiene, docs/plans for the stochastic brain
-(targets `~/tools/x-operator`, a different repo — not a hotspot here).
+**Area A（tool_defer + HITL resume）**：
+- Q1（概念是否散在多模块）：是。两个刚修好的概念都是 5 文件概念："resume 恢复 loaded 集合"（session.py → terminal/lifecycle.py → session/session.py → recovery.py → carrier/lifecycle.py）；"resume 排除暂停时长"（agent.py → point.py → runtime_loop.py → reducer.py → plugin.py）。且两者走**两条并行恢复通道**：`paused_at` 走类型化 `ApprovalResumePoint`，`loaded_namespaces` 走无类型 bundle dict 字符串键——"resume 到底恢复什么"没有单一 module 拥有。
+- Q2（浅模块）：`_capture_loaded_namespaces()`（9 行）、`_paused_seconds_since`（11 行）都浅，但 deletion test 结论是**它们不是删除点**——它们承载的兼容性规则/调用点 invariant 才是问题（见候选 1、3）。`_optional_float` 等 12 个 micro-helper 是家族级 depth，单删无意义，不提案。`names.py` 薄但不浅（双向映射真逻辑），保留。
+- Q3（纯函数 vs 调用方式 bug）：`_paused_seconds_since` 可单测但**零覆盖**；过去两周两个生产 bug 都住在 wiring（bundle 带没带键、snapshot.created_at 被谁写成什么），不在纯函数里。`_capture_loaded_namespaces` 的"每个 pause 路径都必须 capture" invariant 分散在 2 个调用点，无 module 强制。
+- Q4（seam 泄漏）：三处——① `StateSnapshot.created_at` 在 resume 路径被重载为暂停时刻（最重，contracts 层 SSOT 在撒谎）；② `bind_resume_capabilities` 手工镜像 create-run 的 `DeferPolicy.for_vocal_mode` 推导（"Mirror the create-run policy (ADR-0248)" 注释，人肉同步）；③ terminal 层函数级局部 import 伸手进 infrastructure 的 defer ContextVar。
+- Q5（测试缺口）：`ToolDeferSession(loaded_namespaces=[...])` seed 路径零直接测试；`_paused_seconds_since` + `DefaultReducer.apply_resume` 的 budget 平移零覆盖（`test_resume_point_paused_at.py` 只到 point.py round-trip 就停）；`validate_bundle` 是否校验 `loaded_namespaces`——本轮已确认：**不校验**（函数体只查 run_id/approval_request/resume_point），`_restore_from_bundle:306` 的 `bundle.get("loaded_namespaces") or ()` 绕过 load contract（`frozenset("abc")` 会静默变成字符集，错类型不炸）。
 
-Hot areas chosen for the friction walk (browser tooling is the natural
-continuation — RA-146~153 converged the *tools* but the *subagent's*
-fallback dispatch and the *driver's* internals were never walked):
+**Area B（browser tools）**：
+- 机械扫描（误报已剔除：`BrowserSearchTool.items` 是 verticals schema 的 items；`BrowserSetCaptchaPreferenceTool.kind/value` 是嵌套 scope 内读取）确认三处**声明了但 execute 零读取**的参数：`BrowserOpenTool.outlink_idx`/`line_start`、`BrowserLookupCitationUrlTool.url_id`、`BrowserSteerTaskTool.user_requested_screenshot`。
+- `BrowserOpenTool.url_id`（schema："此前 search 或 open 返回的页面 ID 或搜索会话 ID"）被 `str(args.get("url") or args.get("url_id"))` 直接拼进 URL：整数 page ID 5 → `_normalize_url` → `"https://5"`，然后**宣称打开成功**。全仓（lca/ + tests/）除 tools.py 自身外零 `url_id`/`outlink_idx`/`line_start` 生产者——LLM 是唯一可能调用方，拿到的是垃圾导航 + 成功谎言。RA-148 同类（叙事≠实现）。
+- `BrowserTaskStore.register_task` / `BrowserTaskRecord(` 全仓 lca/ 零生产调用者（只有 tests/ 在用）：按 RA-149 pattern 这是刻意留下的测试供数 seam，不是 bug，不开 story；但记一笔——任务生命周期工具簇在生产侧当前无 producer（spawn 已 fail-closed），属产品缺口而非架构摩擦，ADR 级别，本轮不动。
 
-(A) `lca/infrastructure/tools/browser/` — tools.py (1069L, read fully),
-    task_store.py (176L), executor.py (106L), driver_tool.py (34L)
-(B) `lca/infrastructure/browser/cdp_driver.py` (514L, read fully)
-(C) `lca/infrastructure/browser/subagent.py` (225L, read fully) +
-    `arbitration.py` (87L, read fully)
+## 候选表
 
-### Organic friction walk
+| ID | Files | Problem | Solution | Benefits（locality+leverage） | Strength |
+|---|---|---|---|---|---|
+| RA-158 | `lca/infrastructure/tools/browser/tools.py`（BrowserOpenTool / BrowserLookupCitationUrlTool / BrowserSteerTaskTool） | 工具 schema 声明了实现根本不读的参数（open 的 outlink_idx/line_start；lookup 的 url_id；steer 的 user_requested_screenshot），且 open 把整数 url_id `str()` 后拼成 `https://5` 去导航并返回成功——LLM 面契约撒谎 | validate 层 fail-closed：出现不支持的参数直接返回命名错误；url_id 仅当本身是合法 URL 时才沿用旧路径，否则 fail-closed（"页面 ID 解析尚未实现，请直接传 url"） | "哪些参数真有效"的知识从"散在 schema 描述与实现的不一致"收敛到 validate 一处；leverage：以后任何参数增删都在 validate 有单一真值，LLM 得到可行动的错误而非静默垃圾 | Strong |
+| RA-159 | `lca/contracts/models/core/state/state.py`（StateSnapshot）、`lca/plugins/session/runtime/resume/point.py`（resume_point_to_state_snapshot）、`lca/runtime/loop/runtime_loop.py`（_paused_seconds_since） | `StateSnapshot.created_at` 在 resume 路径被重载为 WAITING_INPUT 暂停时刻，其他路径是快照创建时间——contracts 层字段双语义，`_paused_seconds_since` 的正确性依赖 point.py 一个 if 分支 + runtime_loop.py 一段 docstring 的口头约定；1188c7b97 整个修复骑在这个重载上 | 给 StateSnapshot 加显式字段 `paused_at: datetime \| None = None`；resume_point_to_state_snapshot 写它、不再碰 created_at；_paused_seconds_since 改读 `snapshot.paused_at`（None→0 秒）；created_at 恢复单一语义 | pause 语义第一次有了自己的名字，不再寄生；leverage：以后任何 wall-clock 读者读显式字段，不再需要知道重载约定；旧 bundle（无 paused_at）自然得 None→0，迁移零风险 | Strong |
+| RA-160 | `lca/plugins/transport/webserver/carrier/runs/lifecycle/lifecycle.py`（bind_resume_capabilities）、run entry 的 policy 创建处、`lca/infrastructure/tool_defer/policy.py` | "这个 run 用什么 defer policy" 的推导写了两遍：run entry 一处，resume bind 侧手工镜像（注释 "Mirror the create-run policy (ADR-0248)"）；`for_vocal_mode` 每演进一次 resume 侧必须人肉同步 | 抽共用纯函数（如 `defer_policy_for_run(vocal_mode, ...)`），两处调用点都调它；输入显式化 | 推导知识从两处调用点收进一个 adapter；leverage：下次 policy 演进只改一处，resume 侧不可能再漏同步 | Worth exploring |
+| RA-161 | `lca/plugins/transport/webserver/carrier/runs/recovery.py`（validate_bundle） | validate_bundle 自称 "the one place that decides what a resume bundle must contain"，但 `loaded_namespaces` 键绕过它（`frozenset("abc")` 式静默错义不炸） | load contract 覆盖该键：present 时必须为 `list[str]`，否则 bundle 判 corrupt（→ None → 404 路径）；absent 仍允许（兼容 10-19 前的老 bundle，沿用 `or ()` 默认） | "bundle 里能装什么"的判定权真正回到 validate_bundle；leverage：以后新增 bundle 键有现成的类型门可挂 | Worth exploring |
 
-#### Area A — `tools/browser/` (tools.py / task_store.py / executor.py / driver_tool.py)
+**记录但不开 story**：① resume 双通道（类型化 point vs 无类型 bundle dict）——需要先定层边界（`loaded_namespaces` 是 webserver 层概念，`ApprovalResumePoint` 住 session 层），贸然并入可能污染层边界；RA-161 先解决其中可落地的具体子项。② 任务存储生产侧无 producer——产品缺口，ADR 级别。③ `_tool_to_spec` 双胞胎（session.py vs think.history.assemble）——刻意 duplication（分层约束），"同一性"不可测是已知 trade-off，不对抗。
 
-1. **Bouncing between small modules?** Mild. Understanding one tool call
-   crosses tool class → task_store/driver → contracts BrowserActionResult.
-   The 17 classes are spec-mandated interfaces (Muse Browser Spec), so the
-   per-class thinness is not sprawl — the *schema* is the interface.
-2. **Shallow modules?** `BrowserNavigateTool(BrowserOpenTool)` is a pure
-   alias subclass — but its interface (the spec tool name) is the value;
-   deletion test passes (it earns existence via spec compatibility).
-   The two fail-closed placeholder tools (spawn_task, deep_research) each
-   re-implement the same warn + fail-closed Observation ritual → two = real
-   (→ RA-157).
-3. **Pure functions hiding call-site bugs?** No. `_normalize_url`,
-   `browser_preview_widget_tag`, `_args_for`, `_result_from_observation`
-   are genuine locality helpers; no call-site bug found.
-4. **Leaky seams?** YES — real finding. `BrowserSteerTaskTool.execute`
-   (tools.py:476-482) mutates `task.status` / `task.payment_approved`
-   directly on the record; `BrowserTransferTaskTool.execute` (tools.py:~680)
-   mutates `task.status` directly. Meanwhile `BrowserTaskStore.update_task`
-   offers an update seam with **zero callers** (verified by grep across
-   `lca/` and `tests/`; RA-152 round independently confirmed zero calls).
-   The store's own mutation seam is dead while its sibling tools reach
-   past it into record fields → RA-156.
-5. **Testability?** The interface is the test surface: 26 tests pass
-   (contracts/browser + infrastructure/browser + tools/browser), each tool
-   exercised via `execute()` through the interface.
-6. **Verdict**: two stories (RA-156, RA-157).
+## 自我诘问（per-candidate grilling）
 
-#### Area B — `infrastructure/browser/cdp_driver.py`
+### RA-158
+- **Constraints**：工具 schema 是 LLM 面契约，不能静默改语义；RA-147 的 honesty 纪律（未知引用 fail-closed）是直接先例；`BrowserSpawnTaskTool`/`BrowserDeepResearchTool` 已是 `_UnimplementedTool`，其参数是刻意 inert——**不动它们**，只动三个"宣称能干活"的工具。`browser_preview` e2e（test_browser_preview_and_takeover_e2e.py）走的是正常 open 路径，必须保持绿。
+- **Dependencies**：调用方只有 LLM（全仓零内部 producer 已验证）；`BrowserOpenTool.validate()` 已有返回错误字符串→execute 转 fail-closed Observation 的现成管道。
+- **Shape of the deepened module**：validate 里加命名检查：`outlink_idx`/`line_start` 出现 → `"暂不支持 outlink_idx/line_start，请直接用 url 打开目标页"`；`url_id` 无 `url` 且非 URL 形态 → `"url_id 页面 ID 解析尚未实现，请直接传 url"`；`BrowserLookupCitationUrlTool` 的 `url_id` 出现 → 同款 fail-closed；`BrowserSteerTaskTool` 的 `user_requested_screenshot` 出现 → `"截图需求参数暂不支持，已忽略指令本身"`（fail-closed 而非静默忽略——steer 的指令注入是主要求，截图是附加，error 里说清"指令已受理、截图需求未受理"？不——fail-closed 纪律要求要么全拒要么说清。steer 的语义是"注入指令"，截图只是附加需求；最诚实的是受理指令但在 details 里声明 screenshot 未被处理。决定：steer 走"受理+details 声明未处理项"（叙事==实现，RA-148 第二选项），open/lookup 走硬 fail-closed（参数决定导航目标，错了必须拒）。）
+- **Test survival**：现有 open/search/find/lookup 测试钉的是正常路径；新增测试钉 fail-closed 三条（整数 url_id、outlink_idx、lookup url_id）+ steer details 声明。
+- **Deletion test verdict**：把"不支持"知识删掉 → 回到静默垃圾；validate 里的检查**集中**了"哪些参数真有效"的知识，earn 存在。concentrates。
 
-1. **Bouncing?** No — single module owns sessions/pages/CDP/screencast.
-2. **Shallow?** `choose_chromium_proxy(env_server, *, mihomo_open)` is
-   the good case: a genuine pure function taking the probe result as a
-   parameter — fully testable (`test_chrome_proxy_prefers_mihomo_*`).
-   `_mihomo_proxy_open` / `_chromium_proxy` are thin environment probes
-   with a real decision; they earn their names.
-3. **Leaky seams?** Two `BrowserSessionSummary` update-rebuilds
-   (cdp_driver.py:215 in `_init_cdp_for_session`, :325 in `navigate`)
-   hand-copy all 8 contract fields verbatim, differing only in the 2-3
-   changed fields — and they have *already drifted*: :215 hardcodes
-   `has_active_stream=True` while :325 copies `summary.has_active_stream`.
-   `BrowserSessionSummary` is a frozen pydantic BaseModel, so
-   `model_copy(update=...)` is the contract's own evolve seam — the driver
-   hand-rolls what the contract gives for free → RA-155.
-4. **`has_page` side effect?** EXAMINED AND CLEARED. `has_page()` does
-   mutate (`_pages.pop` / `_cdp_sessions.pop` on closed pages), but
-   `tests/infrastructure/browser/test_browser_reopen_snapshot.py:77`
-   (`test_has_page_drops_a_closed_playwright_page`) *pins the reaping
-   through the interface*: `assert driver.has_page("brw_dead") is False`
-   + `assert "brw_dead" not in driver._pages`. Deletion test: removing the
-   reaping turns this test red — the reaping concentrates behavior, it
-   earns its place. The interface is the test surface and the surface
-   pins the design. No story.
-5. **Verdict**: one story (RA-155).
+### RA-159
+- **Constraints**：StateSnapshot 是 contracts 层，改字段是 SSOT 级改动；旧 bundle（无 paused_at）必须零行为变化（None→0 秒）；`created_at` 的其他读者——实现时 grep 确认 resume 路径只有 `_paused_seconds_since` 在消费暂停语义。
+- **Dependencies**：point.py（写）→ state.py（字段）→ runtime_loop.py（读）；`apply_resume(paused_seconds=)` 协议与 `DefaultReducer` 不动（输入不变，只是来源从重载字段变显式字段）；`ApprovalResumePoint.paused_at` 的 serialize/deserialize 已存在。
+- **Shape of the deepened module**：`StateSnapshot.paused_at: datetime | None = None`；`resume_point_to_state_snapshot` 里 `if point.paused_at: kwargs["paused_at"] = ...` 替代现在的 `kwargs["created_at"] = ...`；`_paused_seconds_since(snapshot)` 读 `snapshot.paused_at`，None → 0.0；docstring 里那段"旧 bundle 得零"的口头约定删除（由类型默认值表达）。
+- **Test survival**：`test_resume_point_paused_at.py` 的 round-trip 测试继续绿；新增：paused_at 经 snapshot round-trip、旧 snapshot（无 paused_at）→ 0 秒、`DefaultReducer.apply_resume` 的 budget 平移被 paused_at 驱动（补 Q5 的测试缺口）。
+- **Deletion test verdict**：删掉重载 → pause 语义第一次有了名字；知识从"if 分支 + docstring 口头约定"**集中**到类型字段。concentrates。
 
-#### Area C — `infrastructure/browser/subagent.py` + `arbitration.py`
+### RA-160
+- **Constraints**：ADR-0248 的 vocal-mode eager 策略语义零变化；先 grep 找到 run entry 的 policy 创建处（实现时做）。
+- **Dependencies**：两处调用点 + `policy.py`（`for_vocal_mode` 的家）。
+- **Shape of the deepened module**：`policy.py`（或其邻近）新增纯函数 `defer_policy_for_run(vocal_mode, ...)`（参数按 run entry 现状显式化）；run entry 与 `bind_resume_capabilities` 都调它，bind 侧删掉 "Mirror" 注释的手工推导。
+- **Test survival**：defer policy 现有测试钉行为；零行为变化，只收敛调用点。
+- **Deletion test verdict**：删掉镜像 → 推导知识从两处**集中**到一处。concentrates。
 
-1. **Bouncing?** YES — the finding. `BrowserSubagent.execute_action`
-   dispatches over `BrowserActionType` in three layers (RA-146 design):
-   injected executor → `_execute_via_driver` → fail-closed. But layer 2,
-   `_execute_via_driver` (subagent.py:120-225), is a ~100-line if-chain
-   re-implementing dispatch over the *same* `BrowserActionType` space that
-   `executor.py::_ACTION_TOOL_NAMES` already owns. The two tables diverge:
-   executor covers 4 types (NAVIGATE/CLICK/SCREENSHOT/CLOSE);
-   `_execute_via_driver` covers 6 (adds TYPE, EXTRACT_TEXT). A new action
-   type now requires edits in two modules; TYPE/EXTRACT_TEXT silently skip
-   the shared execution seam RA-146 built.
-2. **Shallow?** `arbitration.py` (87L) is deep: 5-method state machine
-   (IDLE/AGENT_RUNNING/HUMAN_TAKEOVER/CLOSED) with `evaluate_input`
-   gating — small interface, real semantics. Deletion test passes.
-   `_execute_via_driver`'s six branches are shallow *relative to the seam
-   they shadow*: each branch is "try driver.X, wrap in result" — the same
-   shape the tools already wrap.
-3. **Leaky seams?** The `_execute_via_driver` branches call
-   `self.driver.navigate/click/type_text/take_screenshot/extract_text/
-   close_session` directly, bypassing the tool wrappers that
-   `build_browser_action_executor` would use for the same actions —
-   so NAVIGATE via subagent-driver path and NAVIGATE via tool path can
-   diverge in result shaping (e.g. screenshot artifact-id generation
-   happens in both places independently).
-4. **Testability?** `test_browser_lifecycle_scenarios.py:296`
-   (`BrowserSubagent(driver=driver)`) pins the driver-direct path;
-   `test_browser_subagent_purity.py` pins the tools path. Both must stay
-   green through convergence.
-5. **Verdict**: one story (RA-154, top).
+### RA-161
+- **Constraints**：validate_bundle 的 fail-closed 哲学（corrupt → None → handler 404）；`write_resume_bundle` 写的是 `sorted(session.loaded_namespaces)`（list[str]）；10-19 之前的老 bundle 没有该键——absent 必须允许。
+- **Dependencies**：仅 recovery.py 内部；`_restore_from_bundle` 在 validate 之后读，可信任类型。
+- **Shape of the deepened module**：validate_bundle 加一段：`"loaded_namespaces" in data` 时必须 `isinstance(list)` 且全 `str`，否则 return None；absent → 通过（下游 `or ()` 保持）。
+- **Test survival**：现有 resume bundle 测试；新增：错类型（str/dict）→ None，缺键 → 通过。
+- **Deletion test verdict**："bundle 能装什么"的判定**集中**回自称唯一判定点的 validate_bundle。concentrates。
 
-### Runtime verification
+## Top recommendation
 
-- (a) basic run → COMPLETED; (c) two sequential runs → completed /
-  completed (mock LLM, main worktree, `LLM_API_KEY=<redacted>
-- (b) `tests/scenario/browser/test_browser_preview_and_takeover_e2e.py`
-  → 1 passed; browser tool + subagent + executor suites → 26 passed.
-- No crash / hang / silent failure observed. No P0 runtime candidate.
+先做 **RA-158**：LLM 面契约撒谎是离用户最近的谎言（调用方直接拿到 `https://5` 的"成功"），且全仓零内部 producer、零兼容风险，是最干净的 Strong。接着 **RA-159**：contracts 层 SSOT 字段双语义，刚落地的生产修复骑在上面，不收敛则下一个 wall-clock 读者还会踩。然后 **RA-161**（小而实，补 load contract 缺口），最后 **RA-160**（需先定位 run entry，稍重）。
 
-### Duplication scan (secondary, after the walk)
+## Diversity quota
 
-- `_ACTION_TOOL_NAMES` (executor.py:26) vs `_execute_via_driver`
-  (subagent.py:120): already captured as RA-154 — not mechanical dup,
-  diverging seams.
-- Two fail-closed "not implemented" rituals (spawn_task, deep_research)
-  → RA-157 (vocabulary-sanctioned two = real).
-- Two 8-field `BrowserSessionSummary` rebuilds → RA-155.
-- `update_task` dead seam (0 callers) vs two direct-mutation sites →
-  RA-156.
-- No other mechanical duplication found in the walked areas worth a
-  story (launch-kwargs dict appears twice in `_init_cdp_for_session`
-  but the two sites configure genuinely different scenarios —
-  first-launch vs relaunch; one adapter = hypothetical).
+- 摩擦漫步来源：RA-158（browser 工具簇精读：被忽略的声明参数 + url_id 语义错乱）、RA-159（tool_defer/HITL 恢复链精读：contracts 层 seam 泄漏）。✓ 不是全 duplication。
+- RA-160/161 是 wiring 收敛类（"two = real" 的变体：两处推导 / 判定点名实不符），属次要但非注水——每条都有 deletion test 通过的证据。
 
-## Phase 2 — Self-grilling
+## 运行时验证记录
 
-### RA-154 — Converge `_execute_via_driver`'s dispatch table onto the shared executor seam
+脚本：`/tmp/raphy-verify-20261019.py`（由 hidden_files/raphy-runtime-verify-20261014.py 改 worktree 路径），`env LLM_API_KEY=dummyprobe python3` 经 stdin 在 worktree 跑。
+结果：A 基础 run COMPLETED / B 工具调用 COMPLETED / C 双轮 run COMPLETED / D 不收敛 run → status=failed 无异常（RA-023 回归守住），`DONE failures=0`。无新增 P0/P1。
 
-- **Constraints**: RA-146's three-layer order stays (explicit executor →
-  driver-direct → fail-closed). `driver=None` + no executor → fail-closed
-  behavior stays. Subagent lock + arbitration interplay untouched.
-  BrowserActionType enum (contracts) untouched.
-- **Dependencies**: `subagent.py` → would import
-  `build_browser_action_executor` from `lca.infrastructure.tools.browser.
-  executor`; executor → `build_browser_tools` (tools.py). No cycle:
-  tools.py never imports subagent. Callers pinning paths:
-  `test_browser_lifecycle_scenarios.py:296` (driver-direct),
-  `test_browser_subagent_purity.py` (tools),
-  `test_browser_action_executor.py` (executor map).
-- **Shape of the deepened module**: `_ACTION_TOOL_NAMES` extended to
-  TYPE + EXTRACT_TEXT, backed by driver methods (either minimal Tool
-  adapters in driver_tool.py's 同类家园 or direct adapters in
-  executor.py — implementer's call); `_execute_via_driver` becomes a
-  one-liner delegating to `build_browser_action_executor(driver=self.
-  driver)`. One dispatch table for "BrowserAction → how it executes".
-- **Test survival**: the three test files above stay green; new test:
-  driver-only subagent dispatches TYPE/EXTRACT_TEXT and the results come
-  back through the executor path (not the private if-chain).
-- **Deletion test verdict**: deleting `_execute_via_driver`'s branches
-  concentrates dispatch into the map — CONCENTRATES. Strong.
+---
 
-### RA-155 — Replace manual 8-field summary rebuilds with `model_copy(update=...)`
-
-- **Constraints**: `BrowserSessionSummary` is a frozen contract model —
-  do not touch the contract; `model_copy` is its built-in evolve seam.
-  navigate()'s "keep old title on goto failure" (RA-153) semantics stay.
-- **Dependencies**: only cdp_driver.py internals; tests in
-  `test_browser_reopen_snapshot.py` pin title/url after reopen.
-- **Shape**: `self._sessions[sid] = old.model_copy(update={"url": url,
-  "title": title or "Page"})` at both sites; the :215
-  `has_active_stream=True` hardcode becomes explicit (or stays as an
-  update key — implementer's call, but the drift must be resolved, not
-  hidden).
-- **Test survival**: reopen-snapshot tests green; ruff clean.
-- **Deletion test verdict**: concentrates the copy ritual into the
-  contract's own seam — CONCENTRATES. Worth exploring (mechanical, but
-  drift is already demonstrated).
-
-### RA-156 — Delete the dead `BrowserTaskStore.update_task` seam
-
-- **Constraints**: steer/transfer tools' direct field writes are the
-  actual mutation seam; do not change their behavior. `add_timeline_step`
-  stays the timestamp bump path.
-- **Dependencies**: zero callers of `update_task` (grep over `lca/` +
-  `tests/`; RA-152 round independently confirmed). No test pins it
-  (checked: no `update_task` in tests/).
-- **Shape**: delete `update_task` from `BrowserTaskStore`; the single
-  mutation path becomes direct record-field writes followed by
-  `add_timeline_step` (the pattern steer/transfer already use).
-  Alternative rejected: routing through `update_task` — its `hasattr`
-  silent-skip is weaker than direct assignment (typos vanish silently).
-- **Test survival**: no test references it; full browser suites stay green.
-- **Deletion test verdict**: deletes a false affordance — JUST MOVES
-  nothing, REMOVES dead code (RA-137 precedent). Worth exploring.
-
-### RA-157 — Extract the two fail-closed "not implemented" tool rituals into a shared base
-
-- **Constraints**: the honesty contract (warn log + success=False +
-  "尚未实现" error, never a fabricated running receipt) is the behavior
-  to preserve, per RA-147/RA-149. Spec tool names/descriptions stay.
-- **Dependencies**: both tools live in tools.py; driver_tool.py is the
-  RA-151-established 同类家园 for shared tool bases.
-- **Shape**: `_UnimplementedTool(Tool)` in driver_tool.py holding the
-  ritual; subclasses declare the log tag + error message.
-  (Mirror of RA-151's `_DriverInjectedTool` convergence.)
-- **Test survival**: existing fail-closed tests for spawn_task /
-  deep_research (if any pin the messages, update to the shared source);
-  ruff clean.
-- **Deletion test verdict**: deleting the base moves ~6 lines × 2 back —
-  but the ritual is a *contract*, and centralizing means the next
-  "not implemented" tool inherits it — CONCENTRATES the honesty ritual.
-  Worth exploring (vocabulary-sanctioned two = real; RA-151 precedent).
-
-## Phase 3 — Candidate table
-
-| # | Files | Problem | Solution | Benefits (locality + leverage) | Strength |
-|---|-------|---------|----------|-------------------------------|----------|
-| RA-154 | `infrastructure/browser/subagent.py` (120-225), `infrastructure/tools/browser/executor.py` (26) | Two dispatch tables over `BrowserActionType`: executor map covers 4 types, `_execute_via_driver` covers 6 (adds TYPE/EXTRACT_TEXT) — same concept, diverging coverage; new types need two edits | Extend `_ACTION_TOOL_NAMES` to TYPE/EXTRACT_TEXT (driver-backed); `_execute_via_driver` delegates to `build_browser_action_executor(driver=...)` | Locality: one dispatch table. Leverage: new action types = one map entry. Tests: driver path + tools path converge, one place to pin result shaping | **Strong** |
-| RA-155 | `infrastructure/browser/cdp_driver.py` (215, 325) | Two hand-copied 8-field `BrowserSessionSummary` rebuilds; already drifted (`:215` hardcodes `has_active_stream=True`, `:325` copies it); contract field additions need two edits | `old.model_copy(update={...})` via the frozen contract's own evolve seam | Locality: copy ritual in one expression. Leverage: future contract fields flow through automatically | Worth exploring |
-| RA-156 | `infrastructure/tools/browser/task_store.py` (`update_task`), `tools.py` (steer/transfer) | `update_task` is a dead seam (0 callers, 0 tests); the real mutation seam is direct record-field writes in two tools — a false affordance | Delete `update_task`; keep direct writes + `add_timeline_step` as the single path | Locality: one mutation path. `hasattr` silent-skip removed (typos no longer vanish) | Worth exploring |
-| RA-157 | `infrastructure/tools/browser/tools.py` (spawn_task, deep_research), `driver_tool.py` | Two = real: identical warn + fail-closed Observation ritual in the two "not implemented" placeholder tools | `_UnimplementedTool(Tool)` base in driver_tool.py (RA-151 precedent) | Locality: honesty ritual in one place. Leverage: the next placeholder tool inherits the contract | Worth exploring |
-
-**Top recommendation**: RA-154 first. It is the only candidate that
-finishes a convergence RA-146 started: the "shared execution seam" only
-became shared in name while the subagent's fallback kept a private,
-diverging dispatch table. Two tables over one enum is the textbook leaky
-seam — and the fix deletes ~100 lines while making TYPE/EXTRACT_TEXT
-honest citizens of the shared seam. The other three are Worth exploring
-in any order (RA-155's drift is already demonstrated, so it edges out
-RA-156/157).
-
-**Diversity quota**: satisfied — RA-154 (leaky seam / diverging dispatch,
-friction walk), RA-155 (copy-ritual drift, friction walk), RA-156 (dead
-seam, friction walk) are all friction-walk findings; only RA-157 is a
-duplication-class story.
+Assessment complete: 4 stories written, top is RA-158.

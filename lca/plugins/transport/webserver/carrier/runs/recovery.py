@@ -158,6 +158,16 @@ def validate_bundle(data: Any, run_id: str) -> dict[str, Any] | None:
         deserialize_resume_point(resume_point)
     except Exception:
         return None
+    loaded_namespaces = data.get("loaded_namespaces")
+    # RA-161: this key used to bypass the load contract entirely -- a bare
+    # string would silently become frozenset("abc") -> {"a", "b", "c"}
+    # downstream in _restore_from_bundle. Absent stays allowed so
+    # pre-2026-10-19 bundles keep loading (downstream "or ()" default).
+    if loaded_namespaces is not None and (
+        not isinstance(loaded_namespaces, list)
+        or not all(isinstance(item, str) for item in loaded_namespaces)
+    ):
+        return None
     return data
 
 

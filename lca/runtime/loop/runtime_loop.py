@@ -81,13 +81,14 @@ logger = logging.getLogger(__name__)
 def _paused_seconds_since(snapshot: StateSnapshot) -> float:
     """Seconds the run spent paused before this resume, per the snapshot.
 
-    The snapshot's ``created_at`` is the WAITING_INPUT pause time when the
-    resume bundle carried ``paused_at``; older bundles leave it at the
-    reconstruction time, yielding zero so the pre-fix behavior is preserved.
+    RA-159: reads the explicit ``paused_at`` field. ``None`` -- a snapshot
+    built before the field existed, or a resume bundle without pause info --
+    yields zero, preserving the pre-fix behavior.
     """
-    if snapshot.created_at is None:
+    paused_at = snapshot.paused_at
+    if paused_at is None:
         return 0.0
-    elapsed = (utc_now() - snapshot.created_at).total_seconds()
+    elapsed = (utc_now() - paused_at).total_seconds()
     return elapsed if elapsed > 0 else 0.0
 
 

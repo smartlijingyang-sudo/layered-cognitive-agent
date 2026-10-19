@@ -201,3 +201,32 @@ def test_bundle_write_failure_is_contained(tmp_path: Path) -> None:
     session = _paused_session()
     session.locator = None  # no locator -> best-effort skip, no raise
     write_resume_bundle(session)  # should not raise
+
+
+def test_ra161_validate_bundle_rejects_mistyped_loaded_namespaces(tmp_path: Path) -> None:
+    """RA-161: loaded_namespaces 键曾绕过 load contract —— 错类型必须判 corrupt。
+
+    裸字符串会在 _restore_from_bundle 里静默变成 frozenset("shell") 的字符集；
+    缺键（2026-10-19 前的老 bundle）仍允许，下游 or () 兜底。
+    """
+    from lca.plugins.transport.webserver.carrier.runs.recovery import validate_bundle
+
+    run_dir = tmp_path / "traces" / "run-rec-1"
+    run_dir.mkdir(parents=True, exist_ok=True)
+    session = _paused_session()
+    session.locator.run_dir.return_value = run_dir
+    session.loaded_namespaces = frozenset({"shell"})
+    write_resume_bundle(session)
+    bundle = json.loads((run_dir / "resume_bundle.json").read_text(encoding="utf-8"))
+
+    # writer 产出的合法形态（list[str]）通过
+    assert validate_bundle(bundle, "run-rec-1") == bundle
+    # 缺键（老 bundle）仍通过
+    no_key = dict(bundle)
+    del no_key["loaded_namespaces"]
+    assert validate_bundle(no_key, "run-rec-1") == no_key
+    # 错类型一律判 corrupt
+    for bad in ("shell", {"shell": True}, [1, 2], [["shell"]], [None]):
+        mutated = dict(bundle)
+        mutated["loaded_namespaces"] = bad
+        assert validate_bundle(mutated, "run-rec-1") is None

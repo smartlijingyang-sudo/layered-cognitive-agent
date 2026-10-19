@@ -82,7 +82,9 @@ def resume_point_to_state_snapshot(point: ApprovalResumePoint) -> StateSnapshot:
         ),
     }
     if point.paused_at:
-        kwargs["created_at"] = datetime.fromtimestamp(point.paused_at, tz=UTC)
+        # RA-159: pause time gets its own field; created_at keeps the single
+        # "snapshot creation time" semantics (default_factory=utc_now).
+        kwargs["paused_at"] = datetime.fromtimestamp(point.paused_at, tz=UTC)
     return StateSnapshot(**kwargs)
 
 
@@ -92,8 +94,10 @@ def resume_point_from_state_snapshot(approval_id: str, snapshot: object) -> Appr
     cursor = getattr(snapshot, "phase_cursor", None)
     if cursor is None:
         raise ValueError("approval resume requires a declarative phase_cursor")
-    created_at = getattr(snapshot, "created_at", None)
-    paused_at = created_at.timestamp() if created_at is not None else 0.0
+    # RA-159: read the explicit paused_at field; created_at is snapshot
+    # creation time and no longer carries pause semantics.
+    paused_at_dt = getattr(snapshot, "paused_at", None)
+    paused_at = paused_at_dt.timestamp() if paused_at_dt is not None else 0.0
     return ApprovalResumePoint(
         approval_id=approval_id,
         snapshot_id=_attr_text(snapshot, "snapshot_id"),
