@@ -158,20 +158,6 @@ class ApprovalPolicyEngine:
         return ApprovalRequirement(required=False, reason_kind=ApprovalReasonKind.NONE)
 
 
-class ApprovalPolicyRegistry:
-    """Registry maintaining ordered approval strategies for extensible rule injection."""
-
-    def __init__(self) -> None:
-        self._strategies: list[tuple[int, ApprovalStrategy]] = []
-
-    def register(self, strategy: ApprovalStrategy, priority: int = 100) -> None:
-        self._strategies.append((priority, strategy))
-        self._strategies.sort(key=lambda item: item[0])
-
-    def list_strategies(self) -> list[ApprovalStrategy]:
-        return [strat for _, strat in self._strategies]
-
-
 _STANDARD_SHELL_TOOLS: frozenset[str] = frozenset(
     {
         "runCommand",

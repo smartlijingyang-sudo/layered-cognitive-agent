@@ -4493,3 +4493,20 @@ brain/reducer/memory/hub/standing_refresher 等键，待 RA-123 落地后再评�
     KeyError）。“同一路径只 exec 一次”与“热升级要重载”不矛盾：复用键必须是
     （路径，内容摘要），不是路径本身。先跑既有热升级测试，复用语义自然浮现。
 ---
+## [2026-10-20 03:xx 夜轮] - RA-164（情况 A）：删除零调用者的 ApprovalPolicyRegistry
+- 实现内容：从 `lca/infrastructure/runtime_plane/access/approval_engine.py`
+  删除 `ApprovalPolicyRegistry` 类（`register`/`list_strategies` 的 sorted-list
+  包装）；删测试文件里的 import + `test_registry_allows_custom_strategy_injection`
+  + 仅该测试用的两个 import（`ApprovalRequirement`、`ApprovalPolicyEngine`）；
+  测试模块 docstring 去掉 "Strategy registry"。
+- 改动文件：`lca/infrastructure/runtime_plane/access/approval_engine.py`（-14 行）、
+  `tests/infrastructure/runtime_plane/access/test_approval_engine.py`（-30 行）。
+  `_STANDARD_SHELL_TOOLS` 未动（RA-167 的目标）。
+- 测试：剩余 6 个 approval-engine 测试全绿（chain order / strategy verdicts /
+  approved-override）；`ruff check` 2 文件 clean。全仓 grep 确认零生产调用者
+  （只有定义 + 自身测试），纯删除、零行为变化。
+- **Learnings for future iterations:**
+  - **删类时连带清“只为它存在”的 import（RA-164 实证）：** 删掉 registry 测试后，
+    `ApprovalRequirement` 和 `ApprovalPolicyEngine` 两个 import 变死——删测试
+    后必跑一遍 `ruff check`，让 F401 告诉你还有哪些是只为它活着的。
+---

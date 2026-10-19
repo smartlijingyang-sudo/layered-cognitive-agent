@@ -2419,9 +2419,9 @@
         "All remaining approval-engine tests (chain order, strategy verdicts, approved-override) stay green; ruff check clean. Zero behavior change by construction."
       ],
       "priority": "P1",
-      "passes": false,
+      "passes": true,
       "branchName": "raphy/arch-20261020-0145",
-      "notes": "Strength: Strong. Friction-walk finding (Area B, approval chain). Trivially safe warm-up deletion."
+      "notes": "Strength: Strong. Friction-walk finding (Area B, approval chain). Trivially safe warm-up deletion. DONE 2026-10-20: deleted ApprovalPolicyRegistry from lca/infrastructure/runtime_plane/access/approval_engine.py (zero production callers confirmed by repo-wide grep: only its definition + its own test); deleted its import and test_registry_allows_custom_strategy_injection from tests/infrastructure/runtime_plane/access/test_approval_engine.py, plus the two imports only that test used (ApprovalRequirement, ApprovalPolicyEngine); test module docstring updated. Remaining 6 approval-engine tests green; ruff clean. Zero behavior change by construction (pure deletion)."
     },
     {
       "id": "RA-165",
