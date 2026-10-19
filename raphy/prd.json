@@ -2376,9 +2376,9 @@
         "New tests: wrong-typed loaded_namespaces (str, dict) -> None; missing key -> valid; existing resume bundle tests stay green; ruff check clean."
       ],
       "priority": "P2",
-      "passes": false,
+      "passes": true,
       "branchName": "raphy/arch-20261019-2245",
-      "notes": "Strength: Worth exploring. Friction-walk finding (Area A, Q5 open check, confirmed this round): the load seam's fail-closed philosophy extended to the one key that currently bypasses it."
+      "notes": "Strength: Worth exploring. Friction-walk finding (Area A, Q5 open check, confirmed this round): the load seam's fail-closed philosophy extended to the one key that currently bypasses it. DONE 2026-10-19: validate_bundle 新增 loaded_namespaces 类型门：present 时必须为 list[str]，否则判 corrupt（-> None -> 既有 404 路径）；absent 仍允许（兼容 10-19 前老 bundle，下游 or () 兜底）。ruff SIM102 修过一次（嵌套 if 合并）。新增 1 测试（writer 真实产出通过 / 缺键通过 / 5 种错类型判 None）；restart_recovery 套件 14 passed，ruff clean。"
     }
   ]
 }

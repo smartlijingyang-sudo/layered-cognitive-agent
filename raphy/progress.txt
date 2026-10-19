@@ -4335,3 +4335,12 @@ brain/reducer/memory/hub/standing_refresher 等键，待 RA-123 落地后再评�
   - 解字段重载时必须双向查：`to_snapshot`（写）和 `from_snapshot`（读）是同一重载的两个消费者，只改一边会制造新的不对称 bug。本轮 grep 发现反向适配器也在读 `created_at` 当暂停时刻——评估时子任务没标出来，协调者实现前全图 grep 补上了。
   - 旧测试钉旧契约时：先判断测试钉的是"私有路径旧塑形"还是"story 要求的契约本身"。本轮是后者（story 明确要求废除双语义），所以测试随契约改是正当的，且在测试 docstring 里写明了原因，避免后人误判为"修掉测试"。
 ---
+
+## [2026-10-19 23:55 轮] - RA-161（validate_bundle 覆盖 loaded_namespaces 类型门）
+
+- 实现：`lca/plugins/transport/webserver/carrier/runs/recovery.py::validate_bundle` 加一段——`loaded_namespaces` present 时必须 `list[str]`，否则 return None（走既有 corrupt→404 路径）；absent 仍允许（老 bundle 兼容）。
+- 测试：新增 1 测试（用 `write_resume_bundle` 真实产出做底：合法形态通过 / 删键通过 / str/dict/list[int]/嵌套 list/None 5 种错类型判 None）；套件 14 passed；`ruff check` clean（中途 SIM102 嵌套 if 已合并）。
+- **Learnings for future iterations:**
+  - "自称唯一判定点"的 seam，先读函数体验证它到底判定了哪些键——docstring 的宣称可能是愿景不是现实（本轮：validate_bundle 宣称 the one place，实际漏了最新加的键）。
+  - absent vs present-but-wrong 的区别对待是 fail-closed 里的兼容性常规动作：判 corrupt 只针对"声称有但格式错"，不针对"老版本没有"。
+---
