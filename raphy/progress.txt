@@ -4273,3 +4273,12 @@ brain/reducer/memory/hub/standing_refresher 等键，待 RA-123 落地后再评�
   - str.index 定位方法定义时，同名调用点（self._execute_via_driver(）也在文件中；
     用带 "async def " 前缀的精确串定位，且先断言后写回前确认替换区间。
 ---
+
+## 2026-10-19 09:00 - RA-155
+- 两处 BrowserSessionSummary 手动 8 字段重建收敛：`_init_cdp_for_session`（cdp_driver.py:215）改成 `old.model_copy(update={"url": url, "title": title or "Page", "has_active_stream": True})`；`navigate`（:325）改成 `summary.model_copy(update={"url": url, "title": title})`。
+- 漂移显式消解：:215 的 `has_active_stream=True` 硬编码保留为显式 update key —— 该处刚发送 Page.startScreencast、流确已建立；navigate 处保留 `summary.has_active_stream`（流状态该点未知，不臆断）。progress.txt 与 commit body 均记录该理由。
+- Files changed: lca/infrastructure/browser/cdp_driver.py, raphy/prd.json, raphy/progress.txt
+- **Learnings for future iterations:**
+  - `model_copy(update=...)` 是 frozen contract 的 evolve seam：8 字段只写变更字段，后续 contract 加字段零触碰。收敛前先确认测试钉的是语义（title/url）而非旧塑形——本轮 `test_browser_reopen_snapshot.py` 全是语义断言，直接改。
+  - `has_active_stream` 两处语义本就不同（init 是"刚建立流"，navigate 是"流状态未知保留旧值"）——"漂移"不一定是 bug，先判断语义再决定收敛形状；显式保留比静默抹掉诚实。
+---

@@ -2294,9 +2294,9 @@
         "tests/infrastructure/browser/test_browser_reopen_snapshot.py green (pins title/url after reopen); ruff check clean."
       ],
       "priority": "P2",
-      "passes": false,
+      "passes": true,
       "branchName": "raphy/arch-20261019-0745",
-      "notes": "Strength: Worth exploring. Mechanical duplication (two = real), but drift is already demonstrated — the sites are not byte-identical, which is exactly why the story exists."
+      "notes": "Strength: Worth exploring. Mechanical duplication (two = real), but drift is already demonstrated — the sites are not byte-identical, which is exactly why the story exists. DONE 2026-10-19: 两处 8 字段手动重建改成 old.model_copy(update={...}) 只写变更字段；:215 的 has_active_stream=True 显式保留为 update key（Page.startScreencast 刚开启流，流状态确立是该点唯一知道的事——漂移已显式消解，不是隐藏）；navigate 处保留旧值（RA-153 的 title 保留逻辑未动）。test_browser_reopen_snapshot.py 4 passed, ruff clean。"
     },
     {
       "id": "RA-156",
