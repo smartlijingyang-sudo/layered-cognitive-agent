@@ -1,4 +1,10 @@
 ## Codebase Patterns
+- **收敛三叉派生路径前，先把三条路径的真实分歧枚举全（RA-168 评估实证）：**
+  同一行 journal event 可能同时被 writer wire、shared SSOT（derive_event_message）、kernel fold
+  三条路径派生；评估时只看其中一条会漏掉真正的分歧（本轮：writer passthrough、
+  SSOT 静默 drop、fold ValueError——三种语义）。动手点名文件前，先把每条路径对该行
+  的 inclusion/shape 语义列出来，分歧数 = 故事的验收条数。
+
 - 删除硬编码 fallback 时，先 grep 全仓测试找 pin 住它行为的用例——blast radius 常超出 story 点名的文件（RA-167：criterion 只点了 1 个文件，实际 5 个测试/4 个文件 依赖 no-session backstop）。不要删测试的 intent，把它们 re-source 到 SSOT 上 （本例：defer catalog/session），安全语义保持、来源换正主。
 
 - **热升级重 exec 前先删 pyc：同秒同尺寸改写会让 pyc 校验误判（RA-162 实证）：**
@@ -4564,3 +4570,154 @@ Evidence notes:
 
 Tests: 113 passed (tests/infrastructure/runtime_plane/ + 3 scenario/runtime files), ruff clean on
 all 5 touched files.
+
+---
+
+## 2026-10-20 night — assess 04:45 round (3 candidates: RA-168/169/170)
+
+Branch `raphy/arch-20261020-0445` from main `88c83a37b`. YAGNI scope over last
+~40 commits; friction-walked 3 hot areas end-to-end: run session writer /
+message derivation (full read), tool defer session + approval engine (full
+read), runtime loop + browser tools (structure scan). Runtime verification:
+mock-LLM smoke (a)+(c) -> RUN1: completed | RUN2: completed; 01:45 round's
+scripted harness already covered (b) tool-call and (d) non-converging
+(Result failed, no exception, RA-023 pinned) -- no new crash/hang found.
+
+Findings:
+- **RA-168 (Strong, P1)**: one `surface/developer_message` journal row is
+  passthrough on the LLM wire / silently dropped by the shared SSOT
+  `derive_event_message` / fail-loud ValueError in the kernel fold
+  (reproduced on a real developer-row envelope). Cron handoff appends this
+  row every handoff turn (ADR-0268 section 6) -- production crash vector.
+  RA-163's docstring said this gets 'its own story' -- none existed (all 167
+  stories grepped). Marker `surface_op='developer_message'` is the RA-163
+  type-suffix mistake class.
+- **RA-169 (Worth exploring, P2)**: twin ~200-line unmounted-widget fallback
+  pipelines (connector_auth x browser_preview) in run_session_writer.py --
+  one parameterized seam, two instantiations.
+- **RA-170 (Worth exploring, P2)**: `_drop_reasoning_after_dropped_calls` is a
+  permanently dead pipeline stage (no reasoning-item event type exists) --
+  delete or implement + pin.
+
+Diversity quota satisfied (RA-168 leaky seam + RA-170 shallow/no-op from the
+friction walk; RA-169 the secondary duplication finding).
+
+Top recommendation: RA-168 first (only production-relevant divergence; explicit
+RA-163 residual debt on the 'what text the model sees' SSOT).
+
+
+---
+
+## 2026-10-20 night — RA-168 landed (developer_message derive-path convergence)
+
+Converged the three disagreeing derive paths on `surface/developer_message`
+rows (cron handoff, ADR-0268 §6) onto one policy: **inclusion everywhere**.
+
+- `lca_kernel/events/fold/inputs.py`: new `SURFACE_DEVELOPER_TYPE =
+  "surface/developer_message"` closed-set literal added to
+  `SURFACE_EVENT_TYPES` (kernel could not import `lca/session/surface_types.py`
+  — layering — so the literal is explicit in the kernel with a docstring
+  noting the DSH-extension vocabulary; unknown `surface/*` still fail-closed);
+  exported from `lca_kernel/events/fold/fold.py`.
+- `lca/runtime/session/run_session_writer.py::append_developer_message`:
+  marker `"developer_message"` → `"append"` (RA-163 SurfaceOp-contract rule;
+  the type-suffixed marker was the RA-163 "tool_result" mistake class).
+- `lca/plugins/session/runtime/messages/messages.py::derive_event_message`:
+  developer rows now project as `{"role": "developer", "content": ...}`
+  instead of silent `None` — same shape the LLM wire emits.
+- `derive_messages` docstring "retained differences" bullet updated (the
+  RA-163 residual story is now landed, not deferred).
+
+Files changed: 4 source + new test
+`tests/integration/test_developer_message_convergence.py` (4 tests: kernel
+eligibility + fold nodes, marker contract, wire/SSOT/transcript agreement,
+job_id/run_id provenance).
+
+**Learnings for future iterations:**
+- **三叉派生路径收敛时，先确认 crash 路径是哪个（RA-168 实证）：**
+  评估只确认了 fold 的 `_surface_op_of` 会抛；实现时发现真正的生产 crash
+  路径是 `derive_messages`/`export_transcript`（它们对整本 journal 调
+  `foldSurface`）——修 eligibility seam 本体，而不是在调用点绕。评估的
+  "哪个版本更正确"要落实到"哪条调用链在生产里走"。
+- **kernel 不能 import lca 时，闭集字面量显式写进 kernel（RA-168 实证）：**
+  `surface/developer_message` 在 kernel 里是显式字面量常量（+ docstring
+  说明 DSH 扩展词表），而不是前缀规则——闭集保持闭集，未知 surface/*
+  继续 fail-closed，`test_known_types_fail_closed` 的 union 断言不受影响
+  （union 去重，catalog 结果不变）。
+- **marker 收敛和 type 收敛必须一次改完（RA-163 模式再现）：**
+  只加 kernel eligibility 而不改 writer 的 marker，fold 照样 ValueError
+  （"not surface-eligible" 变 "invalid surfaceOp"）——RA-163 的教训在这里
+  又应验了一次。
+
+Tests: new file 4 passed; fail-closed 18 passed; fold/model_visible/token_usage
+suites 30+20 passed (3 pre-existing env skips); ruff clean on all 5 files.
+
+
+---
+
+## 2026-10-20 night — RA-169 landed (twin widget-fallback pipelines converged)
+
+`lca/runtime/session/run_session_writer.py` 的两条 ~200 行孪生 widget 保底管线
+（connector_auth / browser_preview：扫描 surface 事件找未挂载 tag → 向
+assistant content 追加 `[widget:kind?...]`）收敛为一条参数化 seam：
+
+- `_WidgetField`（wire 键/规范键/qs 别名/默认值/空值省略/fallback 键）+
+  `_WidgetKind`（name/tag 正则/id 字段/字段表/fallback 来源/必填字段）两个
+  frozen dataclass；`_extract_unmounted_widgets` /
+  `_ensure_widgets_in_assistant_message` / `_parse_widget_qs` /
+  `_fallback_widget_fields` / `_widget_field_value` 五个泛型函数；
+  `_CONNECTOR_WIDGET_KIND` / `_BROWSER_WIDGET_KIND` 两个实例；
+  四个公开函数（`extract_pending_intents_from_events` 等）保持原名/原签名，
+  变为薄封装（`lca/runtime/session/__init__.py` 与测试的引用不受影响）。
+
+附带发现并修复一个 pre-existing 红测试：
+`test_browser_widget_deterministic_fallback` 的 fixture 用了 RA-163 之前的
+dsh 风格 `"surface/tool_result"` 类型（c970b845d 起变红），按 RA-167 模式
+把 fixture re-source 到 `SURFACE_TOOL_RESULT_TYPE`（不删 intent）。
+
+Files changed: `lca/runtime/session/run_session_writer.py`（+178/-165），
+`tests/contracts/browser/test_browser_integration_and_fallback.py`（fixture），
+新测试 `tests/runtime/test_widget_fallback_seam.py`（4 个：第三种假想 kind
+的 tag 提取/meta fallback/挂载跳过+去重/追加+omit_if_empty+不重复）。
+
+**Learnings for future iterations:**
+- **孪生管线收敛时，先把两份实现的"隐式默认"对齐成显式字段（RA-169 实证）：**
+  connector 的 fallback 只读 snake_case 键、browser 读 snake|camel；ensure 的
+  tag 参数一个省略空值一个全带——这些差异必须变成 `_WidgetField` 的显式字段
+  （qs_aliases/fallback_keys/omit_if_empty），而不是在泛型函数里 if/else。
+  字段表就是差异的清单。
+- **stale fixture 的红测试先查 git 再动手（RA-169 实证）：**
+  `git stash` 验证改前已红 + `git log -S` 定位到 RA-163 词表收敛，结论是
+  fixture 过期不是产品 bug——修法是 re-source 到 SSOT 常量（RA-167 模式），
+  不是放宽实现去迁就旧 fixture。
+- **仓库不强制 `ruff format`（RA-169 实证）：** main 的同文件 `ruff format
+  --check` 本来就不过；`ruff check` 干净即达标，不要顺手 reformat 制造
+  diff 噪音。
+
+Tests: widget 相关 21 passed（含新 seam 测试 4 + RA-168 的 4）; ruff check
+clean on all touched files.
+
+
+---
+
+## 2026-10-20 night — RA-170 landed (delete the no-op reasoning-drop stage)
+
+删除了 `lca/runtime/session/run_session_writer.py` 里永久 no-op 的
+`_drop_reasoning_after_dropped_calls`（函数本体 + `derive_messages` 里的
+唯一调用点）：它恒返回输入不变，而 journal 里根本不存在 reasoning-item
+事件类型——这是为不存在的事件类型准备的假想 seam，不配占一个 pipeline
+stage。原调用处留了一行注释说明删除理由。
+
+orphan-drop 的 wire 语义（OpenAI `drop_orphan_function_calls` 镜像 +
+PR-2 G-17 `orphan_dropped_count`）完全未动；删除在构造上就是行为中性的。
+
+Files changed: `lca/runtime/session/run_session_writer.py`（-16/+4）。
+
+**Learnings for future iterations:**
+- **"保守起见留着"的 no-op stage 是技术债的温床（RA-170 实证）：**
+  docstring 写着"No-op when..."的函数，如果那个 when 永远不成立，它就是
+  死代码——删它比留着更诚实。deletion test 没过（删了什么都没浓缩）的
+  反面：留着它是在暗示 pipeline 有这个 stage，新人会误以为 reasoning
+  drop 是真实行为。
+
+Tests: orphan-drop + writer + developer-convergence 16 passed; ruff clean.

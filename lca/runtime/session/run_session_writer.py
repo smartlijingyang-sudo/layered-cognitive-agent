@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import re
 from collections.abc import Sequence
+from dataclasses import dataclass
 from typing import Any, Literal
 from urllib.parse import parse_qs, urlencode
 
@@ -133,16 +134,6 @@ def _drop_orphan_tool_results(
     return kept
 
 
-def _drop_reasoning_after_dropped_calls(messages: list[Message]) -> list[Message]:
-    """Drop reasoning items emitted before a dropped tool call.
-
-    No-op when no reasoning-item event type is in the journal: orphan-drop
-    is conservative and only removes what it can identify. Returns the
-    input unchanged.
-    """
-    return messages
-
-
 class RunSessionWriter(RunSessionWriterProtocol):
     """Owner of the run-scoped Session. Single surface append path."""
 
@@ -245,6 +236,9 @@ class RunSessionWriter(RunSessionWriterProtocol):
         stay in the journal for replay provenance.
         """
         session = self._require_session()
+        # RA-168: marker 收敛到 SurfaceOp 契约("append" | replace);"developer_message"
+        # 是类型后缀的误用(与 RA-163 的 "tool_result" 同类),会导致 kernel fold
+        # fail-closed(ValueError: not surface-eligible)。
         event = session.append(
             DEVELOPER_MESSAGE_TYPE,
             {
@@ -253,7 +247,7 @@ class RunSessionWriter(RunSessionWriterProtocol):
                 "job_id": job_id,
                 "run_id": run_id,
             },
-            surface_op="developer_message",
+            surface_op="append",
         )
         return self._event_ref(session, event)
 
@@ -424,10 +418,11 @@ class RunSessionWriter(RunSessionWriterProtocol):
           :class:`RunHealthReport`. The fold SSOT also feeds transcript/history
           reads, where silent row deletion would rewrite history; and this
           shim is the actual LLM wire (``think.history.assemble``).
-        - ``surface/developer_message`` rows pass through here; the fold SSOT
-          raises ``ValueError`` on them (kernel surface-eligibility
-          fail-loud). Pre-existing divergence, deferred to its own story per
-          the RA-163 residual notes (ADR-0268 DSH vocabulary).
+        - ``surface/developer_message`` rows are converged (RA-168): the
+          kernel fold now admits the DSH extension type (closed-set literal),
+          the marker converged to ``"append"`` per the SurfaceOp contract,
+          and the shared SSOT projects them as ``role="developer"`` — the
+          same row the wire passthrough emits.
         - ``surface/*`` extension fallthrough (``Message(role=event.type)``)
           stays here; the SSOT returns ``None`` for unknown surface types.
 
@@ -453,7 +448,9 @@ class RunSessionWriter(RunSessionWriterProtocol):
         counter: list[int] = [0]
         msgs = _drop_orphan_tool_results(msgs, counter=counter)
         self._orphan_dropped_count += counter[0]
-        msgs = _drop_reasoning_after_dropped_calls(msgs)
+        # RA-170: the speculative _drop_reasoning_after_dropped_calls stage
+        # (a pipeline step for a reasoning-item event type that does not
+        # exist) was deleted — a hypothetical seam earns no pipeline stage.
         return msgs
 
     @property
@@ -480,18 +477,204 @@ class RunSessionWriter(RunSessionWriterProtocol):
         return session.request_header()
 
 
-_CONNECTOR_WIDGET_RE = re.compile(r"\[widget:connector_auth\?([^\]]+)\]")
+@dataclass(frozen=True)
+class _WidgetField:
+    """One field of a widget tag: wire key, canonical key, aliases, defaults."""
+
+    wire: str  # tag query-param key, e.g. "intentId"
+    canonical: str  # internal dict key, e.g. "intent_id"
+    qs_aliases: tuple[str, ...]  # extra query-string keys recognized when parsing
+    default: str
+    omit_if_empty: bool  # skip from the tag when the value is empty
+    fallback_keys: tuple[str, ...]  # lookup order in the fallback source mapping
 
 
-def _parse_connector_widget_qs(query: str) -> dict[str, str | None]:
-    """Parse a ``[widget:connector_auth?...]`` query string into intent fields."""
+@dataclass(frozen=True)
+class _WidgetKind:
+    """One instantiation of the unmounted-widget fallback seam.
+
+    RA-169: the connector_auth (INV-CAP-04) and browser_preview (ADR-0280)
+    pipelines were near-verbatim twins — same scan-for-unmounted algorithm,
+    regex and field names swapped. Both are now two instantiations of this
+    seam; a third widget kind is one more instantiation.
+    """
+
+    name: str
+    tag_re: re.Pattern[str]
+    id_field: str  # canonical field used for mount matching + dedup
+    fields: tuple[_WidgetField, ...]
+    # where to read fields when a tool-result row carries no widget tag:
+    # "meta_or_data" (data["meta"] then data, canonical keys) or
+    # "payload_or_data" (data["payload"] if a dict else data, fallback keys)
+    fallback_source: str
+    fallback_required: tuple[str, ...]  # canonical fields that must be present
+
+
+_CONNECTOR_WIDGET_KIND = _WidgetKind(
+    name="connector_auth",
+    tag_re=re.compile(r"\[widget:connector_auth\?([^\]]+)\]"),
+    id_field="intent_id",
+    fields=(
+        _WidgetField("intentId", "intent_id", ("intent_id",), "", False, ("intent_id",)),
+        _WidgetField("appName", "app_name", ("app_name",), "Connector", False, ("app_name",)),
+        _WidgetField("connectionId", "connection_id", ("connection_id",), "", True, ("connection_id",)),
+        _WidgetField("mode", "mode", (), "", True, ("mode",)),
+    ),
+    fallback_source="meta_or_data",
+    fallback_required=("intent_id",),
+)
+
+_BROWSER_WIDGET_KIND = _WidgetKind(
+    name="browser_preview",
+    tag_re=re.compile(r"\[widget:browser_preview\?([^\]]+)\]"),
+    id_field="sessionId",
+    fields=(
+        _WidgetField("sessionId", "sessionId", ("session_id",), "", False, ("session_id", "sessionId")),
+        _WidgetField("url", "url", (), "", False, ("url",)),
+        _WidgetField("title", "title", (), "Web Page", False, ("title",)),
+        _WidgetField("status", "status", (), "agent_running", False, ("status",)),
+    ),
+    fallback_source="payload_or_data",
+    fallback_required=("sessionId", "url"),
+)
+
+
+def _parse_widget_qs(kind: _WidgetKind, query: str) -> dict[str, str]:
+    """Parse a widget tag query string into canonical fields."""
     qs = parse_qs(query)
-    return {
-        "intent_id": (qs.get("intentId") or qs.get("intent_id") or [None])[0],
-        "app_name": (qs.get("appName") or qs.get("app_name") or ["Connector"])[0],
-        "connection_id": (qs.get("connectionId") or qs.get("connection_id") or [""])[0],
-        "mode": (qs.get("mode") or [""])[0],
-    }
+    parsed: dict[str, str] = {}
+    for f in kind.fields:
+        value = ""
+        for key in (f.wire, *f.qs_aliases):
+            hit = (qs.get(key) or [""])[0]
+            if hit:
+                value = hit
+                break
+        parsed[f.canonical] = value or f.default
+    return parsed
+
+
+def _fallback_widget_fields(kind: _WidgetKind, data: dict[str, Any]) -> dict[str, str] | None:
+    """Read widget fields from a tool-result row that carries no widget tag."""
+    if kind.fallback_source == "meta_or_data":
+        meta = data.get("meta") or {}
+        def read(f: _WidgetField) -> str:
+            for key in f.fallback_keys:
+                hit = meta.get(key) or data.get(key)
+                if hit:
+                    return str(hit)
+            return f.default
+    else:  # "payload_or_data"
+        payload = data.get("payload")
+        base = payload if isinstance(payload, dict) else data
+        def read(f: _WidgetField) -> str:
+            for key in f.fallback_keys:
+                hit = base.get(key)
+                if hit:
+                    return str(hit)
+            return f.default
+    fields = {f.canonical: read(f) for f in kind.fields}
+    if not all(fields[req] for req in kind.fallback_required):
+        return None
+    return fields
+
+
+def _extract_unmounted_widgets(
+    events: Sequence[Any], kind: _WidgetKind
+) -> list[dict[str, str]]:
+    """Extract unmounted widget intents from session events.
+
+    An intent is unmounted if it was emitted in a tool-result surface event
+    but has not yet appeared in any preceding assistant surface event.
+    """
+    mounted_ids: set[str] = set()
+    tool_intents: list[dict[str, str]] = []
+
+    for event in events:
+        event_type = getattr(event, "type", "")
+        data = getattr(event, "data", {}) or {}
+
+        if event_type == SURFACE_ASSISTANT_TYPE:
+            content = data.get("content") or ""
+            for match in kind.tag_re.finditer(content):
+                id_value = _parse_widget_qs(kind, match.group(1))[kind.id_field]
+                if id_value:
+                    mounted_ids.add(id_value)
+
+        elif event_type == SURFACE_TOOL_RESULT_TYPE:
+            content = data.get("content") or ""
+            found = False
+            for match in kind.tag_re.finditer(content):
+                fields = _parse_widget_qs(kind, match.group(1))
+                if fields[kind.id_field]:
+                    tool_intents.append(fields)
+                    found = True
+
+            if not found:
+                fields = _fallback_widget_fields(kind, data)
+                if fields is not None:
+                    tool_intents.append(fields)
+
+    # Return only unmounted intents (deduplicated by id field)
+    seen: set[str] = set()
+    unmounted: list[dict[str, str]] = []
+    for item in tool_intents:
+        iid = item[kind.id_field]
+        if iid not in mounted_ids and iid not in seen:
+            seen.add(iid)
+            unmounted.append(item)
+    return unmounted
+
+
+def _widget_field_value(item: Any, f: _WidgetField) -> str:
+    """Read one canonical field from a dict or an object (INV-CAP-04 parity)."""
+    keys = (f.canonical, f.wire, *f.qs_aliases)
+    if isinstance(item, dict):
+        for key in keys:
+            hit = item.get(key)
+            if hit:
+                return str(hit)
+    else:
+        for key in keys:
+            hit = getattr(item, key, None)
+            if hit:
+                return str(hit)
+    return f.default
+
+
+def _ensure_widgets_in_assistant_message(
+    raw_model_content: str | None,
+    pending: Sequence[dict[str, Any] | Any] | None,
+    kind: _WidgetKind,
+) -> str:
+    """Ensure all pending widget intents are represented as tags."""
+    content = raw_model_content or ""
+    if not pending:
+        return content
+
+    widgets_to_append: list[str] = []
+    id_spec = next(f for f in kind.fields if f.canonical == kind.id_field)
+    for item in pending:
+        id_value = _widget_field_value(item, id_spec)
+        if not id_value or id_value in content:
+            continue
+
+        params: dict[str, str] = {}
+        for f in kind.fields:
+            value = _widget_field_value(item, f)
+            if f.omit_if_empty and not value:
+                continue
+            params[f.wire] = value
+        tag = f"[widget:{kind.name}?{urlencode(params)}]"
+        widgets_to_append.append(tag)
+
+    if not widgets_to_append:
+        return content
+
+    suffix = "\n\n".join(widgets_to_append)
+    if content.strip():
+        return f"{content.rstrip()}\n\n{suffix}"
+    return suffix
 
 
 def extract_pending_intents_from_events(
@@ -503,62 +686,7 @@ def extract_pending_intents_from_events(
     surface event but has not yet appeared in any preceding assistant
     surface event.
     """
-    mounted_intent_ids: set[str] = set()
-    tool_intents: list[dict[str, str]] = []
-
-    for event in events:
-        event_type = getattr(event, "type", "")
-        data = getattr(event, "data", {}) or {}
-
-        if event_type == SURFACE_ASSISTANT_TYPE:
-            content = data.get("content") or ""
-            for match in _CONNECTOR_WIDGET_RE.finditer(content):
-                intent_id = _parse_connector_widget_qs(match.group(1))["intent_id"]
-                if intent_id:
-                    mounted_intent_ids.add(intent_id)
-
-        elif event_type == SURFACE_TOOL_RESULT_TYPE:
-            content = data.get("content") or ""
-            found = False
-            for match in _CONNECTOR_WIDGET_RE.finditer(content):
-                fields = _parse_connector_widget_qs(match.group(1))
-                intent_id = fields["intent_id"]
-                if intent_id:
-                    tool_intents.append(
-                        {
-                            "intent_id": intent_id,
-                            "app_name": fields["app_name"],
-                            "connection_id": fields["connection_id"],
-                            "mode": fields["mode"],
-                        }
-                    )
-                    found = True
-
-            if not found:
-                meta = data.get("meta") or {}
-                intent_id = meta.get("intent_id") or data.get("intent_id")
-                if intent_id:
-                    tool_intents.append(
-                        {
-                            "intent_id": intent_id,
-                            "app_name": meta.get("app_name") or data.get("app_name") or "Connector",
-                            "connection_id": meta.get("connection_id")
-                            or data.get("connection_id")
-                            or "",
-                            "mode": meta.get("mode") or data.get("mode") or "",
-                        }
-                    )
-
-    # Return only unmounted intents (deduplicated by intent_id)
-    seen: set[str] = set()
-    unmounted: list[dict[str, str]] = []
-    for item in tool_intents:
-        iid = item["intent_id"]
-        if iid not in mounted_intent_ids and iid not in seen:
-            seen.add(iid)
-            unmounted.append(item)
-
-    return unmounted
+    return _extract_unmounted_widgets(events, _CONNECTOR_WIDGET_KIND)
 
 
 def ensure_intent_widget_in_assistant_message(
@@ -570,64 +698,9 @@ def ensure_intent_widget_in_assistant_message(
     If the raw model content already contains the intentId, it is not duplicated.
     Otherwise, a standard [widget:connector_auth?...] tag is appended.
     """
-    content = raw_model_content or ""
-    if not pending_intents:
-        return content
-
-    widgets_to_append: list[str] = []
-    for item in pending_intents:
-        if isinstance(item, dict):
-            intent_id = item.get("intent_id") or item.get("intentId")
-            app_name = item.get("app_name") or item.get("appName") or "Connector"
-            connection_id = item.get("connection_id") or item.get("connectionId") or ""
-            mode = item.get("mode") or ""
-        else:
-            intent_id = getattr(item, "intent_id", None) or getattr(item, "intentId", None)
-            app_name = getattr(item, "app_name", "Connector") or getattr(
-                item, "appName", "Connector"
-            )
-            connection_id = getattr(item, "connection_id", "") or getattr(item, "connectionId", "")
-            mode = getattr(item, "mode", "")
-
-        if not intent_id:
-            continue
-
-        if intent_id in content:
-            continue
-
-        params: dict[str, str] = {
-            "intentId": str(intent_id),
-            "appName": str(app_name),
-        }
-        if connection_id:
-            params["connectionId"] = str(connection_id)
-        if mode:
-            params["mode"] = str(mode)
-
-        tag = f"[widget:connector_auth?{urlencode(params)}]"
-        widgets_to_append.append(tag)
-
-    if not widgets_to_append:
-        return content
-
-    suffix = "\n\n".join(widgets_to_append)
-    if content.strip():
-        return f"{content.rstrip()}\n\n{suffix}"
-    return suffix
-
-
-_BROWSER_WIDGET_RE = re.compile(r"\[widget:browser_preview\?([^\]]+)\]")
-
-
-def _parse_browser_widget_qs(query: str) -> dict[str, str]:
-    """Parse a ``[widget:browser_preview?...]`` query string."""
-    qs = parse_qs(query)
-    return {
-        "sessionId": (qs.get("sessionId") or qs.get("session_id") or [""])[0],
-        "url": (qs.get("url") or [""])[0],
-        "title": (qs.get("title") or ["Web Page"])[0],
-        "status": (qs.get("status") or ["agent_running"])[0],
-    }
+    return _ensure_widgets_in_assistant_message(
+        raw_model_content, pending_intents, _CONNECTOR_WIDGET_KIND
+    )
 
 
 def extract_pending_browser_widgets_from_events(
@@ -638,51 +711,7 @@ def extract_pending_browser_widgets_from_events(
     A browser preview is unmounted if emitted in a tool-result surface event
     but never appeared in any preceding assistant surface event.
     """
-    mounted_session_ids: set[str] = set()
-    tool_widgets: list[dict[str, str]] = []
-
-    for event in events:
-        event_type = getattr(event, "type", "")
-        data = getattr(event, "data", {}) or {}
-
-        if event_type == SURFACE_ASSISTANT_TYPE:
-            content = data.get("content") or ""
-            for match in _BROWSER_WIDGET_RE.finditer(content):
-                sid = _parse_browser_widget_qs(match.group(1))["sessionId"]
-                if sid:
-                    mounted_session_ids.add(sid)
-
-        elif event_type == SURFACE_TOOL_RESULT_TYPE:
-            content = data.get("content") or ""
-            found = False
-            for match in _BROWSER_WIDGET_RE.finditer(content):
-                fields = _parse_browser_widget_qs(match.group(1))
-                if fields["sessionId"]:
-                    tool_widgets.append(fields)
-                    found = True
-
-            if not found:
-                payload = data.get("payload") if isinstance(data.get("payload"), dict) else data
-                sid = payload.get("session_id") or payload.get("sessionId")
-                url = payload.get("url")
-                if sid and url:
-                    tool_widgets.append(
-                        {
-                            "sessionId": str(sid),
-                            "url": str(url),
-                            "title": str(payload.get("title") or "Web Page"),
-                            "status": str(payload.get("status") or "agent_running"),
-                        }
-                    )
-
-    seen: set[str] = set()
-    unmounted: list[dict[str, str]] = []
-    for item in tool_widgets:
-        sid = item["sessionId"]
-        if sid not in mounted_session_ids and sid not in seen:
-            seen.add(sid)
-            unmounted.append(item)
-    return unmounted
+    return _extract_unmounted_widgets(events, _BROWSER_WIDGET_KIND)
 
 
 def ensure_browser_widget_in_assistant_message(
@@ -690,29 +719,9 @@ def ensure_browser_widget_in_assistant_message(
     pending_widgets: Sequence[dict[str, str]] | None = None,
 ) -> str:
     """Ensure unmounted browser widgets are projected into assistant message (ADR-0280)."""
-    content = raw_model_content or ""
-    if not pending_widgets:
-        return content
-
-    widgets_to_append: list[str] = []
-    for item in pending_widgets:
-        sid = item.get("sessionId")
-        if not sid or sid in content:
-            continue
-        url = item.get("url") or ""
-        title = item.get("title") or "Web Page"
-        status = item.get("status") or "agent_running"
-        params = {"sessionId": sid, "url": url, "title": title, "status": status}
-        tag = f"[widget:browser_preview?{urlencode(params)}]"
-        widgets_to_append.append(tag)
-
-    if not widgets_to_append:
-        return content
-
-    suffix = "\n\n".join(widgets_to_append)
-    if content.strip():
-        return f"{content.rstrip()}\n\n{suffix}"
-    return suffix
+    return _ensure_widgets_in_assistant_message(
+        raw_model_content, pending_widgets, _BROWSER_WIDGET_KIND
+    )
 
 
 __all__ = [
