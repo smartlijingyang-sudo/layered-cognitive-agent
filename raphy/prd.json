@@ -2462,9 +2462,9 @@
         "tests/.../test_namespace_approval_strategy.py green; ruff check clean. This is a stitch, not a revert — the new semantics must cover every case the old set caught."
       ],
       "priority": "P2",
-      "passes": false,
+      "passes": true,
       "branchName": "raphy/arch-20261020-0145",
-      "notes": "Strength: Worth exploring. Friction-walk finding (Area B, Q3 wiring-bug specimen). The wire gate's dual-spelling usage is directly readable — no forbidden-area reads needed."
+      "notes": "Strength: Worth exploring. Friction-walk finding (Area B, Q3 wiring-bug specimen). The wire gate's dual-spelling usage is directly readable — no forbidden-area reads needed.\n2026-10-20 night: landed. Dual-spelling namespace lookup (raw, canonical alternate) mirroring tool_wire_gate.py:146-147; _STANDARD_SHELL_TOOLS set + both backstop branches deleted. All 13 members covered by a session-based regression test (new dual-spelling strategy via default engine). 5 pre-existing tests across 4 files pinned the old no-session backstop; updated to source the namespace from the defer catalog (session) — security intents preserved. 113 tests green, ruff clean."
     }
   ]
 }

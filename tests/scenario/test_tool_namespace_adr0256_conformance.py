@@ -191,24 +191,34 @@ def test_inv_05_unloaded_namespace_wire_gate_blocking() -> None:
 
 
 def test_inv_06_shell_domain_triggers_approval() -> None:
-    """INV-06: shell 域工具调用必然触发 REQUIRE_APPROVAL 审批要求."""
-    strategy = NamespaceApprovalStrategy()
-    tool_calls = [
-        ToolCall(
-            tool_name="runCommand",
-            call_id="c1",
-            arguments={"command": "rm -rf /"},
-        )
-    ]
-    req = strategy.evaluate(tool_calls)
-    assert req is not None
-    assert req.required is True
-    assert req.reason_kind == ApprovalReasonKind.ELEVATED_COMMAND
+    """INV-06: shell 域工具调用必然触发 REQUIRE_APPROVAL 审批要求.
 
-    engine = build_default_approval_engine()
-    engine_req = engine.evaluate(tool_calls)
-    assert engine_req.required is True
-    assert engine_req.reason_kind == ApprovalReasonKind.ELEVATED_COMMAND
+    RA-167:命名空间来自 defer catalog（session），不再依赖硬编码名单。
+    """
+    session = ToolDeferSession(DeferPolicy.default())
+    session.update_turn([_ConformanceTool("runCommand", namespace="shell")])  # type: ignore[arg-type]
+    session.load_namespace("shell")
+    token = set_current_defer_session(session)
+    try:
+        strategy = NamespaceApprovalStrategy()
+        tool_calls = [
+            ToolCall(
+                tool_name="runCommand",
+                call_id="c1",
+                arguments={"command": "rm -rf /"},
+            )
+        ]
+        req = strategy.evaluate(tool_calls)
+        assert req is not None
+        assert req.required is True
+        assert req.reason_kind == ApprovalReasonKind.ELEVATED_COMMAND
+
+        engine = build_default_approval_engine()
+        engine_req = engine.evaluate(tool_calls)
+        assert engine_req.required is True
+        assert engine_req.reason_kind == ApprovalReasonKind.ELEVATED_COMMAND
+    finally:
+        reset_current_defer_session(token)
 
 
 def test_inv_07_no_name_forms_camel_leakage() -> None:

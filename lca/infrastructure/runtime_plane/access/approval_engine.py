@@ -158,24 +158,6 @@ class ApprovalPolicyEngine:
         return ApprovalRequirement(required=False, reason_kind=ApprovalReasonKind.NONE)
 
 
-_STANDARD_SHELL_TOOLS: frozenset[str] = frozenset(
-    {
-        "runCommand",
-        "run_command",
-        "execScript",
-        "exec_script",
-        "executeCode",
-        "execute_code",
-        "getCommandOutput",
-        "get_command_output",
-        "killCommand",
-        "kill_command",
-        "box_run_command",
-        "bash",
-        "run_skill_script",
-    }
-)
-
 #: ADR-0268 §2.1/§9：模型发起的 cron 写操作必须挂起等审批回注。
 _CRON_MUTATION_TOOLS: frozenset[str] = frozenset({"cron.update", "cron.remove"})
 
@@ -259,15 +241,21 @@ class NamespaceApprovalStrategy:
             tool_name = getattr(call, "tool_name", None)
             if not isinstance(tool_name, str) or not tool_name:
                 continue
+            # Dual-spelling policy (RA-167): mirror the wire gate — the model
+            # may address a tool by either spelling; namespace lookup tries the
+            # raw spelling first, then the canonical alternate.
+            alternate = canonical_tool_name(tool_name)
             if defer_session is not None:
                 # An unloaded name is not about to run. The wire gate returns
                 # the namespace error. Approving it asks a person to authorize
                 # a schema this turn did not expose.
                 resolved = tool_name
-                if resolved not in visible and resolved not in session_tool_to_ns:
-                    alternate = canonical_tool_name(resolved)
-                    if alternate in visible or alternate in session_tool_to_ns:
-                        resolved = alternate
+                if (
+                    resolved not in visible
+                    and resolved not in session_tool_to_ns
+                    and (alternate in visible or alternate in session_tool_to_ns)
+                ):
+                    resolved = alternate
                 if resolved not in visible:
                     continue
 
@@ -275,15 +263,11 @@ class NamespaceApprovalStrategy:
             if self._tool_namespaces and tool_name in self._tool_namespaces:
                 ns = self._tool_namespaces[tool_name]
             elif defer_session is not None:
-                session_ns = defer_session.namespace_of_tool(tool_name)
-                if session_ns is not None:
-                    ns = session_ns
-                elif tool_name in _STANDARD_SHELL_TOOLS:
-                    # Session missed (e.g. snake_case alias): fall back to the
-                    # standard shell-tool set, as before the session lookup.
-                    ns = "shell"
-            elif tool_name in _STANDARD_SHELL_TOOLS:
-                ns = "shell"
+                ns = defer_session.namespace_of_tool(tool_name) or (
+                    defer_session.namespace_of_tool(alternate)
+                    if alternate != tool_name
+                    else None
+                )
 
             if ns and approval_rules.get(ns) == "require_approval":
                 return ApprovalRequirement(

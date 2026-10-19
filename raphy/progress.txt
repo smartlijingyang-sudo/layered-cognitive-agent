@@ -1,4 +1,5 @@
 ## Codebase Patterns
+- 删除硬编码 fallback 时，先 grep 全仓测试找 pin 住它行为的用例——blast radius 常超出 story 点名的文件（RA-167：criterion 只点了 1 个文件，实际 5 个测试/4 个文件 依赖 no-session backstop）。不要删测试的 intent，把它们 re-source 到 SSOT 上 （本例：defer catalog/session），安全语义保持、来源换正主。
 
 - **热升级重 exec 前先删 pyc：同秒同尺寸改写会让 pyc 校验误判（RA-162 实证）：**
   CPython pyc 有效性校验用整数秒 mtime + size；插件 `.py` 在同一秒内被改写且
@@ -4532,3 +4533,34 @@ brain/reducer/memory/hub/standing_refresher 等键，待 RA-123 落地后再评�
     扫描确认零 in-repo plugin_meta 声明 parameters——“没有插件依赖宽松 revive”
     这个结论本身就是证据，写进 notes，下一轮不用重查。
 ---
+
+## 2026-10-20 night — RA-167 landed (dual-spelling approval, _STANDARD_SHELL_TOOLS deleted)
+
+`NamespaceApprovalStrategy.evaluate` now tries `(raw, canonical alternate)` spellings for
+`namespace_of_tool`, mirroring `tool_wire_gate.py:146-147` order exactly. The 13-member
+`_STANDARD_SHELL_TOOLS` set and both backstop branches (session-miss + no-session) are deleted.
+
+Blast radius was bigger than the assessment's criterion 3 named: 5 pre-existing tests across
+4 files pinned the old no-session backstop (`test_shell_namespace_triggers_approval`,
+`test_shell_delete_vectors_require_approval_via_default_engine`,
+`test_d1_shell_namespace_requires_approval`, `test_inv_06_shell_domain_triggers_approval`,
+`test_t11_shell_tool_call_triggers_approval_requirement`). All updated to source the namespace
+from the defer catalog via a real `ToolDeferSession` (shell namespace loaded) — their security
+intents (shell → REQUIRE_APPROVAL, ADR-0256/ADR-0255 acceptance) are preserved, now via the
+catalog instead of the hardcoded shadow. Criterion-2 net: the old S6 test now covers all 13
+members through `build_default_approval_engine()`.
+
+Evidence notes:
+- `namespace_of_tool` is exact-match (`session._tool_to_namespace.get(name)`); the wire gate's
+  "try twice" is the only reason the snake_case alias resolved — verified by reading
+  `session.py:244-247` and `tool_wire_gate.py:146-147`.
+- `_STANDARD_SHELL_TOOLS` was born in the same commit (`a1c20526d`) as
+  `test_shell_namespace_triggers_approval` — the test always depended on the backstop, so the
+  "stitch" necessarily re-sources those tests from the catalog.
+- Neighboring tests in `test_tool_namespace_adr0256_conformance.py` already used sessions;
+  `test_inv_06` was the odd one out — its update follows the file's own pattern.
+- `ruff` SIM102 fired after hoisting `alternate` (nested-if became single-statement body);
+  combined the conditions — semantics identical.
+
+Tests: 113 passed (tests/infrastructure/runtime_plane/ + 3 scenario/runtime files), ruff clean on
+all 5 touched files.
