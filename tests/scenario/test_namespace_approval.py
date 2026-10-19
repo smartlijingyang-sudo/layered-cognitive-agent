@@ -26,13 +26,38 @@ def test_d1_shell_namespace_requires_approval():
     """shell 域的 runCommand 触发用户审批(验收 5).
 
     动因:run_56ee6564e3ea 里截断的残缺命令被直接执行.
+    RA-167:命名空间来自 defer catalog（session），不再依赖硬编码名单。
     """
+    from lca.infrastructure.tool_defer.session import (
+        ToolDeferSession,
+        reset_current_defer_session,
+        set_current_defer_session,
+    )
+
     assert DEFAULT_NAMESPACE_APPROVAL["shell"] == "require_approval"
     assert DeferPolicy().namespace_approval["shell"] == "require_approval"
-    strategy = NamespaceApprovalStrategy(approval_mapping={"shell": "require_approval"})
-    req = strategy.evaluate([_call("runCommand")])
-    assert isinstance(req, ApprovalRequirement) and req.required
-    assert req.details["namespace"] == "shell"
+
+    class _Tool:
+        def __init__(self, name: str, namespace: str) -> None:
+            self.name = name
+            self.namespace = namespace
+            self.description = name
+            self.parameters = {"type": "object", "properties": {}}
+
+        async def execute(self, args: dict[str, object]) -> dict[str, object]:
+            return {"ok": True}
+
+    session = ToolDeferSession(DeferPolicy.default())
+    session.update_turn([_Tool("runCommand", "shell")])
+    session.load_namespace("shell")
+    token = set_current_defer_session(session)
+    try:
+        strategy = NamespaceApprovalStrategy(approval_mapping={"shell": "require_approval"})
+        req = strategy.evaluate([_call("runCommand")])
+        assert isinstance(req, ApprovalRequirement) and req.required
+        assert req.details["namespace"] == "shell"
+    finally:
+        reset_current_defer_session(token)
 
 
 def test_d2_file_namespace_is_auto_by_default():

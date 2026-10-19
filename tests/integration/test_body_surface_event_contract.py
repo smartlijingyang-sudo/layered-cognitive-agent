@@ -36,7 +36,11 @@ from lca.contracts.models.core.execution.decision import Decision, ToolCall
 from lca.contracts.models.team.role.team import CacheConfig, RetryPolicy
 from lca.contracts.protocols.runtime.infra.infra import Tool
 from lca.runtime.session.run_session_writer import RunSessionWriter
-from lca_kernel.events.fold.inputs import SURFACE_TOOL_RESULT_TYPE
+from lca_kernel.events.fold.inputs import (
+    SURFACE_ASSISTANT_TYPE,
+    SURFACE_TOOL_RESULT_TYPE,
+    SURFACE_USER_TYPE,
+)
 
 # ── Minimal in-memory SessionProtocol fixture ──────────────────────────────
 
@@ -166,7 +170,7 @@ def _body(writer: RunSessionWriter) -> SimpleBody:
 
 
 def test_one_assistant_message_per_decision() -> None:
-    """A Decision with 3 tool_calls MUST commit exactly 1 surface/assistant_message.
+    """A Decision with 3 tool_calls MUST commit exactly 1 assistant surface row.
 
     The single assistant row carries all 3 declared tool_calls in its
     ``tool_calls`` payload (spec §G-16 invariant).
@@ -182,8 +186,16 @@ def test_one_assistant_message_per_decision() -> None:
     assert isinstance(receipts, list)
     assert len(receipts) == 3
 
-    surface_events = [e for e in session.events if e.type.startswith("surface/")]
-    assistant_events = [e for e in surface_events if e.type == "surface/assistant_message"]
+    surface_events = [
+        e
+        for e in session.events
+        if e.type in (
+            SURFACE_USER_TYPE,
+            SURFACE_ASSISTANT_TYPE,
+            SURFACE_TOOL_RESULT_TYPE,
+        ) or e.type.startswith("surface/")
+    ]
+    assistant_events = [e for e in surface_events if e.type == SURFACE_ASSISTANT_TYPE]
     assert len(assistant_events) == 1
 
     declared = assistant_events[0].data["tool_calls"]

@@ -11,7 +11,8 @@ before the next LLM call sees the history.
 
 PR-2 (G-16): ``dispatch_tool_call`` was renamed to ``dispatch_tool_calls``
 (commit-batch over ``decision.tool_calls``). The persist-before-execute
-invariant is preserved — exactly ONE ``surface/assistant_message`` row
+invariant is preserved — exactly ONE assistant surface row
+(``spine.llm.request.header.assistant``)
 carrying ALL N declared tool_calls lands BEFORE any tool runs.
 """
 
@@ -32,7 +33,11 @@ from lca.contracts.models.core.state.state import AgentState
 from lca.contracts.models.team.role.team import CacheConfig, RetryPolicy
 from lca.contracts.protocols.runtime.infra.infra import Tool
 from lca.runtime.session.run_session_writer import RunSessionWriter
-from lca_kernel.events.fold.inputs import SURFACE_TOOL_RESULT_TYPE
+from lca_kernel.events.fold.inputs import (
+    SURFACE_ASSISTANT_TYPE,
+    SURFACE_TOOL_RESULT_TYPE,
+    SURFACE_USER_TYPE,
+)
 
 # ── Minimal in-memory SessionProtocol fixture ──────────────────────────────
 
@@ -253,11 +258,15 @@ def test_tool_result_persisted_after_tool_execution() -> None:
     surface_events = [
         e
         for e in session.events
-        if e.type.startswith("surface/") or e.type == SURFACE_TOOL_RESULT_TYPE
+        if e.type in (
+            SURFACE_USER_TYPE,
+            SURFACE_ASSISTANT_TYPE,
+            SURFACE_TOOL_RESULT_TYPE,
+        ) or e.type.startswith("surface/")
     ]
     assert [e.type for e in surface_events] == [
-        "surface/user_message",
-        "surface/assistant_message",
+        SURFACE_USER_TYPE,
+        SURFACE_ASSISTANT_TYPE,
         SURFACE_TOOL_RESULT_TYPE,
     ]
 
@@ -292,9 +301,10 @@ def test_result_write_failure_reports_persistence_failed_but_tool_ran() -> None:
     and returns success; the tool-result ``append`` raises. ``dispatch_tool_calls``
     must:
       - return ``EffectReceipt(FAILED, error_code="session_persistence_failed")``;
-      - leave the journal holding ``[surface/user_message,
-        surface/assistant_message{tool_calls=[X]}]`` with NO
-        ``surface/tool_result`` (the append failed before the event landed);
+      - leave the journal holding the user + assistant surface rows
+        (``spine.llm.request.header`` /
+        ``spine.llm.request.header.assistant{tool_calls=[X]}``) with NO
+        tool-result row (the append failed before the event landed);
       - the tool DID run — the executor was called.
 
     The journal is consistent: the assistant row precedes (and declares)
@@ -342,11 +352,19 @@ def test_result_write_failure_reports_persistence_failed_but_tool_ran() -> None:
     # Tool DID run — the executor was invoked before the result append failed.
     assert recorder.calls == [{"name": "echo", "args": {"x": 1}}]
 
-    # Journal: user + assistant_message(tool_calls=[X]); NO surface/tool_result.
-    surface_events = [e for e in session.events if e.type.startswith("surface/")]
+    # Journal: user + assistant(tool_calls=[X]); NO tool-result row.
+    surface_events = [
+        e
+        for e in session.events
+        if e.type in (
+            SURFACE_USER_TYPE,
+            SURFACE_ASSISTANT_TYPE,
+            SURFACE_TOOL_RESULT_TYPE,
+        ) or e.type.startswith("surface/")
+    ]
     assert [e.type for e in surface_events] == [
-        "surface/user_message",
-        "surface/assistant_message",
+        SURFACE_USER_TYPE,
+        SURFACE_ASSISTANT_TYPE,
     ]
     # The assistant row carries the declared tool_call (no orphan yet).
     assistant_event = surface_events[1]
@@ -428,15 +446,23 @@ def test_unregistered_tool_reports_tool_not_registered() -> None:
     assert receipt.error_code == "tool_not_registered:ghost"
     assert recorder.calls == []  # nothing executed
 
-    surface_events = [e for e in session.events if e.type.startswith("surface/")]
-    assert [e.type for e in surface_events] == ["surface/assistant_message"]
+    surface_events = [
+        e
+        for e in session.events
+        if e.type in (
+            SURFACE_USER_TYPE,
+            SURFACE_ASSISTANT_TYPE,
+            SURFACE_TOOL_RESULT_TYPE,
+        ) or e.type.startswith("surface/")
+    ]
+    assert [e.type for e in surface_events] == [SURFACE_ASSISTANT_TYPE]
 
 
 def test_failed_tool_execution_persists_result_and_reports_execution_failed() -> None:
     """Tool runs but returns ``success=False`` → FAILED(tool_execution_failed).
 
     Per-call semantics: the failure is isolated to this call's receipt; the
-    ``surface/tool_result`` row IS persisted (the journal records the
+    tool-result surface row IS persisted (the journal records the
     failure), and the receipt error_code names the execution failure — not
     a persistence failure.
     """
@@ -467,10 +493,14 @@ def test_failed_tool_execution_persists_result_and_reports_execution_failed() ->
     surface_events = [
         e
         for e in session.events
-        if e.type.startswith("surface/") or e.type == SURFACE_TOOL_RESULT_TYPE
+        if e.type in (
+            SURFACE_USER_TYPE,
+            SURFACE_ASSISTANT_TYPE,
+            SURFACE_TOOL_RESULT_TYPE,
+        ) or e.type.startswith("surface/")
     ]
     assert [e.type for e in surface_events] == [
-        "surface/assistant_message",
+        SURFACE_ASSISTANT_TYPE,
         SURFACE_TOOL_RESULT_TYPE,
     ]
 
@@ -516,7 +546,7 @@ def test_turn_propagates_from_projection_to_journal_rows() -> None:
     rows = [
         e
         for e in session.events
-        if e.type in ("surface/assistant_message", SURFACE_TOOL_RESULT_TYPE)
+        if e.type in (SURFACE_ASSISTANT_TYPE, SURFACE_TOOL_RESULT_TYPE)
     ]
     assert [e.data["turn"] for e in rows] == [3, 3]
 

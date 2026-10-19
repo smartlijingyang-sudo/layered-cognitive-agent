@@ -412,13 +412,40 @@ def test_t11_approval_requirement_overrides_decision_flag() -> None:
 
 
 def test_t11_shell_tool_call_triggers_approval_requirement() -> None:
-    """T11 触发：shell 命名空间工具调用（bash）→ 审批需求 required=True。"""
-    engine = build_default_approval_engine()
-    req = engine.evaluate(
-        [ToolCall(call_id="c1", tool_name="bash", arguments={"command": "rm -rf /"})]
+    """T11 触发：shell 命名空间工具调用（bash）→ 审批需求 required=True。
+
+    RA-167:命名空间来自 defer catalog（session），不再依赖硬编码名单。
+    """
+    from lca.infrastructure.tool_defer.policy import DeferPolicy
+    from lca.infrastructure.tool_defer.session import (
+        ToolDeferSession,
+        reset_current_defer_session,
+        set_current_defer_session,
     )
-    assert req.required is True
-    assert req.target_resource == "bash"
+
+    class _Tool:
+        def __init__(self, name: str, namespace: str) -> None:
+            self.name = name
+            self.namespace = namespace
+            self.description = name
+            self.parameters = {"type": "object", "properties": {}}
+
+        async def execute(self, args: dict[str, object]) -> dict[str, object]:
+            return {"ok": True}
+
+    session = ToolDeferSession(DeferPolicy.default())
+    session.update_turn([_Tool("bash", "shell")])
+    session.load_namespace("shell")
+    token = set_current_defer_session(session)
+    try:
+        engine = build_default_approval_engine()
+        req = engine.evaluate(
+            [ToolCall(call_id="c1", tool_name="bash", arguments={"command": "rm -rf /"})]
+        )
+        assert req.required is True
+        assert req.target_resource == "bash"
+    finally:
+        reset_current_defer_session(token)
 
 
 def test_t11_hitl_tool_call_triggers_approval_requirement() -> None:

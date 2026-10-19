@@ -1,9 +1,10 @@
 """Concrete RunSessionWriter (spec §B, ADR-0226 §1).
 
 One writer per run. All append methods go through :meth:`SessionProtocol.append`
-with the DSH-aligned surface event taxonomy
-(``surface/user_message``, ``surface/assistant_message``, ``surface/tool_result``,
-``log/tool_call``). Fail-loud on unbound Session — no silent ``None`` return,
+with the kernel spine-category surface vocabulary (RA-163):
+``spine.llm.request.header`` (user), ``spine.llm.request.header.assistant``
+(assistant), ``spine.body.tool.execute.end`` (tool result), ``log/tool_call``
+(log-only). Fail-loud on unbound Session — no silent ``None`` return,
 no ContextVar lookup.
 """
 
@@ -25,7 +26,11 @@ from lca.contracts.models.session.tool_error import ToolError
 from lca.contracts.protocols.session.run_session_writer import RunSessionWriterProtocol
 from lca.session.lifecycle.bind import _event_ref_from_session
 from lca.session.surface_types import DEVELOPER_MESSAGE_TYPE
-from lca_kernel.events.fold.inputs import SURFACE_TOOL_RESULT_TYPE
+from lca_kernel.events.fold.inputs import (
+    SURFACE_ASSISTANT_TYPE,
+    SURFACE_TOOL_RESULT_TYPE,
+    SURFACE_USER_TYPE,
+)
 from lca_kernel.events.session.session import SessionEvent, SessionProtocol
 
 
@@ -66,19 +71,20 @@ def _tool_result_content(data: dict[str, Any]) -> str:
 def _surface_event_to_message(event: Any) -> Message:
     """Project a single surface event into the OpenAI message wire shape.
 
-    Only ``surface/*`` events reach this point. Returns a single
-    :class:`Message` per event; non-applicable keys are omitted.
+    Only kernel spine-category surface events (plus ``surface/*`` DSH
+    extensions such as the developer message) reach this point. Returns a
+    single :class:`Message` per event; non-applicable keys are omitted.
     """
-    if event.type == "surface/user_message":
+    if event.type == SURFACE_USER_TYPE:
         content = event.data.get("content") or ""
         return Message(role="user", content=content)
-    if event.type == "surface/assistant_message":
+    if event.type == SURFACE_ASSISTANT_TYPE:
         msg: Message = Message(role="assistant", content=event.data.get("content"))
         tool_calls = event.data.get("tool_calls")
         if tool_calls is not None:
             msg["tool_calls"] = tool_calls
         return msg
-    if event.type in ("surface/tool_result", SURFACE_TOOL_RESULT_TYPE):
+    if event.type == SURFACE_TOOL_RESULT_TYPE:
         msg = Message(
             role="tool",
             content=_tool_result_content(event.data),
@@ -183,18 +189,18 @@ class RunSessionWriter(RunSessionWriterProtocol):
         for idx, turn in enumerate(turns):
             if turn.role in ("user", "human"):
                 session.append(
-                    "surface/user_message",
+                    SURFACE_USER_TYPE,
                     {
                         "message_id": f"history:turn_{idx}",
                         "role": "user",
                         "content": turn.content,
                         "historical": True,
                     },
-                    surface_op="user_message",
+                    surface_op="append",
                 )
             elif turn.role == "assistant":
                 session.append(
-                    "surface/assistant_message",
+                    SURFACE_ASSISTANT_TYPE,
                     {
                         "turn": 0,
                         "step": 0,
@@ -204,7 +210,7 @@ class RunSessionWriter(RunSessionWriterProtocol):
                         "usage": None,
                         "historical": True,
                     },
-                    surface_op="assistant_message",
+                    surface_op="append",
                 )
         self._seeded_prior_turns = True
 
@@ -217,9 +223,9 @@ class RunSessionWriter(RunSessionWriterProtocol):
     ) -> EventRef:
         session = self._require_session()
         event = session.append(
-            "surface/user_message",
+            SURFACE_USER_TYPE,
             {"message_id": message_id, "role": role, "content": content},
-            surface_op="user_message",
+            surface_op="append",
         )
         return self._event_ref(session, event)
 
@@ -278,7 +284,7 @@ class RunSessionWriter(RunSessionWriterProtocol):
                     pending_widgets=pending_browsers,
                 )
         event = session.append(
-            "surface/assistant_message",
+            SURFACE_ASSISTANT_TYPE,
             {
                 "turn": turn,
                 "step": step,
@@ -287,7 +293,7 @@ class RunSessionWriter(RunSessionWriterProtocol):
                 "tool_calls": tool_calls,
                 "usage": usage,
             },
-            surface_op="assistant_message",
+            surface_op="append",
         )
         return self._event_ref(session, event)
 
@@ -333,8 +339,9 @@ class RunSessionWriter(RunSessionWriterProtocol):
         """Append a surface tool result and link it to the assistant row.
 
         The link uses ``source_event_seqs`` so the Session fold can pair this
-        result with its preceding ``surface/assistant_message`` that declared
-        the matching ``tool_call_id``.
+        result with its preceding assistant surface row
+        (``spine.llm.request.header.assistant``) that declared the matching
+        ``tool_call_id``.
         """
         # 局部导入:避免模块加载期引入 infrastructure 层依赖。
         from lca.infrastructure.session.projections.tool_result_message import (
@@ -370,17 +377,18 @@ class RunSessionWriter(RunSessionWriterProtocol):
         return self._event_ref(session, event)
 
     def _last_assistant_tool_call_seq(self, call_id: CallId) -> int | None:
-        """Locate the most recent surface/assistant_message seq that declared ``call_id``.
+        """Locate the most recent assistant surface row seq that declared ``call_id``.
 
-        Returns ``None`` when no preceding assistant row carried the matching
-        tool call — in that case the result still appends, but orphan-drop at
+        (``spine.llm.request.header.assistant``.) Returns ``None`` when no
+        preceding assistant row carried the matching tool call — in that case
+        the result still appends, but orphan-drop at
         :func:`lca.nodes.think.history.assemble.history_assemble`
         will drop it before it reaches the model.
         """
         session = self._require_session()
         match_seq: int | None = None
         for event in session.snapshot_events():
-            if event.type != "surface/assistant_message":
+            if event.type != SURFACE_ASSISTANT_TYPE:
                 continue
             tool_calls = event.data.get("tool_calls") or []
             for tc in tool_calls:
@@ -394,10 +402,34 @@ class RunSessionWriter(RunSessionWriterProtocol):
     def derive_messages(self) -> list[Message]:
         """Walk the journal, surface events only, build the OpenAI messages list.
 
-        Orphan-drop (OpenAI ``drop_orphan_function_calls`` mirror): drop
-        tool/result messages whose ``tool_call_id`` is not present in any
-        preceding assistant message. Drop reasoning items that follow a
-        dropped call.
+        RA-166 compatibility shim over the derive SSOT. The single source of
+        truth for "what text the model sees for a journal event" is the kernel
+        ``foldSurface`` pure function plus
+        :func:`lca.plugins.session.runtime.messages.messages.derive_event_message`
+        (shared with the ``model_visible`` projection increment and
+        ``token_usage``). The three adjudicated forks now agree on both paths:
+
+        - assistant ``tool_calls``: declaring rows are kept even when content
+          is empty/None (OpenAI FC requires the declaring message; ADR-0201
+          MV2). Fixed in the SSOT; this shim always kept them.
+        - empty tool result: ``"[tool_result] (no output)"`` on both paths,
+          decided once at write time by ``build_openai_tool_result_message``.
+        - orphan-drop: applied HERE only (OpenAI ``drop_orphan_function_calls``
+          mirror) — see retained differences below.
+
+        Retained differences (documented, not converged):
+
+        - Orphan-drop + ``orphan_dropped_count`` stay here: pinned by
+          ``tests/integration/test_orphan_tool_result_drop.py`` and wired to
+          :class:`RunHealthReport`. The fold SSOT also feeds transcript/history
+          reads, where silent row deletion would rewrite history; and this
+          shim is the actual LLM wire (``think.history.assemble``).
+        - ``surface/developer_message`` rows pass through here; the fold SSOT
+          raises ``ValueError`` on them (kernel surface-eligibility
+          fail-loud). Pre-existing divergence, deferred to its own story per
+          the RA-163 residual notes (ADR-0268 DSH vocabulary).
+        - ``surface/*`` extension fallthrough (``Message(role=event.type)``)
+          stays here; the SSOT returns ``None`` for unknown surface types.
 
         PR-2 G-17: each call increments ``orphan_dropped_count`` for any
         ``role=tool`` row removed by orphan-drop. Read via the
@@ -408,7 +440,14 @@ class RunSessionWriter(RunSessionWriterProtocol):
         surface_events = [
             e
             for e in session.snapshot_events()
-            if e.type.startswith("surface/") or e.type == SURFACE_TOOL_RESULT_TYPE
+            # RA-163: the spine-category vocabulary is the single surface
+            # taxonomy; the ``surface/`` prefix stays for DSH extensions
+            # (developer message).
+            if e.type in (
+                SURFACE_USER_TYPE,
+                SURFACE_ASSISTANT_TYPE,
+                SURFACE_TOOL_RESULT_TYPE,
+            ) or e.type.startswith("surface/")
         ]
         msgs = [_surface_event_to_message(e) for e in surface_events]
         counter: list[int] = [0]
@@ -460,8 +499,9 @@ def extract_pending_intents_from_events(
 ) -> list[dict[str, str]]:
     """Extract unmounted connector capability intents from session events (INV-CAP-04).
 
-    An intent is considered unmounted if it was emitted in a ``surface/tool_result`` event
-    but has not yet appeared in any preceding ``surface/assistant_message`` event.
+    An intent is considered unmounted if it was emitted in a tool-result
+    surface event but has not yet appeared in any preceding assistant
+    surface event.
     """
     mounted_intent_ids: set[str] = set()
     tool_intents: list[dict[str, str]] = []
@@ -470,14 +510,14 @@ def extract_pending_intents_from_events(
         event_type = getattr(event, "type", "")
         data = getattr(event, "data", {}) or {}
 
-        if event_type == "surface/assistant_message":
+        if event_type == SURFACE_ASSISTANT_TYPE:
             content = data.get("content") or ""
             for match in _CONNECTOR_WIDGET_RE.finditer(content):
                 intent_id = _parse_connector_widget_qs(match.group(1))["intent_id"]
                 if intent_id:
                     mounted_intent_ids.add(intent_id)
 
-        elif event_type in ("surface/tool_result", SURFACE_TOOL_RESULT_TYPE):
+        elif event_type == SURFACE_TOOL_RESULT_TYPE:
             content = data.get("content") or ""
             found = False
             for match in _CONNECTOR_WIDGET_RE.finditer(content):
@@ -595,8 +635,8 @@ def extract_pending_browser_widgets_from_events(
 ) -> list[dict[str, str]]:
     """Extract unmounted browser preview widgets from session events (ADR-0280).
 
-    A browser preview is unmounted if emitted in tool_result but never appeared
-    in any preceding surface/assistant_message.
+    A browser preview is unmounted if emitted in a tool-result surface event
+    but never appeared in any preceding assistant surface event.
     """
     mounted_session_ids: set[str] = set()
     tool_widgets: list[dict[str, str]] = []
@@ -605,14 +645,14 @@ def extract_pending_browser_widgets_from_events(
         event_type = getattr(event, "type", "")
         data = getattr(event, "data", {}) or {}
 
-        if event_type == "surface/assistant_message":
+        if event_type == SURFACE_ASSISTANT_TYPE:
             content = data.get("content") or ""
             for match in _BROWSER_WIDGET_RE.finditer(content):
                 sid = _parse_browser_widget_qs(match.group(1))["sessionId"]
                 if sid:
                     mounted_session_ids.add(sid)
 
-        elif event_type in ("surface/tool_result", SURFACE_TOOL_RESULT_TYPE):
+        elif event_type == SURFACE_TOOL_RESULT_TYPE:
             content = data.get("content") or ""
             found = False
             for match in _BROWSER_WIDGET_RE.finditer(content):

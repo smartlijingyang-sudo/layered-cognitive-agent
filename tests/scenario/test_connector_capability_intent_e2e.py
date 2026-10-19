@@ -26,6 +26,7 @@ from lca.infrastructure.integrations.composio.service.service import ComposioCon
 from lca.infrastructure.tools.composio import ComposioManagementExecutor
 from lca.plugins.transport.webserver.routes_1.routes_composio import ROUTE_SPECS
 from lca.runtime.session.run_session_writer import RunSessionWriter
+from lca_kernel.events.fold.inputs import SURFACE_ASSISTANT_TYPE
 
 
 @dataclass
@@ -155,7 +156,9 @@ async def test_connector_capability_intent_full_e2e_flow(monkeypatch, test_clien
     )
 
     # 验证网关层确定性保底：Session 中的最终 assistant 消息 100% 自动补齐了 widget 标签
-    asst_event = next(e for e in session.snapshot_events() if e.type == "surface/assistant_message")
+    asst_event = next(
+        e for e in session.snapshot_events() if e.type == SURFACE_ASSISTANT_TYPE
+    )
     saved_msg = asst_event.data["content"]
     assert f"[widget:connector_auth?intentId={intent_id}" in saved_msg
     assert "appName=Google+Drive" in saved_msg

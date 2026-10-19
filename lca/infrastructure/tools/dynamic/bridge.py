@@ -58,20 +58,51 @@ class DynamicPluginToolAdapter(Tool):
                 return f"Missing required parameter: {field!r}"
         return None
 
+    def _schema_properties(self) -> dict[str, Any]:
+        """Declared per-field schemas from the parameters schema ({} when schemaless)."""
+        params = self.parameters or {}
+        props = params.get("properties")
+        return props if isinstance(props, dict) else {}
+
+    @staticmethod
+    def _should_revive_json(field: str, properties: dict[str, Any]) -> bool:
+        """Whether a string arg for `field` may be JSON-revived.
+
+        Revive when the schema declares the field as array/object, or when the
+        field is not declared at all (legacy leniency for schemaless bridges).
+        A field declared with any other type (e.g. string) passes through untouched.
+        """
+        decl = properties.get(field)
+        if not isinstance(decl, dict):
+            return True
+        declared_type = decl.get("type")
+        if isinstance(declared_type, list):
+            return "array" in declared_type or "object" in declared_type
+        return declared_type in ("array", "object")
+
     async def execute(self, args: dict[str, Any]) -> Observation:
         """Execute the wrapped dynamic function with flexible argument unpacking."""
         obs_id = new_id("obs")
         try:
-            # Defensive normalization: unpack stringified JSON arrays/objects from LLM
+            # Schema-aware normalization (RA-165): revive stringified JSON only
+            # for fields the parameters schema declares as array/object.
+            # Undeclared fields keep the legacy lenient behavior; fields declared
+            # with any other type (e.g. string) pass through untouched.
+            properties = self._schema_properties()
             normalized_args: dict[str, Any] = {}
             for k, v in args.items():
-                if isinstance(v, str):
+                if isinstance(v, str) and self._should_revive_json(k, properties):
                     s = v.strip()
                     if (s.startswith("[") and s.endswith("]")) or (
                         s.startswith("{") and s.endswith("}")
                     ):
                         try:
                             normalized_args[k] = json.loads(s)
+                            _log.debug(
+                                "dynamic_tool.json_arg_revived",
+                                tool_name=self.name,
+                                field=k,
+                            )
                             continue
                         except (json.JSONDecodeError, ValueError):
                             pass

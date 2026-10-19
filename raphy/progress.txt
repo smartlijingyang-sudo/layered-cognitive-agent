@@ -1,4 +1,21 @@
 ## Codebase Patterns
+- 删除硬编码 fallback 时，先 grep 全仓测试找 pin 住它行为的用例——blast radius 常超出 story 点名的文件（RA-167：criterion 只点了 1 个文件，实际 5 个测试/4 个文件 依赖 no-session backstop）。不要删测试的 intent，把它们 re-source 到 SSOT 上 （本例：defer catalog/session），安全语义保持、来源换正主。
+
+- **热升级重 exec 前先删 pyc：同秒同尺寸改写会让 pyc 校验误判（RA-162 实证）：**
+  CPython pyc 有效性校验用整数秒 mtime + size；插件 `.py` 在同一秒内被改写且
+  字节数不变时，`SourceFileLoader.exec_module` 会直接执行旧字节码，热升级静默
+  失效（本轮实测：VERSION=1 的模块判定重 exec 后仍是 1，`mod_v2 is not mod_v1`
+  通过但内容是旧的——极易误判为“已重载”）。修法：内容摘要判定需要重 exec
+  后，先 `importlib.util.cache_from_source` 定位并删除 pyc，再走正常 spec 流程。
+  注意：内容不变命中缓存直接返回时 pyc 新旧无所谓——只有“判定要重 exec”的
+  分支需要删。
+
+
+- **词表收敛必须连 marker 值一起收敛，单收敛 type 等于换了个 raise（RA-163 实证）：**
+  `surface_op="user_message"` 这类调用方自造的 marker 字符串，即使 type 已收敛到 kernel
+  合格闭集，照样触发 `_surface_op_of` 的第二个 `ValueError`（"carries an invalid surfaceOp"）。
+  收敛方向取共享 seam 的既有契约（本轮：fold 契约只认 `"append"` | replace），type 和 marker
+  一次改完；实现后用纯 fold 路径（无 projection registry）实证不抛错才算收敛完成。
 
 - **双表收敛取共享 seam 的塑形，旧精确断言钉的可能是分歧本身（RA-154 实证）：**
   收敛前先 grep 测试对旧塑形的精确断言（如 `details == {"live": True}`）。
@@ -4354,3 +4371,196 @@ brain/reducer/memory/hub/standing_refresher 等键，待 RA-123 落地后再评�
   - "手工镜像"类 story 动手前先确认重复的到底是哪一层：本轮两处本来就调同一个 `DeferPolicy.for_vocal_mode`（推导逻辑早已共享），真正的重复是"vocal_mode 兜底 + ToolDeferSession 组装 + ADR-0248 注释"三件套。收敛点选在 session.py（被组装对象的家园），不是 policy.py。
   - 跨文件删 import 时用 rg 确认每个名字在该文件的剩余用量，ruff F401 是第二道网。
 ---
+
+---
+
+## [2026-10-20 01:45 轮] - assess（情况 C）：6 个候选（RA-162~167）
+
+- 热点：最近两周几乎全是 raphy 自己的收敛（browser 簇、tool_defer）+ lca-1000 禁区，按 skill 拓宽规则选了三块**新领地**摩擦漫步：Area A cordis creator dynamic bridge（用户刚落地的 `41e92781e`）、Area B 审批许可链（用户刚修 `8c1624fc7`）、Area C run session 写/读链（`run_session_writer.py` 685 行）。三路子任务全读+五问必答；禁区（preamble/ralph R2/lca-1000/gate_chain_strategy/browser 簇/tool_defer/resume）全遵守。
+- 运行时验证：`hidden_files/raphy-runtime-verify-20261020.py`（14 版仅改日期），252 后台跑，`LLM_API_KEY=dummy`，A/B/C COMPLETED、D 非收敛→failed 无异常（RA-023 守住），`DONE failures=0`，无新增 P0。
+- 开出 6 故事（P1×3 Strong + P2×3 Worth exploring，无 duplication 类）：
+  - **RA-163（top）**：writer 斜杠词表（`"surface/user_message"`）vs kernel spine category 闭集 → `Session.derive_messages()` 纯 fold 回退会对 writer 自己的 journal 抛 `ValueError`（inputs.py:218-222 的 fail-loud）；projection registry 挂载可选，所以是真实分叉。先 RA-163 再 RA-166。
+  - **RA-162**：creator 管线与 discovery 管线对同一份 `.py` 各 exec 一次（`sys.modules` 双条目，模块级状态分叉）+ 三套入口启发式互相不一致 → 收进一个共享函数（creator 线 `require_meta=True` 保持 PR12，discovery 线 False 保持宽松）。
+  - **RA-164**：`ApprovalPolicyRegistry` 生产零调用者（git grep 只有定义+自身单测）——hypothetical seam 的反面：zero；纯删。
+  - **RA-165**：`DynamicPluginToolAdapter.execute` 对所有字符串参数做启发式 `json.loads`（不看 schema），合法字符串会被静默改写 → 只对 schema 声明 array/object 的字段还原。
+  - **RA-166**：同名 `derive_messages` 两套实现三处语义分叉（orphan-drop/tool_calls/空占位）→ 先裁定语义再选 kernel fold 为 SSOT；RA-163 之后做。
+  - **RA-167**：`namespace_of_tool` 只试 raw 拼写（wire gate 试双拼写）+ `_STANDARD_SHELL_TOOLS` 是无测试锁定的静态影子集合 → 对齐 wire gate 双拼写策略并删 backstop（把旧集合成员全转成回归测试）。
+- 记录但不开：① `CreatorRuntime` 穿透 9 个私有属性（重构面大，下一轮 creator 线热点再开）；② `append_approval_resolved_if_pending` 绕 typed `ApprovalResolved`（denied 调用方在禁区 webserver 内，未验证）；③ approval 的 `visible` 手工解析→`turn_visible_tool_names()`（seam 在禁区模块内，同语义断言只有调用方反推，无直接证据）；④ `NullHookRegistry`/`_drop_reasoning_after_dropped_calls` no-op 等 micro deletion（留 hygiene 机会）。
+- **Learnings for future iterations:**
+  - assess 选热点时若最近全是 raphy 自己的收敛 + 禁区，按 skill 规则主动拓宽到用户刚落地的 feature commit（本轮：`41e92781e` creator bridge、`8c1624fc7` approval fix）——新代码的约定分叉最多。
+  - 子任务自声明证据缺口是硬门槛：凡建立在"禁区内语义反推"上的候选（如本轮 turn_visible_tool_names 同语义断言）一律不开 story，只记录。
+  - 强 claim 先动手验证再落 story：本轮协调者亲自验证了 `ApprovalPolicyRegistry` 零调用者（git grep）和 RA-163 的 ValueError 证据链（writer 写出形态 + inputs.py raise + append.py 调用链），才敢标 Strong。
+  - 运行时验证脚本启动教训：`env LLM_API_KEY=<redacted>` 里的尖括号被 bash 当重定向吃掉导致启动失败——占位符别写进 shell 命令，用 `LLM_API_KEY=dummy`。
+---
+## [2026-10-20 02:xx 夜轮] - RA-163（情况 A）：收敛 writer surface 词表到 kernel spine category
+
+- 落地：`RunSessionWriter` 的写侧（`append_user_message` / `append_assistant_message` / `seed_prior_turns`）
+  改写 kernel spine-category 类型（`SURFACE_USER_TYPE` / `SURFACE_ASSISTANT_TYPE`），`surface_op`
+  同步改为 fold 契约值 `"append"`；writer 全部读侧（`_surface_event_to_message`、`derive_messages`
+  过滤器、`_last_assistant_tool_call_seq`、`extract_pending_intents_from_events`、
+  `extract_pending_browser_widgets_from_events`）收敛到同一组常量；kernel fold（`inputs.py`）零改动，
+  fail-loud 语义不动。实现前先用脚本复现了 `ValueError: session event "surface/user_message"
+  is not surface-eligible and cannot carry surfaceOp`（inputs.py:219）；修后 `foldSurface`
+  返回 nodes=(0, 1)。
+- 改动文件：`lca/runtime/session/run_session_writer.py`（46+/32-）；测试断言随契约改：
+  `tests/unit/runtime/session/test_run_session_writer.py`（10→11，含新增 fold 无错 pin）、
+  `tests/runtime/session/test_seed_prior_turns.py`、`tests/integration/test_persist_before_execute.py`；
+  plugins 读侧（`messages.py`）本就说 spine 词表，未动，`test_messages_and_fork.py` 5 passed 复验。
+- 测试：11 + 4 + 9 + 5 全部绿；`ruff check` 4 文件 clean。
+- **Learnings for future iterations:**
+  - **marker 值也是词表的一部分（RA-163 实证）：** type 收敛到合格类型还不够——`surface_op="user_message"`
+    这类调用方自造的 marker 字符串在合格类型上照样触发 `_surface_op_of` 的第二个 `ValueError`
+   （"carries an invalid surfaceOp"）。词表收敛必须 type + marker 一起收敛到 fold 契约
+   （`"append"` | replace），单收敛 type 等于换了个 raise。
+  - 读侧 `("surface/tool_result", SURFACE_TOOL_RESULT_TYPE)` 这类双元组是收敛半成品的味道：
+    写侧已经只产 spine 常量，读侧的旧分支就是死分支——"exactly one vocabulary survives"
+    落到读侧就是删旧分支，不留兼容（RA-154 的"断言随契约改"在读侧的对位）。
+  - 残留分叉（未动，待开故事）：`lca/infrastructure/proactive/deliverer.py` 自带
+    `SURFACE_ASSISTANT_MESSAGE = "surface/assistant_message"` 斜杠常量 + `surface_op="assistant_message"`；
+    `append_developer_message` 写 `surface/developer_message` 带 `surface_op="developer_message"`
+   （ADR-0268 DSH 词表，动它要连 catalog 一起改）——都是同一 fail-loud 形状，各自独立成故事。
+  - plugins `derive_event_message` 对 content=None 的 assistant 行返回 None（drop），而 writer 自身的
+    `derive_messages` 保留 tool_calls——这是 RA-166 要裁定的三处分叉之一，本轮只做到"词表统一"，
+    语义分叉不动。
+---
+## [2026-10-20 02:xx 夜轮] - RA-166（情况 A）：同名 derive_messages 三处语义分叉裁定并收敛
+
+- 裁定（记在 commit body，与 RA-163 不矛盾）：
+  1. orphan-drop：写侧语义胜——保留在 writer shim（OpenAI FC 线上孤子tool行会400；
+     tests/integration/test_orphan_tool_result_drop.py 9 个场景测试钉住；orphan_dropped_count
+     挂 RunHealthReport），不进 fold SSOT（SSOT 还喂 transcript/history，静默删行等于改写历史）。
+  2. assistant tool_calls：写侧语义胜——宣告行（content=None + tool_calls）两路都保留
+     （OpenAI FC 要求宣告消息在线上；ADR-0201 MV2；Body 先提交宣告行再跑工具，
+     plugins 侧原来丢弃它会把整轮 tool 结果变成孤子）。修
+     derive_event_message assistant 分支：有 tool_calls 的行永不因空 content 被丢，
+     且 tool_calls 直通输出 dict。
+  3. 空结果占位文本：写侧 "[tool_result] (no output)" 胜
+     （test_successful_tool_without_output_states_it_explicitly 钉住；与 tool_error_text
+     “空成功会让模型盲目重试”同一道理）。收敛在写侧单决策点：
+     build_openai_tool_result_message 空/空白渲染文本直接写占位符，
+     逻辑与 _tool_result_content 字节级对齐（含 strip 边缘），两路读自然一致。
+- 改动文件：lca/plugins/session/runtime/messages/messages.py （fork2）、
+  lca/infrastructure/session/projections/tool_result_message.py （fork3）、
+  lca/runtime/session/run_session_writer.py （derive_messages docstring 重写为 RA-166 兼容垫片标签）、
+  新增 tests/integration/test_derive_messages_convergence.py （3 个三叉点 pin 测试）。
+- 测试：新 3 + orphan 9 + messages_and_fork 5 + model_visible_projection 全绿（19）；
+  writer 单测/parity/assembler/history/body 合约/run_with_tool_use/pr2/persist/seed 全绿（66）；
+  ruff check 4 文件 clean。唯一红 test_emit_diagnostic_status.py::test_audit_runs_diagnostic_status_is_mixed
+  在干净 HEAD 上同样失败（G-14 审计环境问题，与本轮无关）。
+- **Learnings for future iterations:**
+  - **收敛类 story 先写对比脚本再动手（RA-166 实证）：** 动手前先用脚本把两套实现在同一 journal
+    上跑一遍，分叉点会自己跳出来——本轮还拖出了评估没列的第四个分叉：
+    surface/developer_message 行走 fold 路径直接 ValueError（kernel surface-eligibility
+    fail-loud），走 writer 路径则保留。这是 RA-163 明确延期的残留分叉（ADR-0268
+    DSH 词表），本轮只在 shim docstring 记录为已知差异、不修。
+  - **占位符类收敛优先放写侧单决策点（RA-166 实证）：** 两路读各自重建文本永远会漂移
+    （本轮实测：空白 content + error 时两路拼接逻辑差一个 strip）。写侧一次决定占位符、
+    读侧直接用预计算的 data["message"]，分叉自然消失——这正是 ADR-0201
+    “写侧拥有线形状”的设计。
+  - **shim docstring 写清楚“委派给谁 + 保留了哪些差异”（RA-166 实证）：**
+    兼容垫片的价值在于诚实标注差异而不是藏差异——本轮的三处“保留差异”
+    （orphan-drop、developer 行直通、surface/* fallthrough）都写进了 docstring，
+    下一个接手的人不用再对比两份代码猜。
+---
+## [2026-10-20 03:xx 夜轮] - RA-162（情况 A）：creator/discovery 双 importlib exec + 入口发现收敛
+- 实现内容：新增 `lca/infrastructure/preset/plugin_loading.py`（`plugin_module_name` /
+  `load_plugin_module` / `extract_entry` 三函数）；`loader.extract_plugin_factory`
+  与 `discovery._load_plugin_tool` 都委托给共享 seam；`require_meta=True/False`
+  把两线既有严格度收进显式参数（creator 线 PR12 `PluginMetaMissing` 不动，
+  discovery 线 8-fallback 宽松启发式逐字保留）。模块名由绝对路径 sha256 派生
+  （`lca_presets._exec.<name>.<digest>`），`_EXEC_CACHE` 按（模块名，内容摘要）
+  复用：同路径同内容一进程只 exec 一次、两条管线拿到同一 module 对象；
+  磁盘内容变化（热升级）则重 exec，保证永远加载最新源码。
+- 改动文件：新增 `lca/infrastructure/preset/plugin_loading.py`、
+  `tests/infrastructure/preset/test_plugin_loading.py`（4 测试）；改
+  `lca/plugins/tools/cordis_control/loader.py`（`extract_plugin_factory` 委托，
+  删 `importlib.util` / `PluginMetaMissing` 未用 import）、
+  `lca/infrastructure/preset/discovery.py`（`_load_plugin_tool` 委托，删
+  `importlib.util` / `sys` / `typing.Any` 未用 import）。`_load_plugin_tool`
+  方法保留（scenario 测试 :390 的直接调用不动，最小 diff）。
+- 测试：新 4 全绿（双管线同模块对象 + 旧双名永不出现 + exec_count==1 /
+  PR12 缺 meta 抛 `PluginMetaMissing` / bare `execute` 回退可用 /
+  热升级重 exec + 内容不变复用）；`tests/infrastructure/preset/` +
+  `test_dynamic_tool_bridge.py` + ADR-0256 conformance +
+  `test_cordis_creator_assistant_closed_loop.py` 共 28 全绿（含 scenario_5
+  热升级+回滚）；`ruff check` 4 文件 clean。
+- **Learnings for future iterations:**
+  - **热升级重 exec 前先删 pyc（RA-162 实证）：** 见顶部 Codebase Patterns 新条目。
+    同秒同尺寸改写是热升级/测试高频形状（v1→v2 只改几个字符），pyc 陷阱必中；
+    本轮是先被自己的新测试抓到（`is not` 通过但 VERSION 仍是 1），再被 dbg2
+    脚本（慢 import 把两次写分隔到不同秒）反证——“能复现→修→再验证”是标准动作。
+  - **收敛双 exec 类 story，先跑热升级场景测试再定复用语义（RA-162 实证）：**
+    第一版纯 `sys.modules` 复用直接干掉了 scenario_5 热升级（`total_dropoff`
+    KeyError）。“同一路径只 exec 一次”与“热升级要重载”不矛盾：复用键必须是
+    （路径，内容摘要），不是路径本身。先跑既有热升级测试，复用语义自然浮现。
+---
+## [2026-10-20 03:xx 夜轮] - RA-164（情况 A）：删除零调用者的 ApprovalPolicyRegistry
+- 实现内容：从 `lca/infrastructure/runtime_plane/access/approval_engine.py`
+  删除 `ApprovalPolicyRegistry` 类（`register`/`list_strategies` 的 sorted-list
+  包装）；删测试文件里的 import + `test_registry_allows_custom_strategy_injection`
+  + 仅该测试用的两个 import（`ApprovalRequirement`、`ApprovalPolicyEngine`）；
+  测试模块 docstring 去掉 "Strategy registry"。
+- 改动文件：`lca/infrastructure/runtime_plane/access/approval_engine.py`（-14 行）、
+  `tests/infrastructure/runtime_plane/access/test_approval_engine.py`（-30 行）。
+  `_STANDARD_SHELL_TOOLS` 未动（RA-167 的目标）。
+- 测试：剩余 6 个 approval-engine 测试全绿（chain order / strategy verdicts /
+  approved-override）；`ruff check` 2 文件 clean。全仓 grep 确认零生产调用者
+  （只有定义 + 自身测试），纯删除、零行为变化。
+- **Learnings for future iterations:**
+  - **删类时连带清“只为它存在”的 import（RA-164 实证）：** 删掉 registry 测试后，
+    `ApprovalRequirement` 和 `ApprovalPolicyEngine` 两个 import 变死——删测试
+    后必跑一遍 `ruff check`，让 F401 告诉你还有哪些是只为它活着的。
+---
+## [2026-10-20 03:xx 夜轮] - RA-165（情况 A）：DynamicPluginToolAdapter JSON 归一化 schema 感知
+- 实现内容：`execute` 的字符串 JSON-revival 改为 schema 感知——新增
+  `_schema_properties()`（取 parameters.properties）与 `_should_revive_json()`
+  （字段声明为 array/object 才 revive；未声明字段保持旧宽松行为；
+  声明为其他类型如 string 则原样透传）；每次 revive 打
+  `dynamic_tool.json_arg_revived` debug 日志（tool_name + field）。
+- 改动文件：`lca/infrastructure/tools/dynamic/bridge.py`（归一化循环 + 2 helper）；
+  `tests/infrastructure/tools/dynamic/test_dynamic_tool_bridge.py`（+3 测试，
+  + structlog import）。
+- 测试：旧 `test_dynamic_tool_adapter_json_string_argument_unpacking` 全绿
+  （无 schema → 未声明字段 → 旧宽松行为）；新 3 全绿（string 字段 `"[1, 2, 3]"`
+  不改写 / object 字段 revive + `capture_logs` 断言日志带 field 名 / array
+  字段 revive）；`ruff check` 2 文件 clean。
+- **Learnings for future iterations:**
+  - **“只对声明字段收紧、未声明保持旧行为”是兼容式收敛的标准形状（RA-165 实证）：**
+    旧 happy-path 测试桥接时根本不传 parameters（properties={}）；若把“未声明”
+    也判为不 revive，旧测试就红——收紧只针对“schema 明确说了 string”的字段，
+    未声明 = 信息不足 = 保持旧行为。这不是和稀泥，是“有证据才收紧”。
+  - **criterion-2 的 grep 结论要写进 story notes（RA-165 实证）：** 全仓 python
+    扫描确认零 in-repo plugin_meta 声明 parameters——“没有插件依赖宽松 revive”
+    这个结论本身就是证据，写进 notes，下一轮不用重查。
+---
+
+## 2026-10-20 night — RA-167 landed (dual-spelling approval, _STANDARD_SHELL_TOOLS deleted)
+
+`NamespaceApprovalStrategy.evaluate` now tries `(raw, canonical alternate)` spellings for
+`namespace_of_tool`, mirroring `tool_wire_gate.py:146-147` order exactly. The 13-member
+`_STANDARD_SHELL_TOOLS` set and both backstop branches (session-miss + no-session) are deleted.
+
+Blast radius was bigger than the assessment's criterion 3 named: 5 pre-existing tests across
+4 files pinned the old no-session backstop (`test_shell_namespace_triggers_approval`,
+`test_shell_delete_vectors_require_approval_via_default_engine`,
+`test_d1_shell_namespace_requires_approval`, `test_inv_06_shell_domain_triggers_approval`,
+`test_t11_shell_tool_call_triggers_approval_requirement`). All updated to source the namespace
+from the defer catalog via a real `ToolDeferSession` (shell namespace loaded) — their security
+intents (shell → REQUIRE_APPROVAL, ADR-0256/ADR-0255 acceptance) are preserved, now via the
+catalog instead of the hardcoded shadow. Criterion-2 net: the old S6 test now covers all 13
+members through `build_default_approval_engine()`.
+
+Evidence notes:
+- `namespace_of_tool` is exact-match (`session._tool_to_namespace.get(name)`); the wire gate's
+  "try twice" is the only reason the snake_case alias resolved — verified by reading
+  `session.py:244-247` and `tool_wire_gate.py:146-147`.
+- `_STANDARD_SHELL_TOOLS` was born in the same commit (`a1c20526d`) as
+  `test_shell_namespace_triggers_approval` — the test always depended on the backstop, so the
+  "stitch" necessarily re-sources those tests from the catalog.
+- Neighboring tests in `test_tool_namespace_adr0256_conformance.py` already used sessions;
+  `test_inv_06` was the odd one out — its update follows the file's own pattern.
+- `ruff` SIM102 fired after hoisting `alternate` (nested-if became single-statement body);
+  combined the conditions — semantics identical.
+
+Tests: 113 passed (tests/infrastructure/runtime_plane/ + 3 scenario/runtime files), ruff clean on
+all 5 touched files.

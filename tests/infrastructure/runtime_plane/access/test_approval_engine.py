@@ -1,15 +1,12 @@
-"""Test ApprovalPolicyEngine, Strategy registry, and built-in strategies."""
+"""Test ApprovalPolicyEngine and built-in strategies."""
 
 from lca.contracts.models.core.execution.approval import (
     ApprovalReasonKind,
-    ApprovalRequirement,
     RiskLevel,
 )
 from lca.contracts.models.core.execution.decision import ToolCall
 from lca.contracts.models.core.state.plane import PlaneKind, PlaneRef
 from lca.infrastructure.runtime_plane.access.approval_engine import (
-    ApprovalPolicyEngine,
-    ApprovalPolicyRegistry,
     DefaultAllowStrategy,
     HITLInteractionStrategy,
     MachineAccessStrategy,
@@ -108,30 +105,3 @@ def test_engine_evaluates_in_chain_order():
     safe_req = engine.evaluate(safe_calls, plane=None)
     assert safe_req.required is False
     assert safe_req.reason_kind == ApprovalReasonKind.NONE
-
-
-def test_registry_allows_custom_strategy_injection():
-    registry = ApprovalPolicyRegistry()
-
-    class CustomHighRiskStrategy:
-        strategy_name = "custom_high_risk"
-
-        def evaluate(self, tool_calls, plane=None):
-            for call in tool_calls:
-                if call.tool_name == "dangerous_finance_transfer":
-                    return ApprovalRequirement(
-                        required=True,
-                        reason_kind=ApprovalReasonKind.POLICY_RULE,
-                        risk_level=RiskLevel.CRITICAL,
-                        summary="高危转账拦截",
-                    )
-            return None
-
-    registry.register(CustomHighRiskStrategy(), priority=0)
-    engine = ApprovalPolicyEngine(strategies=registry.list_strategies())
-
-    calls = [ToolCall(call_id="c1", tool_name="dangerous_finance_transfer", arguments={})]
-    req = engine.evaluate(calls, plane=None)
-    assert req.required is True
-    assert req.reason_kind == ApprovalReasonKind.POLICY_RULE
-    assert req.risk_level == RiskLevel.CRITICAL

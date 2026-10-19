@@ -54,15 +54,30 @@ def derive_event_message(event: SessionEvent | Mapping[str, Any]) -> dict[str, A
         message = data.get("message")
         if isinstance(message, Mapping):
             content = message.get("content")
-            if isinstance(content, list) and not content:
+            if (
+                isinstance(content, list)
+                and not content
+                and not message.get("tool_calls")
+            ):
                 return None
             return dict(message)
         content = data.get("content")
+        tool_calls = data.get("tool_calls")
         if isinstance(content, str):
-            if not content:
+            if not content and not tool_calls:
                 return None
-            return {"role": "assistant", "content": content}
-        return None
+            out: dict[str, Any] = {"role": "assistant", "content": content}
+        elif tool_calls:
+            # RA-166: a declaring assistant row (content None, tool_calls set)
+            # is wire-mandatory for OpenAI function-calling (ADR-0201 MV2).
+            # The writer commits this shape before any tool runs, so dropping
+            # it here would orphan every tool result of the turn.
+            out = {"role": "assistant", "content": content}
+        else:
+            return None
+        if tool_calls is not None:
+            out["tool_calls"] = list(tool_calls)
+        return out
 
     if event_type == SURFACE_TOOL_RESULT_TYPE:
         message = data.get("message")

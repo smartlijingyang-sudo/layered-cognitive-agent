@@ -16,7 +16,12 @@ from lca.runtime.session.run_session_writer import (
     RunSessionWriter,
     SessionWriterUnboundError,
 )
-from lca_kernel.events.fold.inputs import SURFACE_TOOL_RESULT_TYPE
+from lca_kernel.events.fold.fold import foldSurface
+from lca_kernel.events.fold.inputs import (
+    SURFACE_ASSISTANT_TYPE,
+    SURFACE_TOOL_RESULT_TYPE,
+    SURFACE_USER_TYPE,
+)
 
 
 @dataclass
@@ -91,17 +96,18 @@ def test_unbound_writer_raises_session_writer_unbound_error() -> None:
         writer.append_user_message(message_id="m1", role="user", content="hi")
 
 
-def test_append_user_message_writes_surface_user_message() -> None:
+def test_append_user_message_writes_spine_user_type() -> None:
+    """RA-163: user rows use the kernel spine-category vocabulary, not the slash taxonomy."""
     session = _InMemorySession()
     writer = RunSessionWriter(session=session)
     ref = writer.append_user_message(message_id="m1", role="user", content="hi")
     assert ref.event_id == "test-session:0"
-    assert ref.category == "surface/user_message"
-    assert session.last_event().type == "surface/user_message"
+    assert ref.category == SURFACE_USER_TYPE
+    assert session.last_event().type == SURFACE_USER_TYPE
     assert session.last_event().data["content"] == "hi"
     assert session.last_event().data["message_id"] == "m1"
     assert session.last_event().data["role"] == "user"
-    assert session.last_event().surface_op == "user_message"
+    assert session.last_event().surface_op == "append"
 
 
 def test_append_assistant_message_with_tool_calls_writes_tool_calls_in_payload() -> None:
@@ -116,11 +122,11 @@ def test_append_assistant_message_with_tool_calls_writes_tool_calls_in_payload()
         usage=None,
     )
     event = session.last_event()
-    assert ref.category == "surface/assistant_message"
-    assert event.type == "surface/assistant_message"
+    assert ref.category == SURFACE_ASSISTANT_TYPE
+    assert event.type == SURFACE_ASSISTANT_TYPE
     assert event.data["tool_calls"][0]["id"] == "c1"
     assert event.data["content"] is None
-    assert event.surface_op == "assistant_message"
+    assert event.surface_op == "append"
 
 
 def test_append_tool_call_writes_log_only_event() -> None:
@@ -268,3 +274,26 @@ def test_request_header_returns_epoch_header_system_field() -> None:
     header = writer.request_header()
     assert header is not None
     assert header.system == "You are a helpful assistant."
+
+
+def test_writer_journal_folds_without_value_error() -> None:
+    """RA-163: writer-produced journal passes the kernel fold pure path.
+
+    Before the vocabulary convergence, feeding writer-produced events through
+    ``foldSurface`` raised ``ValueError`` (a non-eligible slash type carrying
+    a surfaceOp marker) whenever the projection registry was not mounted.
+    """
+    session = _InMemorySession()
+    writer = RunSessionWriter(session=session)
+    writer.append_user_message(message_id="m1", role="user", content="hi")
+    writer.append_assistant_message(
+        turn=0,
+        step=0,
+        role="assistant",
+        content="hello",
+        tool_calls=None,
+        usage=None,
+    )
+    journal = session.snapshot_events()
+    result = foldSurface(journal)  # must not raise
+    assert result.nodes == (0, 1)

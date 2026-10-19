@@ -38,10 +38,23 @@ def build_openai_tool_result_message(
     content: str,
     error: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
-    """Wire message dict consumed by ``derive_event_message`` and OpenAI history."""
+    """Wire message dict consumed by ``derive_event_message`` and OpenAI history.
+
+    RA-166: the empty-result placeholder is decided once here (the single
+    caller is ``RunSessionWriter.append_tool_result``), so the fold read path
+    (``derive_event_message`` returning ``data["message"]``) and the writer
+    read path (``_tool_result_content`` rebuild) agree. The join logic mirrors
+    ``_tool_result_content`` exactly, including the ``strip()`` edge, so the
+    two reads produce byte-identical ``content`` for every input.
+    """
     call_id = tool_call_id.strip()
     err_text = tool_error_text(error)
-    text = f"{content}\n{err_text}" if content and err_text else (err_text or content)
+    if err_text:
+        text = f"{content}\n{err_text}" if content.strip() else err_text
+    elif content.strip():
+        text = content
+    else:
+        text = "[tool_result] (no output)"
     return {
         "role": "tool",
         "tool_call_id": call_id,
