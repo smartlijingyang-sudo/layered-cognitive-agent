@@ -1,6 +1,6 @@
 {
   "project": "LCA Raphy Architecture Optimization",
-  "branchName": "raphy/arch-20261014-0745",
+  "branchName": "raphy/arch-20261019-0745",
   "description": "Continuous architecture deepening for the LCA cognitive-agent codebase via the raphy fresh-session loop. Round 1 (2026-10-06, old prompt): RA-001/RA-002 converged, RA-003 dropped with evidence. Round 2 (2026-10-06, hardened prompt): RA-004..RA-009 all done (merged to main 2026-10-07, merge 1b1526a94). Round 3 (2026-10-07, hardened prompt): friction walk over session plugins, loop_cursor, delegation/body executor; RA-010..RA-013 below. Out of scope: ralph Round 2 areas (DecisionGates, Ingest, ContextFiles shims, Read Runs micro-dirs, MemoryTools directory seam), lca/cognition/memory/ (frozen per Round 2 AP-01), CLI surface must not import contracts (deliberate rule), gate_chain_strategy.py (hands-off: another party's uncommitted work + pre-existing red test). Round 10 (2026-10-08 12:06, branch raphy/arch-20261008-1206): RA-033..RA-041 below (3 Strong + 5 Worth exploring + 1 Speculative; all from friction walk, none duplication-class). Round 11 (2026-10-08 15:05, branch raphy/arch-20261008-1505): RA-042..RA-047 all done (merged to main 2026-10-08, merge 0ab9d67cd). Round 12 (2026-10-08 22:05, branch raphy/arch-20261008-2205): RA-048..RA-050 below (1 Strong + 2 Worth exploring; all from friction walk, none duplication-class). Round DESLOP-100 (2026-10-10, branch raphy/deslop-100, batch-wave Plan A): new wave of architecture deepening + de-slop stories, continuing RA-104+. Focus: remove AI/change-narration slop from current-state prose and code comments, plus real architecture optimizations (deep modules, locality, deletion test) per improve-codebase-architecture. Waves of 5-10 stories, each story one commit with tests. Round 2026-10-14 01:45 (branch raphy/arch-20261014-0145): RA-131..RA-135 -- approved-tool bypass seam chain (record-point approve/reject distinction, canonical invariant in set_approved_tool_names, ContextVar cross-task inheritance seam test) + lobehub run-agent mapping seam (fail-soft contract tests, lazy import for import-time fail-soft). _resolve.py audited as a deep module; six declined probe clusters re-declined. Round 2026-10-14 04:45 (branch raphy/arch-20261014-0448): RA-136..RA-138 -- two verbatim private _model probes converged onto model_name (RA-106 follow-up, two = real), dead carrier/runs/resume.py resume_run name-twin deleted (zero callers), legacy /answer ingress is_rejection gap (evidence-first: retire route or add in-band rejection marker). Speculative RA-139 (typed ResumeAnswer value object) deferred until RA-138 evidence lands. Areas D (runs chain post-RA-131) / E (model identity) / F (skills _package_lookup, RA-107 landed, 0 candidates) friction-walked; runtime verification 4 flows green, RA-023 holds, no P0.",
   "userStories": [
     {
@@ -2267,6 +2267,62 @@
       "passes": true,
       "branchName": "raphy/arch-20261019-0447",
       "notes": "Strength: Worth exploring. Resilient sessions are expected in some deployments; the honest-wording granularity is the judgment call."
+    },
+    {
+      "id": "RA-154",
+      "title": "Converge BrowserSubagent._execute_via_driver's private dispatch table onto the shared executor seam",
+      "description": "As an LCA maintainer, I want one dispatch table over BrowserActionType, because BrowserSubagent._execute_via_driver (subagent.py:120-225) re-implements a ~100-line if-chain over the same action-type space that executor.py::_ACTION_TOOL_NAMES already owns, and the two tables diverge: the executor covers 4 types (NAVIGATE/CLICK/SCREENSHOT/CLOSE) while the driver-direct path covers 6 (adds TYPE/EXTRACT_TEXT). RA-146 established the shared execution seam in name only — the fallback path kept a private, diverging copy. A new action type now requires edits in two modules, and NAVIGATE-via-driver vs NAVIGATE-via-tool can diverge in result shaping (e.g. screenshot artifact-id generation happens independently in both).",
+      "acceptanceCriteria": [
+        "_ACTION_TOOL_NAMES extended to TYPE and EXTRACT_TEXT, backed by driver methods (minimal Tool adapters in driver_tool.py's same-family home, or direct adapters in executor.py — implementer's call, documented in the story notes).",
+        "_execute_via_driver reduced to delegating to build_browser_action_executor(driver=self.driver); the ~100-line if-chain is gone.",
+        "RA-146's three-layer order preserved (explicit executor > driver-direct > fail-closed); driver=None + no executor still fail-closed; lock/arbitration interplay untouched.",
+        "Existing tests stay green: tests/scenario/browser/test_browser_lifecycle_scenarios.py (driver-direct path), tests/infrastructure/browser/test_browser_subagent_purity.py (tools path), tests/infrastructure/tools/browser/test_browser_action_executor.py (executor map). New test pins that a driver-only subagent dispatches TYPE/EXTRACT_TEXT through the executor path.",
+        "ruff check clean."
+      ],
+      "priority": "P1",
+      "passes": false,
+      "branchName": "raphy/arch-20261019-0745",
+      "notes": "Strength: Strong. Assessment: two dispatch tables over one enum is the textbook leaky seam; deletion test passes (deleting the branches concentrates dispatch into the map). Judgment call left to implementer: where TYPE/EXTRACT_TEXT tool adapters live."
+    },
+    {
+      "id": "RA-155",
+      "title": "Replace the two manual 8-field BrowserSessionSummary rebuilds with model_copy(update=...)",
+      "description": "As an LCA maintainer, I want summary updates to use the contract's own evolve seam, because PlaywrightCDPDriver hand-copies all 8 BrowserSessionSummary fields verbatim at two sites (cdp_driver.py:215 in _init_cdp_for_session, :325 in navigate), differing only in the 2-3 changed fields — and they have already drifted: :215 hardcodes has_active_stream=True while :325 copies summary.has_active_stream. BrowserSessionSummary is a frozen pydantic BaseModel, so model_copy(update=...) exists; the driver hand-rolls what the contract gives for free. Every future contract field addition currently requires touching both sites.",
+      "acceptanceCriteria": [
+        "Both rebuild sites become old.model_copy(update={...}) with only the changed fields; the :215 has_active_stream=True hardcode is either preserved explicitly as an update key or removed with a documented reason — the drift must be resolved, not hidden.",
+        "RA-153 semantics preserved: navigate() keeps the pre-navigation title on goto failure.",
+        "tests/infrastructure/browser/test_browser_reopen_snapshot.py green (pins title/url after reopen); ruff check clean."
+      ],
+      "priority": "P2",
+      "passes": false,
+      "branchName": "raphy/arch-20261019-0745",
+      "notes": "Strength: Worth exploring. Mechanical duplication (two = real), but drift is already demonstrated — the sites are not byte-identical, which is exactly why the story exists."
+    },
+    {
+      "id": "RA-156",
+      "title": "Delete the dead BrowserTaskStore.update_task seam",
+      "description": "As an LCA maintainer, I want dead seams deleted, because BrowserTaskStore.update_task offers a mutation seam with zero callers across lca/ and tests/ (verified by grep; RA-152 round independently confirmed zero calls), while the actual mutation seam is direct record-field writes in BrowserSteerTaskTool and BrowserTransferTaskTool (task.status / task.payment_approved) followed by add_timeline_step. A dead update seam is a false affordance — and its hasattr silent-skip makes it weaker than the direct assignment it shadows (typos vanish silently).",
+      "acceptanceCriteria": [
+        "update_task deleted from BrowserTaskStore; direct record-field writes + add_timeline_step remain the single mutation path (behavior of steer/transfer unchanged).",
+        "No test references update_task (verified: none do); full browser suites (contracts/browser, scenario/browser, infrastructure/browser) stay green; ruff check clean."
+      ],
+      "priority": "P2",
+      "passes": false,
+      "branchName": "raphy/arch-20261019-0745",
+      "notes": "Strength: Worth exploring. Deletion-of-dead-code per RA-137 precedent. Alternative considered and rejected: routing steer/transfer through update_task — hasattr silent-skip is fail-open on typos, direct assignment is the honest seam."
+    },
+    {
+      "id": "RA-157",
+      "title": "Extract the two fail-closed 'not implemented' tool rituals into a shared base",
+      "description": "As an LCA maintainer, I want the fail-closed honesty ritual in one place, because BrowserSpawnTaskTool and BrowserDeepResearchTool (tools.py) each re-implement the same 'not implemented' ritual: a docstring declaring non-implementation, a logger.warning, and an Observation with success=False and a '尚未实现' error. Two = real per the deepening vocabulary. RA-151 already established driver_tool.py as the same-family home for shared tool bases (_DriverInjectedTool); this is the same shape applied to the honesty ritual, so the next placeholder tool inherits the contract instead of re-implementing it.",
+      "acceptanceCriteria": [
+        "_UnimplementedTool(Tool) base in driver_tool.py holding the ritual (warn log + fail-closed Observation); BrowserSpawnTaskTool and BrowserDeepResearchTool declare only their log tag + error message.",
+        "Honesty contract preserved: never a fabricated 'running' receipt; spec tool names/descriptions unchanged; ruff check clean."
+      ],
+      "priority": "P2",
+      "passes": false,
+      "branchName": "raphy/arch-20261019-0745",
+      "notes": "Strength: Worth exploring. Vocabulary-sanctioned two = real; RA-151 precedent for the same-family home. Duplication-class story (kept secondary per the diversity quota)."
     }
   ]
 }

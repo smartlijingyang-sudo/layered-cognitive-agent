@@ -4228,3 +4228,19 @@ brain/reducer/memory/hub/standing_refresher 等键，待 RA-123 落地后再评�
   - 工具层 success 语义要显式文档化：resilient 无 page 不是错误（success=True），诚实措辞 + details.live_page 让调用方自己分支——fail-open 和 fail-closed 之外的第三条路。
 - **实现与评估差异：** 评估给 RA-115 二选一，实现选 (a)（工具断言 has_page + 诚实措辞）；goto 失败的 title 处理评估没写死，实现因 contract 必填 str 选择保留旧标题；额外加了 details.live_page 机器可判字段。
 ---
+
+## [2026-10-19 07:45] - assess round (raphy/arch-20261019-0745): 4 candidates
+
+- Hot-spot scan: 近 45 commits 几乎全是 Muse browser 13-tool 套件线（agy + raphy RA-146~153）；friction walk 选了 browser 三块：tools/browser/（tools.py 全读）、infrastructure/browser/cdp_driver.py（全读）、subagent.py + arbitration.py（全读）。避开禁区（progress 顶部 patterns 已列的 RA-146~153 收敛区未重走——本轮恰恰是 RA-146 留下的 fallback seam 没人走过）。
+- Runtime verification（主树干净，直接跑）：(a) Agent 基本 run → COMPLETED；(b) test_browser_preview_and_takeover_e2e.py 1 passed；(c) 同一 agent 两次 run → completed/completed；另跑 browser 三套件 26 passed。无 crash/hang/silent failure，无 P0。
+- RA-154（Strong）：`_execute_via_driver`（subagent.py:120-225）~100 行 if-chain 与 executor.py `_ACTION_TOOL_NAMES` 是同一 BrowserActionType 空间的两张 dispatch 表，且已发散（executor 4 种，driver-direct 6 种，多了 TYPE/EXTRACT_TEXT）；收敛方案：map 扩展到 6 种 + if-chain 委托给 build_browser_action_executor(driver=...)。deletion test 通过。
+- RA-155（Worth exploring）：cdp_driver.py:215/:325 两处 8 字段 BrowserSessionSummary 手工重建已漂移（:215 硬编码 has_active_stream=True，:325 拷贝旧值）；contract 是 frozen pydantic，有 model_copy(update=...) 的自带 evolve seam。
+- RA-156（Worth exploring）：BrowserTaskStore.update_task 零调用者零测试（RA-152 轮已独立确认），真 mutation seam 是 steer/transfer 的直接字段写；删死 seam（hasattr 静默吞拼写错误，不如直接赋值诚实）。
+- RA-157（Worth exploring，duplication 类）：spawn_task / deep_research 两处"未实现" fail-closed 仪式逐字重复（two = real），按 RA-151 前例收进 driver_tool.py 的 _UnimplementedTool 基类。
+- 排除项（有证据不收）：`has_page()` 的写副作用被 `test_has_page_drops_a_closed_playwright_page` 经接口钉住——deletion test 通过，接口即测试面，不拆。
+- **Learnings for future iterations:**
+  - 评估"读代码"时先看有没有测试钉住可疑设计：has_page 的副作用第一眼像 leaky seam，但测试名直接写了 `drops_a_closed_playwright_page`——测试即设计文档，先读测试再判。
+  - RA-146 留的"兼容 fallback 路径"是最容易发散的 seam：主路径收敛完了，fallback 的私有表没人看——评估 hot 区时把"上一轮的兼容路径"单独列为必查项。
+  - frozen contract 的 model_copy 是免费 evolve seam：看到手写全字段重建先查 contract 是不是 BaseModel，是就直接判。
+- Diversity quota：RA-154/155/156 均来自 friction walk（leaky seam / 漂移 / 死 seam），仅 RA-157 是 duplication 类，达标。
+---
