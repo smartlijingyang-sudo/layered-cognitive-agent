@@ -50,9 +50,9 @@ def _tool_to_spec(tool: Tool) -> dict[str, Any]:
 class ToolDeferSession:
     """Run-scoped defer state."""
 
-    def __init__(self, policy: DeferPolicy) -> None:
+    def __init__(self, policy: DeferPolicy, loaded_namespaces: Sequence[str] = ()) -> None:
         self._policy = policy
-        self._loaded: set[str] = set()
+        self._loaded: set[str] = set(loaded_namespaces)
         self._eager_tools: set[str] = set()
         self._namespaces: tuple[ToolNamespace, ...] = ()
         self._specs: dict[str, dict[str, Any]] = {}  # tool name -> wire spec

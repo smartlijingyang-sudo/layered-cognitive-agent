@@ -98,6 +98,7 @@ def write_resume_bundle(session: RunSession) -> None:
         "approval_request": approval_request,
         "resume_point": resume_point,
         "started_at": session.started_at,
+        "loaded_namespaces": sorted(session.loaded_namespaces),
     }
     if validate_bundle(bundle, session.run_id) is None:
         # The write side stays best-effort: a malformed bundle is skipped,
@@ -302,6 +303,7 @@ async def _restore_from_bundle(
     session.status = RunLifecycleStatus.WAITING_INPUT
     session.approval_request = bundle.get("approval_request")
     session.snapshot = snapshot
+    session.loaded_namespaces = frozenset(bundle.get("loaded_namespaces") or ())
     # Do not recreate the step-tree fold machinery: the pause-time
     # journal.json is the historical record and must not be overwritten.
     session.step_tree_bundle = None

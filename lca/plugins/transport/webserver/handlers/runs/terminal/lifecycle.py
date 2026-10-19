@@ -38,6 +38,22 @@ from lca.plugins.transport.webserver.read.runs.terminal import (
 _log = structlog.get_logger(__name__)
 
 
+def _capture_loaded_namespaces() -> frozenset[str]:
+    """Capture the defer session's loaded namespaces at pause time.
+
+    A resumed run creates a fresh ``ToolDeferSession`` without the execution
+    environment, so the pre-pause loaded set must be persisted with the
+    resume bundle and restored on resume. Returns an empty set when no defer
+    session is bound (legacy paths).
+    """
+    from lca.infrastructure.tool_defer.session import current_defer_session
+
+    session = current_defer_session()
+    if session is None:
+        return frozenset()
+    return session.loaded_namespaces
+
+
 # ---------------------------------------------------------------------------
 # Status derivation helpers
 # ---------------------------------------------------------------------------
@@ -152,6 +168,7 @@ class RunTerminalCoordinator:
             session.snapshot = outcome.snapshot
             session.runnable = outcome.resumable
             session.approval_request = outcome.approval_request
+            session.loaded_namespaces = _capture_loaded_namespaces()
             return True
         return False
 
@@ -164,6 +181,7 @@ class RunTerminalCoordinator:
             extra = getattr(result, "extra", {}) or {}
             session.snapshot = extra.get("state_snapshot")
             session.approval_request = extra.get("approval_request")
+            session.loaded_namespaces = _capture_loaded_namespaces()
             return True
         return False
 
