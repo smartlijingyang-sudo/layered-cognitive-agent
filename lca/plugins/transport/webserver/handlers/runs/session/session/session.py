@@ -98,6 +98,10 @@ class RunSession:
     # 工具权限审批通过后，把已批准的工具名记在这里。resume 后同一 run 内
     # 模型再次调用这些工具时，act.authorize 放行（避免「审批→重调→再审批」循环）。
     approved_tool_names: set[str] = field(default_factory=set)
+    # 暂停前 defer session 已加载的命名空间（如 'shell'）。resume 会创建全新
+    # 的 ToolDeferSession，必须把这里恢复进去，否则模型恢复后对已加载工具的
+    # 调用会被 namespace_not_loaded 拒绝。
+    loaded_namespaces: frozenset[str] = frozenset()
     # Same hot-cache class: RuntimePlane handles published per-turn by the
     # execution environment. A HIL resume runs in a new task without the
     # environment, so it re-publishes these instead of re-resolving

@@ -94,7 +94,10 @@ def bind_resume_capabilities(session, bindings):
             # run's vocal contract and visible tool schema agree.
             vocal_mode = getattr(bindings, "vocal_mode", "direct") or "direct"
             defer_token = set_current_defer_session(
-                ToolDeferSession(DeferPolicy.for_vocal_mode(vocal_mode))
+                ToolDeferSession(
+                    DeferPolicy.for_vocal_mode(vocal_mode),
+                    loaded_namespaces=session.loaded_namespaces,
+                )
             )
     try:
         yield
