@@ -75,9 +75,8 @@ def bind_resume_capabilities(session, bindings):
         set_capability_bindings,
         set_current_tools_service,
     )
-    from lca.infrastructure.tool_defer.policy import DeferPolicy
     from lca.infrastructure.tool_defer.session import (
-        ToolDeferSession,
+        new_defer_session,
         reset_current_defer_session,
         set_current_defer_session,
     )
@@ -89,13 +88,13 @@ def bind_resume_capabilities(session, bindings):
         capability_token = set_capability_bindings(session.capability_bindings)
         if getattr(session, "tools_service", None) is not None:
             tools_token = set_current_tools_service(session.tools_service)
-            # Mirror the create-run policy (ADR-0248): gated vocal
-            # mode keeps the ``agent`` namespace eager so the resumed
-            # run's vocal contract and visible tool schema agree.
+            # RA-160: the vocal-mode -> defer-session derivation is shared
+            # with create-run in new_defer_session; resume only adds the
+            # pause-time loaded-namespaces seed.
             vocal_mode = getattr(bindings, "vocal_mode", "direct") or "direct"
             defer_token = set_current_defer_session(
-                ToolDeferSession(
-                    DeferPolicy.for_vocal_mode(vocal_mode),
+                new_defer_session(
+                    vocal_mode,
                     loaded_namespaces=session.loaded_namespaces,
                 )
             )

@@ -291,3 +291,27 @@ def test_turn_visible_tool_names_matches_wire() -> None:
     session.update_turn(_tools())
     wire, _catalog = session.render_turn()
     assert session.turn_visible_tool_names() == set(_wire_names(wire))
+
+
+def test_ra160_new_defer_session_shared_derivation() -> None:
+    """RA-160: new_defer_session 是 create-run 与 resume-rebind 共用的推导点。
+
+    gated -> agent 命名空间 eager（ADR-0248）；其他/空 vocal_mode -> 默认策略；
+    resume 的 loaded_namespaces seed 透传。
+    """
+    from lca.infrastructure.tool_defer.session import new_defer_session
+
+    gated = new_defer_session("gated")
+    assert "agent" in gated.policy.eager_namespaces
+    assert gated.loaded_namespaces == frozenset()
+
+    direct = new_defer_session("direct")
+    assert "agent" not in direct.policy.eager_namespaces
+
+    seeded = new_defer_session("gated", loaded_namespaces=["shell", "file"])
+    assert "agent" in seeded.policy.eager_namespaces
+    assert seeded.loaded_namespaces == frozenset({"shell", "file"})
+
+    # 两处旧调用点的 falsy 兜底（"" / None）行为保持：走默认策略
+    assert "agent" not in new_defer_session("").policy.eager_namespaces
+    assert "agent" not in new_defer_session(None).policy.eager_namespaces

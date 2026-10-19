@@ -2363,9 +2363,9 @@
         "Zero behavior change: ADR-0248 vocal-mode eager semantics untouched; existing defer policy tests stay green; ruff check clean."
       ],
       "priority": "P2",
-      "passes": false,
+      "passes": true,
       "branchName": "raphy/arch-20261019-2245",
-      "notes": "Strength: Worth exploring. Friction-walk finding (Area A, Q4 leak #2). Implementer must first grep the run-entry policy creation site; direction (a) per assessment (shared pure function), not (b) (policy into bundle, which entangles with the two-channel question)."
+      "notes": "Strength: Worth exploring. Friction-walk finding (Area A, Q4 leak #2). Implementer must first grep the run-entry policy creation site; direction (a) per assessment (shared pure function), not (b) (policy into bundle, which entangles with the two-channel question). DONE 2026-10-19: tool_defer/session.py 新增 new_defer_session(vocal_mode, *, loaded_namespaces=())（ToolDeferSession 同类家园，包级导出）；execution_environment.py（create-run）与 lifecycle.py::bind_resume_capabilities（resume-rebind）两处调用点改调它，删掉各自的 ToolDeferSession(DeferPolicy.for_vocal_mode(...)) 手工组装与 'Mirror the create-run policy' 注释；两处多余的 DeferPolicy/ToolDeferSession import 已清理。行为零变化（falsy vocal_mode -> 'direct' 兜底两边一致）。新增 1 测试（gated/direct/seed/falsy 四形态）；tool_defer 套件 73 passed + transport/webserver 82 passed，ruff clean。"
     },
     {
       "id": "RA-161",

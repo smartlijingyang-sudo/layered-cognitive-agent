@@ -10,6 +10,7 @@ from lca.infrastructure.tool_defer.policy import DeferPolicy
 from lca.infrastructure.tool_defer.session import (
     ToolDeferSession,
     current_defer_session,
+    new_defer_session,
     reset_current_defer_session,
     set_current_defer_session,
 )
@@ -23,6 +24,7 @@ __all__ = [
     "ToolDeferSession",
     "ToolSearchTool",
     "current_defer_session",
+    "new_defer_session",
     "reset_current_defer_session",
     "set_current_defer_session",
     "tool_search_factory",

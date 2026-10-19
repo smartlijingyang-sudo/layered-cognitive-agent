@@ -38,9 +38,8 @@ from lca.infrastructure.runtime_plane.capability_bindings import (
 )
 from lca.infrastructure.sandbox.runtime.scope import bind_sandbox_runtime
 from lca.infrastructure.skills.assistant.resolver import resolve_skill_store
-from lca.infrastructure.tool_defer.policy import DeferPolicy
 from lca.infrastructure.tool_defer.session import (
-    ToolDeferSession,
+    new_defer_session,
     reset_current_defer_session,
     set_current_defer_session,
 )
@@ -325,13 +324,9 @@ class RunExecutionEnvironment:
                 tools_token = set_current_tools_service(tools_service)
                 # Defer-tool seam (Muse L1 alignment): one session per run;
                 # think.reason's per-turn fork only refreshes the turn view.
-                # Gated vocal mode keeps the ``agent`` namespace eager so
-                # ``send_message`` is visible from turn one (ADR-0248);
-                # otherwise the vocal contract makes the model call a tool
-                # whose schema was never loaded.
-                defer_token = set_current_defer_session(
-                    ToolDeferSession(DeferPolicy.for_vocal_mode(vocal_mode))
-                )
+                # RA-160: the vocal-mode -> defer-session derivation is shared
+                # with the resume-rebind path in new_defer_session (ADR-0248).
+                defer_token = set_current_defer_session(new_defer_session(vocal_mode))
                 with (
                     run_workspace_scope(session.run_id) as workspace,
                     run_scope(ambit.scope) if ambit.scope is not None else nullcontext(),

@@ -4344,3 +4344,13 @@ brain/reducer/memory/hub/standing_refresher 等键，待 RA-123 落地后再评�
   - "自称唯一判定点"的 seam，先读函数体验证它到底判定了哪些键——docstring 的宣称可能是愿景不是现实（本轮：validate_bundle 宣称 the one place，实际漏了最新加的键）。
   - absent vs present-but-wrong 的区别对待是 fail-closed 里的兼容性常规动作：判 corrupt 只针对"声称有但格式错"，不针对"老版本没有"。
 ---
+
+## [2026-10-19 24:05 轮] - RA-160（defer policy 推导收进共用函数 new_defer_session）
+
+- 实现：`lca/infrastructure/tool_defer/session.py` 新增 `new_defer_session(vocal_mode, *, loaded_namespaces=())`（`ToolDeferSession` 同类家园，包级导出进 `__init__.__all__`）；`execution_environment.py`（create-run）与 `lifecycle.py::bind_resume_capabilities`（resume-rebind）两处改调它，删手工组装与 "Mirror the create-run policy" 注释；两处多余的 `DeferPolicy`/`ToolDeferSession` import 已清理（ruff F401 会抓）。
+- 行为核对：falsy vocal_mode（"" / None）→ "direct" 兜底，两边旧行为一致（for_vocal_mode 只对 "gated" 特殊处理）；resume 的 `loaded_namespaces` seed 是刻意差异，保留为关键字参数。
+- 测试：新增 1 测试（gated/direct/seed/falsy）；tool_defer 73 passed；tests/transport/test_resume_rebinds_ambient.py + tests/plugins/transport/webserver/ 82 passed；`ruff check` clean。
+- **Learnings for future iterations:**
+  - "手工镜像"类 story 动手前先确认重复的到底是哪一层：本轮两处本来就调同一个 `DeferPolicy.for_vocal_mode`（推导逻辑早已共享），真正的重复是"vocal_mode 兜底 + ToolDeferSession 组装 + ADR-0248 注释"三件套。收敛点选在 session.py（被组装对象的家园），不是 policy.py。
+  - 跨文件删 import 时用 rg 确认每个名字在该文件的剩余用量，ruff F401 是第二道网。
+---
