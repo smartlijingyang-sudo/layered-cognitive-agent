@@ -19,6 +19,7 @@ from lca.runtime.session.run_session_writer import (
     ensure_browser_widget_in_assistant_message,
     extract_pending_browser_widgets_from_events,
 )
+from lca_kernel.events.fold.fold import SURFACE_TOOL_RESULT_TYPE
 
 
 def test_defer_policy_browser_namespace() -> None:
@@ -86,7 +87,9 @@ def test_browser_widget_deterministic_fallback() -> None:
 
     events = [
         MockEvent(
-            "surface/tool_result",
+            # RA-169: fixture re-sourced onto the converged spine vocabulary
+            # (pre-RA-163 dsh-style "surface/tool_result" no longer matches).
+            SURFACE_TOOL_RESULT_TYPE,
             {
                 "content": "已打开页面：[widget:browser_preview?sessionId=brw_999&url=https%3A%2F%2Fmuse.ai&title=Muse&status=agent_running]",
                 "tool_call_id": "call_1",

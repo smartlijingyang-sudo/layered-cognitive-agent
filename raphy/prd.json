@@ -2491,9 +2491,9 @@
         "A new unit test instantiates the seam for a hypothetical third widget kind (proving the seam, not just DRY-ing two copies). ruff check clean."
       ],
       "priority": "P2",
-      "passes": false,
+      "passes": true,
       "branchName": "raphy/arch-20261020-0445",
-      "notes": "Strength: Worth exploring. Duplication-class finding (Area A Q2, secondary scan) -- paired with RA-168/RA-170 friction-walk findings so the round is not all-duplication. Callers are only append_assistant_message; seam move is local to the file."
+      "notes": "Strength: Worth exploring. Duplication-class finding (Area A Q2, secondary scan) -- paired with RA-168/RA-170 friction-walk findings so the round is not all-duplication. Callers are only append_assistant_message; seam move is local to the file.\n2026-10-20 night: landed. One parameterized seam in lca/runtime/session/run_session_writer.py: _WidgetField/_WidgetKind dataclasses + _extract_unmounted_widgets + _ensure_widgets_in_assistant_message + _parse_widget_qs + _fallback_widget_fields + _widget_field_value; connector_auth (INV-CAP-04) and browser_preview (ADR-0280) are two instantiations (_CONNECTOR_WIDGET_KIND/_BROWSER_WIDGET_KIND); the four public functions are thin wrappers with unchanged names/signatures. ~200 lines of twin logic -> ~150 lines of seam + 2 specs. Found a pre-existing red test: test_browser_widget_deterministic_fallback used the pre-RA-163 dsh-style 'surface/tool_result' fixture type (red since c970b845d); re-sourced the fixture onto SURFACE_TOOL_RESULT_TYPE (RA-167 pattern: re-source intent to SSOT, don't delete intent). New tests/runtime/test_widget_fallback_seam.py pins the seam with a hypothetical third kind ('widget:receipt'): tag extract, meta fallback, mount-skip+dedup, ensure append + omit_if_empty + no-dup. ruff check clean (format not enforced repo-wide)."
     },
     {
       "id": "RA-170",

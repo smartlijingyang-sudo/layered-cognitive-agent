@@ -4651,3 +4651,48 @@ job_id/run_id provenance).
 
 Tests: new file 4 passed; fail-closed 18 passed; fold/model_visible/token_usage
 suites 30+20 passed (3 pre-existing env skips); ruff clean on all 5 files.
+
+
+---
+
+## 2026-10-20 night — RA-169 landed (twin widget-fallback pipelines converged)
+
+`lca/runtime/session/run_session_writer.py` 的两条 ~200 行孪生 widget 保底管线
+（connector_auth / browser_preview：扫描 surface 事件找未挂载 tag → 向
+assistant content 追加 `[widget:kind?...]`）收敛为一条参数化 seam：
+
+- `_WidgetField`（wire 键/规范键/qs 别名/默认值/空值省略/fallback 键）+
+  `_WidgetKind`（name/tag 正则/id 字段/字段表/fallback 来源/必填字段）两个
+  frozen dataclass；`_extract_unmounted_widgets` /
+  `_ensure_widgets_in_assistant_message` / `_parse_widget_qs` /
+  `_fallback_widget_fields` / `_widget_field_value` 五个泛型函数；
+  `_CONNECTOR_WIDGET_KIND` / `_BROWSER_WIDGET_KIND` 两个实例；
+  四个公开函数（`extract_pending_intents_from_events` 等）保持原名/原签名，
+  变为薄封装（`lca/runtime/session/__init__.py` 与测试的引用不受影响）。
+
+附带发现并修复一个 pre-existing 红测试：
+`test_browser_widget_deterministic_fallback` 的 fixture 用了 RA-163 之前的
+dsh 风格 `"surface/tool_result"` 类型（c970b845d 起变红），按 RA-167 模式
+把 fixture re-source 到 `SURFACE_TOOL_RESULT_TYPE`（不删 intent）。
+
+Files changed: `lca/runtime/session/run_session_writer.py`（+178/-165），
+`tests/contracts/browser/test_browser_integration_and_fallback.py`（fixture），
+新测试 `tests/runtime/test_widget_fallback_seam.py`（4 个：第三种假想 kind
+的 tag 提取/meta fallback/挂载跳过+去重/追加+omit_if_empty+不重复）。
+
+**Learnings for future iterations:**
+- **孪生管线收敛时，先把两份实现的"隐式默认"对齐成显式字段（RA-169 实证）：**
+  connector 的 fallback 只读 snake_case 键、browser 读 snake|camel；ensure 的
+  tag 参数一个省略空值一个全带——这些差异必须变成 `_WidgetField` 的显式字段
+  （qs_aliases/fallback_keys/omit_if_empty），而不是在泛型函数里 if/else。
+  字段表就是差异的清单。
+- **stale fixture 的红测试先查 git 再动手（RA-169 实证）：**
+  `git stash` 验证改前已红 + `git log -S` 定位到 RA-163 词表收敛，结论是
+  fixture 过期不是产品 bug——修法是 re-source 到 SSOT 常量（RA-167 模式），
+  不是放宽实现去迁就旧 fixture。
+- **仓库不强制 `ruff format`（RA-169 实证）：** main 的同文件 `ruff format
+  --check` 本来就不过；`ruff check` 干净即达标，不要顺手 reformat 制造
+  diff 噪音。
+
+Tests: widget 相关 21 passed（含新 seam 测试 4 + RA-168 的 4）; ruff check
+clean on all touched files.
