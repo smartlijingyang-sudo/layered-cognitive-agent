@@ -2448,9 +2448,9 @@
         "Do this after RA-163 — one vocabulary must exist before the derivation can converge."
       ],
       "priority": "P2",
-      "passes": false,
+      "passes": true,
       "branchName": "raphy/arch-20261020-0145",
-      "notes": "Strength: Worth exploring. Friction-walk finding (Area C). Heaviest of the six — semantics must be adjudicated before converging, not during."
+      "notes": "Strength: Worth exploring. Friction-walk finding (Area C). Heaviest of the six — semantics must be adjudicated before converging, not during. Implemented 2026-10-20: three forks adjudicated (orphan-drop stays writer-side; declaring assistants kept on both paths; empty-result placeholder decided once at write side); writer.derive_messages relabeled as compat shim; parity pinned by tests/integration/test_derive_messages_convergence.py."
     },
     {
       "id": "RA-167",

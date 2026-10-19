@@ -4412,3 +4412,42 @@ brain/reducer/memory/hub/standing_refresher 等键，待 RA-123 落地后再评�
     `derive_messages` 保留 tool_calls——这是 RA-166 要裁定的三处分叉之一，本轮只做到"词表统一"，
     语义分叉不动。
 ---
+## [2026-10-20 02:xx 夜轮] - RA-166（情况 A）：同名 derive_messages 三处语义分叉裁定并收敛
+
+- 裁定（记在 commit body，与 RA-163 不矛盾）：
+  1. orphan-drop：写侧语义胜——保留在 writer shim（OpenAI FC 线上孤子tool行会400；
+     tests/integration/test_orphan_tool_result_drop.py 9 个场景测试钉住；orphan_dropped_count
+     挂 RunHealthReport），不进 fold SSOT（SSOT 还喂 transcript/history，静默删行等于改写历史）。
+  2. assistant tool_calls：写侧语义胜——宣告行（content=None + tool_calls）两路都保留
+     （OpenAI FC 要求宣告消息在线上；ADR-0201 MV2；Body 先提交宣告行再跑工具，
+     plugins 侧原来丢弃它会把整轮 tool 结果变成孤子）。修
+     derive_event_message assistant 分支：有 tool_calls 的行永不因空 content 被丢，
+     且 tool_calls 直通输出 dict。
+  3. 空结果占位文本：写侧 "[tool_result] (no output)" 胜
+     （test_successful_tool_without_output_states_it_explicitly 钉住；与 tool_error_text
+     “空成功会让模型盲目重试”同一道理）。收敛在写侧单决策点：
+     build_openai_tool_result_message 空/空白渲染文本直接写占位符，
+     逻辑与 _tool_result_content 字节级对齐（含 strip 边缘），两路读自然一致。
+- 改动文件：lca/plugins/session/runtime/messages/messages.py （fork2）、
+  lca/infrastructure/session/projections/tool_result_message.py （fork3）、
+  lca/runtime/session/run_session_writer.py （derive_messages docstring 重写为 RA-166 兼容垫片标签）、
+  新增 tests/integration/test_derive_messages_convergence.py （3 个三叉点 pin 测试）。
+- 测试：新 3 + orphan 9 + messages_and_fork 5 + model_visible_projection 全绿（19）；
+  writer 单测/parity/assembler/history/body 合约/run_with_tool_use/pr2/persist/seed 全绿（66）；
+  ruff check 4 文件 clean。唯一红 test_emit_diagnostic_status.py::test_audit_runs_diagnostic_status_is_mixed
+  在干净 HEAD 上同样失败（G-14 审计环境问题，与本轮无关）。
+- **Learnings for future iterations:**
+  - **收敛类 story 先写对比脚本再动手（RA-166 实证）：** 动手前先用脚本把两套实现在同一 journal
+    上跑一遍，分叉点会自己跳出来——本轮还拖出了评估没列的第四个分叉：
+    surface/developer_message 行走 fold 路径直接 ValueError（kernel surface-eligibility
+    fail-loud），走 writer 路径则保留。这是 RA-163 明确延期的残留分叉（ADR-0268
+    DSH 词表），本轮只在 shim docstring 记录为已知差异、不修。
+  - **占位符类收敛优先放写侧单决策点（RA-166 实证）：** 两路读各自重建文本永远会漂移
+    （本轮实测：空白 content + error 时两路拼接逻辑差一个 strip）。写侧一次决定占位符、
+    读侧直接用预计算的 data["message"]，分叉自然消失——这正是 ADR-0201
+    “写侧拥有线形状”的设计。
+  - **shim docstring 写清楚“委派给谁 + 保留了哪些差异”（RA-166 实证）：**
+    兼容垫片的价值在于诚实标注差异而不是藏差异——本轮的三处“保留差异”
+    （orphan-drop、developer 行直通、surface/* fallthrough）都写进了 docstring，
+    下一个接手的人不用再对比两份代码猜。
+---

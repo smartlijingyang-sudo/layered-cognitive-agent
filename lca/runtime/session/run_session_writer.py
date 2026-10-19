@@ -402,10 +402,34 @@ class RunSessionWriter(RunSessionWriterProtocol):
     def derive_messages(self) -> list[Message]:
         """Walk the journal, surface events only, build the OpenAI messages list.
 
-        Orphan-drop (OpenAI ``drop_orphan_function_calls`` mirror): drop
-        tool/result messages whose ``tool_call_id`` is not present in any
-        preceding assistant message. Drop reasoning items that follow a
-        dropped call.
+        RA-166 compatibility shim over the derive SSOT. The single source of
+        truth for "what text the model sees for a journal event" is the kernel
+        ``foldSurface`` pure function plus
+        :func:`lca.plugins.session.runtime.messages.messages.derive_event_message`
+        (shared with the ``model_visible`` projection increment and
+        ``token_usage``). The three adjudicated forks now agree on both paths:
+
+        - assistant ``tool_calls``: declaring rows are kept even when content
+          is empty/None (OpenAI FC requires the declaring message; ADR-0201
+          MV2). Fixed in the SSOT; this shim always kept them.
+        - empty tool result: ``"[tool_result] (no output)"`` on both paths,
+          decided once at write time by ``build_openai_tool_result_message``.
+        - orphan-drop: applied HERE only (OpenAI ``drop_orphan_function_calls``
+          mirror) — see retained differences below.
+
+        Retained differences (documented, not converged):
+
+        - Orphan-drop + ``orphan_dropped_count`` stay here: pinned by
+          ``tests/integration/test_orphan_tool_result_drop.py`` and wired to
+          :class:`RunHealthReport`. The fold SSOT also feeds transcript/history
+          reads, where silent row deletion would rewrite history; and this
+          shim is the actual LLM wire (``think.history.assemble``).
+        - ``surface/developer_message`` rows pass through here; the fold SSOT
+          raises ``ValueError`` on them (kernel surface-eligibility
+          fail-loud). Pre-existing divergence, deferred to its own story per
+          the RA-163 residual notes (ADR-0268 DSH vocabulary).
+        - ``surface/*`` extension fallthrough (``Message(role=event.type)``)
+          stays here; the SSOT returns ``None`` for unknown surface types.
 
         PR-2 G-17: each call increments ``orphan_dropped_count`` for any
         ``role=tool`` row removed by orphan-drop. Read via the
