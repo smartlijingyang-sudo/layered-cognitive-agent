@@ -40,6 +40,7 @@ Accept criteria (ADR-0292 §3):
 
 from __future__ import annotations
 
+import contextlib
 import dataclasses
 from types import SimpleNamespace
 
@@ -558,13 +559,52 @@ async def test_s10_authorize_passes_grant_agnostic_tool() -> None:
     assert routing.next_hint is None  # 无授权拒绝
 
 
+@contextlib.contextmanager
+def _shell_tool_defer_session(*tool_names: str):
+    """给 shell 工具审批测试装一个真实 ToolDeferSession。
+
+    RA-167 删除了 ``_STANDARD_SHELL_TOOLS`` backstop：命名空间只能来自
+    defer catalog。沿用 RA-167 自身的 re-source 模式（真实 session +
+    ``set_current_defer_session``），让 ``NamespaceApprovalStrategy`` 经
+    ambient session 把 shell 域工具判为 require_approval。
+    """
+    from lca.infrastructure.tool_defer.policy import DeferPolicy
+    from lca.infrastructure.tool_defer.session import (
+        ToolDeferSession,
+        reset_current_defer_session,
+        set_current_defer_session,
+    )
+
+    class _Tool:
+        def __init__(self, name: str, namespace: str) -> None:
+            self.name = name
+            self.namespace = namespace
+            self.description = name
+            self.parameters = {"type": "object", "properties": {}}
+
+        async def execute(self, args: dict[str, object]) -> dict[str, object]:
+            return {"ok": True}
+
+    session = ToolDeferSession(DeferPolicy.default())
+    session.update_turn([_Tool(n, "shell") for n in tool_names])
+    session.load_namespace("shell")
+    token = set_current_defer_session(session)
+    try:
+        yield session
+    finally:
+        reset_current_defer_session(token)
+
+
 @pytest.mark.asyncio
 async def test_s10_authorize_allows_previously_approved_tool(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """工具权限审批通过后（``RunSession.approved_tool_names`` 含该工具），
     act.authorize 必须放行，避免 full-restart resume 的「审批→重调→再审批」
-    循环。放行的标志是传给 gate 的 ``approval_requirement.required == False``。"""
+    循环。放行的标志是传给 gate 的 ``approval_requirement.required == False``。
+
+    RA-167：shell 命名空间来自 defer catalog（真实 session），不再走
+    ``_STANDARD_SHELL_TOOLS`` backstop。"""
     import lca.nodes.act.authorize.authorize as authorize_mod
     from lca.nodes.act.authorize.authorize import ActAuthorizeExecutor
 
@@ -578,10 +618,11 @@ async def test_s10_authorize_allows_previously_approved_tool(
         tool_calls=[ToolCall(call_id="tc_exec", tool_name="executeCode", arguments={"code": "1"})],
     )
     executor = ActAuthorizeExecutor()
-    output = await executor.node_execute(
-        NodeContext(runtime={}, budget={}, metadata={}),
-        NodeInput(port_values={"decision": decision}),
-    )
+    with _shell_tool_defer_session("executeCode"):
+        output = await executor.node_execute(
+            NodeContext(runtime={}, budget={}, metadata={}),
+            NodeInput(port_values={"decision": decision}),
+        )
     req = output.port_values["approval_requirement"]
     assert req.required is False
     assert output.port_values["approval_required"] is False
@@ -591,7 +632,10 @@ async def test_s10_authorize_allows_previously_approved_tool(
 async def test_s10_authorize_still_requires_unapproved_tool(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """未在 ``approved_tool_names`` 中的 shell 工具仍必须要求审批（安全门不失效）。"""
+    """未在 ``approved_tool_names`` 中的 shell 工具仍必须要求审批（安全门不失效）。
+
+    RA-167：shell 命名空间来自 defer catalog（真实 session），不再走
+    ``_STANDARD_SHELL_TOOLS`` backstop。"""
     import lca.nodes.act.authorize.authorize as authorize_mod
     from lca.nodes.act.authorize.authorize import ActAuthorizeExecutor
 
@@ -605,10 +649,11 @@ async def test_s10_authorize_still_requires_unapproved_tool(
         tool_calls=[ToolCall(call_id="tc_exec2", tool_name="executeCode", arguments={"code": "1"})],
     )
     executor = ActAuthorizeExecutor()
-    output = await executor.node_execute(
-        NodeContext(runtime={}, budget={}, metadata={}),
-        NodeInput(port_values={"decision": decision}),
-    )
+    with _shell_tool_defer_session("executeCode"):
+        output = await executor.node_execute(
+            NodeContext(runtime={}, budget={}, metadata={}),
+            NodeInput(port_values={"decision": decision}),
+        )
     req = output.port_values["approval_requirement"]
     assert req.required is True
     assert output.port_values["approval_required"] is True
@@ -619,7 +664,10 @@ async def test_s10_authorize_approved_alias_allows_camel_case_call(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """批准记录与放行检查都用规范形：批准 ``execute_code``（snake）后，模型用
-    ``executeCode``（camelCase 别名）再次调用同一工具也必须放行。"""
+    ``executeCode``（camelCase 别名）再次调用同一工具也必须放行。
+
+    RA-167：shell 命名空间来自 defer catalog（真实 session），不再走
+    ``_STANDARD_SHELL_TOOLS`` backstop；拼写归一走 ``canonical_tool_name``。"""
     import lca.nodes.act.authorize.authorize as authorize_mod
     from lca.nodes.act.authorize.authorize import ActAuthorizeExecutor
 
@@ -635,10 +683,11 @@ async def test_s10_authorize_approved_alias_allows_camel_case_call(
         ],
     )
     executor = ActAuthorizeExecutor()
-    output = await executor.node_execute(
-        NodeContext(runtime={}, budget={}, metadata={}),
-        NodeInput(port_values={"decision": decision}),
-    )
+    with _shell_tool_defer_session("executeCode"):
+        output = await executor.node_execute(
+            NodeContext(runtime={}, budget={}, metadata={}),
+            NodeInput(port_values={"decision": decision}),
+        )
     req = output.port_values["approval_requirement"]
     assert req.required is False
     assert output.port_values["approval_required"] is False
