@@ -1,4 +1,10 @@
 ## Codebase Patterns
+- **收敛三叉派生路径前，先把三条路径的真实分歧枚举全（RA-168 评估实证）：**
+  同一行 journal event 可能同时被 writer wire、shared SSOT（derive_event_message）、kernel fold
+  三条路径派生；评估时只看其中一条会漏掉真正的分歧（本轮：writer passthrough、
+  SSOT 静默 drop、fold ValueError——三种语义）。动手点名文件前，先把每条路径对该行
+  的 inclusion/shape 语义列出来，分歧数 = 故事的验收条数。
+
 - 删除硬编码 fallback 时，先 grep 全仓测试找 pin 住它行为的用例——blast radius 常超出 story 点名的文件（RA-167：criterion 只点了 1 个文件，实际 5 个测试/4 个文件 依赖 no-session backstop）。不要删测试的 intent，把它们 re-source 到 SSOT 上 （本例：defer catalog/session），安全语义保持、来源换正主。
 
 - **热升级重 exec 前先删 pyc：同秒同尺寸改写会让 pyc 校验误判（RA-162 实证）：**
@@ -4564,3 +4570,37 @@ Evidence notes:
 
 Tests: 113 passed (tests/infrastructure/runtime_plane/ + 3 scenario/runtime files), ruff clean on
 all 5 touched files.
+
+---
+
+## 2026-10-20 night — assess 04:45 round (3 candidates: RA-168/169/170)
+
+Branch `raphy/arch-20261020-0445` from main `88c83a37b`. YAGNI scope over last
+~40 commits; friction-walked 3 hot areas end-to-end: run session writer /
+message derivation (full read), tool defer session + approval engine (full
+read), runtime loop + browser tools (structure scan). Runtime verification:
+mock-LLM smoke (a)+(c) -> RUN1: completed | RUN2: completed; 01:45 round's
+scripted harness already covered (b) tool-call and (d) non-converging
+(Result failed, no exception, RA-023 pinned) -- no new crash/hang found.
+
+Findings:
+- **RA-168 (Strong, P1)**: one `surface/developer_message` journal row is
+  passthrough on the LLM wire / silently dropped by the shared SSOT
+  `derive_event_message` / fail-loud ValueError in the kernel fold
+  (reproduced on a real developer-row envelope). Cron handoff appends this
+  row every handoff turn (ADR-0268 section 6) -- production crash vector.
+  RA-163's docstring said this gets 'its own story' -- none existed (all 167
+  stories grepped). Marker `surface_op='developer_message'` is the RA-163
+  type-suffix mistake class.
+- **RA-169 (Worth exploring, P2)**: twin ~200-line unmounted-widget fallback
+  pipelines (connector_auth x browser_preview) in run_session_writer.py --
+  one parameterized seam, two instantiations.
+- **RA-170 (Worth exploring, P2)**: `_drop_reasoning_after_dropped_calls` is a
+  permanently dead pipeline stage (no reasoning-item event type exists) --
+  delete or implement + pin.
+
+Diversity quota satisfied (RA-168 leaky seam + RA-170 shallow/no-op from the
+friction walk; RA-169 the secondary duplication finding).
+
+Top recommendation: RA-168 first (only production-relevant divergence; explicit
+RA-163 residual debt on the 'what text the model sees' SSOT).
