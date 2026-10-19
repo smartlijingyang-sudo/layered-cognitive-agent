@@ -4325,3 +4325,13 @@ brain/reducer/memory/hub/standing_refresher 等键，待 RA-123 落地后再评�
   - fail-closed 前先全仓 grep producer：本轮 `url_id`/`outlink_idx`/`line_start` 全仓零内部 producer（LLM 唯一调用方），才敢做硬拒绝；有 producer 时先读 producer 的期望。
   - steer 选了"受理+details 声明"而非硬拒绝：参数不决定主要语义（指令注入）时，硬拒绝会误伤主流程；参数决定导航目标（open 的 url_id）时必须硬拒绝。fail-closed 的粒度跟"参数是否决定主语义"走。
 ---
+
+## [2026-10-19 23:40 轮] - RA-159（StateSnapshot 显式 paused_at 字段，解除 created_at 重载）
+
+- 实现：`lca/contracts/models/core/state/state.py` 加 `paused_at: datetime | None = None`；`point.py` 的 `resume_point_to_state_snapshot` 改写 `paused_at`（不再碰 `created_at`），`resume_point_from_state_snapshot` 改读 `snapshot.paused_at`（反向适配器是第二个重载消费者，一起解）；`runtime_loop.py::_paused_seconds_since` 改读显式字段（None→0.0）。
+- 消费者图谱（实现前 grep 确认）：`created_at` 的暂停语义只有这两处消费；其他 `StateSnapshot(` 构造点（result_projection/state.snapshot()/各测试）都不设 `created_at`，加字段零兼容风险。`promotion.py`/`fs_repository.py` 的 `created_at` 是别的类，无关。
+- 测试：旧测试 `test_resume_point_to_snapshot_maps_paused_at_to_created_at` 钉的是被 story 废除的重载契约，按 RA-154 模式随契约更新为新断言（仍覆盖 wall-clock 回归）；新增 3 测试。295 + 15 + 3 全绿，`ruff check` clean。
+- **Learnings for future iterations:**
+  - 解字段重载时必须双向查：`to_snapshot`（写）和 `from_snapshot`（读）是同一重载的两个消费者，只改一边会制造新的不对称 bug。本轮 grep 发现反向适配器也在读 `created_at` 当暂停时刻——评估时子任务没标出来，协调者实现前全图 grep 补上了。
+  - 旧测试钉旧契约时：先判断测试钉的是"私有路径旧塑形"还是"story 要求的契约本身"。本轮是后者（story 明确要求废除双语义），所以测试随契约改是正当的，且在测试 docstring 里写明了原因，避免后人误判为"修掉测试"。
+---

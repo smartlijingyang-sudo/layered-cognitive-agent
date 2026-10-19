@@ -2350,9 +2350,9 @@
         "Tests: paused_at round-trips through the snapshot; a snapshot without paused_at yields 0 seconds (old-bundle compat); the DefaultReducer budget shift is still driven by paused_at; existing resume-point round-trip tests stay green; ruff check clean."
       ],
       "priority": "P1",
-      "passes": false,
+      "passes": true,
       "branchName": "raphy/arch-20261019-2245",
-      "notes": "Strength: Strong. Friction-walk finding (Area A, Q4 leak #1): a contracts-layer seam lying about field semantics; deletion test passes -- pause semantics gets its own name instead of parasitizing created_at."
+      "notes": "Strength: Strong. Friction-walk finding (Area A, Q4 leak #1): a contracts-layer seam lying about field semantics; deletion test passes -- pause semantics gets its own name instead of parasitizing created_at. DONE 2026-10-19: StateSnapshot 新增 paused_at: datetime | None = None（state.py）；resume_point_to_state_snapshot 改写 paused_at、不再碰 created_at；resume_point_from_state_snapshot 改读 snapshot.paused_at（反向适配器同步解重载）；_paused_seconds_since 改读显式字段（None->0.0，老 bundle 兼容）。旧测试 test_resume_point_to_snapshot_maps_paused_at_to_created_at 随契约变更更新为新断言（RA-154 模式：钉旧塑形的精确断言随 story 要求的契约统一而改）；新增 3 测试（paused_at 字段替代重载 / 无 paused_at round-trip 得 0 / _paused_seconds_since 读显式字段，补 Q5 缺口）。295（plugins/session+emit+resume_memory）+15（resume lifecycle+restart recovery）+3（result_projection）全绿，ruff clean。"
     },
     {
       "id": "RA-160",

@@ -89,6 +89,11 @@ class StateSnapshot:
     state_ref: str
     reason: SnapshotReason = SnapshotReason.PERIODIC
     created_at: datetime = field(default_factory=utc_now)
+    # RA-159: the WAITING_INPUT pause moment on the resume path. ``None`` =
+    # not a resume snapshot (or a bundle predating this field). Never overload
+    # ``created_at`` with pause semantics again -- it means snapshot creation
+    # time on every path.
+    paused_at: datetime | None = None
     phase_cursor: PhaseRunCursor | None = field(default=None, compare=True, repr=True)
     # The trace remains stable across a paused turn and its eventual resume.
     # ``run_id`` is filled by the Agent lifecycle boundary after it owns the
