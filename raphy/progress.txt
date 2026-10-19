@@ -4510,3 +4510,25 @@ brain/reducer/memory/hub/standing_refresher 等键，待 RA-123 落地后再评�
     `ApprovalRequirement` 和 `ApprovalPolicyEngine` 两个 import 变死——删测试
     后必跑一遍 `ruff check`，让 F401 告诉你还有哪些是只为它活着的。
 ---
+## [2026-10-20 03:xx 夜轮] - RA-165（情况 A）：DynamicPluginToolAdapter JSON 归一化 schema 感知
+- 实现内容：`execute` 的字符串 JSON-revival 改为 schema 感知——新增
+  `_schema_properties()`（取 parameters.properties）与 `_should_revive_json()`
+  （字段声明为 array/object 才 revive；未声明字段保持旧宽松行为；
+  声明为其他类型如 string 则原样透传）；每次 revive 打
+  `dynamic_tool.json_arg_revived` debug 日志（tool_name + field）。
+- 改动文件：`lca/infrastructure/tools/dynamic/bridge.py`（归一化循环 + 2 helper）；
+  `tests/infrastructure/tools/dynamic/test_dynamic_tool_bridge.py`（+3 测试，
+  + structlog import）。
+- 测试：旧 `test_dynamic_tool_adapter_json_string_argument_unpacking` 全绿
+  （无 schema → 未声明字段 → 旧宽松行为）；新 3 全绿（string 字段 `"[1, 2, 3]"`
+  不改写 / object 字段 revive + `capture_logs` 断言日志带 field 名 / array
+  字段 revive）；`ruff check` 2 文件 clean。
+- **Learnings for future iterations:**
+  - **“只对声明字段收紧、未声明保持旧行为”是兼容式收敛的标准形状（RA-165 实证）：**
+    旧 happy-path 测试桥接时根本不传 parameters（properties={}）；若把“未声明”
+    也判为不 revive，旧测试就红——收紧只针对“schema 明确说了 string”的字段，
+    未声明 = 信息不足 = 保持旧行为。这不是和稀泥，是“有证据才收紧”。
+  - **criterion-2 的 grep 结论要写进 story notes（RA-165 实证）：** 全仓 python
+    扫描确认零 in-repo plugin_meta 声明 parameters——“没有插件依赖宽松 revive”
+    这个结论本身就是证据，写进 notes，下一轮不用重查。
+---

@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Any
 
 import pytest
+import structlog
 
 from lca.contracts.models.core.execution.decision import Observation
 from lca.contracts.models.core.execution.result import ToolExecutionError
@@ -254,3 +255,71 @@ async def test_dynamic_tool_adapter_json_string_argument_unpacking() -> None:
     assert res.success is True
     assert res.payload == 65
     assert received_items == [10, 20, 30]
+
+
+@pytest.mark.asyncio
+async def test_dynamic_tool_adapter_string_field_not_rewritten() -> None:
+    """RA-165: a string-typed schema field is never JSON-rewritten."""
+    received: list[Any] = []
+
+    def echo_code(code: str) -> str:
+        received.append(code)
+        return code
+
+    tool = DynamicToolBridge.bridge_callable(
+        name="echo_code",
+        func=echo_code,
+        description="Echo a code snippet",
+        parameters={"type": "object", "properties": {"code": {"type": "string"}}},
+    )
+    res = await tool.execute({"code": "[1, 2, 3]"})
+    assert res.success is True
+    assert received == ["[1, 2, 3]"]
+    assert res.payload == "[1, 2, 3]"
+
+
+@pytest.mark.asyncio
+async def test_dynamic_tool_adapter_object_field_revives_with_debug_log() -> None:
+    """RA-165: an object-typed schema field still revives, debug log names the field."""
+    received: list[Any] = []
+
+    def apply_config(config: dict[str, Any]) -> dict[str, Any]:
+        received.append(config)
+        return config
+
+    tool = DynamicToolBridge.bridge_callable(
+        name="apply_config",
+        func=apply_config,
+        description="Apply config",
+        parameters={"type": "object", "properties": {"config": {"type": "object"}}},
+    )
+    with structlog.testing.capture_logs() as logs:
+        res = await tool.execute({"config": '{"a": 1}'})
+    assert res.success is True
+    assert received == [{"a": 1}]
+    assert res.payload == {"a": 1}
+    revived = [e for e in logs if e.get("event") == "dynamic_tool.json_arg_revived"]
+    assert len(revived) == 1
+    assert revived[0]["field"] == "config"
+    assert revived[0]["tool_name"] == "apply_config"
+
+
+@pytest.mark.asyncio
+async def test_dynamic_tool_adapter_array_field_revives() -> None:
+    """RA-165: an array-typed schema field still revives."""
+    received: list[Any] = []
+
+    def sum_items(items: list[int]) -> int:
+        received.append(items)
+        return sum(items)
+
+    tool = DynamicToolBridge.bridge_callable(
+        name="sum_items",
+        func=sum_items,
+        description="Sum items",
+        parameters={"type": "object", "properties": {"items": {"type": "array"}}},
+    )
+    res = await tool.execute({"items": "[4, 5]"})
+    assert res.success is True
+    assert received == [[4, 5]]
+    assert res.payload == 9

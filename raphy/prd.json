@@ -2433,9 +2433,9 @@
         "test_dynamic_tool_adapter_json_string_argument_unpacking stays green (happy path preserved); new tests: string field receiving \"[1, 2]\" is NOT rewritten; object field receiving a JSON string still revives; ruff check clean."
       ],
       "priority": "P2",
-      "passes": false,
+      "passes": true,
       "branchName": "raphy/arch-20261020-0145",
-      "notes": "Strength: Worth exploring. Friction-walk finding (Area A, Q3 no-locality case). Touches LLM fault-tolerance behavior — check plugin dependencies first."
+      "notes": "Strength: Worth exploring. Friction-walk finding (Area A, Q3 no-locality case). Touches LLM fault-tolerance behavior — check plugin dependencies first. DONE 2026-10-20: DynamicPluginToolAdapter.execute now revives stringified JSON only for fields whose parameters schema declares type array/object (_should_revive_json); undeclared fields keep legacy leniency (existing test_dynamic_tool_adapter_json_string_argument_unpacking stays green); string-typed fields pass through untouched; each revival logs dynamic_tool.json_arg_revived with tool_name+field at debug. Criterion-2 grep evidence: zero in-repo plugin_meta declares 'parameters' (lca/+tests/ repo-wide python scan), so no existing plugin depends on loose revival for a string-typed field -- no opt-in flag needed. 3 new tests (string not rewritten / object revives + debug log asserts field name / array revives); 9/9 in test_dynamic_tool_bridge.py green; ruff clean."
     },
     {
       "id": "RA-166",
