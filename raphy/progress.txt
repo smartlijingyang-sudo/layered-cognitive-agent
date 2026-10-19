@@ -4282,3 +4282,11 @@ brain/reducer/memory/hub/standing_refresher 等键，待 RA-123 落地后再评�
   - `model_copy(update=...)` 是 frozen contract 的 evolve seam：8 字段只写变更字段，后续 contract 加字段零触碰。收敛前先确认测试钉的是语义（title/url）而非旧塑形——本轮 `test_browser_reopen_snapshot.py` 全是语义断言，直接改。
   - `has_active_stream` 两处语义本就不同（init 是"刚建立流"，navigate 是"流状态未知保留旧值"）——"漂移"不一定是 bug，先判断语义再决定收敛形状；显式保留比静默抹掉诚实。
 ---
+
+## 2026-10-19 09:10 - RA-156
+- 删除 `BrowserTaskStore.update_task`（task_store.py:64-73）：删除前全仓 grep `update_task`（lca/ + tests/）确认仅定义 1 处、零调用者；steer/transfer 的直接字段写（task.status / task.payment_approved）+ add_timeline_step 原样保留，为唯一变更路径。
+- Files changed: lca/infrastructure/tools/browser/task_store.py, raphy/prd.json, raphy/progress.txt
+- **Learnings for future iterations:**
+  - 删死 seam 前不只查"被谁调用"，还查全仓 `update_task` 字符串引用（RA-137 规则的同形应用）——本轮定义是唯一命中，直接删。
+  - hasattr silent-skip 的 fail-open 性质是评估要删的核心原因：死 seam 不是无害冗余，是会吞掉拼写错误的假 affordance。
+---

@@ -2307,9 +2307,9 @@
         "No test references update_task (verified: none do); full browser suites (contracts/browser, scenario/browser, infrastructure/browser) stay green; ruff check clean."
       ],
       "priority": "P2",
-      "passes": false,
+      "passes": true,
       "branchName": "raphy/arch-20261019-0745",
-      "notes": "Strength: Worth exploring. Deletion-of-dead-code per RA-137 precedent. Alternative considered and rejected: routing steer/transfer through update_task — hasattr silent-skip is fail-open on typos, direct assignment is the honest seam."
+      "notes": "Strength: Worth exploring. Deletion-of-dead-code per RA-137 precedent. Alternative considered and rejected: routing steer/transfer through update_task — hasattr silent-skip is fail-open on typos, direct assignment is the honest seam. DONE 2026-10-19: 全仓 grep（lca/+tests/）复核仅定义处 1 处、零调用者后删除 BrowserTaskStore.update_task；grep update_task 全仓 0 引用；contracts/browser + scenario/browser + infrastructure/browser 三套件 58 passed, ruff clean。"
     },
     {
       "id": "RA-157",
