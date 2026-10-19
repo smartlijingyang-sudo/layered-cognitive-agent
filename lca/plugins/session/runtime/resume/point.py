@@ -9,6 +9,7 @@ ignorant of whether a snapshot or a payload arrives first.
 from __future__ import annotations
 
 from collections.abc import Mapping
+from datetime import UTC, datetime
 
 from lca.contracts.atoms.ids.ids import RunId, TraceId
 from lca.contracts.harness.collaboration.agent import ApprovalResumePoint
@@ -33,6 +34,7 @@ def serialize_resume_point(point: ApprovalResumePoint) -> dict[str, object]:
         "budget_snapshot": dict(point.budget_snapshot),
         "trace_id": point.trace_id,
         "run_id": point.run_id,
+        "paused_at": point.paused_at,
     }
 
 
@@ -56,19 +58,20 @@ def deserialize_resume_point(payload: Mapping[str, object]) -> ApprovalResumePoi
         },
         trace_id=TraceId(_optional_text(payload, "trace_id")),
         run_id=RunId(_optional_text(payload, "run_id")),
+        paused_at=_optional_float(payload, "paused_at"),
     )
 
 
 def resume_point_to_state_snapshot(point: ApprovalResumePoint) -> StateSnapshot:
     """Reconstruct the existing runtime snapshot without reviving a live object."""
 
-    return StateSnapshot(
-        snapshot_id=point.snapshot_id,
-        step=point.step,
-        state_ref=point.state_ref,
-        trace_id=point.trace_id,
-        run_id=point.run_id,
-        phase_cursor=PhaseRunCursor(
+    kwargs: dict[str, object] = {
+        "snapshot_id": point.snapshot_id,
+        "step": point.step,
+        "state_ref": point.state_ref,
+        "trace_id": point.trace_id,
+        "run_id": point.run_id,
+        "phase_cursor": PhaseRunCursor(
             plan_ref=point.plan_ref,
             node_id=point.node_id,
             visit_counts=point.visit_counts,
@@ -77,7 +80,10 @@ def resume_point_to_state_snapshot(point: ApprovalResumePoint) -> StateSnapshot:
             causation_refs=point.causation_refs,
             budget_snapshot=dict(point.budget_snapshot),
         ),
-    )
+    }
+    if point.paused_at:
+        kwargs["created_at"] = datetime.fromtimestamp(point.paused_at, tz=UTC)
+    return StateSnapshot(**kwargs)
 
 
 def resume_point_from_state_snapshot(approval_id: str, snapshot: object) -> ApprovalResumePoint:
@@ -86,6 +92,8 @@ def resume_point_from_state_snapshot(approval_id: str, snapshot: object) -> Appr
     cursor = getattr(snapshot, "phase_cursor", None)
     if cursor is None:
         raise ValueError("approval resume requires a declarative phase_cursor")
+    created_at = getattr(snapshot, "created_at", None)
+    paused_at = created_at.timestamp() if created_at is not None else 0.0
     return ApprovalResumePoint(
         approval_id=approval_id,
         snapshot_id=_attr_text(snapshot, "snapshot_id"),
@@ -102,6 +110,7 @@ def resume_point_from_state_snapshot(approval_id: str, snapshot: object) -> Appr
         budget_snapshot={str(key): int(value) for key, value in cursor.budget_snapshot.items()},
         trace_id=TraceId(_attr_optional_text(snapshot, "trace_id")),
         run_id=RunId(_attr_optional_text(snapshot, "run_id")),
+        paused_at=paused_at,
     )
 
 
@@ -115,6 +124,13 @@ def _text(payload: Mapping[str, object], field: str) -> str:
 def _optional_text(payload: Mapping[str, object], field: str) -> str:
     value = payload.get(field, "")
     return value if isinstance(value, str) else ""
+
+
+def _optional_float(payload: Mapping[str, object], field: str) -> float:
+    value = payload.get(field, 0.0)
+    if isinstance(value, bool):
+        return 0.0
+    return float(value) if isinstance(value, (int, float)) else 0.0
 
 
 def _non_negative_int(value: object, field: str) -> int:

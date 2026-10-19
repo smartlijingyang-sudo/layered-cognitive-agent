@@ -147,6 +147,23 @@ def test_apply_resume_records_input_turn_and_restores_working_status() -> None:
     assert out.step == 1
 
 
+def test_apply_resume_extends_wall_clock_budget_by_pause_duration() -> None:
+    from datetime import timedelta
+
+    from lca.contracts.atoms.ids.ids import utc_now
+
+    state = _state()
+    state.status = TaskStatus.INPUT_REQUIRED
+    assert state.budget.max_wall_clock_seconds == 300
+    # Run started 600s ago; it paused 400s ago (pre-pause active time = 200s).
+    state.budget.started_at = utc_now() - timedelta(seconds=600)
+    assert state.budget.exceeded(resource="wall_clock_seconds")
+
+    out = DefaultReducer().apply_resume(state, "yes", None, paused_seconds=400)
+
+    assert out.budget.exceeded(resource="wall_clock_seconds") is False
+
+
 def test_apply_artifact_closure_method_is_removed() -> None:
     """ADR-0158 决策 六:apply_artifact_closure 整段删除;Reducer 不再折叠 closure。
 

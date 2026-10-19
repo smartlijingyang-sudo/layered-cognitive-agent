@@ -9,6 +9,7 @@ from __future__ import annotations
 import functools
 import logging
 from collections.abc import Callable
+from datetime import timedelta
 from typing import TYPE_CHECKING, ParamSpec, TypeVar, cast, overload
 
 from pydantic import BaseModel
@@ -525,6 +526,8 @@ class DefaultReducer(Reducer):
         state: AgentState,
         input_value: object | None,
         turn: Turn | None,
+        *,
+        paused_seconds: float = 0.0,
     ) -> AgentState:
         state.status = TaskStatus.WORKING
         if input_value is not None:
@@ -532,6 +535,10 @@ class DefaultReducer(Reducer):
         if turn is not None:
             state.history.append(turn)
             state.step += 1
+        if paused_seconds > 0 and state.budget is not None:
+            # HITL wall-clock budget: paused time waiting for human input is
+            # not active reasoning, so shift the clock forward on resume.
+            state.budget.started_at = state.budget.started_at + timedelta(seconds=paused_seconds)
         return state
 
     @_instrument_apply

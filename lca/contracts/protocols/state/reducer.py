@@ -100,8 +100,15 @@ class Reducer(Protocol):
         state: AgentState,
         input_value: object | None,
         turn: Turn | None,
+        *,
+        paused_seconds: float = 0.0,
     ) -> AgentState:
-        """恢复已加载状态；可选地折叠人工输入对应的 ``Turn``。"""
+        """恢复已加载状态；可选地折叠人工输入对应的 ``Turn``。
+
+        ``paused_seconds`` 是本 run 等待人工输入期间经过的秒数。wall-clock
+        预算只应统计活跃推理时间，恢复时把 ``budget.started_at`` 向后平移该
+        时长，避免长时间暂停导致预算耗尽、恢复即失败。
+        """
         ...
 
     def apply_paused(self, state: AgentState, snapshot_ref: object) -> AgentState:

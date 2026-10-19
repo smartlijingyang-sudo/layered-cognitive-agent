@@ -17,7 +17,7 @@ from typing import TYPE_CHECKING, Any, cast
 if TYPE_CHECKING:
     from lca.infrastructure.observability.spine.event.record import Outcome
 
-from lca.contracts.atoms.ids.ids import new_id
+from lca.contracts.atoms.ids.ids import new_id, utc_now
 from lca.contracts.models.auto_review.models import AutoReviewMode as AutoReviewModeEnum
 from lca.contracts.models.core.execution.result import Result
 from lca.contracts.models.core.policy.budget import DEFAULT_MAX_STEPS, create_budget
@@ -76,6 +76,19 @@ if TYPE_CHECKING:
     from lca_kernel.events.session.session import SessionProtocol
 
 logger = logging.getLogger(__name__)
+
+
+def _paused_seconds_since(snapshot: StateSnapshot) -> float:
+    """Seconds the run spent paused before this resume, per the snapshot.
+
+    The snapshot's ``created_at`` is the WAITING_INPUT pause time when the
+    resume bundle carried ``paused_at``; older bundles leave it at the
+    reconstruction time, yielding zero so the pre-fix behavior is preserved.
+    """
+    if snapshot.created_at is None:
+        return 0.0
+    elapsed = (utc_now() - snapshot.created_at).total_seconds()
+    return elapsed if elapsed > 0 else 0.0
 
 
 class CognitiveRuntime(Runtime):
@@ -380,6 +393,7 @@ class CognitiveRuntime(Runtime):
             state,
             resume_input.input_value,
             resume_input.turn,
+            paused_seconds=_paused_seconds_since(snapshot),
         )
         # ADR-0246 PR-8: 恢复路径补跑记忆捕获——人工回答也是用户陈述，
         # 先提炼身份/偏好再进入下一轮，避免「说了但没记」。
