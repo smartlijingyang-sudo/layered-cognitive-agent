@@ -4696,3 +4696,28 @@ Files changed: `lca/runtime/session/run_session_writer.py`（+178/-165），
 
 Tests: widget 相关 21 passed（含新 seam 测试 4 + RA-168 的 4）; ruff check
 clean on all touched files.
+
+
+---
+
+## 2026-10-20 night — RA-170 landed (delete the no-op reasoning-drop stage)
+
+删除了 `lca/runtime/session/run_session_writer.py` 里永久 no-op 的
+`_drop_reasoning_after_dropped_calls`（函数本体 + `derive_messages` 里的
+唯一调用点）：它恒返回输入不变，而 journal 里根本不存在 reasoning-item
+事件类型——这是为不存在的事件类型准备的假想 seam，不配占一个 pipeline
+stage。原调用处留了一行注释说明删除理由。
+
+orphan-drop 的 wire 语义（OpenAI `drop_orphan_function_calls` 镜像 +
+PR-2 G-17 `orphan_dropped_count`）完全未动；删除在构造上就是行为中性的。
+
+Files changed: `lca/runtime/session/run_session_writer.py`（-16/+4）。
+
+**Learnings for future iterations:**
+- **"保守起见留着"的 no-op stage 是技术债的温床（RA-170 实证）：**
+  docstring 写着"No-op when..."的函数，如果那个 when 永远不成立，它就是
+  死代码——删它比留着更诚实。deletion test 没过（删了什么都没浓缩）的
+  反面：留着它是在暗示 pipeline 有这个 stage，新人会误以为 reasoning
+  drop 是真实行为。
+
+Tests: orphan-drop + writer + developer-convergence 16 passed; ruff clean.

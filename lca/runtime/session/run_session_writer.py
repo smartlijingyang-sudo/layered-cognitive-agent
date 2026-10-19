@@ -134,16 +134,6 @@ def _drop_orphan_tool_results(
     return kept
 
 
-def _drop_reasoning_after_dropped_calls(messages: list[Message]) -> list[Message]:
-    """Drop reasoning items emitted before a dropped tool call.
-
-    No-op when no reasoning-item event type is in the journal: orphan-drop
-    is conservative and only removes what it can identify. Returns the
-    input unchanged.
-    """
-    return messages
-
-
 class RunSessionWriter(RunSessionWriterProtocol):
     """Owner of the run-scoped Session. Single surface append path."""
 
@@ -458,7 +448,9 @@ class RunSessionWriter(RunSessionWriterProtocol):
         counter: list[int] = [0]
         msgs = _drop_orphan_tool_results(msgs, counter=counter)
         self._orphan_dropped_count += counter[0]
-        msgs = _drop_reasoning_after_dropped_calls(msgs)
+        # RA-170: the speculative _drop_reasoning_after_dropped_calls stage
+        # (a pipeline step for a reasoning-item event type that does not
+        # exist) was deleted — a hypothetical seam earns no pipeline stage.
         return msgs
 
     @property

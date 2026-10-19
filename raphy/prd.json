@@ -2504,9 +2504,9 @@
         "derive_messages behavior is identical on all existing fixtures: tests/integration/test_orphan_tool_result_drop.py and the run-session writer tests green without semantic loosening. ruff check clean."
       ],
       "priority": "P2",
-      "passes": false,
+      "passes": true,
       "branchName": "raphy/arch-20261020-0445",
-      "notes": "Strength: Worth exploring. Shallow/no-op finding (Area A Q5). Behavior-neutral by construction if deleted; orphan-drop wire semantics (OpenAI drop_orphan_function_calls mirror, PR-2 G-17 counter) must stay untouched."
+      "notes": "Strength: Worth exploring. Shallow/no-op finding (Area A Q5). Behavior-neutral by construction if deleted; orphan-drop wire semantics (OpenAI drop_orphan_function_calls mirror, PR-2 G-17 counter) must stay untouched.\n2026-10-20 night: landed. Deleted _drop_reasoning_after_dropped_calls (the function + its single call site in derive_messages) — it always returned its input unchanged; no reasoning-item event type exists in the journal, so the stage was permanently dead. A one-line comment records the deletion rationale at the former call site. Orphan-drop wire semantics (OpenAI drop_orphan_function_calls mirror + PR-2 G-17 orphan_dropped_count) untouched. Behavior-neutral by construction: orphan-drop + writer + RA-168 convergence tests all green."
     }
   ]
 }
