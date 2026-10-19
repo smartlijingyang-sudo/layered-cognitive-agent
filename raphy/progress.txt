@@ -4290,3 +4290,12 @@ brain/reducer/memory/hub/standing_refresher 等键，待 RA-123 落地后再评�
   - 删死 seam 前不只查"被谁调用"，还查全仓 `update_task` 字符串引用（RA-137 规则的同形应用）——本轮定义是唯一命中，直接删。
   - hasattr silent-skip 的 fail-open 性质是评估要删的核心原因：死 seam 不是无害冗余，是会吞掉拼写错误的假 affordance。
 ---
+
+## 2026-10-19 09:25 - RA-157
+- `driver_tool.py` 新增 `_UnimplementedTool(Tool)`：`execute` 持有共享的 fail-closed 仪式（logger.warning + success=False/payload=None/error 含"尚未实现" 的 Observation）；子类只声明 `_log_tag` / `_not_implemented_error` ClassVar + `_log_detail(args)` 参数摘要。
+- `BrowserSpawnTaskTool`/`BrowserDeepResearchTool` 改继承 `_UnimplementedTool`：各自 execute 仪式删除；error 文案逐字不变；RA-149/RA-147 的 honesty 注释保留在 `_log_detail` 上；deep research 类 docstring 补"后端尚未实现，调用 fail-closed"声明；spec 的 name/description ClassVar 未动。
+- Files changed: lca/infrastructure/tools/browser/driver_tool.py, lca/infrastructure/tools/browser/tools.py, raphy/prd.json, raphy/progress.txt
+- **Learnings for future iterations:**
+  - 收基类前先查生产构造点：`build_browser_tools` 里 `BrowserSpawnTaskTool(driver)` 传 driver —— 基类 `__init__` 必须兼容收下（收下不用 + 注释说明），否则生产构造点炸。
+  - honesty 契约的测试钉点（success=False、error 含"尚未实现"、payload None）在 test_browser_muse_full_suite.py——改仪式前先读测试的断言集合，确认哪些是语义 pin。
+---

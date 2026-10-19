@@ -2320,9 +2320,9 @@
         "Honesty contract preserved: never a fabricated 'running' receipt; spec tool names/descriptions unchanged; ruff check clean."
       ],
       "priority": "P2",
-      "passes": false,
+      "passes": true,
       "branchName": "raphy/arch-20261019-0745",
-      "notes": "Strength: Worth exploring. Vocabulary-sanctioned two = real; RA-151 precedent for the same-family home. Duplication-class story (kept secondary per the diversity quota)."
+      "notes": "Strength: Worth exploring. Vocabulary-sanctioned two = real; RA-151 precedent for the same-family home. Duplication-class story (kept secondary per the diversity quota). DONE 2026-10-19: driver_tool.py 新增 _UnimplementedTool(Tool)（RA-151 的 _DriverInjectedTool 同类家园）：execute 持有 warn + fail-closed Observation 仪式，子类只声明 _log_tag/_not_implemented_error + _log_detail(args)。BrowserSpawnTaskTool/BrowserDeepResearchTool 改继承基类，error 文案逐字不变（测试钉的“尚未实现”/payload None 全过）；deep research 类 docstring 补声明未实现；_UnimplementedTool.__init__ 兼容 driver=None（build_browser_tools 历史上传 driver 构造 spawn）。三套件 58 passed, ruff clean。"
     }
   ]
 }
