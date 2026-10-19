@@ -12,6 +12,7 @@ import pytest
 
 from lca_kernel.events.fold.fold import (
     SURFACE_ASSISTANT_TYPE,
+    SURFACE_DEVELOPER_TYPE,
     SURFACE_EVENT_TYPES,
     SURFACE_TOOL_RESULT_TYPE,
     SURFACE_USER_TYPE,
@@ -28,6 +29,7 @@ from lca_kernel.events.fold.fold import (
 USER = SURFACE_USER_TYPE
 ASSISTANT = SURFACE_ASSISTANT_TYPE
 TOOL = SURFACE_TOOL_RESULT_TYPE
+DEVELOPER = SURFACE_DEVELOPER_TYPE
 
 
 def ev(
@@ -88,16 +90,21 @@ def dsh_tool_data(call_id: str, content: str, *, is_error: bool = False) -> dict
 
 
 def test_dsh_type_names_are_not_eligible() -> None:
-    """dsh 原名不是 LCA surface 闭集;必须先映射到 spine category。"""
+    """dsh 原名不是 LCA surface 闭集;必须先映射到 spine category。
+
+    RA-168 起闭集为 4 成员(dsh 核心三类型 + surface/developer_message 扩展)。
+    """
     assert isSurfaceEligibleType("user/message") is False
     assert isSurfaceEligibleType("assistant/message") is False
     assert isSurfaceEligibleType("tool/result") is False
     assert isSurfaceEligibleType(USER) is True
     assert isSurfaceEligibleType(ASSISTANT) is True
     assert isSurfaceEligibleType(TOOL) is True
+    assert isSurfaceEligibleType(DEVELOPER) is True
     assert isSurfaceEligibleType("turn/start") is False
     assert isSurfaceEligibleType("spine.llm.call.start") is False
-    assert frozenset({USER, ASSISTANT, TOOL}) == SURFACE_EVENT_TYPES
+    assert isSurfaceEligibleType("surface/unknown_future_type") is False
+    assert frozenset({USER, ASSISTANT, TOOL, DEVELOPER}) == SURFACE_EVENT_TYPES
 
 
 # ── 空流 / 非 surface ────────────────────────────────────────────────────
