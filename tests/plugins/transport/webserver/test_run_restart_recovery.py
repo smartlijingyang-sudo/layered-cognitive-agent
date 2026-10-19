@@ -103,6 +103,7 @@ def test_write_and_load_resume_bundle(tmp_path: Path) -> None:
     run_dir.mkdir(parents=True, exist_ok=True)
     session = _paused_session()
     session.locator.run_dir.return_value = run_dir
+    session.loaded_namespaces = frozenset({"shell", "file"})
 
     write_resume_bundle(session)
 
@@ -117,6 +118,7 @@ def test_write_and_load_resume_bundle(tmp_path: Path) -> None:
     assert bundle["approval_request"]["approval_id"] == "plan-ref-1:intervene.interrupt:1"
     assert bundle["resume_point"]["approval_id"] == "plan-ref-1:intervene.interrupt:1"
     assert bundle["resume_point"]["state_ref"] == "mem://trace-rec-1/0"
+    assert bundle["loaded_namespaces"] == ["file", "shell"]
 
     loaded = load_resume_bundle("run-rec-1", session.locator)
     assert loaded == bundle

@@ -51,6 +51,19 @@ def _bound_session() -> tuple[ToolDeferSession, Any]:
     return session, token
 
 
+def test_tool_defer_session_restores_loaded_namespaces() -> None:
+    session = ToolDeferSession(
+        DeferPolicy.default(),
+        loaded_namespaces=("shell", "file"),
+    )
+    assert session.loaded_namespaces == frozenset({"shell", "file"})
+
+
+def test_tool_defer_session_default_loaded_is_empty() -> None:
+    session = ToolDeferSession(DeferPolicy.default())
+    assert session.loaded_namespaces == frozenset()
+
+
 async def test_execute_loads_namespace_and_returns_specs() -> None:
     session, token = _bound_session()
     try:
