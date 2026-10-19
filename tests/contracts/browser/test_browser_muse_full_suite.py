@@ -457,3 +457,79 @@ async def test_ra153_navigate_goto_failure_no_fabricated_title() -> None:
     assert summary.title == "Old Title"
     assert summary.title != "Navigated Page"
     assert summary.url == "https://example.com/other"
+
+
+@pytest.mark.asyncio
+async def test_ra158_open_tool_integer_url_id_fails_closed() -> None:
+    """RA-158: 整数 url_id（页面 ID 形态）必须 fail-closed，绝不能 str() 后导航到 https://5 并谎报成功。"""
+    tool = BrowserOpenTool(driver=_Ra153FakeDriver(live=True))
+    obs = await tool.execute({"url_id": 5})
+    assert obs.success is False
+    assert "url_id" in (obs.error or "")
+
+
+@pytest.mark.asyncio
+async def test_ra158_open_tool_outlink_idx_and_line_start_fail_closed() -> None:
+    """RA-158: schema 声明但实现不支持的 outlink_idx/line_start 必须 fail-closed，不能静默忽略。"""
+    tool = BrowserOpenTool(driver=_Ra153FakeDriver(live=True))
+    obs = await tool.execute({"url": "https://example.com", "outlink_idx": 1})
+    assert obs.success is False
+    assert "outlink_idx" in (obs.error or "")
+    obs2 = await tool.execute({"url": "https://example.com", "line_start": 10})
+    assert obs2.success is False
+    assert "line_start" in (obs2.error or "")
+
+
+@pytest.mark.asyncio
+async def test_ra158_open_tool_url_shaped_url_id_still_honored() -> None:
+    """RA-158: url_id 本身是 URL 形态时沿用旧路径（向后兼容），裸域名照旧补 https://。"""
+    tool = BrowserOpenTool(driver=_Ra153FakeDriver(live=True))
+    obs = await tool.execute({"url_id": "https://example.com"})
+    assert obs.success is True
+    assert obs.payload["url"] == "https://example.com"
+    obs2 = await tool.execute({"url_id": "muse.ai"})
+    assert obs2.success is True
+    assert obs2.payload["url"] == "https://muse.ai"
+
+
+@pytest.mark.asyncio
+async def test_ra158_lookup_citation_url_id_fails_closed() -> None:
+    """RA-158: browser_lookup_citation_url 的 url_id 声明了但从不读取，必须 fail-closed。"""
+    tool = BrowserLookupCitationUrlTool()
+    obs = await tool.execute({"citation_id": "c1", "url_id": 7})
+    assert obs.success is False
+    assert "url_id" in (obs.error or "")
+
+
+@pytest.mark.asyncio
+async def test_ra158_steer_screenshot_request_declared_not_silently_ignored() -> None:
+    """RA-158: steer 的 user_requested_screenshot 不支持——指令照常受理，但 details 必须诚实声明未处理。"""
+    from lca.contracts.atoms.ids.ids import new_id
+    from lca.infrastructure.tools.browser.task_store import (
+        BrowserTaskRecord,
+        get_shared_task_store,
+    )
+
+    task_id = new_id("btask")
+    store = get_shared_task_store()
+    store.register_task(BrowserTaskRecord(
+        task_id=task_id,
+        task_description="RA-158 steer 截图声明测试",
+        session_id="brw_ra158",
+        status="running",
+        initial_url="https://example.com",
+        current_url="https://example.com",
+        title="RA-158",
+    ))
+    tool = BrowserSteerTaskTool()
+    obs = await tool.execute({
+        "browser_task_id": task_id,
+        "task": "继续",
+        "user_requested_screenshot": True,
+    })
+    assert obs.success is True
+    assert obs.payload["details"]["status"] == "running"
+    assert obs.payload["details"]["user_requested_screenshot"] == "unsupported_ignored"
+    # 不带该参数时 details 里不应出现该键
+    obs2 = await tool.execute({"browser_task_id": task_id, "task": "继续"})
+    assert "user_requested_screenshot" not in obs2.payload["details"]

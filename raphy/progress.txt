@@ -4314,3 +4314,14 @@ brain/reducer/memory/hub/standing_refresher 等键，待 RA-123 落地后再评�
   - fail-closed 哲学下 absent vs present-but-wrong 要区别对待：老 bundle 兼容要求 absent 放行，只对 present-but-wrong 判 corrupt（RA-161）。
   - assess 轮读大文件用"子任务只读拆分 + 协调者亲自核关键断言"的分工：子任务给广度，协调者对要开 story 的每个断言亲自 grep 验证（如本轮亲自验证了 url_id 零 producer、validate_bundle 函数体）。
 ---
+
+## [2026-10-19 23:20 轮] - RA-158（browser 工具声明但不用的参数 fail-closed）
+
+- 实现：`lca/infrastructure/tools/browser/tools.py` 新增 `_looks_like_url`（纯数字=页面 ID 形态）；`BrowserOpenTool.validate` 对 `outlink_idx`/`line_start`/非 URL 形态 `url_id` 返回命名 fail-closed 错误；`BrowserLookupCitationUrlTool` 新增 `validate`（`url_id` 出现即 fail-closed）；`BrowserSteerTaskTool` 的 `user_requested_screenshot` 改为"指令照常受理 + details 声明 `unsupported_ignored`"（叙事==实现，RA-148 第二选项），参数描述同步改为诚实措辞。
+- 文件：`lca/infrastructure/tools/browser/tools.py`、`tests/contracts/browser/test_browser_muse_full_suite.py`（+5 测试）。
+- 测试：合同套件 23 passed（18 原有 + 5 新增）；`ruff check` clean。
+- **Learnings for future iterations:**
+  - 工具参数"声明但不用"的扫描要两遍：第一遍宽松正则会误报 schema 嵌套 key（`scope.kind`、`verticals.items`）和带默认值的 `args.get("x", d)`；第二遍用精确前缀匹配（`args.get("x"`/`args["x"`）复核。
+  - fail-closed 前先全仓 grep producer：本轮 `url_id`/`outlink_idx`/`line_start` 全仓零内部 producer（LLM 唯一调用方），才敢做硬拒绝；有 producer 时先读 producer 的期望。
+  - steer 选了"受理+details 声明"而非硬拒绝：参数不决定主要语义（指令注入）时，硬拒绝会误伤主流程；参数决定导航目标（open 的 url_id）时必须硬拒绝。fail-closed 的粒度跟"参数是否决定主语义"走。
+---

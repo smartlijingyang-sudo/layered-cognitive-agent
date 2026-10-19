@@ -2335,9 +2335,9 @@
         "New tests pin the three fail-closed paths plus the steer details declaration; all existing browser suites stay green; ruff check clean."
       ],
       "priority": "P1",
-      "passes": false,
+      "passes": true,
       "branchName": "raphy/arch-20261019-2245",
-      "notes": "Strength: Strong. Friction-walk finding (Area B): mechanical schema-vs-execute scan with false positives eliminated; 'the interface is the test surface' -- the LLM-facing contract currently promises page-ID resolution it cannot deliver."
+      "notes": "Strength: Strong. Friction-walk finding (Area B): mechanical schema-vs-execute scan with false positives eliminated; 'the interface is the test surface' -- the LLM-facing contract currently promises page-ID resolution it cannot deliver. DONE 2026-10-19: tools.py 新增 _looks_like_url（纯数字=页面 ID 形态）；BrowserOpenTool.validate 对 outlink_idx/line_start/非 URL 形态 url_id fail-closed；BrowserLookupCitationUrlTool 新增 validate（url_id 出现即 fail-closed）；BrowserSteerTaskTool 的 user_requested_screenshot 改为受理指令+details 声明 unsupported_ignored（叙事==实现），参数描述同步诚实化。5 个新测试全绿（整数 url_id/outlink_idx/line_start/lookup url_id 四条 fail-closed + URL 形态 url_id 向后兼容 + steer details 声明）；合同套件 23 passed，ruff clean。"
     },
     {
       "id": "RA-159",
