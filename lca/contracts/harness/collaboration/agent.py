@@ -77,6 +77,9 @@ class ApprovalResumePoint:
     # Optional for journal records created before recovery correlation was added.
     trace_id: TraceId = ""  # type: ignore[assignment]
     run_id: RunId = ""  # type: ignore[assignment]
+    # Epoch seconds when the run entered WAITING_INPUT. Preserved so a resumed
+    # run can exclude the paused duration from its wall-clock budget.
+    paused_at: float = 0.0
 
     def __post_init__(self) -> None:
         if not self.approval_id.strip():
