@@ -2,12 +2,9 @@
 
 from __future__ import annotations
 
-import importlib.util
-import sys
 from dataclasses import dataclass
 from enum import StrEnum
 from pathlib import Path
-from typing import Any
 
 import structlog
 
@@ -15,6 +12,7 @@ from lca.contracts.models.preset.package import AuthoredPlugin, PresetPackage, P
 from lca.contracts.protocols import Tool
 from lca.contracts.protocols.preset.repository import PresetRepositoryProtocol
 from lca.infrastructure.preset.fs_repository import FileSystemPresetRepository
+from lca.infrastructure.preset.plugin_loading import extract_entry, load_plugin_module
 from lca.infrastructure.tools.dynamic.bridge import DynamicToolBridge
 
 _log = structlog.get_logger(__name__)
@@ -159,45 +157,22 @@ class AssistantPresetDiscovery:
         return "\n".join(lines)
 
     def _load_plugin_tool(self, preset_dir: Path, plugin: AuthoredPlugin) -> Tool | None:
-        """Dynamically load and adapt a plugin into a Tool instance."""
+        """Dynamically load and adapt a plugin into a Tool instance.
+
+        模块加载与入口发现走共享 seam（``lca.infrastructure.preset.plugin_loading``，
+        RA-162）：``require_meta=False`` 保持 discovery 线的 8-fallback 宽松度；
+        同一 ``.py`` 若经 creator 管线加载过，复用 ``sys.modules`` 里的同一个
+        module 对象。
+        """
         plugin_file = preset_dir / "plugins" / f"{plugin.name}.py"
         if not plugin_file.is_file():
             plugin_file = preset_dir / f"{plugin.name}.py"
         if not plugin_file.is_file():
             return None
 
-        module_name = f"lca_presets._autonomous.{preset_dir.name}.{plugin.name}"
-        spec = importlib.util.spec_from_file_location(module_name, str(plugin_file))
-        if spec is None or spec.loader is None:
-            raise ImportError(f"Failed to create spec for {plugin_file}")
+        module = load_plugin_module(plugin_file, plugin.name)
+        target_fn, meta = extract_entry(module, plugin.name, require_meta=False)
 
-        module = importlib.util.module_from_spec(spec)
-        sys.modules[module_name] = module
-        spec.loader.exec_module(module)
-
-        # 1. Check for factory
-        factory_fn = getattr(module, "factory", None) or getattr(
-            module, f"{plugin.name}_factory", None
-        )
-        target_fn: Any = None
-        if factory_fn is not None and callable(factory_fn):
-            target_fn = factory_fn()
-        else:
-            target_fn = getattr(module, plugin.name, None) or getattr(module, "run", None)
-            if target_fn is None:
-                for candidate in ("analyze", "execute", "handler", "main"):
-                    fn = getattr(module, candidate, None)
-                    if callable(fn):
-                        target_fn = fn
-                        break
-
-        if target_fn is None:
-            raise AttributeError(
-                f"Plugin {plugin.name!r} does not expose a callable factory, "
-                f"function {plugin.name!r}, or run()"
-            )
-
-        meta: dict[str, Any] = getattr(module, "plugin_meta", {}) or {}
         desc = (
             meta.get("description")
             or getattr(target_fn, "__doc__", "")

@@ -2391,9 +2391,9 @@
         "Existing suites stay green: test_cordis_creator_assistant_closed_loop.py, test_dynamic_tool_bridge.py, test_tool_namespace_adr0256_conformance.py; ruff check clean. ADR-0256 namespace fail-fast registration semantics unchanged."
       ],
       "priority": "P1",
-      "passes": false,
+      "passes": true,
       "branchName": "raphy/arch-20261020-0145",
-      "notes": "Strength: Strong. Friction-walk finding (Area A, creator bridge). Note: the directly-private _load_plugin_tool call in test_cordis_creator_assistant_closed_loop.py:390 can be rerouted through the new public function as a side benefit. Out of scope: CreatorRuntime's private-attr penetration (recorded in assessment.md, next round)."
+      "notes": "Strength: Strong. Friction-walk finding (Area A, creator bridge). Note: the directly-private _load_plugin_tool call in test_cordis_creator_assistant_closed_loop.py:390 can be rerouted through the new public function as a side benefit. Out of scope: CreatorRuntime's private-attr penetration (recorded in assessment.md, next round). DONE 2026-10-20: converged into lca/infrastructure/preset/plugin_loading.py (plugin_module_name/load_plugin_module/extract_entry); loader.extract_plugin_factory and discovery._load_plugin_tool both delegate, require_meta=True/False keeps each line's strictness. Content-digest-aware sys.modules reuse: same path+content -> one exec, identical module object; content change (hot upgrade) -> re-exec. Stale-pyc trap fixed: same-second same-size rewrite no longer execs old bytecode (_drop_stale_bytecode). 4 new tests in tests/infrastructure/preset/test_plugin_loading.py (dual-pipeline identity, PR12 PluginMetaMissing, bare execute fallback, hot-upgrade re-exec); 28 tests green incl. scenario_5 hot-upgrade + ADR-0256 conformance; ruff clean."
     },
     {
       "id": "RA-163",

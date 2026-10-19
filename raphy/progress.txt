@@ -1,5 +1,15 @@
 ## Codebase Patterns
 
+- **热升级重 exec 前先删 pyc：同秒同尺寸改写会让 pyc 校验误判（RA-162 实证）：**
+  CPython pyc 有效性校验用整数秒 mtime + size；插件 `.py` 在同一秒内被改写且
+  字节数不变时，`SourceFileLoader.exec_module` 会直接执行旧字节码，热升级静默
+  失效（本轮实测：VERSION=1 的模块判定重 exec 后仍是 1，`mod_v2 is not mod_v1`
+  通过但内容是旧的——极易误判为“已重载”）。修法：内容摘要判定需要重 exec
+  后，先 `importlib.util.cache_from_source` 定位并删除 pyc，再走正常 spec 流程。
+  注意：内容不变命中缓存直接返回时 pyc 新旧无所谓——只有“判定要重 exec”的
+  分支需要删。
+
+
 - **词表收敛必须连 marker 值一起收敛，单收敛 type 等于换了个 raise（RA-163 实证）：**
   `surface_op="user_message"` 这类调用方自造的 marker 字符串，即使 type 已收敛到 kernel
   合格闭集，照样触发 `_surface_op_of` 的第二个 `ValueError`（"carries an invalid surfaceOp"）。
@@ -4450,4 +4460,36 @@ brain/reducer/memory/hub/standing_refresher 等键，待 RA-123 落地后再评�
     兼容垫片的价值在于诚实标注差异而不是藏差异——本轮的三处“保留差异”
     （orphan-drop、developer 行直通、surface/* fallthrough）都写进了 docstring，
     下一个接手的人不用再对比两份代码猜。
+---
+## [2026-10-20 03:xx 夜轮] - RA-162（情况 A）：creator/discovery 双 importlib exec + 入口发现收敛
+- 实现内容：新增 `lca/infrastructure/preset/plugin_loading.py`（`plugin_module_name` /
+  `load_plugin_module` / `extract_entry` 三函数）；`loader.extract_plugin_factory`
+  与 `discovery._load_plugin_tool` 都委托给共享 seam；`require_meta=True/False`
+  把两线既有严格度收进显式参数（creator 线 PR12 `PluginMetaMissing` 不动，
+  discovery 线 8-fallback 宽松启发式逐字保留）。模块名由绝对路径 sha256 派生
+  （`lca_presets._exec.<name>.<digest>`），`_EXEC_CACHE` 按（模块名，内容摘要）
+  复用：同路径同内容一进程只 exec 一次、两条管线拿到同一 module 对象；
+  磁盘内容变化（热升级）则重 exec，保证永远加载最新源码。
+- 改动文件：新增 `lca/infrastructure/preset/plugin_loading.py`、
+  `tests/infrastructure/preset/test_plugin_loading.py`（4 测试）；改
+  `lca/plugins/tools/cordis_control/loader.py`（`extract_plugin_factory` 委托，
+  删 `importlib.util` / `PluginMetaMissing` 未用 import）、
+  `lca/infrastructure/preset/discovery.py`（`_load_plugin_tool` 委托，删
+  `importlib.util` / `sys` / `typing.Any` 未用 import）。`_load_plugin_tool`
+  方法保留（scenario 测试 :390 的直接调用不动，最小 diff）。
+- 测试：新 4 全绿（双管线同模块对象 + 旧双名永不出现 + exec_count==1 /
+  PR12 缺 meta 抛 `PluginMetaMissing` / bare `execute` 回退可用 /
+  热升级重 exec + 内容不变复用）；`tests/infrastructure/preset/` +
+  `test_dynamic_tool_bridge.py` + ADR-0256 conformance +
+  `test_cordis_creator_assistant_closed_loop.py` 共 28 全绿（含 scenario_5
+  热升级+回滚）；`ruff check` 4 文件 clean。
+- **Learnings for future iterations:**
+  - **热升级重 exec 前先删 pyc（RA-162 实证）：** 见顶部 Codebase Patterns 新条目。
+    同秒同尺寸改写是热升级/测试高频形状（v1→v2 只改几个字符），pyc 陷阱必中；
+    本轮是先被自己的新测试抓到（`is not` 通过但 VERSION 仍是 1），再被 dbg2
+    脚本（慢 import 把两次写分隔到不同秒）反证——“能复现→修→再验证”是标准动作。
+  - **收敛双 exec 类 story，先跑热升级场景测试再定复用语义（RA-162 实证）：**
+    第一版纯 `sys.modules` 复用直接干掉了 scenario_5 热升级（`total_dropoff`
+    KeyError）。“同一路径只 exec 一次”与“热升级要重载”不矛盾：复用键必须是
+    （路径，内容摘要），不是路径本身。先跑既有热升级测试，复用语义自然浮现。
 ---

@@ -9,13 +9,18 @@
 - :func:`ensure_plugin_on_disk`：把源文本写到 preset 目录（mount / publish
   都需要），为后续 ``importlib.util.spec_from_file_location`` 提供磁盘路径。
 
+模块加载与入口发现走共享 seam（``lca.infrastructure.preset.plugin_loading``，
+RA-162）：creator 管线与 preset 自主发现管线用同一模块名方案 + 内容摘要
+感知的 ``sys.modules`` 复用——同一 ``.py`` 内容不变时一进程只 exec 一次，
+磁盘内容变化（热升级）时重新 exec；入口发现的严格度由 ``require_meta``
+显式选择（creator 线 PR12 严格，discovery 线 8-fallback 宽松）。
+
 为什么独立成模块：cordis_control Tool 主类体超过 250 行有效代码上限，
 helpers 独立后既满足宪法 §8.2 行数守卫，又能让 Tool 类聚焦「4-action 分发」。
 """
 
 from __future__ import annotations
 
-import importlib.util
 import sys
 from contextlib import suppress
 from pathlib import Path
@@ -23,8 +28,8 @@ from typing import Any, cast
 
 from lca.application.authoring.preset_authoring import PresetAuthoring
 from lca.contracts.harness.composition.plugin_meta import PluginMeta
-from lca.contracts.mechanisms.composition.composition import PluginMetaMissing
 from lca.contracts.models.core.execution.sandbox import SANDBOX_MOUNT_ROOT
+from lca.infrastructure.preset.plugin_loading import extract_entry, load_plugin_module
 
 
 def resolve_plugin_path(path: str, *, assistant_home: Path | None = None) -> Path:
@@ -87,6 +92,11 @@ def extract_plugin_factory(
     PR12 强制：plugin 源模块必须显式声明 ``plugin_meta`` 字典；缺则抛
     :class:`PluginMetaMissing`（不允许自动补全，避免隐性默认）。
 
+    模块加载与入口发现收敛到共享 seam
+    （``lca.infrastructure.preset.plugin_loading``）：``require_meta=True``
+    保持 creator 线的 PR12 严格度；同一 ``.py`` 若经 discovery 管线加载过，
+    复用 ``sys.modules`` 里的同一个 module 对象。
+
     Returns:
         ``(factory_callable, plugin_meta_dict)``
     """
@@ -100,29 +110,10 @@ def extract_plugin_factory(
     if path_added:
         sys.path.insert(0, preset_root_str)
     try:
-        module_name = f"lca_agent_presets._runtime.{plugin_name}"
-        spec = importlib.util.spec_from_file_location(module_name, str(target))
-        if spec is None or spec.loader is None:
-            raise ImportError(f"无法为 {target} 构建 importlib spec")
-        module = importlib.util.module_from_spec(spec)
-        sys.modules[module_name] = module
-        spec.loader.exec_module(module)
-
-        factory_callable = getattr(module, "factory", None) or getattr(
-            module, f"{plugin_name}_factory", None
+        module = load_plugin_module(target, plugin_name)
+        factory_callable, plugin_meta_raw = extract_entry(
+            module, plugin_name, require_meta=True
         )
-        if factory_callable is None or not callable(factory_callable):
-            raise PluginMetaMissing(
-                f"plugin 模块 {target} 未定义 factory() 或 {plugin_name}_factory()",
-                plugin_name=plugin_name,
-            )
-
-        plugin_meta_raw = getattr(module, "plugin_meta", None)
-        if not plugin_meta_raw:
-            raise PluginMetaMissing(
-                f"plugin 模块 {target} 缺少 plugin_meta TypedDict（PR12 强制）",
-                plugin_name=plugin_name,
-            )
         plugin_meta: dict[str, Any] = dict(plugin_meta_raw)
         plugin_meta.setdefault("name", plugin_name)
         plugin_meta.setdefault("layer", "behavior")
