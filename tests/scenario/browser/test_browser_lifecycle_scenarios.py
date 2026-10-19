@@ -308,8 +308,19 @@ async def test_scenario_operate_browser_type_click_screenshot() -> None:
         BrowserAction(action_type=BrowserActionType.CLICK, selector="#go"),
     )
     assert clicked.success is True
-    assert clicked.details == {"live": True}
+    # RA-154: driver 直驱收敛到共享执行 seam，CLICK 结果塑形与工具路径统一
+    # （details 含 selector）；旧精确 {"live": True} 钉的是已消除的分歧。
+    assert clicked.details["live"] is True
     assert page._elements["body"].text == "Greeting: Hi Muse"
+
+    # RA-154: EXTRACT_TEXT 经共享执行 seam 走新的 browser_extract_text 工具。
+    extracted = await subagent.execute_action(
+        sid,
+        BrowserAction(action_type=BrowserActionType.EXTRACT_TEXT),
+    )
+    assert extracted.success is True
+    assert extracted.details == {"live": True}
+    assert "Greeting: Hi Muse" in (extracted.text_content or "")
 
     shot_tool = BrowserScreenshotTool(driver=driver)
     shot_obs = await shot_tool.execute({"session_id": sid})

@@ -61,16 +61,6 @@ class BrowserTaskStore:
         status_priority = {"running": 0, "parked": 1, "human_takeover": 2, "succeeded": 3, "failed": 4, "blocked": 5, "closed": 6}
         return sorted(tasks, key=lambda t: (status_priority.get(t.status, 9), -t.updated_at_ms))
 
-    def update_task(self, task_id: str, **kwargs: Any) -> BrowserTaskRecord | None:
-        task = self._tasks.get(task_id)
-        if not task:
-            return None
-        for k, v in kwargs.items():
-            if hasattr(task, k):
-                setattr(task, k, v)
-        task.updated_at_ms = int(time.time() * 1000)
-        return task
-
     def add_timeline_step(self, task_id: str, action: str, detail: str) -> None:
         task = self._tasks.get(task_id)
         if not task:

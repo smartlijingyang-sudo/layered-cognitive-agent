@@ -26,7 +26,9 @@ logger = logging.getLogger(__name__)
 _ACTION_TOOL_NAMES: dict[BrowserActionType, str] = {
     BrowserActionType.NAVIGATE: "browser_navigate",
     BrowserActionType.CLICK: "browser_click",
+    BrowserActionType.TYPE: "browser_type",
     BrowserActionType.SCREENSHOT: "browser_screenshot",
+    BrowserActionType.EXTRACT_TEXT: "browser_extract_text",
     BrowserActionType.CLOSE: "browser_close",
 }
 
@@ -71,11 +73,14 @@ def _result_from_observation(
 def build_browser_action_executor(
     tools: Sequence[Tool] | None = None,
     driver: Any | None = None,
+    session_id: str | None = None,
 ) -> Callable[[BrowserAction], Awaitable[BrowserActionResult]]:
     """构建浏览器动作执行器：把 BrowserAction 分发到真实的浏览器工具。
 
     :param tools: 显式工具集；不传则用 build_browser_tools(driver) 构建。
     :param driver: 透传给 build_browser_tools 的 CDP 驱动。
+    :param session_id: 透传给各浏览器工具的会话 ID（RA-154：subagent driver
+        直驱路径用；不传则工具按各自缺省处理）。
     """
     tool_list = list(tools) if tools is not None else build_browser_tools(driver)
     by_name = {getattr(tool, "name", ""): tool for tool in tool_list}
@@ -89,8 +94,11 @@ def build_browser_action_executor(
                 success=False,
                 error=f"没有浏览器工具支撑动作 '{action.action_type.value}'",
             )
+        args = _args_for(action)
+        if session_id is not None:
+            args["session_id"] = session_id
         try:
-            observation = await tool.execute(_args_for(action))
+            observation = await tool.execute(args)
         except Exception as exc:
             logger.warning("浏览器工具 %s 执行异常: %s", tool_name, exc)
             return BrowserActionResult(

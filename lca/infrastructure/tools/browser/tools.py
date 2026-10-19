@@ -20,6 +20,7 @@ from lca.contracts.models.core.execution.decision import Observation
 from lca.contracts.protocols import Tool
 from lca.infrastructure.tools.browser.driver_tool import (
     _DriverInjectedTool,
+    _UnimplementedTool,
     browser_preview_widget_tag,
 )
 from lca.infrastructure.tools.browser.task_store import (
@@ -375,7 +376,7 @@ class BrowserLookupCitationUrlTool(Tool):
 # 2. 实时浏览器任务层（6 个核心工具，异步委托、任务自包含、权限收敛）
 # =====================================================================
 
-class BrowserSpawnTaskTool(_DriverInjectedTool):
+class BrowserSpawnTaskTool(_UnimplementedTool):
     """浏览器异步任务派发工具：派发后端尚未实现，调用 fail-closed（Muse 核心任务层占位）。"""
 
     name: ClassVar[str] = "browser_spawn_task"
@@ -416,20 +417,14 @@ class BrowserSpawnTaskTool(_DriverInjectedTool):
     effect_kind: ClassVar[Literal["ephemeral", "persistent", "stateful_once"]] = "persistent"
     default_timeout_s: ClassVar[int] = 30
 
-    async def execute(self, args: dict[str, Any]) -> Observation:
+    _log_tag: ClassVar[str] = "[BrowserSpawnTaskTool]"
+    _not_implemented_error: ClassVar[str] = "浏览器异步任务派发尚未实现：browser_spawn_task 当前无法派发真实后台任务（无 worker 后端、无 handoff 回流接线）"
+
+    def _log_detail(self, args: dict[str, Any]) -> str:
         # RA-149: 没有真实的异步派发后端（无 worker loop、无 handoff producer，
         # task_description 全仓零消费者），诚实 fail-closed。绝不返回"已派发/running"的伪造回执。
         task_text = str(args.get("task") or "")
-        logger.warning(
-            "[BrowserSpawnTaskTool] async spawn backend not implemented (task=%r)",
-            task_text[:80],
-        )
-        return Observation(
-            observation_id=new_id("obs"),
-            success=False,
-            payload=None,
-            error="浏览器异步任务派发尚未实现：browser_spawn_task 当前无法派发真实后台任务（无 worker 后端、无 handoff 回流接线）",
-        )
+        return f"async spawn backend not implemented (task={task_text[:80]!r})"
 
 
 
@@ -821,8 +816,8 @@ class BrowserGetCaptchaPreferenceTool(Tool):
 # 4. 研究层（1 个工具，深度调研，带来源与报告返回）
 # =====================================================================
 
-class BrowserDeepResearchTool(Tool):
-    """派发隔离的深度研究任务（Muse 研究层规范）。"""
+class BrowserDeepResearchTool(_UnimplementedTool):
+    """派发隔离的深度研究任务（Muse 研究层规范）。后端尚未实现，调用 fail-closed。"""
 
     name: ClassVar[str] = "browser_deep_research"
     namespace: ClassVar[str] = "browser"
@@ -848,23 +843,15 @@ class BrowserDeepResearchTool(Tool):
     effect_kind: ClassVar[Literal["ephemeral", "persistent", "stateful_once"]] = "persistent"
     default_timeout_s: ClassVar[int] = 30
 
-    async def execute(self, args: dict[str, Any]) -> Observation:
+    _log_tag: ClassVar[str] = "[BrowserDeepResearchTool]"
+    _not_implemented_error: ClassVar[str] = "深度研究 worker 尚未实现：browser_deep_research 当前无法派发真实研究任务"
+
+    def _log_detail(self, args: dict[str, Any]) -> str:
         # RA-147: 当前没有真实的深度研究 worker 后端（无派发目标、无 handoff
         # 接线），诚实 fail-closed。绝不返回"已启动/running"的伪造回执。
         mission = str(args.get("mission") or "")
         slug = str(args.get("slug") or "")
-        logger.warning(
-            "[BrowserDeepResearchTool] deep research worker not implemented "
-            "(mission=%r slug=%r)",
-            mission[:80],
-            slug,
-        )
-        return Observation(
-            observation_id=new_id("obs"),
-            success=False,
-            payload=None,
-            error="深度研究 worker 尚未实现：browser_deep_research 当前无法派发真实研究任务",
-        )
+        return f"deep research worker not implemented (mission={mission[:80]!r} slug={slug!r})"
 
 
 # =====================================================================
@@ -1014,6 +1001,91 @@ class BrowserCloseTool(_DriverInjectedTool):
         return Observation(observation_id=new_id("obs"), success=True, payload=res.model_dump())
 
 
+class BrowserTypeTool(_DriverInjectedTool):
+    """浏览器文本输入工具（兼容层：subagent TYPE 动作的共享执行支撑，RA-154）。"""
+
+    name: ClassVar[str] = "browser_type"
+    namespace: ClassVar[str] = "browser"
+    description: ClassVar[str] = "在网页指定的 CSS 或 XPath 选择器元素中输入文本。"
+    parameters: ClassVar[dict[str, Any]] = {
+        "type": "object",
+        "properties": {
+            "selector": {"type": "string", "description": "目标输入元素选择器"},
+            "text": {"type": "string", "description": "要输入的文本内容"},
+            "session_id": {"type": "string", "description": "目标浏览器会话 ID"},
+        },
+        "required": ["selector"],
+    }
+    is_idempotent: ClassVar[bool] = False
+    effect_kind: ClassVar[Literal["ephemeral", "persistent", "stateful_once"]] = "ephemeral"
+    default_timeout_s: ClassVar[int] = 30
+
+    def validate(self, args: dict[str, Any]) -> str | None:
+        if not args.get("selector") or not isinstance(args["selector"], str):
+            return "selector 必填"
+        return None
+
+    async def execute(self, args: dict[str, Any]) -> Observation:
+        err = self.validate(args)
+        if err is not None:
+            return Observation(observation_id=new_id("obs"), success=False, payload=None, error=err)
+        session_id = str(args.get("session_id") or "")
+        selector = args["selector"]
+        text = str(args.get("text") or "")
+        typed = False
+        try:
+            typed = await self._get_driver().type_text(session_id, selector, text)
+        except Exception as exc:
+            logger.warning("[BrowserTypeTool] live type failed: %s", exc)
+        if typed:
+            text_content = f"已在元素 `{selector}` 输入文本。"
+        else:
+            text_content = (
+                f"无法输入文本：会话 {session_id} 没有可操作的活动浏览器页面。"
+            )
+        res = BrowserActionResult(
+            action_type=BrowserActionType.TYPE,
+            success=typed,
+            session_id=session_id or None,
+            text_content=text_content,
+            details={"live": typed},
+        )
+        return Observation(observation_id=new_id("obs"), success=typed, payload=res.model_dump())
+
+
+class BrowserExtractTextTool(_DriverInjectedTool):
+    """浏览器页面文本提取工具（兼容层：subagent EXTRACT_TEXT 动作的共享执行支撑，RA-154）。"""
+
+    name: ClassVar[str] = "browser_extract_text"
+    namespace: ClassVar[str] = "browser"
+    description: ClassVar[str] = "提取当前浏览器页面可见文本内容。"
+    parameters: ClassVar[dict[str, Any]] = {
+        "type": "object",
+        "properties": {
+            "session_id": {"type": "string", "description": "目标浏览器会话 ID"},
+        },
+    }
+    is_idempotent: ClassVar[bool] = True
+    effect_kind: ClassVar[Literal["ephemeral", "persistent", "stateful_once"]] = "ephemeral"
+    default_timeout_s: ClassVar[int] = 30
+
+    async def execute(self, args: dict[str, Any]) -> Observation:
+        session_id = str(args.get("session_id") or "")
+        text = ""
+        try:
+            text = await self._get_driver().extract_text(session_id)
+        except Exception as exc:
+            logger.warning("[BrowserExtractTextTool] live extract failed: %s", exc)
+        res = BrowserActionResult(
+            action_type=BrowserActionType.EXTRACT_TEXT,
+            success=True,
+            session_id=session_id or None,
+            text_content=text or "",
+            details={"live": bool(text)},
+        )
+        return Observation(observation_id=new_id("obs"), success=True, payload=res.model_dump())
+
+
 # =====================================================================
 # 构建器导出
 # =====================================================================
@@ -1044,6 +1116,8 @@ def build_browser_tools(driver: PlaywrightCDPDriver | None = None) -> list[Tool]
         BrowserClickTool(driver),
         BrowserScreenshotTool(driver),
         BrowserCloseTool(driver),
+        BrowserTypeTool(driver),
+        BrowserExtractTextTool(driver),
     ]
 
 
@@ -1052,6 +1126,7 @@ __all__ = [
     "BrowserCloseTaskTool",
     "BrowserCloseTool",
     "BrowserDeepResearchTool",
+    "BrowserExtractTextTool",
     "BrowserFindTool",
     "BrowserGetCaptchaPreferenceTool",
     "BrowserListTasksTool",
@@ -1065,5 +1140,6 @@ __all__ = [
     "BrowserSpawnTaskTool",
     "BrowserSteerTaskTool",
     "BrowserTransferTaskTool",
+    "BrowserTypeTool",
     "build_browser_tools",
 ]

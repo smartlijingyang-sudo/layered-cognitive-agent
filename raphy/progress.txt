@@ -1,5 +1,11 @@
 ## Codebase Patterns
 
+- **双表收敛取共享 seam 的塑形，旧精确断言钉的可能是分歧本身（RA-154 实证）：**
+  收敛前先 grep 测试对旧塑形的精确断言（如 `details == {"live": True}`）。
+  若精确断言钉的是私有路径的旧塑形，收敛方向取共享 seam 的既有塑形，
+  断言放松为语义 pin（`details["live"]`）——这是故事要求的契约统一，
+  不是"修掉测试"；前提是放松后测试仍经真实 fake 实证行为。
+
 - **fail-closed 改造后场景测试供数改走 seam（RA-149 实证）：**
   工具 fail-closed 后，原来经该工具链条供数的场景测试不要删覆盖——改由底层
   seam（本轮：共享任务存储 register_task + add_timeline_step）直接登记供数，
@@ -4227,4 +4233,69 @@ brain/reducer/memory/hub/standing_refresher 等键，待 RA-123 落地后再评�
   - "诚实"不等于"把字段置空"：title 是 contracts 必填 str 时，保留旧值比伪造新值诚实，改 contract 是另一类 story 的 scope。
   - 工具层 success 语义要显式文档化：resilient 无 page 不是错误（success=True），诚实措辞 + details.live_page 让调用方自己分支——fail-open 和 fail-closed 之外的第三条路。
 - **实现与评估差异：** 评估给 RA-115 二选一，实现选 (a)（工具断言 has_page + 诚实措辞）；goto 失败的 title 处理评估没写死，实现因 contract 必填 str 选择保留旧标题；额外加了 details.live_page 机器可判字段。
+---
+
+## [2026-10-19 07:45] - assess round (raphy/arch-20261019-0745): 4 candidates
+
+- Hot-spot scan: 近 45 commits 几乎全是 Muse browser 13-tool 套件线（agy + raphy RA-146~153）；friction walk 选了 browser 三块：tools/browser/（tools.py 全读）、infrastructure/browser/cdp_driver.py（全读）、subagent.py + arbitration.py（全读）。避开禁区（progress 顶部 patterns 已列的 RA-146~153 收敛区未重走——本轮恰恰是 RA-146 留下的 fallback seam 没人走过）。
+- Runtime verification（主树干净，直接跑）：(a) Agent 基本 run → COMPLETED；(b) test_browser_preview_and_takeover_e2e.py 1 passed；(c) 同一 agent 两次 run → completed/completed；另跑 browser 三套件 26 passed。无 crash/hang/silent failure，无 P0。
+- RA-154（Strong）：`_execute_via_driver`（subagent.py:120-225）~100 行 if-chain 与 executor.py `_ACTION_TOOL_NAMES` 是同一 BrowserActionType 空间的两张 dispatch 表，且已发散（executor 4 种，driver-direct 6 种，多了 TYPE/EXTRACT_TEXT）；收敛方案：map 扩展到 6 种 + if-chain 委托给 build_browser_action_executor(driver=...)。deletion test 通过。
+- RA-155（Worth exploring）：cdp_driver.py:215/:325 两处 8 字段 BrowserSessionSummary 手工重建已漂移（:215 硬编码 has_active_stream=True，:325 拷贝旧值）；contract 是 frozen pydantic，有 model_copy(update=...) 的自带 evolve seam。
+- RA-156（Worth exploring）：BrowserTaskStore.update_task 零调用者零测试（RA-152 轮已独立确认），真 mutation seam 是 steer/transfer 的直接字段写；删死 seam（hasattr 静默吞拼写错误，不如直接赋值诚实）。
+- RA-157（Worth exploring，duplication 类）：spawn_task / deep_research 两处"未实现" fail-closed 仪式逐字重复（two = real），按 RA-151 前例收进 driver_tool.py 的 _UnimplementedTool 基类。
+- 排除项（有证据不收）：`has_page()` 的写副作用被 `test_has_page_drops_a_closed_playwright_page` 经接口钉住——deletion test 通过，接口即测试面，不拆。
+- **Learnings for future iterations:**
+  - 评估"读代码"时先看有没有测试钉住可疑设计：has_page 的副作用第一眼像 leaky seam，但测试名直接写了 `drops_a_closed_playwright_page`——测试即设计文档，先读测试再判。
+  - RA-146 留的"兼容 fallback 路径"是最容易发散的 seam：主路径收敛完了，fallback 的私有表没人看——评估 hot 区时把"上一轮的兼容路径"单独列为必查项。
+  - frozen contract 的 model_copy 是免费 evolve seam：看到手写全字段重建先查 contract 是不是 BaseModel，是就直接判。
+- Diversity quota：RA-154/155/156 均来自 friction walk（leaky seam / 漂移 / 死 seam），仅 RA-157 是 duplication 类，达标。
+---
+## 2026-10-19 08:40 CST - RA-154
+- 收敛 BrowserSubagent._execute_via_driver 的私有分发表到共享执行 seam：
+  executor._ACTION_TOOL_NAMES 扩展 TYPE->browser_type、EXTRACT_TEXT->browser_extract_text；
+  新增 BrowserTypeTool / BrowserExtractTextTool（tools.py §5 兼容层，同类家园）；
+  _execute_via_driver 删 ~100 行 if-chain，改为委托 build_browser_action_executor(driver, session_id)；
+  executor 新增可选 session_id 参数做 args 注入（向后兼容）。
+- Files changed: lca/infrastructure/browser/subagent.py, lca/infrastructure/tools/browser/executor.py,
+  lca/infrastructure/tools/browser/tools.py,
+  tests/scenario/browser/test_browser_lifecycle_scenarios.py（CLICK 精确断言放松 + EXTRACT_TEXT e2e 新增）,
+  tests/infrastructure/browser/test_browser_subagent.py（新增委托路由测试，TYPE/EXTRACT_TEXT 参数化）。
+- Tests: ruff check 全过；contracts/browser + scenario/browser + infrastructure/browser +
+  infrastructure/tools/browser 共 62 passed。
+- **Learnings for future iterations:**
+  - 双表收敛的方向取已有共享 seam 的塑形：旧精确断言钉的可能是分歧本身。CLICK 的
+    `details == {"live": True}` 钉的是 driver-path 私有塑形，收敛到工具塑形后放松为
+    `details["live"]`——这是故事要求的契约统一，不是"修掉测试"。判断标准：放松后测试
+    仍经真实 fake（DOM 页）实证行为（真实输入/点击发生），只不再钉旧分歧的字面量。
+  - 新工具适配器的"同类家园"=已存在的同类工具所在模块（本轮 tools.py §5），不是只有
+    基类的 driver_tool.py——评估的二选一之外可能有 churn 更小的第三处，动手前先看
+    同类已落在哪。
+  - str.index 定位方法定义时，同名调用点（self._execute_via_driver(）也在文件中；
+    用带 "async def " 前缀的精确串定位，且先断言后写回前确认替换区间。
+---
+
+## 2026-10-19 09:00 - RA-155
+- 两处 BrowserSessionSummary 手动 8 字段重建收敛：`_init_cdp_for_session`（cdp_driver.py:215）改成 `old.model_copy(update={"url": url, "title": title or "Page", "has_active_stream": True})`；`navigate`（:325）改成 `summary.model_copy(update={"url": url, "title": title})`。
+- 漂移显式消解：:215 的 `has_active_stream=True` 硬编码保留为显式 update key —— 该处刚发送 Page.startScreencast、流确已建立；navigate 处保留 `summary.has_active_stream`（流状态该点未知，不臆断）。progress.txt 与 commit body 均记录该理由。
+- Files changed: lca/infrastructure/browser/cdp_driver.py, raphy/prd.json, raphy/progress.txt
+- **Learnings for future iterations:**
+  - `model_copy(update=...)` 是 frozen contract 的 evolve seam：8 字段只写变更字段，后续 contract 加字段零触碰。收敛前先确认测试钉的是语义（title/url）而非旧塑形——本轮 `test_browser_reopen_snapshot.py` 全是语义断言，直接改。
+  - `has_active_stream` 两处语义本就不同（init 是"刚建立流"，navigate 是"流状态未知保留旧值"）——"漂移"不一定是 bug，先判断语义再决定收敛形状；显式保留比静默抹掉诚实。
+---
+
+## 2026-10-19 09:10 - RA-156
+- 删除 `BrowserTaskStore.update_task`（task_store.py:64-73）：删除前全仓 grep `update_task`（lca/ + tests/）确认仅定义 1 处、零调用者；steer/transfer 的直接字段写（task.status / task.payment_approved）+ add_timeline_step 原样保留，为唯一变更路径。
+- Files changed: lca/infrastructure/tools/browser/task_store.py, raphy/prd.json, raphy/progress.txt
+- **Learnings for future iterations:**
+  - 删死 seam 前不只查"被谁调用"，还查全仓 `update_task` 字符串引用（RA-137 规则的同形应用）——本轮定义是唯一命中，直接删。
+  - hasattr silent-skip 的 fail-open 性质是评估要删的核心原因：死 seam 不是无害冗余，是会吞掉拼写错误的假 affordance。
+---
+
+## 2026-10-19 09:25 - RA-157
+- `driver_tool.py` 新增 `_UnimplementedTool(Tool)`：`execute` 持有共享的 fail-closed 仪式（logger.warning + success=False/payload=None/error 含"尚未实现" 的 Observation）；子类只声明 `_log_tag` / `_not_implemented_error` ClassVar + `_log_detail(args)` 参数摘要。
+- `BrowserSpawnTaskTool`/`BrowserDeepResearchTool` 改继承 `_UnimplementedTool`：各自 execute 仪式删除；error 文案逐字不变；RA-149/RA-147 的 honesty 注释保留在 `_log_detail` 上；deep research 类 docstring 补"后端尚未实现，调用 fail-closed"声明；spec 的 name/description ClassVar 未动。
+- Files changed: lca/infrastructure/tools/browser/driver_tool.py, lca/infrastructure/tools/browser/tools.py, raphy/prd.json, raphy/progress.txt
+- **Learnings for future iterations:**
+  - 收基类前先查生产构造点：`build_browser_tools` 里 `BrowserSpawnTaskTool(driver)` 传 driver —— 基类 `__init__` 必须兼容收下（收下不用 + 注释说明），否则生产构造点炸。
+  - honesty 契约的测试钉点（success=False、error 含"尚未实现"、payload None）在 test_browser_muse_full_suite.py——改仪式前先读测试的断言集合，确认哪些是语义 pin。
 ---

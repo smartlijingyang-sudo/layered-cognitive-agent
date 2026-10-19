@@ -212,15 +212,11 @@ class PlaywrightCDPDriver(BrowserDriverPort):
 
                 if session_id in self._sessions:
                     old = self._sessions[session_id]
-                    self._sessions[session_id] = BrowserSessionSummary(
-                        session_id=old.session_id,
-                        run_id=old.run_id,
-                        url=url,
-                        title=title or "Page",
-                        status=old.status,
-                        viewport_width=old.viewport_width,
-                        viewport_height=old.viewport_height,
-                        has_active_stream=True,
+                    # RA-155: has_active_stream=True 显式保留 —— 上方 Page.startScreencast
+                    # 刚开启 screencast 流，这里是唯一知道流已建立的地方，
+                    # 不是旧代码的漂移（navigate 处则保留旧值）。
+                    self._sessions[session_id] = old.model_copy(
+                        update={"url": url, "title": title or "Page", "has_active_stream": True}
                     )
         except (ImportError, Exception) as exc:
             logger.warning("[PlaywrightCDPDriver] CDP init skipped: %s", exc)
@@ -322,16 +318,7 @@ class PlaywrightCDPDriver(BrowserDriverPort):
             except Exception as e:
                 logger.warning("[PlaywrightCDPDriver] Navigation error: %s", e)
 
-        updated = BrowserSessionSummary(
-            session_id=summary.session_id,
-            run_id=summary.run_id,
-            url=url,
-            title=title,
-            status=summary.status,
-            viewport_width=summary.viewport_width,
-            viewport_height=summary.viewport_height,
-            has_active_stream=summary.has_active_stream,
-        )
+        updated = summary.model_copy(update={"url": url, "title": title})
         self._sessions[session_id] = updated
 
         relay = self._relays.get(session_id)
