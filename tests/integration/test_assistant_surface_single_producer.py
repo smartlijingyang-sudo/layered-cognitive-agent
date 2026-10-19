@@ -56,8 +56,9 @@ from lca.plugins.events.publishers import _session_publish
 from lca.runtime.session.run_session_writer import RunSessionWriter
 from lca.session.append import Session
 from lca.session.lifecycle.bind import RunEventSessionBridge
+from lca_kernel.events.fold.inputs import SURFACE_ASSISTANT_TYPE
 
-SURFACE_ASSISTANT = "surface/assistant_message"
+SURFACE_ASSISTANT = SURFACE_ASSISTANT_TYPE
 
 
 class _RuntimeCarrier(dict):

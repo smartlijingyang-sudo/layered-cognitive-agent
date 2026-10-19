@@ -16,6 +16,7 @@ from lca.runtime.session.run_session_writer import (
     RunSessionWriter,
     SessionWriterUnboundError,
 )
+from lca_kernel.events.fold.inputs import SURFACE_ASSISTANT_TYPE, SURFACE_USER_TYPE
 
 
 @dataclass
@@ -75,13 +76,13 @@ def test_seed_prior_turns_injects_surface_events_and_preserves_messages() -> Non
     # Verify session events appended
     assert len(session.events) == 2
     ev0 = session.events[0]
-    assert ev0.type == "surface/user_message"
+    assert ev0.type == SURFACE_USER_TYPE
     assert ev0.data["role"] == "user"
     assert ev0.data["content"] == "请帮我写一个 python 脚本"
     assert ev0.data["historical"] is True
 
     ev1 = session.events[1]
-    assert ev1.type == "surface/assistant_message"
+    assert ev1.type == SURFACE_ASSISTANT_TYPE
     assert ev1.data["role"] == "assistant"
     assert ev1.data["content"] == "好的，请问脚本要实现什么功能？"
     assert ev1.data["historical"] is True

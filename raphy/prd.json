@@ -2406,9 +2406,9 @@
         "tests/unit/runtime/session/test_run_session_writer.py green (event-type assertions updated with the contract change); new test pinning 'writer-produced journal folds without ValueError'; ruff check clean."
       ],
       "priority": "P1",
-      "passes": false,
+      "passes": true,
       "branchName": "raphy/arch-20261020-0145",
-      "notes": "Strength: Strong. Friction-walk finding (Area C, run session write/read chain). Top recommendation: fix this before RA-166 — only after one vocabulary exists can the twin derive_messages converge."
+      "notes": "Strength: Strong. Friction-walk finding (Area C, run session write/read chain). Top recommendation: fix this before RA-166 — only after one vocabulary exists can the twin derive_messages converge. Landed 2026-10-20 02:xx (night round). Writer append_* (append_user_message / append_assistant_message / seed_prior_turns) now emit the kernel spine-category types (SURFACE_USER_TYPE / SURFACE_ASSISTANT_TYPE) with surface_op='append'; all writer read sides (_surface_event_to_message, derive_messages filter, _last_assistant_tool_call_seq, extract_pending_intents/browser_widgets) converge to the same constants; kernel fold semantics untouched. Tests: test_run_session_writer.py 11 passed (incl. new foldSurface no-ValueError pin), test_seed_prior_turns.py 4 passed, test_persist_before_execute.py 9 passed, plugins test_messages_and_fork.py 5 passed, test_assistant_surface_single_producer.py + test_body_surface_event_contract.py + test_gateway_intent_widget_fallback.py 12 passed, test_connector_capability_intent_e2e.py 1 passed (all pinned the old slash vocabulary, updated per RA-154 contract-change rule); proactive deliverer/avatar tests 28 passed (out-of-scope path unchanged); ruff check clean. Residual forks (out of scope): proactive deliverer.py SURFACE_ASSISTANT_MESSAGE slash constant + append_developer_message surface/developer_message with surface_op='developer_message' — same fail-loud shape, own story."
     },
     {
       "id": "RA-164",

@@ -7,6 +7,7 @@ from lca.runtime.session.run_session_writer import (
     RunSessionWriter,
     ensure_intent_widget_in_assistant_message,
 )
+from lca_kernel.events.fold.inputs import SURFACE_ASSISTANT_TYPE
 
 
 @dataclass
@@ -113,7 +114,7 @@ def test_run_session_writer_auto_appends_widget_from_prior_tool_result():
 
     # 断言持久化到 session 中的事实必定携带了 widget 标签
     snapshot = session.snapshot_events()
-    asst_event = next(e for e in snapshot if e.type == "surface/assistant_message")
+    asst_event = next(e for e in snapshot if e.type == SURFACE_ASSISTANT_TYPE)
     saved_content = asst_event.data["content"]
     assert "cai_auto_456" in saved_content
     assert "[widget:connector_auth?intentId=cai_auto_456" in saved_content
@@ -155,7 +156,7 @@ def test_run_session_writer_no_duplicate_on_subsequent_turns():
     )
 
     snapshot = session.snapshot_events()
-    asst_events = [e for e in snapshot if e.type == "surface/assistant_message"]
+    asst_events = [e for e in snapshot if e.type == SURFACE_ASSISTANT_TYPE]
     assert len(asst_events) == 2
     # Turn 1 携带了 widget
     assert "cai_turn1" in asst_events[0].data["content"]

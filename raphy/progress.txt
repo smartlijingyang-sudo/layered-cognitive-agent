@@ -1,5 +1,11 @@
 ## Codebase Patterns
 
+- **词表收敛必须连 marker 值一起收敛，单收敛 type 等于换了个 raise（RA-163 实证）：**
+  `surface_op="user_message"` 这类调用方自造的 marker 字符串，即使 type 已收敛到 kernel
+  合格闭集，照样触发 `_surface_op_of` 的第二个 `ValueError`（"carries an invalid surfaceOp"）。
+  收敛方向取共享 seam 的既有契约（本轮：fold 契约只认 `"append"` | replace），type 和 marker
+  一次改完；实现后用纯 fold 路径（无 projection registry）实证不抛错才算收敛完成。
+
 - **双表收敛取共享 seam 的塑形，旧精确断言钉的可能是分歧本身（RA-154 实证）：**
   收敛前先 grep 测试对旧塑形的精确断言（如 `details == {"live": True}`）。
   若精确断言钉的是私有路径的旧塑形，收敛方向取共享 seam 的既有塑形，
@@ -4374,4 +4380,35 @@ brain/reducer/memory/hub/standing_refresher 等键，待 RA-123 落地后再评�
   - 子任务自声明证据缺口是硬门槛：凡建立在"禁区内语义反推"上的候选（如本轮 turn_visible_tool_names 同语义断言）一律不开 story，只记录。
   - 强 claim 先动手验证再落 story：本轮协调者亲自验证了 `ApprovalPolicyRegistry` 零调用者（git grep）和 RA-163 的 ValueError 证据链（writer 写出形态 + inputs.py raise + append.py 调用链），才敢标 Strong。
   - 运行时验证脚本启动教训：`env LLM_API_KEY=<redacted>` 里的尖括号被 bash 当重定向吃掉导致启动失败——占位符别写进 shell 命令，用 `LLM_API_KEY=dummy`。
+---
+## [2026-10-20 02:xx 夜轮] - RA-163（情况 A）：收敛 writer surface 词表到 kernel spine category
+
+- 落地：`RunSessionWriter` 的写侧（`append_user_message` / `append_assistant_message` / `seed_prior_turns`）
+  改写 kernel spine-category 类型（`SURFACE_USER_TYPE` / `SURFACE_ASSISTANT_TYPE`），`surface_op`
+  同步改为 fold 契约值 `"append"`；writer 全部读侧（`_surface_event_to_message`、`derive_messages`
+  过滤器、`_last_assistant_tool_call_seq`、`extract_pending_intents_from_events`、
+  `extract_pending_browser_widgets_from_events`）收敛到同一组常量；kernel fold（`inputs.py`）零改动，
+  fail-loud 语义不动。实现前先用脚本复现了 `ValueError: session event "surface/user_message"
+  is not surface-eligible and cannot carry surfaceOp`（inputs.py:219）；修后 `foldSurface`
+  返回 nodes=(0, 1)。
+- 改动文件：`lca/runtime/session/run_session_writer.py`（46+/32-）；测试断言随契约改：
+  `tests/unit/runtime/session/test_run_session_writer.py`（10→11，含新增 fold 无错 pin）、
+  `tests/runtime/session/test_seed_prior_turns.py`、`tests/integration/test_persist_before_execute.py`；
+  plugins 读侧（`messages.py`）本就说 spine 词表，未动，`test_messages_and_fork.py` 5 passed 复验。
+- 测试：11 + 4 + 9 + 5 全部绿；`ruff check` 4 文件 clean。
+- **Learnings for future iterations:**
+  - **marker 值也是词表的一部分（RA-163 实证）：** type 收敛到合格类型还不够——`surface_op="user_message"`
+    这类调用方自造的 marker 字符串在合格类型上照样触发 `_surface_op_of` 的第二个 `ValueError`
+   （"carries an invalid surfaceOp"）。词表收敛必须 type + marker 一起收敛到 fold 契约
+   （`"append"` | replace），单收敛 type 等于换了个 raise。
+  - 读侧 `("surface/tool_result", SURFACE_TOOL_RESULT_TYPE)` 这类双元组是收敛半成品的味道：
+    写侧已经只产 spine 常量，读侧的旧分支就是死分支——"exactly one vocabulary survives"
+    落到读侧就是删旧分支，不留兼容（RA-154 的"断言随契约改"在读侧的对位）。
+  - 残留分叉（未动，待开故事）：`lca/infrastructure/proactive/deliverer.py` 自带
+    `SURFACE_ASSISTANT_MESSAGE = "surface/assistant_message"` 斜杠常量 + `surface_op="assistant_message"`；
+    `append_developer_message` 写 `surface/developer_message` 带 `surface_op="developer_message"`
+   （ADR-0268 DSH 词表，动它要连 catalog 一起改）——都是同一 fail-loud 形状，各自独立成故事。
+  - plugins `derive_event_message` 对 content=None 的 assistant 行返回 None（drop），而 writer 自身的
+    `derive_messages` 保留 tool_calls——这是 RA-166 要裁定的三处分叉之一，本轮只做到"词表统一"，
+    语义分叉不动。
 ---
