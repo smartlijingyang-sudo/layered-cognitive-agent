@@ -1,5 +1,11 @@
 ## Codebase Patterns
 
+- **双表收敛取共享 seam 的塑形，旧精确断言钉的可能是分歧本身（RA-154 实证）：**
+  收敛前先 grep 测试对旧塑形的精确断言（如 `details == {"live": True}`）。
+  若精确断言钉的是私有路径的旧塑形，收敛方向取共享 seam 的既有塑形，
+  断言放松为语义 pin（`details["live"]`）——这是故事要求的契约统一，
+  不是"修掉测试"；前提是放松后测试仍经真实 fake 实证行为。
+
 - **fail-closed 改造后场景测试供数改走 seam（RA-149 实证）：**
   工具 fail-closed 后，原来经该工具链条供数的场景测试不要删覆盖——改由底层
   seam（本轮：共享任务存储 register_task + add_timeline_step）直接登记供数，
@@ -4243,4 +4249,27 @@ brain/reducer/memory/hub/standing_refresher 等键，待 RA-123 落地后再评�
   - RA-146 留的"兼容 fallback 路径"是最容易发散的 seam：主路径收敛完了，fallback 的私有表没人看——评估 hot 区时把"上一轮的兼容路径"单独列为必查项。
   - frozen contract 的 model_copy 是免费 evolve seam：看到手写全字段重建先查 contract 是不是 BaseModel，是就直接判。
 - Diversity quota：RA-154/155/156 均来自 friction walk（leaky seam / 漂移 / 死 seam），仅 RA-157 是 duplication 类，达标。
+---
+## 2026-10-19 08:40 CST - RA-154
+- 收敛 BrowserSubagent._execute_via_driver 的私有分发表到共享执行 seam：
+  executor._ACTION_TOOL_NAMES 扩展 TYPE->browser_type、EXTRACT_TEXT->browser_extract_text；
+  新增 BrowserTypeTool / BrowserExtractTextTool（tools.py §5 兼容层，同类家园）；
+  _execute_via_driver 删 ~100 行 if-chain，改为委托 build_browser_action_executor(driver, session_id)；
+  executor 新增可选 session_id 参数做 args 注入（向后兼容）。
+- Files changed: lca/infrastructure/browser/subagent.py, lca/infrastructure/tools/browser/executor.py,
+  lca/infrastructure/tools/browser/tools.py,
+  tests/scenario/browser/test_browser_lifecycle_scenarios.py（CLICK 精确断言放松 + EXTRACT_TEXT e2e 新增）,
+  tests/infrastructure/browser/test_browser_subagent.py（新增委托路由测试，TYPE/EXTRACT_TEXT 参数化）。
+- Tests: ruff check 全过；contracts/browser + scenario/browser + infrastructure/browser +
+  infrastructure/tools/browser 共 62 passed。
+- **Learnings for future iterations:**
+  - 双表收敛的方向取已有共享 seam 的塑形：旧精确断言钉的可能是分歧本身。CLICK 的
+    `details == {"live": True}` 钉的是 driver-path 私有塑形，收敛到工具塑形后放松为
+    `details["live"]`——这是故事要求的契约统一，不是"修掉测试"。判断标准：放松后测试
+    仍经真实 fake（DOM 页）实证行为（真实输入/点击发生），只不再钉旧分歧的字面量。
+  - 新工具适配器的"同类家园"=已存在的同类工具所在模块（本轮 tools.py §5），不是只有
+    基类的 driver_tool.py——评估的二选一之外可能有 churn 更小的第三处，动手前先看
+    同类已落在哪。
+  - str.index 定位方法定义时，同名调用点（self._execute_via_driver(）也在文件中；
+    用带 "async def " 前缀的精确串定位，且先断言后写回前确认替换区间。
 ---

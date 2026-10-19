@@ -1014,6 +1014,91 @@ class BrowserCloseTool(_DriverInjectedTool):
         return Observation(observation_id=new_id("obs"), success=True, payload=res.model_dump())
 
 
+class BrowserTypeTool(_DriverInjectedTool):
+    """浏览器文本输入工具（兼容层：subagent TYPE 动作的共享执行支撑，RA-154）。"""
+
+    name: ClassVar[str] = "browser_type"
+    namespace: ClassVar[str] = "browser"
+    description: ClassVar[str] = "在网页指定的 CSS 或 XPath 选择器元素中输入文本。"
+    parameters: ClassVar[dict[str, Any]] = {
+        "type": "object",
+        "properties": {
+            "selector": {"type": "string", "description": "目标输入元素选择器"},
+            "text": {"type": "string", "description": "要输入的文本内容"},
+            "session_id": {"type": "string", "description": "目标浏览器会话 ID"},
+        },
+        "required": ["selector"],
+    }
+    is_idempotent: ClassVar[bool] = False
+    effect_kind: ClassVar[Literal["ephemeral", "persistent", "stateful_once"]] = "ephemeral"
+    default_timeout_s: ClassVar[int] = 30
+
+    def validate(self, args: dict[str, Any]) -> str | None:
+        if not args.get("selector") or not isinstance(args["selector"], str):
+            return "selector 必填"
+        return None
+
+    async def execute(self, args: dict[str, Any]) -> Observation:
+        err = self.validate(args)
+        if err is not None:
+            return Observation(observation_id=new_id("obs"), success=False, payload=None, error=err)
+        session_id = str(args.get("session_id") or "")
+        selector = args["selector"]
+        text = str(args.get("text") or "")
+        typed = False
+        try:
+            typed = await self._get_driver().type_text(session_id, selector, text)
+        except Exception as exc:
+            logger.warning("[BrowserTypeTool] live type failed: %s", exc)
+        if typed:
+            text_content = f"已在元素 `{selector}` 输入文本。"
+        else:
+            text_content = (
+                f"无法输入文本：会话 {session_id} 没有可操作的活动浏览器页面。"
+            )
+        res = BrowserActionResult(
+            action_type=BrowserActionType.TYPE,
+            success=typed,
+            session_id=session_id or None,
+            text_content=text_content,
+            details={"live": typed},
+        )
+        return Observation(observation_id=new_id("obs"), success=typed, payload=res.model_dump())
+
+
+class BrowserExtractTextTool(_DriverInjectedTool):
+    """浏览器页面文本提取工具（兼容层：subagent EXTRACT_TEXT 动作的共享执行支撑，RA-154）。"""
+
+    name: ClassVar[str] = "browser_extract_text"
+    namespace: ClassVar[str] = "browser"
+    description: ClassVar[str] = "提取当前浏览器页面可见文本内容。"
+    parameters: ClassVar[dict[str, Any]] = {
+        "type": "object",
+        "properties": {
+            "session_id": {"type": "string", "description": "目标浏览器会话 ID"},
+        },
+    }
+    is_idempotent: ClassVar[bool] = True
+    effect_kind: ClassVar[Literal["ephemeral", "persistent", "stateful_once"]] = "ephemeral"
+    default_timeout_s: ClassVar[int] = 30
+
+    async def execute(self, args: dict[str, Any]) -> Observation:
+        session_id = str(args.get("session_id") or "")
+        text = ""
+        try:
+            text = await self._get_driver().extract_text(session_id)
+        except Exception as exc:
+            logger.warning("[BrowserExtractTextTool] live extract failed: %s", exc)
+        res = BrowserActionResult(
+            action_type=BrowserActionType.EXTRACT_TEXT,
+            success=True,
+            session_id=session_id or None,
+            text_content=text or "",
+            details={"live": bool(text)},
+        )
+        return Observation(observation_id=new_id("obs"), success=True, payload=res.model_dump())
+
+
 # =====================================================================
 # 构建器导出
 # =====================================================================
@@ -1044,6 +1129,8 @@ def build_browser_tools(driver: PlaywrightCDPDriver | None = None) -> list[Tool]
         BrowserClickTool(driver),
         BrowserScreenshotTool(driver),
         BrowserCloseTool(driver),
+        BrowserTypeTool(driver),
+        BrowserExtractTextTool(driver),
     ]
 
 
@@ -1052,6 +1139,7 @@ __all__ = [
     "BrowserCloseTaskTool",
     "BrowserCloseTool",
     "BrowserDeepResearchTool",
+    "BrowserExtractTextTool",
     "BrowserFindTool",
     "BrowserGetCaptchaPreferenceTool",
     "BrowserListTasksTool",
@@ -1065,5 +1153,6 @@ __all__ = [
     "BrowserSpawnTaskTool",
     "BrowserSteerTaskTool",
     "BrowserTransferTaskTool",
+    "BrowserTypeTool",
     "build_browser_tools",
 ]

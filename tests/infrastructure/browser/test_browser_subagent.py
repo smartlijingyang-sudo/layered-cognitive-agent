@@ -111,3 +111,38 @@ def test_browser_subagent_accepts_sync_executor():
     )
     assert result.success is True
     assert result.action_type == BrowserActionType.CLOSE
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "action_type", [BrowserActionType.TYPE, BrowserActionType.EXTRACT_TEXT]
+)
+async def test_execute_via_driver_delegates_to_shared_executor(
+    monkeypatch, action_type
+):
+    """RA-154: driver-only subagent 不再手写分发表，经共享执行 seam 分发。
+
+    钉住三点：调用了 build_browser_action_executor；driver 与 session_id
+    透传；原始 action 对象流向 executor。
+    """
+    from lca.infrastructure.browser import subagent as subagent_mod
+
+    seen: dict = {}
+
+    async def fake_execute(action):
+        seen["action"] = action
+        return BrowserActionResult(action_type=action.action_type, success=True)
+
+    def fake_build(*args, **kwargs):
+        seen["kwargs"] = kwargs
+        return fake_execute
+
+    monkeypatch.setattr(subagent_mod, "build_browser_action_executor", fake_build)
+
+    driver = object()  # 仅验证透传，不触碰真实 driver
+    subagent = BrowserSubagent(agent_id="drv_only", driver=driver)
+    action = BrowserAction(action_type=action_type, selector="#name", text="hi")
+    result = await subagent.execute_action("sess_x", action)
+
+    assert result.success is True
+    assert seen["kwargs"]["driver"] is driver
+    assert seen["kwargs"]["session_id"] == "sess_x"
+    assert seen["action"] is action

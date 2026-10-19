@@ -3,24 +3,21 @@
 from __future__ import annotations
 
 import inspect
-import logging
 from collections.abc import Awaitable, Callable, Iterable
 from typing import TYPE_CHECKING
 
-from lca.contracts.atoms.ids.ids import new_id
 from lca.contracts.models.browser.models import (
     BrowserAction,
     BrowserActionResult,
-    BrowserActionType,
 )
 from lca.contracts.protocols import Tool
 from lca.infrastructure.browser.arbitration import BrowserArbitrationEngine
 from lca.infrastructure.computer.desktop_lock import DesktopLockCoordinator
+from lca.infrastructure.tools.browser.executor import build_browser_action_executor
 
 if TYPE_CHECKING:
     from lca.infrastructure.browser.cdp_driver import PlaywrightCDPDriver
 
-logger = logging.getLogger(__name__)
 
 # 动作执行器：共享浏览器执行 seam，由调用方经构造函数注入。
 # 同步或异步可调用对象：(BrowserAction) -> BrowserActionResult。
@@ -122,104 +119,16 @@ class BrowserSubagent:
         session_id: str,
         action: BrowserAction,
     ) -> BrowserActionResult:
-        """driver 直驱真执行：无显式 executor 时的兼容路径（真执行，不伪造）。"""
-        if action.action_type == BrowserActionType.NAVIGATE:
-            try:
-                summary = await self.driver.navigate(
-                    session_id, action.url or "about:blank"
-                )
-                return BrowserActionResult(
-                    action_type=action.action_type,
-                    success=True,
-                    session_id=session_id,
-                    url=summary.url,
-                    title=summary.title,
-                )
-            except Exception as exc:
-                logger.warning("[BrowserSubagent] live navigate failed: %s", exc)
-                return BrowserActionResult(
-                    action_type=action.action_type,
-                    success=False,
-                    error=str(exc),
-                )
-        if action.action_type == BrowserActionType.CLICK:
-            clicked = False
-            if action.selector:
-                try:
-                    clicked = await self.driver.click(session_id, action.selector)
-                except Exception as exc:
-                    logger.warning("[BrowserSubagent] live click failed: %s", exc)
-                    clicked = False
-            return BrowserActionResult(
-                action_type=action.action_type,
-                success=clicked,
-                text_content=f"Clicked selector: {action.selector}",
-                details={"live": clicked},
-            )
-        if action.action_type == BrowserActionType.TYPE:
-            typed = False
-            if action.selector:
-                try:
-                    typed = await self.driver.type_text(
-                        session_id, action.selector, action.text or ""
-                    )
-                except Exception as exc:
-                    logger.warning("[BrowserSubagent] live type failed: %s", exc)
-                    typed = False
-            return BrowserActionResult(
-                action_type=action.action_type,
-                success=typed,
-                text_content=f"Typed text into {action.selector}",
-                details={"live": typed},
-            )
-        if action.action_type == BrowserActionType.SCREENSHOT:
-            art_id = new_id("art_screenshot")
-            try:
-                shot = await self.driver.take_screenshot(session_id)
-            except Exception as exc:
-                logger.warning("[BrowserSubagent] live screenshot failed: %s", exc)
-                shot = None
-            if shot is not None:
-                return BrowserActionResult(
-                    action_type=action.action_type,
-                    success=True,
-                    screenshot_artifact_id=art_id,
-                    details={"live": True, "screenshot_bytes": len(shot)},
-                )
-            return BrowserActionResult(
-                action_type=action.action_type,
-                success=False,
-                screenshot_artifact_id=art_id,
-                details={"live": False},
-            )
-        if action.action_type == BrowserActionType.EXTRACT_TEXT:
-            try:
-                text = await self.driver.extract_text(session_id)
-            except Exception as exc:
-                logger.warning("[BrowserSubagent] live extract failed: %s", exc)
-                text = ""
-            return BrowserActionResult(
-                action_type=action.action_type,
-                success=True,
-                text_content=text or "",
-                details={"live": bool(text)},
-            )
-        if action.action_type == BrowserActionType.CLOSE:
-            try:
-                closed = await self.driver.close_session(session_id)
-            except Exception as exc:
-                logger.warning("[BrowserSubagent] live close failed: %s", exc)
-                closed = False
-            return BrowserActionResult(
-                action_type=action.action_type,
-                success=closed,
-                session_id=session_id,
-            )
-        return BrowserActionResult(
-            action_type=action.action_type,
-            success=False,
-            error=f"driver 直驱不支持动作类型 '{action.action_type.value}'",
+        """driver 直驱：收敛到共享执行 seam（RA-154）。
+
+        不再手写动作类型分发表：session_id 经 args 注入工具，
+        分发与结果塑形和显式 executor 路径完全一致；无支撑工具的动作类型
+        由 executor 内 fail-closed。
+        """
+        executor = build_browser_action_executor(
+            driver=self.driver, session_id=session_id
         )
+        return await executor(action)
 
 
 __all__ = ["ActionExecutor", "BrowserSubagent"]

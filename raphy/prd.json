@@ -2280,9 +2280,9 @@
         "ruff check clean."
       ],
       "priority": "P1",
-      "passes": false,
+      "passes": true,
       "branchName": "raphy/arch-20261019-0745",
-      "notes": "Strength: Strong. Assessment: two dispatch tables over one enum is the textbook leaky seam; deletion test passes (deleting the branches concentrates dispatch into the map). Judgment call left to implementer: where TYPE/EXTRACT_TEXT tool adapters live."
+      "notes": "Strength: Strong. Assessment: two dispatch tables over one enum is the textbook leaky seam; deletion test passes (deleting the branches concentrates dispatch into the map). Judgment call left to implementer: where TYPE/EXTRACT_TEXT tool adapters live.\n\nImplemented 2026-10-19: (1) 评估的二选一（driver_tool.py / executor.py）之外选了第三处：新工具 BrowserTypeTool / BrowserExtractTextTool 落在 tools.py §5 兼容层——四个同类工具（navigate/click/screenshot/close）的真正家园，符合 RA-139 同类家园原则，churn 更小。(2) executor.build_browser_action_executor 新增可选 session_id 参数（向后兼容；不传时 _args_for 输出不变，executor 既有测试零改动），subagent._execute_via_driver 委托给它，~100 行 if-chain 删除。(3) 塑形收敛方向取工具塑形（共享 seam 的既有契约）：scenario 测试的 CLICK 精确断言 {\"live\": True} 放松为 details[\"live\"] is True——该精确断言钉的是已消除的分歧塑形，不是修测试；TYPE 新工具沿用旧 driver-path 塑形（details={\"live\"}），断言保持精确。(4) 三层顺序与锁/仲裁联动不变；driver=None + 无 executor 仍 fail-closed。"
     },
     {
       "id": "RA-155",
