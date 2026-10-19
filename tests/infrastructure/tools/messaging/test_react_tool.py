@@ -24,23 +24,23 @@ def test_reaction_accepts_single_emoji():
 
 
 def test_reaction_rejects_plain_text_emoji():
-    with pytest.raises(Exception):
+    with pytest.raises(ValueError):
         MessageReaction(message_id="msg_1", emoji="hello")
 
 
 def test_reaction_rejects_empty_emoji():
-    with pytest.raises(Exception):
+    with pytest.raises(ValueError):
         MessageReaction(message_id="msg_1", emoji="   ")
 
 
 def test_reaction_rejects_empty_message_id():
-    with pytest.raises(Exception):
+    with pytest.raises(ValueError):
         MessageReaction(message_id="  ", emoji="👍")
 
 
 def test_reaction_is_frozen():
     r = MessageReaction(message_id="msg_1", emoji="👍")
-    with pytest.raises(Exception):
+    with pytest.raises(ValueError):
         r.emoji = "🎉"  # type: ignore[misc]
 
 
