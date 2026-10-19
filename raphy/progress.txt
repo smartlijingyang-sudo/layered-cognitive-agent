@@ -4354,3 +4354,24 @@ brain/reducer/memory/hub/standing_refresher 等键，待 RA-123 落地后再评�
   - "手工镜像"类 story 动手前先确认重复的到底是哪一层：本轮两处本来就调同一个 `DeferPolicy.for_vocal_mode`（推导逻辑早已共享），真正的重复是"vocal_mode 兜底 + ToolDeferSession 组装 + ADR-0248 注释"三件套。收敛点选在 session.py（被组装对象的家园），不是 policy.py。
   - 跨文件删 import 时用 rg 确认每个名字在该文件的剩余用量，ruff F401 是第二道网。
 ---
+
+---
+
+## [2026-10-20 01:45 轮] - assess（情况 C）：6 个候选（RA-162~167）
+
+- 热点：最近两周几乎全是 raphy 自己的收敛（browser 簇、tool_defer）+ lca-1000 禁区，按 skill 拓宽规则选了三块**新领地**摩擦漫步：Area A cordis creator dynamic bridge（用户刚落地的 `41e92781e`）、Area B 审批许可链（用户刚修 `8c1624fc7`）、Area C run session 写/读链（`run_session_writer.py` 685 行）。三路子任务全读+五问必答；禁区（preamble/ralph R2/lca-1000/gate_chain_strategy/browser 簇/tool_defer/resume）全遵守。
+- 运行时验证：`hidden_files/raphy-runtime-verify-20261020.py`（14 版仅改日期），252 后台跑，`LLM_API_KEY=dummy`，A/B/C COMPLETED、D 非收敛→failed 无异常（RA-023 守住），`DONE failures=0`，无新增 P0。
+- 开出 6 故事（P1×3 Strong + P2×3 Worth exploring，无 duplication 类）：
+  - **RA-163（top）**：writer 斜杠词表（`"surface/user_message"`）vs kernel spine category 闭集 → `Session.derive_messages()` 纯 fold 回退会对 writer 自己的 journal 抛 `ValueError`（inputs.py:218-222 的 fail-loud）；projection registry 挂载可选，所以是真实分叉。先 RA-163 再 RA-166。
+  - **RA-162**：creator 管线与 discovery 管线对同一份 `.py` 各 exec 一次（`sys.modules` 双条目，模块级状态分叉）+ 三套入口启发式互相不一致 → 收进一个共享函数（creator 线 `require_meta=True` 保持 PR12，discovery 线 False 保持宽松）。
+  - **RA-164**：`ApprovalPolicyRegistry` 生产零调用者（git grep 只有定义+自身单测）——hypothetical seam 的反面：zero；纯删。
+  - **RA-165**：`DynamicPluginToolAdapter.execute` 对所有字符串参数做启发式 `json.loads`（不看 schema），合法字符串会被静默改写 → 只对 schema 声明 array/object 的字段还原。
+  - **RA-166**：同名 `derive_messages` 两套实现三处语义分叉（orphan-drop/tool_calls/空占位）→ 先裁定语义再选 kernel fold 为 SSOT；RA-163 之后做。
+  - **RA-167**：`namespace_of_tool` 只试 raw 拼写（wire gate 试双拼写）+ `_STANDARD_SHELL_TOOLS` 是无测试锁定的静态影子集合 → 对齐 wire gate 双拼写策略并删 backstop（把旧集合成员全转成回归测试）。
+- 记录但不开：① `CreatorRuntime` 穿透 9 个私有属性（重构面大，下一轮 creator 线热点再开）；② `append_approval_resolved_if_pending` 绕 typed `ApprovalResolved`（denied 调用方在禁区 webserver 内，未验证）；③ approval 的 `visible` 手工解析→`turn_visible_tool_names()`（seam 在禁区模块内，同语义断言只有调用方反推，无直接证据）；④ `NullHookRegistry`/`_drop_reasoning_after_dropped_calls` no-op 等 micro deletion（留 hygiene 机会）。
+- **Learnings for future iterations:**
+  - assess 选热点时若最近全是 raphy 自己的收敛 + 禁区，按 skill 规则主动拓宽到用户刚落地的 feature commit（本轮：`41e92781e` creator bridge、`8c1624fc7` approval fix）——新代码的约定分叉最多。
+  - 子任务自声明证据缺口是硬门槛：凡建立在"禁区内语义反推"上的候选（如本轮 turn_visible_tool_names 同语义断言）一律不开 story，只记录。
+  - 强 claim 先动手验证再落 story：本轮协调者亲自验证了 `ApprovalPolicyRegistry` 零调用者（git grep）和 RA-163 的 ValueError 证据链（writer 写出形态 + inputs.py raise + append.py 调用链），才敢标 Strong。
+  - 运行时验证脚本启动教训：`env LLM_API_KEY=<redacted>` 里的尖括号被 bash 当重定向吃掉导致启动失败——占位符别写进 shell 命令，用 `LLM_API_KEY=dummy`。
+---

@@ -2379,6 +2379,92 @@
       "passes": true,
       "branchName": "raphy/arch-20261019-2245",
       "notes": "Strength: Worth exploring. Friction-walk finding (Area A, Q5 open check, confirmed this round): the load seam's fail-closed philosophy extended to the one key that currently bypasses it. DONE 2026-10-19: validate_bundle 新增 loaded_namespaces 类型门：present 时必须为 list[str]，否则判 corrupt（-> None -> 既有 404 路径）；absent 仍允许（兼容 10-19 前老 bundle，下游 or () 兜底）。ruff SIM102 修过一次（嵌套 if 合并）。新增 1 测试（writer 真实产出通过 / 缺键通过 / 5 种错类型判 None）；restart_recovery 套件 14 passed，ruff clean。"
+    },
+    {
+      "id": "RA-162",
+      "title": "Converge the dual importlib exec and entry-point discovery used by the creator and preset pipelines",
+      "description": "As an LCA maintainer, I want the creator pipeline (loader.py) and the preset discovery pipeline (discovery.py) to share one plugin-loading seam, so that a plugin's entry-point contract and its loaded module identity are defined in one place. Today the same .py file is importlib-exec'ed twice under different module names (lca_agent_presets._runtime.{name} vs lca_presets._autonomous.{dir}.{name}), so module-level state (singletons, caches) forks into two copies in one process; and the two 'find the entry function' heuristics disagree (PR12 forces plugin_meta in the creator line, the discovery line accepts 8 fallbacks).",
+      "acceptanceCriteria": [
+        "One shared function (e.g. extract_entry(module, *, require_meta: bool)) implements entry discovery; loader.extract_plugin_factory and discovery._load_plugin_tool both call it. Creator line keeps require_meta=True (PR12 PluginMetaMissing preserved); discovery line keeps require_meta=False (8-fallback leniency preserved).",
+        "Same plugin path is exec'ed at most once per process: a unified module-name scheme plus sys.modules reuse; loading the same path via both pipelines yields the identical module object.",
+        "New tests: (a) exec same path through both pipelines -> one sys.modules entry, identical module object; (b) creator line with missing plugin_meta still raises PluginMetaMissing; (c) discovery line still finds a bare `execute` fallback entry.",
+        "Existing suites stay green: test_cordis_creator_assistant_closed_loop.py, test_dynamic_tool_bridge.py, test_tool_namespace_adr0256_conformance.py; ruff check clean. ADR-0256 namespace fail-fast registration semantics unchanged."
+      ],
+      "priority": "P1",
+      "passes": false,
+      "branchName": "raphy/arch-20261020-0145",
+      "notes": "Strength: Strong. Friction-walk finding (Area A, creator bridge). Note: the directly-private _load_plugin_tool call in test_cordis_creator_assistant_closed_loop.py:390 can be rerouted through the new public function as a side benefit. Out of scope: CreatorRuntime's private-attr penetration (recorded in assessment.md, next round)."
+    },
+    {
+      "id": "RA-163",
+      "title": "Converge the run-session writer's surface event vocabulary onto the kernel spine categories",
+      "description": "As an LCA maintainer, I want every surface event the writer produces to use the kernel's spine-category vocabulary, so that Session.derive_messages()'s pure-fold fallback never raises on the writer's own journal. Today append_user_message / append_assistant_message write \"surface/user_message\"-style slash types while the kernel fold's surface-eligible set is a spine-category closed set (lca_kernel/events/fold/inputs.py); _surface_op_of raises ValueError for 'non-eligible type carrying surfaceOp'. The projection registry mount is optional, so this is a real fail-loud fork, not style.",
+      "acceptanceCriteria": [
+        "First reproduce the ValueError in a test: journal produced by append_user_message/append_assistant_message fed through the kernel fold pure path (no projection registry) raises today; it must not raise after the fix.",
+        "Writer append_* paths emit spine-category types (map to the SURFACE_*_TYPE constants in lca_kernel/events/fold/inputs.py, e.g. SURFACE_TOOL_RESULT_TYPE); alternatively normalize once at Session.append entry — implementation chooses, but exactly one vocabulary survives.",
+        "Both read sides (writer derive_messages and plugins messages.py derive_messages) re-verified against the unified vocabulary; the kernel fold fail-loud semantics (inputs.py) are NOT weakened.",
+        "tests/unit/runtime/session/test_run_session_writer.py green (event-type assertions updated with the contract change); new test pinning 'writer-produced journal folds without ValueError'; ruff check clean."
+      ],
+      "priority": "P1",
+      "passes": false,
+      "branchName": "raphy/arch-20261020-0145",
+      "notes": "Strength: Strong. Friction-walk finding (Area C, run session write/read chain). Top recommendation: fix this before RA-166 — only after one vocabulary exists can the twin derive_messages converge."
+    },
+    {
+      "id": "RA-164",
+      "title": "Delete the zero-caller ApprovalPolicyRegistry",
+      "description": "As an LCA maintainer, I want dead extension points removed, so the codebase stops advertising a seam nobody uses. ApprovalPolicyRegistry (approval_engine.py:161-172) is a sorted-list wrapper whose only references are its own definition and its own unit test — git grep confirms zero production callers (build_default_approval_engine uses a hard-coded chain). This is the inverse of 'one adapter = hypothetical seam': zero.",
+      "acceptanceCriteria": [
+        "ApprovalPolicyRegistry class deleted from lca/infrastructure/runtime_plane/access/approval_engine.py along with its import in tests/infrastructure/runtime_plane/access/test_approval_engine.py and its registry-specific test(s).",
+        "All remaining approval-engine tests (chain order, strategy verdicts, approved-override) stay green; ruff check clean. Zero behavior change by construction."
+      ],
+      "priority": "P1",
+      "passes": false,
+      "branchName": "raphy/arch-20261020-0145",
+      "notes": "Strength: Strong. Friction-walk finding (Area B, approval chain). Trivially safe warm-up deletion."
+    },
+    {
+      "id": "RA-165",
+      "title": "Make DynamicPluginToolAdapter's JSON argument normalization schema-aware",
+      "description": "As an LCA maintainer, I want the dynamic tool bridge's LLM-argument tolerance to follow the tool's declared schema, so that legitimate string arguments are never silently rewritten. Today DynamicPluginToolAdapter.execute (bridge.py:65-78) JSON-decodes ANY string parameter starting with '[' or '{', ignoring the parameters schema — a legitimate string like a code snippet \"[1, 2, 3]\" is silently mutated into a list, and nothing in the interface warns the caller.",
+      "acceptanceCriteria": [
+        "String-revival only applies to fields whose parameters schema declares type array or object (or an explicit opt-in flag); plain string fields pass through untouched; a debug log records field name on each revival.",
+        "Before changing, grep all in-repo plugin parameters declarations to confirm no existing plugin depends on the loose revival for a string-typed field; if one does, record it in the story notes and keep its behavior via explicit opt-in.",
+        "test_dynamic_tool_adapter_json_string_argument_unpacking stays green (happy path preserved); new tests: string field receiving \"[1, 2]\" is NOT rewritten; object field receiving a JSON string still revives; ruff check clean."
+      ],
+      "priority": "P2",
+      "passes": false,
+      "branchName": "raphy/arch-20261020-0145",
+      "notes": "Strength: Worth exploring. Friction-walk finding (Area A, Q3 no-locality case). Touches LLM fault-tolerance behavior — check plugin dependencies first."
+    },
+    {
+      "id": "RA-166",
+      "title": "Converge the twin derive_messages into one message-derivation seam",
+      "description": "As an LCA maintainer, I want exactly one derive_messages, so that 'what text the model sees for a journal event' has a single source of truth. Today run_session_writer.py:394 and lca/plugins/session/runtime/messages/messages.py:76 share the name but fork in three places (orphan-drop, assistant tool_calls kept-vs-dropped, empty-result placeholder text). Which reader you get depends on which same-named function the caller happened to pick.",
+      "acceptanceCriteria": [
+        "Before converging, adjudicate the correct semantics for each of the three forks (orphan-drop, tool_calls, empty placeholder), citing ADR-0201 and the existing scenario tests as authority; record the adjudication in the commit body.",
+        "Recommended shape: kernel fold pure function + projection increment as SSOT; the writer's derive_messages becomes a clearly-labeled compatibility shim (docstring states delegation + known differences) or is deleted if it has zero exclusive consumers.",
+        "Pin each fork point with a test first (per the RA-154 pattern: if a test pins an old shape the story retires, the test follows the contract with a docstring note); all readers (assemble.py, model_context_assembler, history.py, token_meter.py) re-verified; ruff check clean.",
+        "Do this after RA-163 — one vocabulary must exist before the derivation can converge."
+      ],
+      "priority": "P2",
+      "passes": false,
+      "branchName": "raphy/arch-20261020-0145",
+      "notes": "Strength: Worth exploring. Friction-walk finding (Area C). Heaviest of the six — semantics must be adjudicated before converging, not during."
+    },
+    {
+      "id": "RA-167",
+      "title": "Align NamespaceApprovalStrategy's spelling policy with the wire gate and drop the _STANDARD_SHELL_TOOLS backstop",
+      "description": "As an LCA maintainer, I want the approval engine to resolve tool-name spellings the same way the wire gate does, so that a new shell-tool alias cannot silently bypass approval. Today NamespaceApprovalStrategy.evaluate calls namespace_of_tool with the RAW name only, while tool_wire_gate.py:146-147 tries resolved + alternate spellings — same seam, two miss-handling policies, which is exactly the bug shape of 8c1624fc7. The +4-line fix (static _STANDARD_SHELL_TOOLS set) is a bandage over the wiring: a hand-synced shadow of the defer catalog with no test pinning its sync.",
+      "acceptanceCriteria": [
+        "evaluate tries (resolved, alternate) spellings for namespace_of_tool, mirroring the wire gate's order; the _STANDARD_SHELL_TOOLS set and its backstop branch are deleted.",
+        "Turn every member of the deleted _STANDARD_SHELL_TOOLS set into a test case: each must still be require_approval under the new dual-spelling strategy (regression net for the 8c1624fc7 fix).",
+        "tests/.../test_namespace_approval_strategy.py green; ruff check clean. This is a stitch, not a revert — the new semantics must cover every case the old set caught."
+      ],
+      "priority": "P2",
+      "passes": false,
+      "branchName": "raphy/arch-20261020-0145",
+      "notes": "Strength: Worth exploring. Friction-walk finding (Area B, Q3 wiring-bug specimen). The wire gate's dual-spelling usage is directly readable — no forbidden-area reads needed."
     }
   ]
 }
