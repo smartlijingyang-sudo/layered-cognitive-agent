@@ -2477,9 +2477,9 @@
         "tests/observability/session/test_known_types_fail_closed.py stays green (developer_message is a known DSH type in DSH_SURFACE_EVENT_TYPES; the fail-closed contract for unknown types must not regress); a new test pins the agreed developer-row projection across the three paths. ruff check clean."
       ],
       "priority": "P1",
-      "passes": false,
+      "passes": true,
       "branchName": "raphy/arch-20261020-0445",
-      "notes": "Strength: Strong. Friction-walk finding (Area A Q4 leaky seam). Constraints: ADR-0268 section 6, ADR-0201 MV2; kernel SURFACE_EVENT_TYPES is dsh-parity so eligibility changes need the DSH extension vocabulary lens. Grilling recorded in raphy/assessment.md."
+      "notes": "Strength: Strong. Friction-walk finding (Area A Q4 leaky seam). Constraints: ADR-0268 section 6, ADR-0201 MV2; kernel SURFACE_EVENT_TYPES is dsh-parity so eligibility changes need the DSH extension vocabulary lens. Grilling recorded in raphy/assessment.md.\n2026-10-20 night: landed. Convergence direction = inclusion on all three paths (ADR-0268 section 6 requires the model to see the handoff): (1) lca_kernel/events/fold/inputs.py: new SURFACE_DEVELOPER_TYPE ('surface/developer_message') closed-set literal added to SURFACE_EVENT_TYPES, exported from fold.py; (2) append_developer_message marker 'developer_message' -> 'append' (RA-163 SurfaceOp rule); (3) derive_event_message now projects developer rows as role='developer' instead of silent None. Verified: foldSurface no longer raises on a real developer row; wire == SSOT == export_transcript; job_id/run_id provenance preserved. New regression test tests/integration/test_developer_message_convergence.py (4 tests). Assessment said 'kernel surface-eligibility fail-loud' was the only blocker — implementation confirmed the third path (fold) was the crash vector (derive_messages/export_transcript call foldSurface on whole journals), fixed at the eligibility seam rather than at call sites."
     },
     {
       "id": "RA-169",

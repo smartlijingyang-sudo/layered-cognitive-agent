@@ -67,11 +67,21 @@ dsh ``tool/result`` 的 LCA 对位。replace 只能改 content 类字段
 身份字段必须与被替换节点一致。
 """
 
+SURFACE_DEVELOPER_TYPE: str = "surface/developer_message"
+"""模型可见 developer 消息的 DSH 扩展 surface 类型。
+
+LCA 扩展命名空间(``surface/``)的唯一具名成员;ADR-0268 §6 cron handoff
+以此类型向父轮注入 worker 报告。dsh 核心三类型之外显式列出 —— 扩展词表
+仍是闭集,未知 ``surface/*`` 类型继续 fail-closed。RA-168:fold / wire /
+model_visible 三条派生路径对该类型达成一致(包含,marker 恒为 "append")。
+"""
+
 SURFACE_EVENT_TYPES: frozenset[str] = frozenset(
     {
         SURFACE_USER_TYPE,
         SURFACE_ASSISTANT_TYPE,
         SURFACE_TOOL_RESULT_TYPE,
+        SURFACE_DEVELOPER_TYPE,
     }
 )
 """可进入模型可见 surface 的 category 闭集。
@@ -81,6 +91,8 @@ SURFACE_EVENT_TYPES: frozenset[str] = frozenset(
 - ``user/message`` → ``spine.llm.request.header``
 - ``assistant/message`` → ``spine.llm.request.header.assistant``
 - ``tool/result`` → ``spine.body.tool.execute.end``
+- dsh 扩展 → ``surface/developer_message``(具名列出,闭集;未知
+  ``surface/*`` 仍 fail-closed)
 
 只有这些类型可携带 ``surfaceOp`` / ``sourceEventSeqs``;其它 category
 (含 ``turn/start``、``spine.llm.call.*``、dsh 原名)出现这两字段即失败。

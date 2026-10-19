@@ -245,6 +245,9 @@ class RunSessionWriter(RunSessionWriterProtocol):
         stay in the journal for replay provenance.
         """
         session = self._require_session()
+        # RA-168: marker 收敛到 SurfaceOp 契约("append" | replace);"developer_message"
+        # 是类型后缀的误用(与 RA-163 的 "tool_result" 同类),会导致 kernel fold
+        # fail-closed(ValueError: not surface-eligible)。
         event = session.append(
             DEVELOPER_MESSAGE_TYPE,
             {
@@ -253,7 +256,7 @@ class RunSessionWriter(RunSessionWriterProtocol):
                 "job_id": job_id,
                 "run_id": run_id,
             },
-            surface_op="developer_message",
+            surface_op="append",
         )
         return self._event_ref(session, event)
 
@@ -424,10 +427,11 @@ class RunSessionWriter(RunSessionWriterProtocol):
           :class:`RunHealthReport`. The fold SSOT also feeds transcript/history
           reads, where silent row deletion would rewrite history; and this
           shim is the actual LLM wire (``think.history.assemble``).
-        - ``surface/developer_message`` rows pass through here; the fold SSOT
-          raises ``ValueError`` on them (kernel surface-eligibility
-          fail-loud). Pre-existing divergence, deferred to its own story per
-          the RA-163 residual notes (ADR-0268 DSH vocabulary).
+        - ``surface/developer_message`` rows are converged (RA-168): the
+          kernel fold now admits the DSH extension type (closed-set literal),
+          the marker converged to ``"append"`` per the SurfaceOp contract,
+          and the shared SSOT projects them as ``role="developer"`` — the
+          same row the wire passthrough emits.
         - ``surface/*`` extension fallthrough (``Message(role=event.type)``)
           stays here; the SSOT returns ``None`` for unknown surface types.
 

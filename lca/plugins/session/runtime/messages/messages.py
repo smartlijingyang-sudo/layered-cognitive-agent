@@ -16,6 +16,7 @@ from typing import Any
 from lca.contracts.harness.tasks.session import SessionEvent
 from lca_kernel.events.fold.fold import (
     SURFACE_ASSISTANT_TYPE,
+    SURFACE_DEVELOPER_TYPE,
     SURFACE_TOOL_RESULT_TYPE,
     SURFACE_USER_TYPE,
     SurfaceFoldResult,
@@ -84,6 +85,11 @@ def derive_event_message(event: SessionEvent | Mapping[str, Any]) -> dict[str, A
         if isinstance(message, Mapping):
             return dict(message)
         return None
+
+    # RA-168: developer rows are model-visible (ADR-0268 §6 cron handoff) —
+    # same inclusion + shape as the LLM wire (RunSessionWriter.derive_messages).
+    if event_type == SURFACE_DEVELOPER_TYPE:
+        return {"role": "developer", "content": data.get("content")}
 
     return None
 

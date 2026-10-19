@@ -4604,3 +4604,50 @@ friction walk; RA-169 the secondary duplication finding).
 
 Top recommendation: RA-168 first (only production-relevant divergence; explicit
 RA-163 residual debt on the 'what text the model sees' SSOT).
+
+
+---
+
+## 2026-10-20 night — RA-168 landed (developer_message derive-path convergence)
+
+Converged the three disagreeing derive paths on `surface/developer_message`
+rows (cron handoff, ADR-0268 §6) onto one policy: **inclusion everywhere**.
+
+- `lca_kernel/events/fold/inputs.py`: new `SURFACE_DEVELOPER_TYPE =
+  "surface/developer_message"` closed-set literal added to
+  `SURFACE_EVENT_TYPES` (kernel could not import `lca/session/surface_types.py`
+  — layering — so the literal is explicit in the kernel with a docstring
+  noting the DSH-extension vocabulary; unknown `surface/*` still fail-closed);
+  exported from `lca_kernel/events/fold/fold.py`.
+- `lca/runtime/session/run_session_writer.py::append_developer_message`:
+  marker `"developer_message"` → `"append"` (RA-163 SurfaceOp-contract rule;
+  the type-suffixed marker was the RA-163 "tool_result" mistake class).
+- `lca/plugins/session/runtime/messages/messages.py::derive_event_message`:
+  developer rows now project as `{"role": "developer", "content": ...}`
+  instead of silent `None` — same shape the LLM wire emits.
+- `derive_messages` docstring "retained differences" bullet updated (the
+  RA-163 residual story is now landed, not deferred).
+
+Files changed: 4 source + new test
+`tests/integration/test_developer_message_convergence.py` (4 tests: kernel
+eligibility + fold nodes, marker contract, wire/SSOT/transcript agreement,
+job_id/run_id provenance).
+
+**Learnings for future iterations:**
+- **三叉派生路径收敛时，先确认 crash 路径是哪个（RA-168 实证）：**
+  评估只确认了 fold 的 `_surface_op_of` 会抛；实现时发现真正的生产 crash
+  路径是 `derive_messages`/`export_transcript`（它们对整本 journal 调
+  `foldSurface`）——修 eligibility seam 本体，而不是在调用点绕。评估的
+  "哪个版本更正确"要落实到"哪条调用链在生产里走"。
+- **kernel 不能 import lca 时，闭集字面量显式写进 kernel（RA-168 实证）：**
+  `surface/developer_message` 在 kernel 里是显式字面量常量（+ docstring
+  说明 DSH 扩展词表），而不是前缀规则——闭集保持闭集，未知 surface/*
+  继续 fail-closed，`test_known_types_fail_closed` 的 union 断言不受影响
+  （union 去重，catalog 结果不变）。
+- **marker 收敛和 type 收敛必须一次改完（RA-163 模式再现）：**
+  只加 kernel eligibility 而不改 writer 的 marker，fold 照样 ValueError
+  （"not surface-eligible" 变 "invalid surfaceOp"）——RA-163 的教训在这里
+  又应验了一次。
+
+Tests: new file 4 passed; fail-closed 18 passed; fold/model_visible/token_usage
+suites 30+20 passed (3 pre-existing env skips); ruff clean on all 5 files.
