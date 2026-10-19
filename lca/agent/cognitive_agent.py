@@ -394,6 +394,7 @@ class CognitiveAgent(AgentUnit):
             )
 
     async def cancel(self) -> None:
+        """尽力取消；默认 Runtime 无全局 cancel 时为 no-op。"""
         pass
 
     @staticmethod
