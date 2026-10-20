@@ -1,4 +1,18 @@
 ## Codebase Patterns
+- **resume bundle 的 write/read 两侧必须一起走完 inventory（RA-177 评估实证）：**
+  RA-173 的 `_BUNDLE_FIELDS` inventory 让写侧不再手写镜像，但读侧
+  `_restore_from_bundle` 是手写的 `session.x = restored["x"]` 赋值链——新字段
+  加进 inventory 不会自动出现在读侧。评估新 resume 字段时，不要只看
+  `_BUNDLE_FIELDS` 有没有它，要 grep `_restore_from_bundle` 有没有消费它；
+  "bundle 里有、读侧没读" = 写读分歧，静默丢事实（本轮 namespace_approval）。
+
+- **"exists stays physical" 之类的上一轮口述结论，动之前先 grep 证据（RA-179 评估实证）：**
+  RA-176 的 progress 注记说 exists() 保持 physical 是因为 "ingest dedup
+  relies on it"。本轮实测：两个生产消费者（ingest try_resolve_local_file、
+  sandbox runtime_tools validate）都是把 exists() 当"是否还可用"用的，
+  trashed 文件穿过两层检查恰恰是 seam 泄漏。结论性注记如果没贴调用链，
+  假设它已过期，动手前重查。
+
 - **写/读手工镜像收敛时，spec 取 extract/read/required 三元组而非共享常量（RA-173 实证）：**
   bundle 这类"写枚举 session 属性、读重列 key"的双胞胎，三方消费形状不同
   （写侧 session→JSON、读侧 bundle→typed value、校验侧 required 集合），一个
@@ -4961,4 +4975,27 @@ three concrete differences). RA-172 and RA-173 are safe same-area follow-ups.
     AC 的 deletion test 只审判了 path-addressed trash_file ritual。
   - 反斜杠编辑走 stdin 时直接写 chr(92) 构造，绝不走 sed 穿 exec 的
     多层转义（本轮 sed 把 "\\\\" 吃成 "\"" 写坏一行，靠 ast.parse 发现）。
+---
+
+---
+## Round 2026-10-21 05:45 (assess only, branch raphy/arch-20261021-0545 from 37cd74ab2)
+
+- Scope (YAGNI over ~40 commits): resume-bundle machinery (0bb3878f1
+  per-assistant namespace approval override + a514de47e paused_at stamp),
+  post-RA-176 file store delete seam, preset repository (37cd74ab2).
+- Friction walk, 5 questions answered per area; modules read end-to-end:
+  recovery.py, terminal/lifecycle.py, point.py, result_projection.py,
+  tool_defer/session.py, file/store.py, file/trash.py, preset/fs_repository.py,
+  access/approval_engine.py.
+- Runtime verification: Agent smoke (MockLLM) RUN1/RUN2 completed;
+  test_run_restart_recovery.py 17/17 green; filesystem e2e + trash 12/12 green.
+- Stories written: RA-177 (Strong, P1: _restore_from_bundle 丢了 inventory
+  的 namespace_approval，kernel-restart 恢复路径把 shell=allow 的 run 静默
+  re-gate 回全局默认), RA-178 (P2: apply_driver/resume_outcome 双胞胎
+  pause-fact 捕获收敛), RA-179 (P2: LocalFileStore.exists() 不认 trash
+  状态，读表面自相矛盾；消费者当 validity 用，修复是 fail-closed),
+  RA-180 (P2: _load_from_dir 双胞胎 plugin-load 循环收敛).
+- Top recommendation: RA-177 first.
+- Files changed this round: raphy/assessment.md, raphy/prd.json,
+  raphy/progress.txt. Assess-only commit, no code touched.
 ---
