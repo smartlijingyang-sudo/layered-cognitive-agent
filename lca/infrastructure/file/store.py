@@ -29,7 +29,7 @@ from lca.infrastructure.path.locator import assistant_workspace_root
 if False:
     from lca.infrastructure.file.registry import FileIndexRegistry
 
-_SAFE_NAME_RE = re.compile(r"[^A-Za-z0-9._-]+")
+_SAFE_NAME_RE = re.compile(r"[^\w.\-_]+", re.UNICODE)
 _MAX_NAME_LEN = 180
 
 
