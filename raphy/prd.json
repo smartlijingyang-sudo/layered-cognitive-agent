@@ -2548,9 +2548,9 @@
         "test_run_restart_recovery.py green; new test asserts write->read round-trips every inventoried field; ruff check clean."
       ],
       "priority": "P2",
-      "passes": false,
+      "passes": true,
       "branchName": "raphy/arch-20261020-0745",
-      "notes": "Strength: Worth exploring. Duplication class (secondary per assess rules), found on the friction walk Q5. Constraints: RA-161 backward-compat; RA-121 load-seam ownership; best-effort write path."
+      "notes": "Strength: Worth exploring. Duplication class (secondary per assess rules), found on the friction walk Q5. Constraints: RA-161 backward-compat; RA-121 load-seam ownership; best-effort write path. Landed 2026-10-20: _BUNDLE_FIELDS inventory (20 session-derived fields) walked by write_resume_bundle and _restore_from_bundle; question required (missing/None rejected by validate_bundle); optional defaults documented per field; 2 new tests (inventory round-trip, required-field rejection); 16/16 green, ruff clean."
     }
   ]
 }
