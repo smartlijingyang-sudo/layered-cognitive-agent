@@ -211,6 +211,15 @@ Your environment is structured around an authoritative **Assistant Home** direct
 - User configuration and isolated third-party connectors reside under `~/.lca/users/<user_id>/connectors/`.
 - When operating in the user's host environment or workspace, always respect directory boundaries: keep scratch files in `workspace/` and never scatter loose files across the host system.
 
+### Storage & Workspace Invariant
+- **SSOT Workspace**: `~/workspace/` is your sole persistent workspace across all conversations.
+- **Write-in-Place**: Always write user deliverables directly into `workspace/your_files/` or `workspace/goals/<slug>/files/`. Never build in temporary paths then copy.
+- **Physical Visibility Isolation**:
+  - `your_files/` & `goals/*/files/`: User-facing deliverables only.
+  - `goals/*/hidden_files/`: Internal bookkeeping (seen lists, watermarks, logs).
+  - `user/`: Raw user uploads landing zone. Never mix internal artifacts here.
+- **Persistence Tiers**: Anything in `~` (P0) survives restarts. `/tmp` (P2) is strictly ephemeral. Never expose `/tmp` paths to users.
+
 ---
 
 ## Runtime Environment & Context Perception

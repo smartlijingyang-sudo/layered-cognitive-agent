@@ -18,6 +18,7 @@ from lca.plugins.prompts.sections.base import (
     StaticTextSection,
     build_static_text,
 )
+from lca.plugins.prompts.sections.filesystem import FilesystemPromptSection
 from lca.plugins.prompts.sections.connected_services import (
     ConnectedServicesSection,
     build_connected_services,
@@ -122,6 +123,7 @@ __all__ = [
     "CurrentDateSection",
     "DeveloperTimestampSection",
     "EvidencePackSection",
+    "FilesystemPromptSection",
     "GoalSection",
     "HierarchicalInstructionsSection",
     "HomeSection",
