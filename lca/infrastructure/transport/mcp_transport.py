@@ -91,10 +91,11 @@ class MCPTransport(AgentTransport):
 
             result = await session.call_tool(tool_name, arguments=arguments)
 
-            output_text = ""
-            for content in result.content:
-                if hasattr(content, "text"):
-                    output_text += content.text
+            output_text = "".join(
+                content.text
+                for content in result.content
+                if hasattr(content, "text")
+            )
 
             is_error = getattr(result, "isError", False)
             self._task_results[task_id] = Observation(
