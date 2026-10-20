@@ -24,6 +24,8 @@ from __future__ import annotations
 import asyncio
 import json
 import os
+from collections.abc import Callable
+from dataclasses import dataclass
 from typing import Any
 
 import structlog
@@ -38,6 +40,103 @@ _log = structlog.get_logger(__name__)
 
 _BUNDLE_NAME = "resume_bundle.json"
 _BUNDLE_SCHEMA = "lca.run.resume_bundle/1"
+
+
+@dataclass(frozen=True)
+class _BundleField:
+    """One entry of the resume-bundle field inventory (RA-173).
+
+    ``extract`` pulls the JSON-able value off a paused ``RunSession``
+    (write side); ``read`` restores the typed value from a parsed bundle,
+    applying the field's documented default when the key is absent or
+    falsy. ``required`` marks fields whose absence means the bundle can
+    never rebuild a real ``WAITING_INPUT`` session -- ``validate_bundle``
+    rejects those bundles instead of letting them degrade downstream.
+    """
+
+    name: str
+    required: bool
+    extract: Callable[[RunSession], Any]
+    read: Callable[[dict[str, Any]], Any]
+
+
+def _bundle_str(name: str, default: str = "") -> Callable[[dict[str, Any]], str]:
+    """Read one string field, falling back to its documented default."""
+    return lambda bundle: str(bundle.get(name) or default)
+
+
+def _agent_id_of(session: RunSession) -> str:
+    return getattr(getattr(session, "agent", None), "agent_id", "") or ""
+
+
+def _agent_name_of(session: RunSession) -> str:
+    return getattr(getattr(session, "agent", None), "name", "") or ""
+
+
+# The single inventory both write_resume_bundle and _restore_from_bundle
+# walk. The structural keys (schema / run_id / approval_request /
+# resume_point) are the load-seam contract owned by validate_bundle and stay
+# out of this list. Optional-field defaults are intentional and documented
+# per field; only ``question`` is required -- a resumed run without it
+# renders a broken ask card (the zombie session this seam exists to prevent).
+_BUNDLE_FIELDS: tuple[_BundleField, ...] = (
+    _BundleField("trace_id", False, lambda s: s.trace_id, _bundle_str("trace_id")),
+    _BundleField(
+        "question",
+        True,  # required: no question -> zombie ask card, reject the bundle
+        lambda s: s.question,
+        _bundle_str("question"),
+    ),
+    _BundleField("user_text", False, lambda s: s.user_text, _bundle_str("user_text")),
+    # Missing mode falls back to the solo default the builder already assumes.
+    _BundleField("mode", False, lambda s: s.mode, _bundle_str("mode", "solo")),
+    _BundleField("plan_ref", False, lambda s: s.plan_ref, _bundle_str("plan_ref")),
+    _BundleField("agent_id", False, _agent_id_of, _bundle_str("agent_id", "solo")),
+    _BundleField("agent_name", False, _agent_name_of, _bundle_str("agent_name", "solo")),
+    _BundleField("device_id", False, lambda s: s.device_id, _bundle_str("device_id")),
+    _BundleField("plane", False, lambda s: s.plane, _bundle_str("plane")),
+    _BundleField("extra_plane", False, lambda s: s.extra_plane, _bundle_str("extra_plane")),
+    _BundleField(
+        "execution_target",
+        False,
+        lambda s: s.execution_target,
+        _bundle_str("execution_target"),
+    ),
+    _BundleField("assistant_id", False, lambda s: s.assistant_id, _bundle_str("assistant_id")),
+    _BundleField("user_id", False, lambda s: s.user_id, _bundle_str("user_id")),
+    _BundleField("topic_id", False, lambda s: s.topic_id, _bundle_str("topic_id")),
+    # Missing origin keeps the pre-existing "user" default (ADR-0268 handoff runs set it).
+    _BundleField("origin", False, lambda s: s.origin, _bundle_str("origin", "user")),
+    _BundleField(
+        "developer_seed", False, lambda s: s.developer_seed, _bundle_str("developer_seed")
+    ),
+    _BundleField(
+        "developer_seed_job_id",
+        False,
+        lambda s: s.developer_seed_job_id,
+        _bundle_str("developer_seed_job_id"),
+    ),
+    _BundleField(
+        "attachment_ids",
+        False,
+        lambda s: list(s.attachment_ids or ()),
+        lambda b: tuple(b.get("attachment_ids") or ()),
+    ),
+    _BundleField(
+        "started_at",
+        False,
+        lambda s: s.started_at,
+        lambda b: float(b.get("started_at") or 0),
+    ),
+    # RA-161: absent stays allowed so pre-2026-10-19 bundles keep loading;
+    # a mistyped value is rejected by validate_bundle, not here.
+    _BundleField(
+        "loaded_namespaces",
+        False,
+        lambda s: sorted(s.loaded_namespaces),
+        lambda b: frozenset(b.get("loaded_namespaces") or ()),
+    ),
+)
 
 
 # ---------------------------------------------------------------------------
@@ -73,33 +172,18 @@ def write_resume_bundle(session: RunSession) -> None:
             exc_info=True,
         )
         return
-    agent = getattr(session, "agent", None)
-    bundle = {
+    bundle: dict[str, Any] = {
         "schema": _BUNDLE_SCHEMA,
+        # Load-seam keys owned by validate_bundle (not the field
+        # inventory): run identity + the two fail-closed payloads.
         "run_id": session.run_id,
-        "trace_id": session.trace_id,
-        "question": session.question,
-        "user_text": session.user_text,
-        "mode": session.mode,
-        "plan_ref": session.plan_ref,
-        "agent_id": getattr(agent, "agent_id", "") or "",
-        "agent_name": getattr(agent, "name", "") or "",
-        "device_id": session.device_id,
-        "plane": session.plane,
-        "extra_plane": session.extra_plane,
-        "execution_target": session.execution_target,
-        "assistant_id": session.assistant_id,
-        "user_id": session.user_id,
-        "topic_id": session.topic_id,
-        "origin": session.origin,
-        "developer_seed": session.developer_seed,
-        "developer_seed_job_id": session.developer_seed_job_id,
-        "attachment_ids": list(session.attachment_ids or ()),
         "approval_request": approval_request,
         "resume_point": resume_point,
-        "started_at": session.started_at,
-        "loaded_namespaces": sorted(session.loaded_namespaces),
     }
+    # RA-173: the session-derived field inventory is walked here and in
+    # _restore_from_bundle -- one list, no hand-mirrored copies.
+    for field in _BUNDLE_FIELDS:
+        bundle[field.name] = field.extract(session)
     if validate_bundle(bundle, session.run_id) is None:
         # The write side stays best-effort: a malformed bundle is skipped,
         # never raised, on the pause path.
@@ -128,10 +212,11 @@ def validate_bundle(data: Any, run_id: str) -> dict[str, Any] | None:
 
     The load seam is the one place that decides what a resume bundle must
     contain: a non-dict JSON body, an ill-typed ``approval_request``, a
-    missing ``approval_id``, or an unparseable ``resume_point`` all mean the
-    bundle can never rebuild a real ``WAITING_INPUT`` session, so they are
-    rejected here instead of degrading into a zombie session with silent
-    ``str(... or "")`` defaults downstream.
+    missing ``approval_id``, an unparseable ``resume_point``, or a missing
+    required inventoried field (``question``) all mean the bundle can never
+    rebuild a real ``WAITING_INPUT`` session, so they are rejected here
+    instead of degrading into a zombie session with silent defaults
+    downstream.
 
     Returns the bundle when valid, ``None`` when corrupt.  ``None`` keeps
     mapping to the handler's existing "run not found" 404 path
@@ -168,6 +253,13 @@ def validate_bundle(data: Any, run_id: str) -> dict[str, Any] | None:
         or not all(isinstance(item, str) for item in loaded_namespaces)
     ):
         return None
+    for field in _BUNDLE_FIELDS:
+        # RA-173: the inventory owns the required set. A bundle missing a
+        # required field can never rebuild a real WAITING_INPUT session
+        # (e.g. no question -> zombie ask card), so it is rejected here
+        # instead of degrading to a silent default downstream.
+        if field.required and data.get(field.name) is None:
+            return None
     return data
 
 
@@ -279,41 +371,46 @@ async def _restore_from_bundle(
     resume_point = deserialize_resume_point(bundle.get("resume_point") or {})
     snapshot = resume_point_to_state_snapshot(resume_point)
 
+    # RA-173: read walks the same inventory the writer walked; every
+    # default below lives on the field spec, documented there.
+    restored = {field.name: field.read(bundle) for field in _BUNDLE_FIELDS}
     agent = AgentRef(
-        agent_id=str(bundle.get("agent_id") or "solo"),
-        name=str(bundle.get("agent_name") or "solo"),
+        agent_id=restored["agent_id"],
+        name=restored["agent_name"],
     )
     request = RunSessionRequest(
-        question=str(bundle.get("question") or ""),
-        user_text=str(bundle.get("user_text") or ""),
-        mode=str(bundle.get("mode") or "solo"),
-        attachment_ids=tuple(bundle.get("attachment_ids") or ()),
+        question=restored["question"],
+        user_text=restored["user_text"],
+        mode=restored["mode"],
+        attachment_ids=restored["attachment_ids"],
         agent=agent,
-        device_id=str(bundle.get("device_id") or ""),
-        plane=str(bundle.get("plane") or ""),
-        extra_plane=str(bundle.get("extra_plane") or ""),
-        execution_target=str(bundle.get("execution_target") or ""),
-        assistant_id=str(bundle.get("assistant_id") or ""),
-        user_id=str(bundle.get("user_id") or ""),
-        topic_id=str(bundle.get("topic_id") or ""),
-        origin=str(bundle.get("origin") or "user"),
-        developer_seed=str(bundle.get("developer_seed") or ""),
-        developer_seed_job_id=str(bundle.get("developer_seed_job_id") or ""),
+        device_id=restored["device_id"],
+        plane=restored["plane"],
+        extra_plane=restored["extra_plane"],
+        execution_target=restored["execution_target"],
+        assistant_id=restored["assistant_id"],
+        user_id=restored["user_id"],
+        topic_id=restored["topic_id"],
+        origin=restored["origin"],
+        developer_seed=restored["developer_seed"],
+        developer_seed_job_id=restored["developer_seed_job_id"],
     )
     builder = RunSessionBuilder(registry, ctx=ctx)
     session = builder.build(
         request,
         restore={
             "run_id": run_id,
-            "trace_id": str(bundle.get("trace_id") or f"trace_{run_id}"),
-            "started_at": float(bundle.get("started_at") or 0),
-            "plan_ref": str(bundle.get("plan_ref") or ""),
+            # The run_id-scoped trace fallback stays at the call site: the
+            # inventory's read default for trace_id is "" (see the spec).
+            "trace_id": restored["trace_id"] or f"trace_{run_id}",
+            "started_at": restored["started_at"],
+            "plan_ref": restored["plan_ref"],
         },
     )
     session.status = RunLifecycleStatus.WAITING_INPUT
     session.approval_request = bundle.get("approval_request")
     session.snapshot = snapshot
-    session.loaded_namespaces = frozenset(bundle.get("loaded_namespaces") or ())
+    session.loaded_namespaces = restored["loaded_namespaces"]
     # Do not recreate the step-tree fold machinery: the pause-time
     # journal.json is the historical record and must not be overwritten.
     session.step_tree_bundle = None
@@ -338,13 +435,22 @@ def _seed_recovery_facts(
     approval_id = str(resume_point.get("approval_id") or "")
     if not approval_id:
         return
-    approval_request = bundle.get("approval_request")
-    pending = (
-        _pending_tools_calling(approval_request) if isinstance(approval_request, dict) else None
-    )
     from lca.contracts.harness.memory.events import ApprovalPersisted, SessionCheckpoint
-    from lca.infrastructure.session.emit.lifecycle_emit import resolve_run_session_writer
+    from lca.infrastructure.session.emit.lifecycle_emit import (
+        pending_tools_calling_from,
+        resolve_run_session_writer,
+    )
     from lca.loop.fact_gateway import append_catalog_bound
+
+    approval_request = bundle.get("approval_request")
+    # The frontend-facing run id lives on the bundle (validate_bundle pins
+    # bundle["run_id"] to the recovery target); never get_current_run_id().
+    run_id = str(bundle.get("run_id") or "")
+    pending = (
+        pending_tools_calling_from(approval_request, run_id=run_id or None)
+        if isinstance(approval_request, dict)
+        else None
+    )
 
     writer = resolve_run_session_writer(session)
     if writer is None:
@@ -359,24 +465,6 @@ def _seed_recovery_facts(
         session=writer,
         actor="recovery",
     )
-
-
-def _pending_tools_calling(approval_request: dict[str, Any]) -> list[dict[str, Any]]:
-    pending: list[dict[str, Any]] = []
-    tool_calls = approval_request.get("tool_calls")
-    if isinstance(tool_calls, list):
-        for call in tool_calls:
-            if not isinstance(call, dict):
-                continue
-            arguments = call.get("arguments")
-            pending.append(
-                {
-                    "tool_name": str(call.get("tool_name") or ""),
-                    "call_id": str(call.get("call_id") or ""),
-                    "arguments": arguments if isinstance(arguments, dict) else {},
-                }
-            )
-    return pending
 
 
 async def _assemble_runnable(

@@ -1,4 +1,19 @@
 ## Codebase Patterns
+- **写/读手工镜像收敛时，spec 取 extract/read/required 三元组而非共享常量（RA-173 实证）：**
+  bundle 这类"写枚举 session 属性、读重列 key"的双胞胎，三方消费形状不同
+  （写侧 session→JSON、读侧 bundle→typed value、校验侧 required 集合），一个
+  纯 key 列表或共享 dict 压不住类型恢复（tuple/float/frozenset/str 各异）。
+  收敛形态：frozen dataclass（name + required + extract(session) + read(bundle)），
+  写/读/校验都走它；required 宁小勿大，只标"缺了就一定不是合法态"的字段
+  （本轮仅 question），有合法空值或历史默认的字段标 required 会误伤老数据。
+
+- **双胞胎收敛到函数内导入的 seam 时，import 必须挪到第一个调用点之前（RA-171 实证）：**
+  私有双胞胎在模块级时导入顺序无所谓；收敛成共享 seam 后若沿用函数内 lazy
+  import，import 块必须移到该函数体内首次调用之前，否则该名字在运行时是
+  未绑定局部变量（本轮：`_seed_recovery_facts` 里 `pending_tools_calling_from`
+  的 UnboundLocalError，首轮绿测试直接暴露）。收敛双胞胎时顺手检查函数内
+  import 的相对顺序，不要原样保留。
+
 - **收敛三叉派生路径前，先把三条路径的真实分歧枚举全（RA-168 评估实证）：**
   同一行 journal event 可能同时被 writer wire、shared SSOT（derive_event_message）、kernel fold
   三条路径派生；评估时只看其中一条会漏掉真正的分歧（本轮：writer passthrough、
@@ -4721,3 +4736,131 @@ Files changed: `lca/runtime/session/run_session_writer.py`（-16/+4）。
   drop 是真实行为。
 
 Tests: orphan-drop + writer + developer-convergence 16 passed; ruff clean.
+
+
+---
+
+## 2026-10-20 night — assess 07:45 round (3 candidates: RA-171/172/173)
+
+Branch `raphy/arch-20261020-0745` from main `22c7552d0`. YAGNI scope over last
+~40 commits; friction-walked 3 hot areas end-to-end: run lifecycle / resume /
+recovery (carrier lifecycle, recovery, resume point, terminal lifecycle — full
+read), tool defer session (full read), runtime loop resume + reducer pause
+budget (PR #47). run_session_writer and browser tools skipped — converged the
+last two rounds, re-scanned only. Runtime verification: mock-LLM smoke
+(a)+(c) -> RUN1: completed | RUN2: completed; 01:45 round's scripted harness
+already covered (b) tool-call and (d) non-converging (Result failed, no
+exception, RA-023 pinned) — no new crash/hang found.
+
+Findings:
+- **RA-171 (Strong, P1)**: "pending tool calls for the waiting_input
+  checkpoint" is derived twice from the same `approval_request["tool_calls"]`
+  shape with three silent drifts — `emit_approval_pause_from_result`
+  (lifecycle_emit.py, fresh pause) vs `_pending_tools_calling`
+  (recovery.py, restart recovery): fresh skips empty tool_name/call_id
+  (recovery keeps ""), fresh injects `lca_run_id` into askUserQuestion args
+  (recovery drops it — the frontend submit handler cannot resume a
+  recovered run: silent failure on a production path), fresh records
+  `step.tool_call.record`/pending_approval facts (recovery skips). No
+  locality for the concept; two derivations = a real seam already hurting.
+- **RA-172 (Worth exploring, P2)**: twin ~15-line TrustEnvelope bind rituals
+  in `RunLifecycleCoordinator.execute()` / `resume()` (lifecycle.py:185–193
+  vs 327–335) — ADR-0292 §10 P3 policy edits must land twice. Two = real
+  seam, un-owned.
+- **RA-173 (Worth exploring, P2)**: the resume bundle's ~24-field inventory
+  is hand-mirrored between `write_resume_bundle` and `_restore_from_bundle`;
+  only 4 keys are fail-closed in `validate_bundle` while the other ~20 get
+  silent `""` defaults on read — the zombie session `validate_bundle`'s
+  docstring claims to prevent but doesn't cover.
+
+Not candidates (recorded with reasons): tool defer session is deep
+(`new_defer_session` single derivation home, RA-160); reducer pause budget
+is one seam one direction; `_assemble_runnable`'s inline assembler
+construction is deliberate (recovery runs outside the composition root —
+Speculative only); `task_cancelled` helpers and `apply_driver`/`RunTerminalizer`
+aliases are compat hygiene (deletion test moves a one-liner inline); the
+second `RunSessionWriter` in `resume()` is a same-method micro-dup.
+
+Diversity quota satisfied (RA-171 leaky-seam/no-locality from the friction
+walk — Strong; RA-172/173 the secondary duplication findings).
+Not all-duplication.
+
+Top recommendation: RA-171 first (only candidate with measurable silent
+behavioral divergence on a production path; zero locality; drift already
+three concrete differences). RA-172 and RA-173 are safe same-area follow-ups.
+
+## [2026-10-20 08:27 CST] - RA-171
+- Implemented: converged the twin pending_tools_calling derivations onto one
+  seam `pending_tools_calling_from(approval_request, *, run_id=None)` in
+  `lca/infrastructure/session/emit/lifecycle_emit.py` (exported via `__all__`).
+  `emit_approval_pause_from_result` now derives via the seam and keeps the
+  `record_step_tool_call` pending_approval loop explicitly at the fresh call
+  site (ADR-0195 P4-S04). recovery's private `_pending_tools_calling` deleted;
+  `_seed_recovery_facts` calls the seam with the bundle run_id
+  (validate_bundle pins bundle["run_id"] to the recovery target; never
+  get_current_run_id()). Three drifts fixed: (1) recovery no longer keeps
+  empty tool_name/call_id entries; (2) recovery now injects lca_run_id into
+  askUserQuestion args -- a restart-recovered ask card can be resumed by the
+  frontend submit handler; (3) step-record facts stay fresh-path-only,
+  documented as deliberate (recovery journal stays minimal).
+- Files changed:
+  - lca/infrastructure/session/emit/lifecycle_emit.py (+pending_tools_calling_from seam)
+  - lca/plugins/transport/webserver/carrier/runs/recovery.py (-_pending_tools_calling, +seam call)
+  - tests/contracts/test_pending_tools_calling_seam.py (new: 2 pinning tests)
+- Tests: new pinning test FAILED on pre-fix code (proved drift: recovery kept
+  "" entries and dropped lca_run_id), PASSES post-fix; 32 existing
+  approval-pause/recovery/architecture tests green; ruff check clean.
+- **Learnings for future iterations:**
+  - Twin-to-seam convergence: when the twin lived at module level, import
+    order never mattered; after converging onto a function-local import,
+    the import block must move ABOVE the first call site in the function
+    body or the name is an unbound local at runtime (recovery.py
+    UnboundLocalError on first green run).
+  - Bundle run_id is the honest frontend-facing id in recovery: validate_bundle
+    rejects bundles whose run_id mismatches the recovery target, so
+    bundle.get("run_id") is authoritative there; get_current_run_id() would
+    resolve to the minted HIL resume scope, not the UI-visible run.
+---
+## [2026-10-20 08:35 CST] - RA-172
+- Implemented: converged the twin TrustEnvelope bind rituals in
+  RunLifecycleCoordinator.execute()/resume() onto one seam
+  `bind_carrier_trust_envelope(session)` in
+  lca/plugins/transport/webserver/carrier/runs/lifecycle/lifecycle.py
+  (same home as the RA-049 bind_resume_capabilities CM). execute() now wraps
+  the driver body with the CM; resume() folded the CM into its existing
+  tuple-with (ruff SIM117: enter order identical, exit LIFO preserved).
+  Deferred-import discipline preserved (imports live inside the CM body;
+  docstring cites ADR-0292 section 10 P3). Full-repo grep confirmed no
+  third "envelope or assistant default" site (default_facade.py binds the
+  facade's real envelope -- a different policy, left alone).
+- Files changed:
+  - lca/plugins/transport/webserver/carrier/runs/lifecycle/lifecycle.py
+    (+bind_carrier_trust_envelope seam, -both hand-rolled ritual copies)
+  - raphy/prd.json (RA-172 passes: true)
+- Tests: 55 lifecycle/transport/resume tests green
+  (observe_failure/cancel/resume_rebinds_ambient/identity_scopes/
+  assistant_scope_binding/http_run_grant_binder/gateway_lifecycle/
+  resume_session_recovery/resume_idempotency/resume_concurrency);
+  6 architecture+scenario tests green; ruff check clean on the touched file.
+  tests/scenario/code/test_code_conventions.py::TestFileLineCountLimit fails
+  IDENTICALLY at pre-change HEAD (6 offender files, none touched by RA-172)
+  -- pre-existing, out of scope.
+- **Learnings for future iterations:**
+  - Twin-to-CM convergence can trip SIM117: when the twin lived behind
+    intervening statements, ruff stayed silent; once the shared CM becomes
+    the first statement inside an outer tuple-with, fold the CM into the
+    tuple (enter order preserved, exit LIFO identical) instead of nesting.
+  - RA-123 seam-scope check applies to rituals too: grep the whole repo for
+    the resource ritual's signature (trust_envelope_scope / assistant
+    fallback) before converging; the facade path's twin-shaped call was a
+    different policy, not a third occurrence -- diverging policies must not
+    be folded in.
+---
+
+## 2026-10-20 RA-173 (worker session) - resume-bundle field inventory owned in one place
+- **做了什么**：`recovery.py` 新增 `_BUNDLE_FIELDS`（frozen dataclass spec：name + required + session-attr extractor + bundle-read 恢复器），20 个 session 派生字段（trace_id/question/user_text/mode/plan_ref/agent_id/agent_name/device_id/plane/extra_plane/execution_target/assistant_id/user_id/topic_id/origin/developer_seed/developer_seed_job_id/attachment_ids/started_at/loaded_namespaces）全部收敛到该清单；`write_resume_bundle` 与 `_restore_from_bundle` 都走它，不再手工镜像。结构键（schema/run_id/approval_request/resume_point）仍是 validate_bundle 的 load-seam 契约，不在清单里。
+- **校验扩展**：`question` 标 required，缺键/None 的 bundle 被 `validate_bundle` 拒绝（此前静默建成无 question 的僵尸 session）；其余 optional 字段保留原默认值并在 spec 注释里写明意图（mode→"solo"、origin→"user"、loaded_namespaces 缺键仍可加载即 RA-161）。写侧保持 best-effort：`question=None` 的 session 只会触发 `resume_bundle_invalid_skip` 警告跳过，不抛异常。
+- **测试**：`test_run_restart_recovery.py` 16/16 全绿（含 2 个新增：`test_ra173_bundle_field_inventory_round_trip` 断言 20 字段 write→read 全覆盖 round-trip；`test_ra173_validate_bundle_rejects_missing_required_field` 断言缺/None question 被拒、删 optional 仍可加载）。`ruff check` + `ruff format --check` 干净。
+- **Learnings**：
+  - bundle 这类"写枚举/读重列"的手工镜像，收敛方向是 spec 三元组（extract/read/required）而不是简单的"抽一个公共 dict"——因为写侧要 session→JSON、读侧要 bundle→typed value、校验侧要 required 集合，三方消费形状不同，一个带默认值的 read 闭包比共享常量更贴合。
+  - required 集合宁小勿大：只标 story 点名的 zombie 根因（question）；user_text/mode 等有合法空值或历史默认的字段标 required 会误伤老 bundle——"缺失即拒"只适用于"缺了就一定不是合法暂停态"的字段。

@@ -230,3 +230,103 @@ def test_ra161_validate_bundle_rejects_mistyped_loaded_namespaces(tmp_path: Path
         mutated = dict(bundle)
         mutated["loaded_namespaces"] = bad
         assert validate_bundle(mutated, "run-rec-1") is None
+
+
+def test_ra173_bundle_field_inventory_round_trip(tmp_path: Path) -> None:
+    """RA-173: write -> read round-trips every inventoried field.
+
+    The inventory (_BUNDLE_FIELDS) is the single list both the writer and
+    the reader walk; a field added on write but forgotten on read would
+    surface here as a key the bundle has but the read seam drops.
+    """
+    from lca.plugins.transport.webserver.carrier.runs.recovery import _BUNDLE_FIELDS
+
+    run_dir = tmp_path / "traces" / "run-ra173"
+    run_dir.mkdir(parents=True, exist_ok=True)
+    session = _paused_session(run_id="run-ra173")
+    session.locator.run_dir.return_value = run_dir
+    # Non-default values on every inventoried field so the round-trip is real.
+    session.trace_id = "trace-ra173"
+    session.question = "海还是山？"
+    session.user_text = "只问一题，别啰嗦。"
+    session.mode = "team"
+    session.plan_ref = "plan-ra173"
+    session.agent = AgentRef(agent_id="asst_1", name="副驾")
+    session.device_id = "dev-1"
+    session.plane = "web"
+    session.extra_plane = "extra"
+    session.execution_target = "local"
+    session.assistant_id = "asst_x"
+    session.user_id = "u9"
+    session.topic_id = "tpc-9"
+    session.origin = "handoff"
+    session.developer_seed = "seed"
+    session.developer_seed_job_id = "job-1"
+    session.attachment_ids = ("att-1", "att-2")
+    session.started_at = 4242.5
+    session.loaded_namespaces = frozenset({"shell"})
+
+    write_resume_bundle(session)
+    bundle = json.loads((run_dir / "resume_bundle.json").read_text(encoding="utf-8"))
+
+    expected = {
+        "trace_id": "trace-ra173",
+        "question": "海还是山？",
+        "user_text": "只问一题，别啰嗦。",
+        "mode": "team",
+        "plan_ref": "plan-ra173",
+        "agent_id": "asst_1",
+        "agent_name": "副驾",
+        "device_id": "dev-1",
+        "plane": "web",
+        "extra_plane": "extra",
+        "execution_target": "local",
+        "assistant_id": "asst_x",
+        "user_id": "u9",
+        "topic_id": "tpc-9",
+        "origin": "handoff",
+        "developer_seed": "seed",
+        "developer_seed_job_id": "job-1",
+        "attachment_ids": ("att-1", "att-2"),
+        "started_at": 4242.5,
+        "loaded_namespaces": frozenset({"shell"}),
+    }
+    restored = {f.name: f.read(bundle) for f in _BUNDLE_FIELDS}
+    # Dict equality pins both directions: no inventoried field may be
+    # missing from the bundle, and no extra field may sneak in untested.
+    assert restored == expected
+
+
+def test_ra173_validate_bundle_rejects_missing_required_field(tmp_path: Path) -> None:
+    """RA-173: a bundle missing a required inventoried field is rejected.
+
+    Before RA-173 a bundle without 'question' passed validation and rebuilt
+    a zombie session with an empty ask card; optional fields keep their
+    documented defaults and still load when absent.
+    """
+    from lca.plugins.transport.webserver.carrier.runs.recovery import (
+        _BUNDLE_FIELDS,
+        validate_bundle,
+    )
+
+    run_dir = tmp_path / "traces" / "run-ra173-req"
+    run_dir.mkdir(parents=True, exist_ok=True)
+    session = _paused_session(run_id="run-ra173-req")
+    session.locator.run_dir.return_value = run_dir
+    write_resume_bundle(session)
+    bundle = json.loads((run_dir / "resume_bundle.json").read_text(encoding="utf-8"))
+
+    required = [f.name for f in _BUNDLE_FIELDS if f.required]
+    assert required, "the inventory must own at least one required field"
+    for name in required:
+        deleted = dict(bundle)
+        del deleted[name]
+        assert validate_bundle(deleted, "run-ra173-req") is None
+        nulled = dict(bundle)
+        nulled[name] = None
+        assert validate_bundle(nulled, "run-ra173-req") is None
+
+    optional = next(f.name for f in _BUNDLE_FIELDS if not f.required)
+    dropped = dict(bundle)
+    del dropped[optional]
+    assert validate_bundle(dropped, "run-ra173-req") == dropped
