@@ -15,6 +15,7 @@ import os
 import re
 from collections.abc import Sequence
 from dataclasses import asdict, dataclass
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Protocol
 
@@ -68,11 +69,48 @@ class FileStore(Protocol):
 
     def list(self) -> list[StoredFile]: ...
 
+    def delete(self, attachment_id: str) -> bool:
+        """Soft-delete: retire the file from reads/list; bytes stay recoverable.
+
+        Returns True when the file transitioned to trashed, False when there
+        was nothing to do (unknown id, no registry, or already trashed).
+        """
+        ...
+
 
 def _safe_filename(name: str) -> str:
     base = Path(name).name.strip() or "file"
     cleaned = _SAFE_NAME_RE.sub("_", base).strip("._") or "file"
     return cleaned[:_MAX_NAME_LEN]
+
+
+def write_sidecar_pair(
+    meta_path: Path, blob_path: Path, meta: dict[str, object], blob: bytes
+) -> None:
+    """Write one id -> (meta.json + blob) sidecar pair (RA-176 shared ritual).
+
+    Converges the twin hand-rolled pattern: the store's {attachment_id}/ dirs
+    and trash's flat sidecar files both serialize a JSON meta file plus a
+    raw-bytes blob addressed by an id. Layout (subdir vs flat) stays each
+    caller's choice; the serialization ritual is owned here.
+    """
+    meta_path.parent.mkdir(parents=True, exist_ok=True)
+    meta_path.write_text(json.dumps(meta, ensure_ascii=False, indent=2), encoding="utf-8")
+    blob_path.write_bytes(blob)
+
+
+def trash_dir_for(workspace_root: Path) -> Path:
+    """Locate the .trash/ directory for a workspace root (shared rule).
+
+    Historical TrashManager layout: <parent>/.trash when the root itself is
+    named "workspace", else <root>/.trash. Both the store's delete ritual and
+    the manager's restore/purge use this one rule.
+    """
+    root = Path(workspace_root).resolve()
+    base = root.parent if root.name == "workspace" else root
+    trash_dir = base / ".trash"
+    trash_dir.mkdir(parents=True, exist_ok=True)
+    return trash_dir
 
 
 def file_part_from_stored(stored: StoredFile) -> dict[str, object]:
@@ -212,10 +250,9 @@ class LocalFileStore:
         dest_path.write_bytes(data)
 
         # 2. Legacy mirror storage for backward-compatibility lookup by attachment_id
+        # (RA-176: the id -> meta.json + blob write goes through the shared
+        # sidecar helper, converging the twin hand-rolled pattern.)
         directory = self._legacy_root / attachment_id
-        directory.mkdir(parents=True, exist_ok=True)
-        blob_path = directory / "blob"
-        blob_path.write_bytes(data)
 
         stored = StoredFile(
             attachment_id=attachment_id,
@@ -226,10 +263,7 @@ class LocalFileStore:
             conversation_id=conversation_id,
             previewable=_is_previewable(mime, final_name),
         )
-        (directory / "meta.json").write_text(
-            json.dumps(asdict(stored), ensure_ascii=False, indent=2),
-            encoding="utf-8",
-        )
+        write_sidecar_pair(directory / "meta.json", directory / "blob", asdict(stored), data)
 
         # 3. Register in SQLite FileIndexRegistry if present
         if self._registry is not None:
@@ -251,7 +285,16 @@ class LocalFileStore:
 
         return stored
 
+    def _is_trashed(self, attachment_id: str) -> bool:
+        """Trash state is registry-owned; without a registry nothing is trashed."""
+        if self._registry is None:
+            return False
+        record = self._registry.get_by_id(attachment_id)
+        return record is not None and record.trashed_at is not None
+
     def get(self, attachment_id: str) -> StoredFile | None:
+        if self._is_trashed(attachment_id):
+            return None
         meta_path = self._root / attachment_id / "meta.json"
         if not meta_path.is_file():
             return None
@@ -273,6 +316,8 @@ class LocalFileStore:
             return None
 
     def read_bytes(self, attachment_id: str) -> bytes | None:
+        if self._is_trashed(attachment_id):
+            return None
         blob = self._root / attachment_id / "blob"
         if not blob.is_file():
             return None
@@ -280,6 +325,57 @@ class LocalFileStore:
 
     def exists(self, attachment_id: str) -> bool:
         return (self._root / attachment_id / "meta.json").is_file()
+
+    def delete(self, attachment_id: str) -> bool:
+        """Soft-delete through the FileStore interface (RA-176).
+
+        Ritual: resolve the registry record -> retire the live workspace copy
+        into a .trash/ sidecar (shared sidecar helper) -> flag trashed_at in
+        the registry. The {attachment_id}/ mirror (meta.json + blob) is
+        deliberately KEPT: the /files/{attachment_id} stable address and its
+        bytes stay recoverable; reads go dark through the interface because
+        get()/read_bytes()/list() honor the registry flag.
+
+        Returns True when the file transitioned to trashed; False when there
+        was nothing to do (no registry, unknown id, already trashed).
+        """
+        if self._registry is None:
+            return False
+        record = self._registry.get_by_id(attachment_id)
+        if record is None or record.trashed_at is not None:
+            return False
+
+        now = datetime.now(timezone.utc)
+        trash_id = new_id("trash")
+
+        # Retire the live workspace copy; fall back to the mirror blob so the
+        # sidecar always carries recoverable bytes.
+        data: bytes | None = None
+        rel = record.path.replace("\\", "/").lstrip("/")
+        live = self._workspace_root / rel
+        if live.is_file():
+            data = live.read_bytes()
+            live.unlink()
+        if data is None:
+            mirror_blob = self._root / attachment_id / "blob"
+            if mirror_blob.is_file():
+                data = mirror_blob.read_bytes()
+
+        trash_dir = trash_dir_for(self._workspace_root)
+        write_sidecar_pair(
+            trash_dir / f"{trash_id}.meta.json",
+            trash_dir / f"{trash_id}.blob",
+            {
+                "trash_id": trash_id,
+                "attachment_id": attachment_id,
+                "orig_rel_path": rel,
+                "trashed_at": now.isoformat(),
+                "size_bytes": len(data) if data is not None else 0,
+            },
+            data or b"",
+        )
+        self._registry.mark_trashed(record.path, now)
+        return True
 
     def list(self) -> list[StoredFile]:
         """List all stored files, newest first (Workspace SSOT discovery)."""

@@ -2595,9 +2595,10 @@
         "tests/infrastructure/file/test_trash_manager.py and tests/e2e/test_canonical_filesystem_invariants.py green through the new seam; ruff check clean."
       ],
       "priority": "P2",
-      "passes": false,
+      "passes": true,
       "branchName": "raphy/arch-20261020-2345",
-      "notes": "Strength: Worth exploring. Friction-walk Q4/Q5 (seam without an owner; deletion not testable through the interface). Constraints: TrashManager currently has zero production callers (tests only) — this story pins the seam; wiring tools to it is a separate product decision. The /files/{attachment_id} deliverable URL is the stable address (survives user/ timestamp renames) — delete must decide explicitly whether the mirror blob survives for recoverability while reads go dark. Deletion test: concentrates — the move+sidecar+flag ritual is currently split across TrashManager, the registry, and the store's unaware reads."
+      "notes": "Strength: Worth exploring. Friction-walk Q4/Q5 (seam without an owner; deletion not testable through the interface). Constraints: TrashManager currently has zero production callers (tests only) — this story pins the seam; wiring tools to it is a separate product decision. The /files/{attachment_id} deliverable URL is the stable address (survives user/ timestamp renames) — delete must decide explicitly whether the mirror blob survives for recoverability while reads go dark. Deletion test: concentrates — the move+sidecar+flag ritual is currently split across TrashManager, the registry, and the store's unaware reads.",
+      "implemented": "2026-10-21: FileStore Protocol gains delete(attachment_id) soft-delete; LocalFileStore implements the ritual (retire live copy -> .trash/ sidecar via shared write_sidecar_pair helper -> registry trashed_at); the {attachment_id}/ mirror is deliberately KEPT (recoverable, stable address), reads go dark via the registry flag in get/read_bytes/list. Twin sidecar pattern converged onto write_sidecar_pair (put() too). TrashManager kept as path-addressed adapter: trash_file delegates path->id->seam (fail-loud without store); restore/purge unchanged. FileStoreService.delete passthrough added. 21 tests green (file/ + e2e invariants + ingest pipeline + write_file guard); ruff 0 new issues. Known: purge_expired does not clean kept mirrors (follow-up)."
     }
   ]
 }

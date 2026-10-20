@@ -43,3 +43,6 @@ class FileStoreService:
 
     def exists(self, attachment_id: str) -> bool:
         return self.providers.current().exists(attachment_id)
+
+    def delete(self, attachment_id: str) -> bool:
+        return self.providers.current().delete(attachment_id)

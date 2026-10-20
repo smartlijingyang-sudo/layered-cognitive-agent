@@ -4927,3 +4927,38 @@ three concrete differences). RA-172 and RA-173 are safe same-area follow-ups.
   - ruff 的"clean"口径：touched files 上 0 new issues 即可；预先存在的
     16 个（W293/UP017/F401/I001）不动——修它们是评估之外的顺手改。
 ---
+
+## 2026-10-21 00:23 CST - RA-176
+- FileStore Protocol gains delete(attachment_id) soft-delete; LocalFileStore
+  implements the full ritual: resolve registry record -> retire the live
+  workspace copy into .trash/ (fall back to mirror blob) -> write the trash
+  sidecar through the ONE shared write_sidecar_pair helper -> flag
+  registry trashed_at. get()/read_bytes()/list() honor trash state via the
+  registry (list() via get()); exists() stays physical (ingest dedup relies
+  on it; AC only named list/get/read_bytes).
+- Twin id->meta+blob pattern converged: write_sidecar_pair (JSON meta +
+  raw blob) now serves both store.put()'s {attachment_id}/ mirror and the
+  trash flat sidecars; trash_dir_for() shares the .trash/ location rule.
+- Explicit mirror decision (assessment 要求): {attachment_id}/ mirror
+  (meta.json + blob) is deliberately KEPT on delete -- stable
+  /files/{attachment_id} address stays recoverable; reads go dark through
+  the interface via the flag. Known follow-up: purge_expired cleans .trash/
+  only, kept mirrors of purged files orphan (out of scope).
+- TrashManager kept as path-addressed adapter (not deleted): trash_file
+  resolves path->id via registry and delegates to store.delete(); no store
+  -> fail-loud RuntimeError (the old standalone ritual was the bypass).
+  restore_file/purge_expired unchanged (same sidecar format).
+- FileStoreService gains delete passthrough (faithful FileStore).
+- Files changed: lca/infrastructure/file/store.py,
+  lca/infrastructure/file/trash.py,
+  lca/infrastructure/capability/files/files.py,
+  tests/infrastructure/file/test_trash_manager.py (rewritten through the seam),
+  tests/e2e/test_canonical_filesystem_invariants.py (INV-FS-07/08 through seam),
+  raphy/prd.json.
+- **Learnings for future iterations:**
+  - "delegates or deleted" 二选一时：看被删对象是否还承载独立 ritual
+    （本轮 restore/purge 是独立的）——有独立价值就 delegate，无才删。
+    AC 的 deletion test 只审判了 path-addressed trash_file ritual。
+  - 反斜杠编辑走 stdin 时直接写 chr(92) 构造，绝不走 sed 穿 exec 的
+    多层转义（本轮 sed 把 "\\\\" 吃成 "\"" 写坏一行，靠 ast.parse 发现）。
+---

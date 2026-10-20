@@ -1,68 +1,66 @@
 """TrashManager — Recoverable soft-delete repository for workspace files (.trash/).
 
+The delete ritual itself is owned by the FileStore.delete seam (RA-176);
+this manager is the path-addressed adapter over it, plus restore and TTL
+purge over the .trash/ sidecars.
+
 Implements:
-1. Recoverable soft-deletion retaining original relative paths and timestamps (INV-FS-07).
-2. Metadata sidecars (.meta.json + .blob) with SQLite index synchronization.
-3. 30-day automated TTL expiration and purging (INV-FS-08).
+1. Recoverable soft-deletion retaining original relative paths and timestamps (INV-FS-07),
+   via the FileStore.delete seam (move+sidecar+flag ritual owned by the store).
+2. Restore from .trash/ sidecars; 30-day automated TTL expiration and purging (INV-FS-08).
 """
 
 from __future__ import annotations
 
 import json
-import os
 import shutil
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from lca.contracts.atoms.ids.ids import new_id
+from lca.infrastructure.file.store import FileStore, trash_dir_for
 
 
 class TrashManager:
-    """Manages soft-deleted workspace files in the .trash/ directory."""
+    """Path-addressed soft-delete adapter over the FileStore delete seam."""
 
-    def __init__(self, workspace_root: Path | str, registry: Any = None) -> None:
+    def __init__(
+        self,
+        workspace_root: Path | str,
+        registry: Any = None,
+        store: FileStore | None = None,
+    ) -> None:
         self._workspace_root = Path(workspace_root).resolve()
-        if self._workspace_root.name == "workspace":
-            self._trash_dir = self._workspace_root.parent / ".trash"
-        else:
-            self._trash_dir = self._workspace_root / ".trash"
-        self._trash_dir.mkdir(parents=True, exist_ok=True)
+        self._trash_dir = trash_dir_for(self._workspace_root)
         self._registry = registry
+        self._store = store
 
     @property
     def trash_dir(self) -> Path:
         return self._trash_dir
 
     def trash_file(self, rel_path: str) -> bool:
-        """Move a file to .trash/ and mark it trashed in the index."""
-        clean_rel = rel_path.replace("\\", "/").lstrip("/")
-        target = (self._workspace_root / clean_rel).resolve()
-        if not target.is_file():
+        """Soft-delete a workspace file through the FileStore.delete seam.
+
+        Only resolves the path to an attachment id; the move+sidecar+flag
+        ritual lives in the store (RA-176). Requires store=... — fail-loud:
+        the old standalone hand-rolled ritual was the bypass this seam
+        removes, so there is no silent fallback to it.
+        """
+        if self._store is None:
+            raise RuntimeError(
+                "TrashManager.trash_file requires a FileStore (pass store=...); "
+                "the standalone trash ritual was removed in RA-176."
+            )
+        clean_rel = rel_path.replace(chr(92), "/").lstrip("/")
+        record = self._registry.get_by_path(clean_rel) if self._registry is not None else None
+        if record is None:
             return False
-
-        now = datetime.now(timezone.utc)
-        trash_id = new_id("trash")
-        blob_path = self._trash_dir / f"{trash_id}.blob"
-        meta_path = self._trash_dir / f"{trash_id}.meta.json"
-
-        meta = {
-            "trash_id": trash_id,
-            "orig_rel_path": clean_rel,
-            "trashed_at": now.isoformat(),
-            "size_bytes": target.stat().st_size,
-        }
-        meta_path.write_text(json.dumps(meta, ensure_ascii=False, indent=2), encoding="utf-8")
-        shutil.move(str(target), str(blob_path))
-
-        if self._registry is not None:
-            self._registry.mark_trashed(clean_rel, now)
-
-        return True
+        return self._store.delete(record.file_id)
 
     def restore_file(self, rel_path: str) -> bool:
         """Restore a trashed file back to its exact original workspace path."""
-        clean_rel = rel_path.replace("\\", "/").lstrip("/")
+        clean_rel = rel_path.replace(chr(92), "/").lstrip("/")
         dest = (self._workspace_root / clean_rel).resolve()
 
         # Find matching item in trash by orig_rel_path
