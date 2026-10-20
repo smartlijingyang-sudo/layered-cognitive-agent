@@ -114,6 +114,35 @@ async def test_terminal_projection_keeps_pause_resume_data_in_one_result() -> No
 
 
 @pytest.mark.asyncio
+async def test_pause_snapshot_carries_paused_at_for_wall_clock_budget() -> None:
+    """RA-159: 暂停快照必须带 paused_at，resume 才能把等待时间从 wall-clock 预算剔除。"""
+    store = _StateStore()
+    cursor = _cursor()
+    terminal = TerminalOutcome(
+        kind=TerminalOutcomeKind.WAITING_INPUT,
+        stop_reason="approval_required",
+        resume_cursor=ResumeCursor(cursor="resume-think", session_seq=7, approval_id="approval-1"),
+        plan_ref="plan-1",
+        journal_seq_end=12,
+    )
+    declarative = DeclarativeRunOutcome(
+        kind=ExecutionOutcome.PAUSED,
+        cursor=cursor,
+        stop=object(),
+        approval_request={"approval_id": "approval-1", "type": "tool_approval"},
+    )
+
+    result = await TerminalResultProjection(store).project(
+        _state(),
+        terminal_outcome=terminal,
+        declarative_outcome=declarative,
+    )
+
+    snapshot = result.extra["state_snapshot"]
+    assert snapshot.paused_at is not None
+
+
+@pytest.mark.asyncio
 async def test_terminal_projection_derives_failed_result_from_terminal_fact() -> None:
     store = _StateStore()
     terminal = TerminalOutcome(

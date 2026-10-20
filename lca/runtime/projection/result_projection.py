@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from lca.contracts.atoms.ids.ids import TraceId, new_id
+from lca.contracts.atoms.ids.ids import TraceId, new_id, utc_now
 from lca.contracts.models.core.execution.result import Result
 from lca.contracts.models.core.state.lifecycle import TaskStatus
 from lca.contracts.models.core.state.state import AgentState, Budget, StateSnapshot
@@ -128,6 +128,11 @@ class TerminalResultProjection:
                         state_ref=saved_ref,
                         phase_cursor=declarative_outcome.cursor,
                         trace_id=TraceId(final_state.trace_id),
+                        # RA-159：暂停时刻记入快照，resume 时 Reducer 据此把等待
+                        # 人工审批的时长从 wall-clock 预算中剔除（HITL 暂停不算
+                        # 活跃推理时间）。缺省 None 会让 resume 沿用旧行为，长
+                        # 时间未批准的 run 一恢复就被 budget gate 终止。
+                        paused_at=utc_now(),
                     )
         if terminal_outcome.artifact_refs:
             extra["artifact_refs"] = [
