@@ -2611,9 +2611,9 @@
         "tests/plugins/transport/webserver/test_run_restart_recovery.py green; ADR-0292 fail-closed behavior unchanged for the no-override case; ruff check clean."
       ],
       "priority": "P1",
-      "passes": false,
+      "passes": true,
       "branchName": "raphy/arch-20261021-0545",
-      "notes": "Strength: Strong. Friction-walk Q4/Q5 finding (write/read divergence at the bundle seam; the gap is untestable through the interface today). Constraints: validate_bundle format checks stay; DEFAULT_NAMESPACE_APPROVAL remains the default SSOT; old-bundle compat required. Related: 0bb3878f1 (override feature), RA-173 (inventory), RA-174 (SSOT re-source)."
+      "notes": "Strength: Strong. Friction-walk Q4/Q5 finding (write/read divergence at the bundle seam; the gap is untestable through the interface today). Constraints: validate_bundle format checks stay; DEFAULT_NAMESPACE_APPROVAL remains the default SSOT; old-bundle compat required. Related: 0bb3878f1 (override feature), RA-173 (inventory), RA-174 (SSOT re-source).\nDONE 2026-10-21: implemented exactly as assessed. Added `session.namespace_approval = restored[\"namespace_approval\"] or None` in _restore_from_bundle next to the loaded_namespaces line. Regression test test_ra177_restore_applies_namespace_approval_from_bundle pins both AC cases through the real _restore_from_bundle (FakeBuilder stands in for RunSessionBuilder, which needs a full capability context; _seed_recovery_facts / _assemble_runnable stubbed as orthogonal). Test fails without the fix, passes with it. 18/18 tests green, ruff clean."
     },
     {
       "id": "RA-178",

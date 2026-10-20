@@ -4999,3 +4999,25 @@ three concrete differences). RA-172 and RA-173 are safe same-area follow-ups.
 - Files changed this round: raphy/assessment.md, raphy/prd.json,
   raphy/progress.txt. Assess-only commit, no code touched.
 ---
+
+## 2026-10-21 06:xx - RA-177
+- Implemented: `_restore_from_bundle` (carrier/runs/recovery.py:432) now applies
+  the inventoried `namespace_approval` field: `session.namespace_approval =
+  restored["namespace_approval"] or None`, next to the loaded_namespaces line.
+  Old bundles (no key) resolve to None -> global default (fail-closed per ADR-0292).
+- Files changed: lca/plugins/transport/webserver/carrier/runs/recovery.py,
+  tests/plugins/transport/webserver/test_run_restart_recovery.py
+- Tests: 18/18 green (incl. new test_ra177 regression); verified the new test
+  fails with the fix reverted (stash) and passes with it. ruff check clean.
+- **Learnings for future iterations:**
+  - `_restore_from_bundle`'s read chain needs builder capabilities, so pinning the
+    read-side assignment line goes through a FakeBuilder: stub
+    RunSessionBuilder at its defining module
+    (handlers/runs/session/builder/builder.py) since _restore_from_bundle does a
+    function-local `from ... import RunSessionBuilder` at call time; module-level
+    helpers (_assemble_runnable/_seed_recovery_facts) stub directly on the
+    recovery module. The assignment chain itself stays fully real.
+  - `ToolDeferSession.policy` is a property wrapping `_policy`; rebind pins go
+    through `new_defer_session(...).policy.namespace_approval` exactly like the
+    lifecycle.py:99 consumer does.
+---

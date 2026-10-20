@@ -363,3 +363,86 @@ def test_ra173_validate_bundle_rejects_missing_required_field(tmp_path: Path) ->
     dropped = dict(bundle)
     del dropped[optional]
     assert validate_bundle(dropped, "run-ra173-req") == dropped
+
+async def test_ra177_restore_applies_namespace_approval_from_bundle(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """RA-177: _restore_from_bundle must apply the inventoried namespace_approval.
+
+    Before the fix the read side walked every inventoried field except this
+    one, so a run paused under shell=allow silently re-gated to
+    shell=require_approval after a kernel restart (the lifecycle rebind at
+    carrier/runs/lifecycle/lifecycle.py:99 read session.namespace_approval and
+    got the builder default None instead of the paused override).
+    """
+    import lca.plugins.transport.webserver.carrier.runs.recovery as recovery
+    from lca.infrastructure.tool_defer.policy import DEFAULT_NAMESPACE_APPROVAL
+    from lca.infrastructure.tool_defer.session import new_defer_session
+
+    # The builder needs a full capability context; pin the read-side
+    # assignment chain instead (the builder itself is covered elsewhere).
+    class _FakeBuilder:
+        def __init__(self, registry, ctx=None):
+            self._registry = registry
+
+        def build(self, request, restore=None):
+            return _paused_session(
+                run_id=str((restore or {}).get("run_id") or "run-ra177")
+            )
+
+    monkeypatch.setattr(
+        "lca.plugins.transport.webserver.handlers.runs.session.builder.builder."
+        "RunSessionBuilder",
+        _FakeBuilder,
+    )
+    monkeypatch.setattr(recovery, "_assemble_runnable", _noop_coroutine)
+    monkeypatch.setattr(recovery, "_seed_recovery_facts", lambda *a, **k: None)
+
+    async def _restore(bundle: dict) -> RunSession:
+        registry = MagicMock(name="registry")
+        return await recovery._restore_from_bundle(
+            registry,
+            ctx=object(),
+            run_id="run-ra177",
+            bundle=bundle,
+            machine_resolver=None,
+        )
+
+    # Case 1: bundle carries the per-assistant override -> must survive.
+    run_dir = tmp_path / "traces" / "run-ra177"
+    run_dir.mkdir(parents=True, exist_ok=True)
+    paused = _paused_session(run_id="run-ra177")
+    paused.locator.run_dir.return_value = run_dir
+    paused.namespace_approval = {"shell": "allow"}
+    write_resume_bundle(paused)
+    bundle = json.loads((run_dir / "resume_bundle.json").read_text(encoding="utf-8"))
+
+    restored = await _restore(bundle)
+    assert restored.namespace_approval == {"shell": "allow"}
+    # The lifecycle rebind (lifecycle.py:99) consumes the restored session.
+    rebound = new_defer_session(
+        "direct",
+        loaded_namespaces=restored.loaded_namespaces,
+        namespace_approval=restored.namespace_approval,
+    )
+    assert rebound.policy.namespace_approval["shell"] == "allow"
+
+    # Case 2: old bundle without the key -> global default (fail-closed per
+    # ADR-0292: no silent override, no silent re-gate either).
+    old_bundle = dict(bundle)
+    del old_bundle["namespace_approval"]
+    restored_old = await _restore(old_bundle)
+    assert restored_old.namespace_approval is None
+    rebound_old = new_defer_session(
+        "direct",
+        loaded_namespaces=restored_old.loaded_namespaces,
+        namespace_approval=restored_old.namespace_approval,
+    )
+    assert dict(rebound_old.policy.namespace_approval) == dict(
+        DEFAULT_NAMESPACE_APPROVAL
+    )
+
+
+async def _noop_coroutine(session, ctx, *, machine_resolver):
+    """Pin the side-effect helpers; the assignment chain is the test subject."""
+    return None

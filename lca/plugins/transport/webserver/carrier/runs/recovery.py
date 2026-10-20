@@ -427,6 +427,10 @@ async def _restore_from_bundle(
     session.approval_request = bundle.get("approval_request")
     session.snapshot = snapshot
     session.loaded_namespaces = restored["loaded_namespaces"]
+    # RA-177: apply the inventoried per-assistant override; absent/empty
+    # (old bundles) stays None so the rebind falls back to the global
+    # default instead of silently re-gating a paused shell=allow run.
+    session.namespace_approval = restored["namespace_approval"] or None
     # Do not recreate the step-tree fold machinery: the pause-time
     # journal.json is the historical record and must not be overwritten.
     session.step_tree_bundle = None
