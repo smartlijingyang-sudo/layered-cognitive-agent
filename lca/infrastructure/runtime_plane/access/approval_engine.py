@@ -213,6 +213,7 @@ class NamespaceApprovalStrategy:
 
         # Build dynamic tool -> namespace map from defer session if present
         from lca.infrastructure.tool_defer.names import canonical_tool_name
+        from lca.infrastructure.tool_defer.policy import DEFAULT_NAMESPACE_APPROVAL
         from lca.infrastructure.tool_defer.session import current_defer_session
 
         defer_session = current_defer_session()
@@ -221,7 +222,11 @@ class NamespaceApprovalStrategy:
             self._approval_mapping
             if self._approval_mapping is not None
             else (
-                policy.namespace_approval if policy is not None else {"shell": "require_approval"}
+                policy.namespace_approval
+                if policy is not None
+                # RA-174: no-session fallback re-sourced onto the SSOT; copy,
+                # do not share the mutable module-level default.
+                else dict(DEFAULT_NAMESPACE_APPROVAL)
             )
         )
 

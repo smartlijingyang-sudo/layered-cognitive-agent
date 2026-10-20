@@ -2563,9 +2563,10 @@
         "tests/infrastructure/runtime_plane/test_namespace_approval_strategy.py and tests/scenario/test_namespace_approval.py green; ruff check clean."
       ],
       "priority": "P1",
-      "passes": false,
+      "passes": true,
       "branchName": "raphy/arch-20261020-2345",
-      "notes": "Strength: Strong. Friction-walk Q4 (leaky seam: the global default leaks across the defer-session boundary into the approval engine). Constraints: ADR-0292 §10 fail-closed; the explicit approval_mapping override still takes precedence; copy the dict, do not share the mutable module-level default. Deletion test: the inline literal concentrates nothing — policy.py owns the default."
+      "notes": "Strength: Strong. Friction-walk Q4 (leaky seam: the global default leaks across the defer-session boundary into the approval engine). Constraints: ADR-0292 §10 fail-closed; the explicit approval_mapping override still takes precedence; copy the dict, do not share the mutable module-level default. Deletion test: the inline literal concentrates nothing — policy.py owns the default.",
+      "implemented": "2026-10-20: no-session fallback now dict(DEFAULT_NAMESPACE_APPROVAL) imported from lca.infrastructure.tool_defer.policy; hand-written literal deleted. New test test_no_session_fallback_resourced_from_ssot pins fail-closed default + monkeypatch-SSOT follow. 10 tests green, ruff clean."
     },
     {
       "id": "RA-175",

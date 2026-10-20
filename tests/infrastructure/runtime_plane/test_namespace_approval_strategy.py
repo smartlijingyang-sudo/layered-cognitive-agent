@@ -214,3 +214,25 @@ def test_shell_delete_vectors_require_approval_via_default_engine() -> None:
             assert requirement is not None and requirement.required is True, tool_name
     finally:
         reset_current_defer_session(token)
+
+
+def test_no_session_fallback_resourced_from_ssot(monkeypatch) -> None:
+    """RA-174: 无 defer session 时的 fallback 必须派生自 DEFAULT_NAMESPACE_APPROVAL。
+
+    默认 fail-closed（shell 域工具要求审批）；monkeypatch SSOT 后 fallback
+    跟随变化——证明 fallback 不是手写字面量的第二份拷贝。
+    """
+    import lca.infrastructure.tool_defer.policy as policy_mod
+    from lca.infrastructure.tool_defer.session import current_defer_session
+
+    assert current_defer_session() is None  # 本测试不绑 session，断言前提
+
+    strategy = NamespaceApprovalStrategy(tool_namespaces={"runCommand": "shell"})
+    call = ToolCall(tool_name="runCommand", call_id="c1", arguments={"command": "ls"})
+    req = strategy.evaluate([call])
+    assert req is not None and req.required is True
+
+    # SSOT 跟随：fallback 是派生而非手写拷贝
+    monkeypatch.setattr(policy_mod, "DEFAULT_NAMESPACE_APPROVAL", {"shell": "allow"})
+    req2 = strategy.evaluate([call])
+    assert req2 is None

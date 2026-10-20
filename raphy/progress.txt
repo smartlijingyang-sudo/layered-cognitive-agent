@@ -4879,3 +4879,23 @@ three concrete differences). RA-172 and RA-173 are safe same-area follow-ups.
   - provenance（origin）这类"调用方才知道的事实"绝不能由被调模块硬编码默认值冒充：store 的 `origin="upload"` 硬编码让 registry 的 Provenance tracking 从第一天就是错的。接口设计时问一句"这个值的知识在谁手里"，知识不在场的一方只给透传参数、不给默认值语义。
   - 新模块先有测试后有生产调用方是诚实状态（delivery gate / TrashManager），评估时不把"未接线"当架构缺陷写故事——但"接缝缺失"（protocol 无 delete）是真问题：接线迟早要来，接缝现在就该钉。
 - Stories written: RA-174, RA-175, RA-176 (passes: false). Top: RA-174.
+
+## 2026-10-21 00:07 CST - RA-174
+- Re-sourced the no-defer-session fallback in NamespaceApprovalStrategy.evaluate()
+  from hand-written {"shell": "require_approval"} to dict(DEFAULT_NAMESPACE_APPROVAL)
+  (function-local import from lca.infrastructure.tool_defer.policy, next to the
+  existing defer imports; copied, not shared, per the mutable-default constraint).
+- New test test_no_session_fallback_resourced_from_ssot: pins fail-closed default
+  with no session bound, then monkeypatches the SSOT and asserts the fallback
+  follows — proving derivation, not a second literal copy.
+- Files changed: lca/infrastructure/runtime_plane/access/approval_engine.py,
+  tests/infrastructure/runtime_plane/test_namespace_approval_strategy.py,
+  raphy/prd.json.
+- **Learnings for future iterations:**
+  - SSOT-follow test pattern (RA-174 实证): 证明 fallback 派生自 SSOT 而非手写
+    拷贝，最强的 pin 不是"值相等"而是"monkeypatch SSOT 后行为跟随"。
+    函数内 import 让这成为可能（每次调用重新读模块属性）。
+  - Gotcha: prd.json 是 2 空格缩进 + \uXXXX 转义，json round-trip 会整文件
+    diff——一律用 surgical text edit（按 story id 边界切片替换），写完用
+    json.load 校验有效性。
+---
