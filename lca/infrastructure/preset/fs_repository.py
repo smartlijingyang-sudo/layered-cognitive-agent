@@ -322,16 +322,15 @@ class FileSystemPresetRepository(PresetRepositoryProtocol):
         )
 
     def _build_default_bundle_manifest(self, package: PresetPackage) -> dict[str, Any]:
-        plugin_entries = []
-        for p in package.plugins:
-            plugin_entries.append(
-                {
-                    "name": p.name,
-                    "path": f"plugins/{p.name}.py",
-                    "capabilities": list(p.capabilities),
-                    "policy_class": p.policy_class,
-                }
-            )
+        plugin_entries = [
+            {
+                "name": p.name,
+                "path": f"plugins/{p.name}.py",
+                "capabilities": list(p.capabilities),
+                "policy_class": p.policy_class,
+            }
+            for p in package.plugins
+        ]
         return {
             "bundle": {
                 "name": f"preset_{package.preset_id}",
