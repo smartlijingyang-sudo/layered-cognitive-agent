@@ -708,3 +708,16 @@
 | DECOUPLE-TASK-5 | [全量替换与旁路自愈] 彻底切除旧版 scenarios.py/roulette.py，组装生产 Pilot (Pilot Assembly) | Completed | Pilot 成功装配四大解耦组件，单步执行优先走大脑与场景微内核，CLI replay-decision 离线推演闭环，3/3 单测全绿，commit ae9bd17 |
 | DECOUPLE-TASK-6 | [可视化监控与全链路门禁] FastAPI 实时双屏 WebSocket 与前端大盘集成 (Telemetry & HUD) | Completed | FastAPI WebSocket 广播端点（/api/telemetry/ws）、前端双屏 HUD 组件与沙盘实时联通闭环，全套 28/28 不变量单测 100% 全绿，Vite 编译 0 报错，commit e39c0eb |
 
+| BRAINSTORM-LCA-FS-CONTEXT | 深度排查 9 轮 Run 现场日志，定位 lsess 隔离分裂导致文件不可见根因 | Completed | 发现 LocalSandboxAdapter 每次 run 创建新 lsess，文件散落在不同会话目录，导致 Agent 发生文件丢失幻觉 |
+| BRAINSTORM-LCA-FS-QUESTIONS | 澄清演进标准与架构原则（单步提问） | Completed | 用户明确要求“怎么正规怎么长期”，选定对齐第一性原理的高可靠架构 |
+| BRAINSTORM-LCA-FS-APPROACHES | 提炼 2-3 种具体沙箱挂载架构方案及权衡对比 | Completed | 提炼持久直挂、单会话常驻、双挂载三种方案，确立持久直挂为主干路线 |
+| BRAINSTORM-LCA-FS-DESIGN-SECTIONS | 逐步呈现设计细节（五层架构/数据流/双轨宪法与Section/不变量断言）并获取审批 | Completed | 架构第一性原理、五层落地细节、## Filesystem 专用 Section 均获用户审批通过 |
+| BRAINSTORM-LCA-FS-DESIGN-DOC | 沉淀设计文档至 docs/plans/ 并提交 git | Completed | 成功落盘 docs/plans/2026-10-20-canonical-filesystem-and-storage-architecture-design.md，commit c6dab5a77 |
+| BRAINSTORM-LCA-FS-TRANSITION | 转换至实施计划制定（writing-plans） | Completed | 成功落盘 docs/plans/2026-10-20-canonical-filesystem-and-storage-architecture-plan.md，commit dc63652d1 |
+| LCA-FS-TASK-1-CONTRACTS | [契约层] FileRecord 模型、可读性/可见性推导与 sandbox:// URI 协议规范 | Pending | 待执行 |
+| LCA-FS-TASK-2-SANDBOX-MOUNT | [沙箱挂载] LocalSandboxAdapter 改造：废弃每轮 lsess，沙箱 /mnt/data 直挂 workspace/ | Pending | 待执行 |
+| LCA-FS-TASK-3-UPLOAD-PIPELINE | [上传管道] FileStore 重定向至 workspace/user/ 并建立 SQLite 索引登记与全量重建能力 | Pending | 待执行 |
+| LCA-FS-TASK-4-FILESYSTEM-PROMPT | [认知层] 动态 ## Filesystem Section 注入与 CONSTITUTION.md 存储铁律落地 | Pending | 待执行 |
+| LCA-FS-TASK-5-DELIVERY-GATE | [安全网关] 交付物物理 stat 存在性断言拦截器与 /tmp 泄漏防护 | Pending | 待执行 |
+| LCA-FS-TASK-6-TRASH-MANAGER | [回收站] .trash/ 30 天可恢复软删除与原路径恢复管理器 | Pending | 待执行 |
+| LCA-FS-TASK-7-E2E-INVARIANTS | [全量验收] INV-FS-01 至 INV-FS-10 十项端到端不变量回归套件验证 | Pending | 待执行 |
