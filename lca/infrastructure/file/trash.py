@@ -52,7 +52,7 @@ class TrashManager:
                 "TrashManager.trash_file requires a FileStore (pass store=...); "
                 "the standalone trash ritual was removed in RA-176."
             )
-        clean_rel = rel_path.replace(chr(92), "/").lstrip("/")
+        clean_rel = rel_path.replace("\\", "/").lstrip("/")
         record = self._registry.get_by_path(clean_rel) if self._registry is not None else None
         if record is None:
             return False
@@ -60,7 +60,7 @@ class TrashManager:
 
     def restore_file(self, rel_path: str) -> bool:
         """Restore a trashed file back to its exact original workspace path."""
-        clean_rel = rel_path.replace(chr(92), "/").lstrip("/")
+        clean_rel = rel_path.replace("\\", "/").lstrip("/")
         dest = (self._workspace_root / clean_rel).resolve()
 
         # Find matching item in trash by orig_rel_path
