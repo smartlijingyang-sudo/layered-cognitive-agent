@@ -5064,3 +5064,22 @@ three concrete differences). RA-172 and RA-173 are safe same-area follow-ups.
     untouched). Verify the F401 target is truly dead (here: if-False import,
     only referenced in a comment) before letting --fix delete it.
 ---
+
+## 2026-10-21 - RA-180
+- Implemented: `_load_plugins_from(source_dir, meta_plugins, *,
+  skip_name_filters)` seam added to FileSystemPresetRepository
+  (infrastructure/preset/fs_repository.py); the two ~25-line twin plugin-load
+  loops in `_load_from_dir` (plugins/ subdir vs legacy flat dir) now delegate
+  to it. AuthoredPlugin construction exists exactly once (was twice).
+  Both layouts keep loading; metadata merge and save() untouched.
+- Files changed: lca/infrastructure/preset/fs_repository.py,
+  tests/domain/preset/test_preset_repository.py
+- Tests: 15/15 green across the three AC-named suites (incl. new
+  test_ra180_legacy_flat_dir_loads_through_shared_seam pinning descriptor
+  merge + dunder/test_* skip on the flat layout). ruff check clean.
+- **Learnings for future iterations:**
+  - When converging layout-variant twins, keep the seam signature explicit
+    about the one real difference (here: `skip_name_filters` flag) rather
+    than threading predicates -- the call sites stay readable and a third
+    layout variant reuses the seam by passing a flag.
+---

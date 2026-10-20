@@ -2655,9 +2655,9 @@
         "Existing preset tests (tests/domain/preset/test_preset_repository.py, tests/infrastructure/preset/test_plugin_loading.py, tests/infrastructure/preset/test_preset_discovery.py) green; ruff check clean."
       ],
       "priority": "P2",
-      "passes": false,
+      "passes": true,
       "branchName": "raphy/arch-20261021-0545",
-      "notes": "Strength: Worth exploring. Duplication class (secondary per the assess rules; one of four, not the only class). Constraints: both read layouts must keep working."
+      "notes": "Strength: Worth exploring. Duplication class (secondary per the assess rules; one of four, not the only class). Constraints: both read layouts must keep working.\nDONE 2026-10-21: implemented exactly as assessed. The identical per-file ritual (read code, merge meta.get('plugins') descriptors, build AuthoredPlugin) now lives in _load_plugins_from(source_dir, meta_plugins, *, skip_name_filters); the two _load_from_dir branches call it with different source dirs + filter flags. Both layouts keep loading, bundle.yaml/preset.json metadata merge and save() unchanged. New test test_ra180_legacy_flat_dir_loads_through_shared_seam pins legacy flat-dir loading (descriptor merge + dunder/test_* skip) through the seam. 15/15 preset tests green (preset_repository, plugin_loading, preset_discovery), ruff clean."
     }
   ]
 }

@@ -216,6 +216,46 @@ class FileSystemPresetRepository(PresetRepositoryProtocol):
             return True
         return False
 
+    def _load_plugins_from(
+        self,
+        source_dir: Path,
+        meta_plugins: dict[str, Any],
+        *,
+        skip_name_filters: bool,
+    ) -> list[AuthoredPlugin]:
+        """Load AuthoredPlugin objects from the *.py files of one directory.
+
+        RA-180: the two preset layouts (``plugins/`` subdir vs legacy flat
+        dir) share the identical per-file ritual (read code, merge
+        descriptors from ``meta.get("plugins")``, build AuthoredPlugin); they
+        differ only in the glob source and whether dunder/``test_*`` files
+        are skipped.
+        """
+        loaded: list[AuthoredPlugin] = []
+        for py_file in sorted(source_dir.glob("*.py")):
+            if skip_name_filters and (
+                py_file.name.startswith("__") or py_file.name.startswith("test_")
+            ):
+                continue
+            plugin_name = py_file.stem
+            code = py_file.read_text(encoding="utf-8")
+            p_meta = meta_plugins.get(plugin_name, {})
+            caps = tuple(p_meta.get("capabilities", ()))
+            side_effects = p_meta.get("side_effects", "none")
+            policy_class = p_meta.get("policy_class", "execute")
+
+            loaded.append(
+                AuthoredPlugin(
+                    name=plugin_name,
+                    code=code,
+                    path=str(py_file),
+                    capabilities=caps,
+                    side_effects=side_effects,
+                    policy_class=policy_class,
+                )
+            )
+        return loaded
+
     def _load_from_dir(
         self,
         preset_id: str,
@@ -271,45 +311,21 @@ class FileSystemPresetRepository(PresetRepositoryProtocol):
         meta_plugins_dict = {p["name"]: p for p in meta.get("plugins", [])}
 
         if plugins_dir.is_dir():
-            for py_file in sorted(plugins_dir.glob("*.py")):
-                plugin_name = py_file.stem
-                code = py_file.read_text(encoding="utf-8")
-                p_meta = meta_plugins_dict.get(plugin_name, {})
-                caps = tuple(p_meta.get("capabilities", ()))
-                side_effects = p_meta.get("side_effects", "none")
-                policy_class = p_meta.get("policy_class", "execute")
-
-                plugins.append(
-                    AuthoredPlugin(
-                        name=plugin_name,
-                        code=code,
-                        path=str(py_file),
-                        capabilities=caps,
-                        side_effects=side_effects,
-                        policy_class=policy_class,
-                    )
+            plugins.extend(
+                self._load_plugins_from(
+                    plugins_dir,
+                    meta_plugins_dict,
+                    skip_name_filters=False,
                 )
+            )
         elif preset_dir.is_dir():
-            for py_file in sorted(preset_dir.glob("*.py")):
-                if py_file.name.startswith("__") or py_file.name.startswith("test_"):
-                    continue
-                plugin_name = py_file.stem
-                code = py_file.read_text(encoding="utf-8")
-                p_meta = meta_plugins_dict.get(plugin_name, {})
-                caps = tuple(p_meta.get("capabilities", ()))
-                side_effects = p_meta.get("side_effects", "none")
-                policy_class = p_meta.get("policy_class", "execute")
-
-                plugins.append(
-                    AuthoredPlugin(
-                        name=plugin_name,
-                        code=code,
-                        path=str(py_file),
-                        capabilities=caps,
-                        side_effects=side_effects,
-                        policy_class=policy_class,
-                    )
+            plugins.extend(
+                self._load_plugins_from(
+                    preset_dir,
+                    meta_plugins_dict,
+                    skip_name_filters=True,
                 )
+            )
 
         return PresetPackage(
             preset_id=preset_id,
