@@ -155,6 +155,14 @@ def test_avatar_image_component_contract() -> None:
     assert "size" in content
 
 
+def test_avatar_image_skips_fetch_without_assistant_id() -> None:
+    content = _component_tsx_path().read_text(encoding="utf-8")
+
+    # 回归：无 assistantId 时不得请求 /assistants/default/avatar（避免 404 噪音）。
+    assert "if (!assistantId) return;" in content
+    assert "assistantId || 'default'" not in content
+
+
 def test_avatar_image_patch_module_exists() -> None:
     path = (
         Path(__file__).resolve().parents[2]

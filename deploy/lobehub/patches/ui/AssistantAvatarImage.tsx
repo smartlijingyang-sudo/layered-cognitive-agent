@@ -116,7 +116,9 @@ export const AssistantAvatarImage = memo<AssistantAvatarImageProps>(
     const [activeUrl, setActiveUrl] = useState<string | null>(null);
 
     useEffect(() => {
-      const key = assistantId || 'default';
+      // 无 assistantId（首页/未选中助理）时跳过请求，避免 /assistants/default/avatar 404 噪音。
+      if (!assistantId) return;
+      const key = assistantId;
       let cancelled = false;
       const refresh = async () => {
         const url = await fetchActiveAvatarUrl(key);
