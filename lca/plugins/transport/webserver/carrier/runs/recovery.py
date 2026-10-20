@@ -338,13 +338,22 @@ def _seed_recovery_facts(
     approval_id = str(resume_point.get("approval_id") or "")
     if not approval_id:
         return
-    approval_request = bundle.get("approval_request")
-    pending = (
-        _pending_tools_calling(approval_request) if isinstance(approval_request, dict) else None
-    )
     from lca.contracts.harness.memory.events import ApprovalPersisted, SessionCheckpoint
-    from lca.infrastructure.session.emit.lifecycle_emit import resolve_run_session_writer
+    from lca.infrastructure.session.emit.lifecycle_emit import (
+        pending_tools_calling_from,
+        resolve_run_session_writer,
+    )
     from lca.loop.fact_gateway import append_catalog_bound
+
+    approval_request = bundle.get("approval_request")
+    # The frontend-facing run id lives on the bundle (validate_bundle pins
+    # bundle["run_id"] to the recovery target); never get_current_run_id().
+    run_id = str(bundle.get("run_id") or "")
+    pending = (
+        pending_tools_calling_from(approval_request, run_id=run_id or None)
+        if isinstance(approval_request, dict)
+        else None
+    )
 
     writer = resolve_run_session_writer(session)
     if writer is None:
@@ -359,24 +368,6 @@ def _seed_recovery_facts(
         session=writer,
         actor="recovery",
     )
-
-
-def _pending_tools_calling(approval_request: dict[str, Any]) -> list[dict[str, Any]]:
-    pending: list[dict[str, Any]] = []
-    tool_calls = approval_request.get("tool_calls")
-    if isinstance(tool_calls, list):
-        for call in tool_calls:
-            if not isinstance(call, dict):
-                continue
-            arguments = call.get("arguments")
-            pending.append(
-                {
-                    "tool_name": str(call.get("tool_name") or ""),
-                    "call_id": str(call.get("call_id") or ""),
-                    "arguments": arguments if isinstance(arguments, dict) else {},
-                }
-            )
-    return pending
 
 
 async def _assemble_runnable(

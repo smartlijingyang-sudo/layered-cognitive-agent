@@ -158,6 +158,49 @@ def persist_approval(approval_id: str, resume_point: dict[str, object]) -> Appro
     return event
 
 
+def pending_tools_calling_from(
+    approval_request: dict[str, Any],
+    *,
+    run_id: str | None = None,
+) -> list[dict[str, Any]]:
+    """Derive the ``waiting_input`` checkpoint pending_tools_calling list.
+
+    One seam owns this derivation for both the fresh pause path
+    (emit_approval_pause_from_result) and the restart-recovery path
+    (carrier recovery._seed_recovery_facts). Entries with an empty
+    tool_name/call_id are skipped; askUserQuestion arguments gain
+    lca_run_id when run_id is present so the frontend submit handler
+    can resume the run.
+
+    Pure derivation -- no journal side effects. The
+    step.tool_call.record facts stay at the fresh call site per
+    ADR-0195 P4-S04 (the recovery journal stays minimal; the pause-time
+    journal.json is the historical record).
+    """
+    pending: list[dict[str, Any]] = []
+    tool_calls = approval_request.get("tool_calls")
+    if isinstance(tool_calls, list):
+        for call in tool_calls:
+            if not isinstance(call, dict):
+                continue
+            tool_name = str(call.get("tool_name") or "")
+            call_id = str(call.get("call_id") or "")
+            if not tool_name or not call_id:
+                continue
+            arguments = call.get("arguments")
+            if isinstance(arguments, dict) and tool_name == "askUserQuestion" and run_id:
+                arguments = {**arguments, "lca_run_id": run_id}
+            args = arguments if isinstance(arguments, dict) else {}
+            pending.append(
+                {
+                    "tool_name": tool_name,
+                    "call_id": call_id,
+                    "arguments": args,
+                }
+            )
+    return pending
+
+
 def emit_approval_pause_from_result(result: Result) -> None:
     """Emit ``approval.persisted.v1`` + ``waiting_input`` checkpoint from carrier ``extra``.
 
@@ -194,34 +237,17 @@ def emit_approval_pause_from_result(result: Result) -> None:
     run_id = get_current_run_id() or (
         str(scope.run_id) if scope is not None and scope.run_id else ""
     )
-    pending: list[dict[str, Any]] = []
-    tool_calls = approval_request.get("tool_calls")
-    if isinstance(tool_calls, list):
-        for call in tool_calls:
-            if not isinstance(call, dict):
-                continue
-            tool_name = str(call.get("tool_name") or "")
-            call_id = str(call.get("call_id") or "")
-            if not tool_name or not call_id:
-                continue
-            arguments = call.get("arguments")
-            if isinstance(arguments, dict) and tool_name == "askUserQuestion" and run_id:
-                arguments = {**arguments, "lca_run_id": run_id}
-            args = arguments if isinstance(arguments, dict) else {}
-            record_step_tool_call(
-                tool_name=tool_name,
-                invocation_id=call_id,
-                arguments=args,
-                status="pending_approval",
-                actor=_LIFECYCLE_ACTOR,
-            )
-            pending.append(
-                {
-                    "tool_name": tool_name,
-                    "call_id": call_id,
-                    "arguments": args,
-                }
-            )
+    pending = pending_tools_calling_from(approval_request, run_id=run_id or None)
+    # ADR-0195 P4-S04: the step-record side effect stays at the fresh call
+    # site; the recovery path reuses the pause-time journal facts instead.
+    for entry in pending:
+        record_step_tool_call(
+            tool_name=entry["tool_name"],
+            invocation_id=entry["call_id"],
+            arguments=entry["arguments"],
+            status="pending_approval",
+            actor=_LIFECYCLE_ACTOR,
+        )
     resume_point = serialize_resume_point(
         resume_point_from_state_snapshot(approval_id, state_snapshot),
     )
@@ -334,6 +360,7 @@ __all__ = [
     "end_step",
     "end_turn",
     "fail_model",
+    "pending_tools_calling_from",
     "persist_approval",
     "request_model",
     "reset_lifecycle",

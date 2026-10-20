@@ -1,4 +1,11 @@
 ## Codebase Patterns
+- **双胞胎收敛到函数内导入的 seam 时，import 必须挪到第一个调用点之前（RA-171 实证）：**
+  私有双胞胎在模块级时导入顺序无所谓；收敛成共享 seam 后若沿用函数内 lazy
+  import，import 块必须移到该函数体内首次调用之前，否则该名字在运行时是
+  未绑定局部变量（本轮：`_seed_recovery_facts` 里 `pending_tools_calling_from`
+  的 UnboundLocalError，首轮绿测试直接暴露）。收敛双胞胎时顺手检查函数内
+  import 的相对顺序，不要原样保留。
+
 - **收敛三叉派生路径前，先把三条路径的真实分歧枚举全（RA-168 评估实证）：**
   同一行 journal event 可能同时被 writer wire、shared SSOT（derive_event_message）、kernel fold
   三条路径派生；评估时只看其中一条会漏掉真正的分歧（本轮：writer passthrough、
@@ -4773,3 +4780,36 @@ Not all-duplication.
 Top recommendation: RA-171 first (only candidate with measurable silent
 behavioral divergence on a production path; zero locality; drift already
 three concrete differences). RA-172 and RA-173 are safe same-area follow-ups.
+
+## [2026-10-20 08:27 CST] - RA-171
+- Implemented: converged the twin pending_tools_calling derivations onto one
+  seam `pending_tools_calling_from(approval_request, *, run_id=None)` in
+  `lca/infrastructure/session/emit/lifecycle_emit.py` (exported via `__all__`).
+  `emit_approval_pause_from_result` now derives via the seam and keeps the
+  `record_step_tool_call` pending_approval loop explicitly at the fresh call
+  site (ADR-0195 P4-S04). recovery's private `_pending_tools_calling` deleted;
+  `_seed_recovery_facts` calls the seam with the bundle run_id
+  (validate_bundle pins bundle["run_id"] to the recovery target; never
+  get_current_run_id()). Three drifts fixed: (1) recovery no longer keeps
+  empty tool_name/call_id entries; (2) recovery now injects lca_run_id into
+  askUserQuestion args -- a restart-recovered ask card can be resumed by the
+  frontend submit handler; (3) step-record facts stay fresh-path-only,
+  documented as deliberate (recovery journal stays minimal).
+- Files changed:
+  - lca/infrastructure/session/emit/lifecycle_emit.py (+pending_tools_calling_from seam)
+  - lca/plugins/transport/webserver/carrier/runs/recovery.py (-_pending_tools_calling, +seam call)
+  - tests/contracts/test_pending_tools_calling_seam.py (new: 2 pinning tests)
+- Tests: new pinning test FAILED on pre-fix code (proved drift: recovery kept
+  "" entries and dropped lca_run_id), PASSES post-fix; 32 existing
+  approval-pause/recovery/architecture tests green; ruff check clean.
+- **Learnings for future iterations:**
+  - Twin-to-seam convergence: when the twin lived at module level, import
+    order never mattered; after converging onto a function-local import,
+    the import block must move ABOVE the first call site in the function
+    body or the name is an unbound local at runtime (recovery.py
+    UnboundLocalError on first green run).
+  - Bundle run_id is the honest frontend-facing id in recovery: validate_bundle
+    rejects bundles whose run_id mismatches the recovery target, so
+    bundle.get("run_id") is authoritative there; get_current_run_id() would
+    resolve to the minted HIL resume scope, not the UI-visible run.
+---
