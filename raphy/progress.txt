@@ -5038,3 +5038,29 @@ three concrete differences). RA-172 and RA-173 are safe same-area follow-ups.
     the real apply_* paths with stubbed _capture_* helpers, so a future
     third fact landing on only one path would fail the identity assertion.
 ---
+
+## 2026-10-21 - RA-179
+- Implemented: `LocalFileStore.exists()` (infrastructure/file/store.py) now
+  returns False for trashed files -- same `_is_trashed` gate the rest of the
+  read surface honors. Fail-closed; signature unchanged; `delete()` semantics
+  unchanged (mirror {attachment_id}/ blob stays on disk for recoverability).
+- Call-chain audit before touching: every production consumer of
+  FileStore.exists() (ingest try_resolve_local_file x2,
+  sandbox runtime_tools.validate x2, capability/files forward) treats exists()
+  as "is this file still usable" -- none relies on physical presence. The
+  RA-176-era note claiming physical semantics was re-verified and is stale.
+- Files changed: lca/infrastructure/file/store.py,
+  tests/infrastructure/file/test_trash_manager.py
+- Tests: 34 green (AC-named: file_store_and_write_tool, canonical filesystem
+  invariants, trash_manager incl. new test_ra179; plus ingest pipeline x3 and
+  sandbox runtime x2 suites). New test fails with the fix reverted. ruff clean.
+- **Learnings for future iterations:**
+  - "exists stays physical" was a verbal conclusion from RA-176 with no
+    attached call chain -- re-grep the actual consumers before acting on any
+    inherited behavioral claim (pattern already in ## Codebase Patterns;
+    this round confirmed it again with evidence).
+  - ruff on this file had 6 pre-existing findings; the AC's "ruff check clean"
+    on touched files justifies mechanical --fix on the same file (behavior
+    untouched). Verify the F401 target is truly dead (here: if-False import,
+    only referenced in a comment) before letting --fix delete it.
+---

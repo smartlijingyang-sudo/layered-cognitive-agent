@@ -2641,9 +2641,9 @@
         "tests/scenario/file/test_file_store_and_write_tool.py, tests/e2e/test_canonical_filesystem_invariants.py, tests/infrastructure/file/test_trash_manager.py green; ruff check clean."
       ],
       "priority": "P2",
-      "passes": false,
+      "passes": true,
       "branchName": "raphy/arch-20261021-0545",
-      "notes": "Strength: Worth exploring. Friction-walk Q4 (leaky seam at the delete boundary, post-RA-176). Consumers treat exists() as validity, so the fix is fail-closed for both, not a behavior regression. The dead `if False:` conditional import of FileIndexRegistry in store.py:35-36 may be deleted in the same diff only if churn-free."
+      "notes": "Strength: Worth exploring. Friction-walk Q4 (leaky seam at the delete boundary, post-RA-176). Consumers treat exists() as validity, so the fix is fail-closed for both, not a behavior regression. The dead `if False:` conditional import of FileIndexRegistry in store.py:35-36 may be deleted in the same diff only if churn-free.\nDONE 2026-10-21: implemented exactly as assessed. exists() now consults _is_trashed first (same gate as get()/read_bytes()/list()); signature unchanged; delete() soft-delete semantics unchanged (mirror blob kept). Call-chain audit: all production FileStore.exists() consumers (ingest try_resolve_local_file x2, sandbox runtime_tools.validate x2, capability/files provider forward) read exists() as validity -- no consumer relies on physical semantics; the RA-176 'ingest dedup relies on it' note was re-verified stale. New test test_ra179_exists_goes_dark_on_trash pins exists(id) False after delete(id) with the blob still on disk; it fails with the fix reverted. 34 tests green across the AC-named files + ingest pipeline + sandbox runtime suites. ruff clean on both touched files (6 pre-existing lint findings in store.py fixed mechanically to satisfy the AC: dead if-False import, datetime.UTC aliases, blank-line whitespace)."
     },
     {
       "id": "RA-180",
