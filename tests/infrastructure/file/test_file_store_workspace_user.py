@@ -72,3 +72,32 @@ def test_registry_rebuild_from_filesystem(tmp_path: Path):
     assert report_rec is not None
     assert report_rec.visibility == VisibilityTier.USER
     assert report_rec.readability == ReadabilityTier.CONVERTED
+
+
+def test_put_origin_owned_by_caller(tmp_path: Path):
+    """RA-175: FileRecord.origin 由调用方透传决定，不再是 store 硬编码。
+
+    put(origin="agent_created") 登记 agent_created；默认 put() 仍记 upload
+    （向后兼容）。
+    """
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+    registry = FileIndexRegistry(db_path=tmp_path / "test_origin.db")
+    store = LocalFileStore(root=workspace, registry=registry)
+
+    stored_agent = store.put(
+        data=b"agent bytes", name="agent.txt", mime_type="text/plain",
+        origin="agent_created",
+    )
+    rec_agent = registry.get_by_path("user/agent.txt")
+    assert rec_agent is not None
+    assert rec_agent.file_id == stored_agent.attachment_id
+    assert rec_agent.origin == "agent_created"
+
+    stored_default = store.put(
+        data=b"upload bytes", name="upload.txt", mime_type="text/plain",
+    )
+    rec_default = registry.get_by_path("user/upload.txt")
+    assert rec_default is not None
+    assert rec_default.file_id == stored_default.attachment_id
+    assert rec_default.origin == "upload"

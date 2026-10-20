@@ -25,9 +25,14 @@ class FileStoreService:
         name: str,
         mime_type: str,
         conversation_id: str | None = None,
+        origin: str = "upload",
     ) -> StoredFile:
         return self.providers.current().put(
-            data=data, name=name, mime_type=mime_type, conversation_id=conversation_id
+            data=data,
+            name=name,
+            mime_type=mime_type,
+            conversation_id=conversation_id,
+            origin=origin,
         )
 
     def get(self, attachment_id: str) -> StoredFile | None:

@@ -2579,9 +2579,10 @@
         "tests/e2e/test_canonical_filesystem_invariants.py green; ruff check clean."
       ],
       "priority": "P2",
-      "passes": false,
+      "passes": true,
       "branchName": "raphy/arch-20261020-2345",
-      "notes": "Strength: Strong. Friction-walk Q3/Q4 (provenance decision lives away from the knowledge). FileRecord.origin Literal already carries the vocabulary (upload/agent_created/browser_download/artifact_build) — no new values needed. No existing test pins the buggy hardcode (e2e only builds FileRecords directly)."
+      "notes": "Strength: Strong. Friction-walk Q3/Q4 (provenance decision lives away from the knowledge). FileRecord.origin Literal already carries the vocabulary (upload/agent_created/browser_download/artifact_build) — no new values needed. No existing test pins the buggy hardcode (e2e only builds FileRecords directly).",
+      "implemented": "2026-10-21: FileStore.put + LocalFileStore.put + capability passthrough gain origin keyword (default upload, backward compatible); FileRecord uses the caller-passed origin. Callers: write_file/sandbox observation/computer exec -> agent_created; ingest service -> upload (explicit). persist_generated_files (harvest conduit for office_works/computer harvest/exec+lca_computer observations) threads origin with default agent_created. New test test_put_origin_owned_by_caller: explicit agent_created + default upload. 13 tests green, ruff: 0 new issues (16 pre-existing)."
     },
     {
       "id": "RA-176",

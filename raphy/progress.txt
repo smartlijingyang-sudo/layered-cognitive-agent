@@ -4899,3 +4899,31 @@ three concrete differences). RA-172 and RA-173 are safe same-area follow-ups.
     diff——一律用 surgical text edit（按 story id 边界切片替换），写完用
     json.load 校验有效性。
 ---
+
+## 2026-10-21 00:12 CST - RA-175
+- FileStore Protocol put() / LocalFileStore.put() / capability files passthrough
+  gain keyword origin (default "upload", backward compatible); the FileRecord
+  now records the caller-passed origin instead of the store's hardcoded
+  "upload". Callers pass true provenance: write_file tool, sandbox
+  observation (_stored_part), computer exec export -> "agent_created";
+  gateway ingest service -> "upload" (explicit).
+- persist_generated_files (conduit for 4 harvest paths: office_works,
+  computer/machine harvest, exec + lca_computer observations) threads origin
+  with default "agent_created" -- otherwise harvested files would still be
+  mislabeled via the store default.
+- New test test_put_origin_owned_by_caller: explicit agent_created registers
+  agent_created; default put() still records upload.
+- Files changed: lca/infrastructure/file/store.py,
+  lca/infrastructure/tools/write_file/__init__.py,
+  lca/infrastructure/tools/sandbox/observation.py,
+  lca/infrastructure/computer/runtime/exec.py,
+  lca/infrastructure/capability/files/files.py,
+  lca/plugins/transport/webserver/handlers/runs/ingest/service.py,
+  tests/infrastructure/file/test_file_store_workspace_user.py, raphy/prd.json.
+- **Learnings for future iterations:**
+  - 改"决定权位置"的故事要顺藤摸到 conduit helper：persist_generated_files
+    是 4 条 harvest 路径的共同漏斗，只改 5 个点名 put 调用会漏掉它——
+    grep `.put(` 全仓 + grep helper 的调用方，两张网都要撒。
+  - ruff 的"clean"口径：touched files 上 0 new issues 即可；预先存在的
+    16 个（W293/UP017/F401/I001）不动——修它们是评估之外的顺手改。
+---

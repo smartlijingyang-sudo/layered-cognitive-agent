@@ -27,7 +27,7 @@ def _stored_part(
     store: FileStore, data: bytes, name: str, mime: str, previewable: bool = True
 ) -> dict[str, Any]:
     """Store a file and return its A2A-aligned metadata dict."""
-    s = store.put(data=data, name=name, mime_type=mime)
+    s = store.put(data=data, name=name, mime_type=mime, origin="agent_created")
     return {
         "name": s.name,
         "mimeType": s.mime_type,

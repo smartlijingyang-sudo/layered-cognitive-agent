@@ -379,7 +379,7 @@ class ComputerRuntimeExecMixin:
         data = base64.b64decode(b64_raw)
         filename = str(read.state.get("filename") or normalized.rsplit("/", 1)[-1] or "export.bin")
         mime_type = str(read.state.get("mime_type") or "application/octet-stream")
-        stored = self._store.put(data=data, name=filename, mime_type=mime_type)
+        stored = self._store.put(data=data, name=filename, mime_type=mime_type, origin="agent_created")
         # ADR-0102: snake_case python keys matching the ``exportFile``
         # RenderContract (filename / path / mime_type / size / download_url).
         state = {
