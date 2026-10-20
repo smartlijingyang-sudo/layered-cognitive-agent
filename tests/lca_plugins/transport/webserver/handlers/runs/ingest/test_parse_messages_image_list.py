@@ -61,3 +61,34 @@ def test_prior_turn_imagelist_is_dropped():
     ]
     parsed = parse_messages(msgs)
     assert parsed.file_refs == ()
+
+
+def test_image_only_message_does_not_fall_back_to_previous_text():
+    """An image-only trailing user message (empty content, imageList present)
+    is the current turn: ``parse_messages`` must NOT reach back into history
+    and reuse the previous user text as the run task, otherwise the model
+    re-answers an old question instead of handling the upload.
+    """
+    msgs: list[dict[str, Any]] = [
+        {"role": "user", "content": "你存在哪里了 文件内容是什么"},
+        {"role": "assistant", "content": "查到了"},
+        {"role": "user", "content": "",
+         "imageList": [{"id": "img-1", "url": "https://s3/photo.jpg"}]},
+    ]
+    parsed = parse_messages(msgs)
+    assert parsed.user_text == ""
+    assert len(parsed.file_refs) == 1
+    assert parsed.file_refs[0].source == "imageList"
+
+
+def test_imagelist_without_mime_type_has_empty_mime():
+    """LobeHub ``imageList`` items carry no MIME type. The parser must not
+    fabricate ``image/png``: a JPEG upload would then fail magic-bytes
+    validation and be silently dropped.
+    """
+    msgs: list[dict[str, Any]] = [
+        {"role": "user", "content": "",
+         "imageList": [{"id": "img-1", "url": "https://s3/photo.jpg"}]},
+    ]
+    parsed = parse_messages(msgs)
+    assert parsed.file_refs[0].mime_type == ""

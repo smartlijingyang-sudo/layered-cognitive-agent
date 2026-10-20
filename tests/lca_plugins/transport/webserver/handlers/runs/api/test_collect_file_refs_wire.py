@@ -40,6 +40,21 @@ def test_imagelist_top_level_field_yields_image_ref():
     assert refs[0].url == "https://s3/img.png"
 
 
+def test_imagelist_without_mime_type_has_empty_mime():
+    """LobeHub imageList items only carry ``{id, url, alt}``. The ref must
+    not default to ``image/png``, which would reject real JPEG uploads in
+    the downstream magic-bytes integrity check.
+    """
+    msgs = [{
+        "role": "user",
+        "content": "",
+        "imageList": [{"id": "image-file", "url": "https://s3/photo.jpg"}],
+    }]
+    refs = collect_file_refs(msgs)
+    assert len(refs) == 1
+    assert refs[0].mime_type == ""
+
+
 def test_filelist_top_level_field_yields_file_ref():
     msgs = [{
         "role": "user",
