@@ -8,6 +8,8 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
+from lca.contracts.models.core.execution.sandbox import SANDBOX_MOUNT_ROOT
+
 
 class ReadabilityTier(str, Enum):
     NATIVE = "native"
@@ -79,7 +81,7 @@ def classify_readability(filename: str, mime: str = "") -> ReadabilityTier:
 
 
 def to_sandbox_uri(rel_path: str) -> str:
-    clean = rel_path.replace("/mnt/data/", "").lstrip("/")
+    clean = rel_path.replace(f"{SANDBOX_MOUNT_ROOT}/", "").lstrip("/")
     return f"sandbox://workspace/{clean}"
 
 
