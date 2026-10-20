@@ -205,10 +205,15 @@ def test_wsot08_session_root_follows_run_assistant(monkeypatch, tmp_path):
         info = asyncio.run(adapter.create_session(config))
     assert info is not None
     owner_ws = tmp_path / ".lca" / "assistants" / "asst_run_owner" / "workspace"
-    assert (owner_ws / ".sessions" / info.session_id).is_dir()
-    assert not (boot_default_ws / ".sessions" / info.session_id).exists()
+    # New contract (c385b3c12): the session host root IS the run owner's
+    # workspace itself; no per-session `.sessions/<id>` subdir is created.
+    assert adapter._paths_for(info.session_id).host_root == owner_ws
+    assert (owner_ws / "your_files").is_dir()
+    assert adapter._paths_for(info.session_id).host_root != boot_default_ws
 
     # Without the per-run binding the boot default still backs the session.
+    # Anonymous sessions (no workspace_root) keep the legacy
+    # `.sessions/<sid>` layout under the adapter root (adapter.py:320).
     fallback = asyncio.run(adapter.create_session())
     assert fallback is not None
     assert (boot_default_ws / ".sessions" / fallback.session_id).is_dir()
@@ -228,7 +233,9 @@ def test_wsot09_guest_scripts_honor_session_root(monkeypatch, tmp_path):
         adapter.create_session(SessionConfig(workspace_root=str(tmp_path / "owner_ws")))
     )
     assert info is not None
-    session_root = tmp_path / "owner_ws" / ".sessions" / info.session_id
+    # New contract (c385b3c12): the session host root IS the workspace itself;
+    # no per-session `.sessions/<id>` subdir is created.
+    session_root = tmp_path / "owner_ws"
     script = (
         "import os\n"
         "from pathlib import Path\n"
