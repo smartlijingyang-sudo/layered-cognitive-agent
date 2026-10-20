@@ -126,6 +126,8 @@ class LocalSandboxAdapter(Sandbox):
     def _ensure_tree(self, root: Path) -> None:
         root.mkdir(parents=True, exist_ok=True)
         (root / SANDBOX_OUTPUT_SUBDIR).mkdir(parents=True, exist_ok=True)
+        (root / "your_files").mkdir(parents=True, exist_ok=True)
+        (root / "user").mkdir(parents=True, exist_ok=True)
         (root / ".lca" / "background").mkdir(parents=True, exist_ok=True)
 
     def _session_root(self, session_id: str = "") -> Path:
@@ -314,10 +316,13 @@ class LocalSandboxAdapter(Sandbox):
             else self._host_root
         )
         sid = new_id("lsess")
-        path = Path(root) / ".sessions" / sid
+        # Canonical SSOT: the assistant workspace itself is the persistent root.
+        # Ephemeral isolation (.sessions/sid) is only used if explicitly requested (e.g. config.isolated).
+        if config and getattr(config, "isolated", False):
+            path = Path(root) / ".sessions" / sid
+        else:
+            path = Path(root)
         self._ensure_tree(path)
-        # Also ensure canonical guest mount exists when root IS /mnt/data.
-        self._ensure_tree(Path(root))
         self._sessions[sid] = path
         _log.info("local_sandbox_session_created", session_id=sid, root=str(path))
         return SessionInfo(session_id=sid, container_id=f"local:{sid}")
