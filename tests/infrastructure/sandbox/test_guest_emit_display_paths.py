@@ -74,7 +74,9 @@ def test_resolve_maps_contract_absolute_into_session_root(tmp_path: Path) -> Non
         adapter.create_session(SessionConfig(workspace_root=str(tmp_path / "owner")))
     )
     assert info is not None
-    session_root = tmp_path / "owner" / ".sessions" / info.session_id
+    # New contract (c385b3c12): the session host root IS the workspace itself;
+    # no per-session `.sessions/<id>` subdir is created.
+    session_root = tmp_path / "owner"
     body = (
         "def main(encoded):\n"
         "    p = resolve('/mnt/data/hello5.txt')\n"
