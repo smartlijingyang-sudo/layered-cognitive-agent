@@ -109,6 +109,36 @@ def bind_resume_capabilities(session, bindings):
             reset_current_defer_session(defer_token)
 
 
+@contextmanager
+def bind_carrier_trust_envelope(session):
+    """Bind the ADR-0292 section 10 P3 TrustEnvelope for the carrier path.
+
+    The HTTP carrier never goes through
+    ``DefaultRuntimeFacade.resolve_activation``, so no TrustEnvelope is
+    bound by default. Bind assistant grants ∪ RULE_DEFAULTS here, else
+    tools carrying ``required_grant`` (e.g. memory_add requires
+    ``profile.revise``) are fail-closed rejected by ``act.authorize``.
+    The facade path already bound a real envelope; this does not overwrite
+    it.
+
+    The ritual's imports stay function-local (deferred): the carrier
+    lifecycle module must not eagerly import
+    ``lca.infrastructure.assistant.io`` (import-cycle discipline inherited
+    from the twin call sites). Docstring cites ADR-0292 section 10 P3.
+    """
+    from lca.contracts.runtime.trust import (
+        get_current_trust_envelope,
+        trust_envelope_scope,
+    )
+    from lca.infrastructure.assistant.io import assistant_trust_envelope
+
+    envelope = get_current_trust_envelope()
+    if envelope is None:
+        envelope = assistant_trust_envelope(session.assistant_id)
+    with trust_envelope_scope(envelope):
+        yield
+
+
 class RunLifecycleCoordinator:
     """Coordinate run lifecycle while delegating result translation and closure.
 
@@ -175,22 +205,7 @@ class RunLifecycleCoordinator:
             async with environment.prepare() as prepared:
                 workspace = prepared.workspace
                 session.workspace = workspace
-                # ADR-0292 §10 P3:HTTP carrier 路径不走
-                # ``DefaultRuntimeFacade.resolve_activation``，默认没有绑定
-                # TrustEnvelope。这里补绑 assistant grants ∪ RULE_DEFAULTS，
-                # 否则带 ``required_grant`` 的工具（如 memory_add 需要
-                # ``profile.revise``）在 ``act.authorize`` 被 fail-closed 拒绝。
-                # facade 路径已绑定真实 envelope，此处不覆盖。
-                from lca.contracts.runtime.trust import (
-                    get_current_trust_envelope,
-                    trust_envelope_scope,
-                )
-                from lca.infrastructure.assistant.io import assistant_trust_envelope
-
-                envelope = get_current_trust_envelope()
-                if envelope is None:
-                    envelope = assistant_trust_envelope(session.assistant_id)
-                with trust_envelope_scope(envelope):
+                with bind_carrier_trust_envelope(session):
                     outcome = await prepared.driver.execute(
                         session,
                         question=question,
@@ -321,19 +336,11 @@ class RunLifecycleCoordinator:
                     workspace=getattr(session, "workspace", None),
                 ),
                 plane_bindings_scope(bindings) if bindings is not None else nullcontext(),
+                # RA-172: the ADR-0292 section 10 P3 TrustEnvelope bind
+                # ritual wraps the runnable body (same seam as execute()).
+                bind_carrier_trust_envelope(session),
             ):
-                # ADR-0292 §10 P3:resume 同样补绑 TrustEnvelope（见 execute）。
-                from lca.contracts.runtime.trust import (
-                    get_current_trust_envelope,
-                    trust_envelope_scope,
-                )
-                from lca.infrastructure.assistant.io import assistant_trust_envelope
-
-                envelope = get_current_trust_envelope()
-                if envelope is None:
-                    envelope = assistant_trust_envelope(session.assistant_id)
-                with trust_envelope_scope(envelope):
-                    result = await session.runnable.resume(session.snapshot, input=answer)
+                result = await session.runnable.resume(session.snapshot, input=answer)
             # Persist the conclusion text on the session (same as the
             # execute driver) so terminal projection can publish the reply
             # even when the resumed run has no step-tree fold machinery

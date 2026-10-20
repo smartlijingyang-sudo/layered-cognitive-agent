@@ -4813,3 +4813,38 @@ three concrete differences). RA-172 and RA-173 are safe same-area follow-ups.
     bundle.get("run_id") is authoritative there; get_current_run_id() would
     resolve to the minted HIL resume scope, not the UI-visible run.
 ---
+## [2026-10-20 08:35 CST] - RA-172
+- Implemented: converged the twin TrustEnvelope bind rituals in
+  RunLifecycleCoordinator.execute()/resume() onto one seam
+  `bind_carrier_trust_envelope(session)` in
+  lca/plugins/transport/webserver/carrier/runs/lifecycle/lifecycle.py
+  (same home as the RA-049 bind_resume_capabilities CM). execute() now wraps
+  the driver body with the CM; resume() folded the CM into its existing
+  tuple-with (ruff SIM117: enter order identical, exit LIFO preserved).
+  Deferred-import discipline preserved (imports live inside the CM body;
+  docstring cites ADR-0292 section 10 P3). Full-repo grep confirmed no
+  third "envelope or assistant default" site (default_facade.py binds the
+  facade's real envelope -- a different policy, left alone).
+- Files changed:
+  - lca/plugins/transport/webserver/carrier/runs/lifecycle/lifecycle.py
+    (+bind_carrier_trust_envelope seam, -both hand-rolled ritual copies)
+  - raphy/prd.json (RA-172 passes: true)
+- Tests: 55 lifecycle/transport/resume tests green
+  (observe_failure/cancel/resume_rebinds_ambient/identity_scopes/
+  assistant_scope_binding/http_run_grant_binder/gateway_lifecycle/
+  resume_session_recovery/resume_idempotency/resume_concurrency);
+  6 architecture+scenario tests green; ruff check clean on the touched file.
+  tests/scenario/code/test_code_conventions.py::TestFileLineCountLimit fails
+  IDENTICALLY at pre-change HEAD (6 offender files, none touched by RA-172)
+  -- pre-existing, out of scope.
+- **Learnings for future iterations:**
+  - Twin-to-CM convergence can trip SIM117: when the twin lived behind
+    intervening statements, ruff stayed silent; once the shared CM becomes
+    the first statement inside an outer tuple-with, fold the CM into the
+    tuple (enter order preserved, exit LIFO identical) instead of nesting.
+  - RA-123 seam-scope check applies to rituals too: grep the whole repo for
+    the resource ritual's signature (trust_envelope_scope / assistant
+    fallback) before converging; the facade path's twin-shaped call was a
+    different policy, not a third occurrence -- diverging policies must not
+    be folded in.
+---

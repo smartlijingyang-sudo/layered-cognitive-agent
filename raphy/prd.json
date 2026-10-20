@@ -2533,7 +2533,7 @@
         "Behavior-neutral by construction: lifecycle tests green; ruff check clean."
       ],
       "priority": "P2",
-      "passes": false,
+      "passes": true,
       "branchName": "raphy/arch-20261020-0745",
       "notes": "Strength: Worth exploring. Duplication class (secondary per assess rules), found on the friction walk. Dependencies: only execute()/resume() in the same module."
     },
