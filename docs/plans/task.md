@@ -714,10 +714,10 @@
 | BRAINSTORM-LCA-FS-DESIGN-SECTIONS | 逐步呈现设计细节（五层架构/数据流/双轨宪法与Section/不变量断言）并获取审批 | Completed | 架构第一性原理、五层落地细节、## Filesystem 专用 Section 均获用户审批通过 |
 | BRAINSTORM-LCA-FS-DESIGN-DOC | 沉淀设计文档至 docs/plans/ 并提交 git | Completed | 成功落盘 docs/plans/2026-10-20-canonical-filesystem-and-storage-architecture-design.md，commit c6dab5a77 |
 | BRAINSTORM-LCA-FS-TRANSITION | 转换至实施计划制定（writing-plans） | Completed | 成功落盘 docs/plans/2026-10-20-canonical-filesystem-and-storage-architecture-plan.md，commit dc63652d1 |
-| LCA-FS-TASK-1-CONTRACTS | [契约层] FileRecord 模型、可读性/可见性推导与 sandbox:// URI 协议规范 | Pending | 待执行 |
-| LCA-FS-TASK-2-SANDBOX-MOUNT | [沙箱挂载] LocalSandboxAdapter 改造：废弃每轮 lsess，沙箱 /mnt/data 直挂 workspace/ | Pending | 待执行 |
-| LCA-FS-TASK-3-UPLOAD-PIPELINE | [上传管道] FileStore 重定向至 workspace/user/ 并建立 SQLite 索引登记与全量重建能力 | Pending | 待执行 |
-| LCA-FS-TASK-4-FILESYSTEM-PROMPT | [认知层] 动态 ## Filesystem Section 注入与 CONSTITUTION.md 存储铁律落地 | Pending | 待执行 |
-| LCA-FS-TASK-5-DELIVERY-GATE | [安全网关] 交付物物理 stat 存在性断言拦截器与 /tmp 泄漏防护 | Pending | 待执行 |
-| LCA-FS-TASK-6-TRASH-MANAGER | [回收站] .trash/ 30 天可恢复软删除与原路径恢复管理器 | Pending | 待执行 |
-| LCA-FS-TASK-7-E2E-INVARIANTS | [全量验收] INV-FS-01 至 INV-FS-10 十项端到端不变量回归套件验证 | Pending | 待执行 |
+| LCA-FS-TASK-1-CONTRACTS | [契约层] FileRecord 模型、可读性/可见性推导与 sandbox:// URI 协议规范 | Completed | 落地 FileRecord、derive_visibility、classify_readability 与 to_sandbox_uri，测试 4/4 全绿，commit c8af8c9e9 |
+| LCA-FS-TASK-2-SANDBOX-MOUNT | [沙箱挂载] LocalSandboxAdapter 改造：废弃每轮 lsess，沙箱 /mnt/data 直挂 workspace/ | Completed | 废弃按 run 分裂 .sessions/lsess，/mnt/data 直挂持久 workspace，跨会话写入即归位，测试 15/15 全绿，commit c385b3c12 |
+| LCA-FS-TASK-3-UPLOAD-PIPELINE | [上传管道] FileStore 重定向至 workspace/user/ 并建立 SQLite 索引登记与全量重建能力 | Completed | 上传直落 workspace/user/，支持防冲突时间戳，SQLite 索引增删查与全量扫盘重建，测试全绿，commit c8d82192e |
+| LCA-FS-TASK-4-FILESYSTEM-PROMPT | [认知层] 动态 ## Filesystem Section 注入与 CONSTITUTION.md 存储铁律落地 | Completed | 落地 FilesystemPromptSection，动态呈现上传清单与 guest 映射，CONSTITUTION.md 注入 P0/P1/P2 铁律，测试全绿，commit 636cf2734 |
+| LCA-FS-TASK-5-DELIVERY-GATE | [安全网关] 交付物物理 stat 存在性断言拦截器与 /tmp 泄漏防护 | Completed | 落地 delivery_gate，物理 stat 存在性断言与 /tmp 泄漏拦截，测试全绿，commit 48f3f643b |
+| LCA-FS-TASK-6-TRASH-MANAGER | [回收站] .trash/ 30 天可恢复软删除与原路径恢复管理器 | Completed | 落地 TrashManager，支持软删除、原路径还原与 30 天超期物理清理，测试全绿，commit aa61e0d21 |
+| LCA-FS-TASK-7-E2E-INVARIANTS | [全量验收] INV-FS-01 至 INV-FS-10 十项端到端不变量回归套件验证 | Completed | 落地 test_canonical_filesystem_invariants.py，复现并彻底根治 9 轮 Run 现场缺陷，39/39 套件全绿，commit 7b109097b |
