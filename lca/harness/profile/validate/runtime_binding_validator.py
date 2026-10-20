@@ -83,13 +83,16 @@ class MissingBindingError(ValueError):
         )
         extras_section = ""
         if additional:
-            extras_section = "\n\nAdditional missing bindings detected in same profile:"
-            for cap, pol, ext_hint in additional:
-                extras_section += (
-                    f"\n  - {cap!r} (fallback_policy={pol.value}"
-                    + (f", expected module={ext_hint}" if ext_hint else "")
-                    + ")"
-                )
+            extra_lines = [
+                f"\n  - {cap!r} (fallback_policy={pol.value}"
+                + (f", expected module={ext_hint}" if ext_hint else "")
+                + ")"
+                for cap, pol, ext_hint in additional
+            ]
+            extras_section = (
+                "\n\nAdditional missing bindings detected in same profile:"
+                + "".join(extra_lines)
+            )
         message = (
             f"Production profile missing required binding: {capability!r}.\n"
             f"Expected source: {expected_source}{fallback_note}."
