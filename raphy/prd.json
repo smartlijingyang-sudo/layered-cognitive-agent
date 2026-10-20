@@ -2507,6 +2507,50 @@
       "passes": true,
       "branchName": "raphy/arch-20261020-0445",
       "notes": "Strength: Worth exploring. Shallow/no-op finding (Area A Q5). Behavior-neutral by construction if deleted; orphan-drop wire semantics (OpenAI drop_orphan_function_calls mirror, PR-2 G-17 counter) must stay untouched.\n2026-10-20 night: landed. Deleted _drop_reasoning_after_dropped_calls (the function + its single call site in derive_messages) — it always returned its input unchanged; no reasoning-item event type exists in the journal, so the stage was permanently dead. A one-line comment records the deletion rationale at the former call site. Orphan-drop wire semantics (OpenAI drop_orphan_function_calls mirror + PR-2 G-17 orphan_dropped_count) untouched. Behavior-neutral by construction: orphan-drop + writer + RA-168 convergence tests all green."
+    },
+    {
+      "id": "RA-171",
+      "title": "Converge the twin pending_tools_calling derivations (fresh pause vs recovery) onto one seam",
+      "description": "As an LCA maintainer, I want one seam to own the 'pending tool calls for the waiting_input checkpoint' derivation, because today two hand-written derivations of the same concept from the same approval_request['tool_calls'] shape live in two modules that cannot see each other — emit_approval_pause_from_result in lca/infrastructure/session/emit/lifecycle_emit.py (fresh pause path) and _pending_tools_calling in lca/plugins/transport/webserver/carrier/runs/recovery.py (restart-recovery path) — and they have already drifted in three ways: (1) the fresh path skips calls with empty tool_name/call_id while recovery keeps '' entries; (2) the fresh path injects lca_run_id into askUserQuestion arguments so the frontend submit handler can resume the run, while recovery drops it (a restart-recovered run's ask card renders without lca_run_id — silent failure on a production path); (3) the fresh path records step.tool_call.record facts (pending_approval) per call while recovery skips them. No locality: 'what the UI card shows for a paused run' is decided twice. Two derivations = a real seam; the drift is already measurable, so the seam is already hurting.",
+      "acceptanceCriteria": [
+        "One function owns the pending-tools derivation, e.g. pending_tools_calling_from(approval_request, *, run_id=None) in the infrastructure/session emit seam (or a shared helper both modules already import); run_id present injects lca_run_id into askUserQuestion arguments.",
+        "recovery._seed_recovery_facts calls the shared seam with the bundle run_id; the three drifts are gone: identical pending lists for the same approval_request on both paths (pinned by a new test that fails on the current code).",
+        "The record_step_tool_call side effect stays explicitly at the fresh call site per ADR-0195 P4-S04 (recovery journal stays minimal; the story documents the decision). No webserver-carrier import leaks into infrastructure (layering: carrier -> infrastructure only).",
+        "Existing recovery + approval-pause tests green; ruff check clean."
+      ],
+      "priority": "P1",
+      "passes": false,
+      "branchName": "raphy/arch-20261020-0745",
+      "notes": "Strength: Strong. Friction-walk Q3/Q4 finding (no locality + leaky seam). Constraints: ADR-0195 P4-S04 recovery-journal minimalism; lca_run_id needs the frontend-facing run id (bundle run_id in recovery, not get_current_run_id()); emit_approval_pause_from_result is also called from the facade path."
+    },
+    {
+      "id": "RA-172",
+      "title": "Converge the twin TrustEnvelope bind rituals in RunLifecycleCoordinator.execute()/resume()",
+      "description": "As an LCA maintainer, I want the ADR-0292 section 10 P3 TrustEnvelope bind ritual owned in one place, because today RunLifecycleCoordinator.execute() and resume() in lca/plugins/transport/webserver/carrier/runs/lifecycle/lifecycle.py hand-duplicate the same ~15-line ritual (deferred imports of get_current_trust_envelope / trust_envelope_scope / assistant_trust_envelope, 'envelope or assistant default', enter scope; lines 185-193 vs 327-335). A policy edit to P3 must land in two places. 'One adapter = hypothetical seam, two = real' — two occurrences already exist, so the seam is real and should be owned.",
+      "acceptanceCriteria": [
+        "One context manager (e.g. bind_carrier_trust_envelope(session) in the carrier lifecycle module) wraps the driver body in execute() and the runnable body in resume(); both call sites drop their hand-rolled copies.",
+        "The deferred-import discipline is preserved (the ritual's imports stay function-local or move somewhere cycle-safe); the seam's docstring cites ADR-0292 section 10 P3.",
+        "Behavior-neutral by construction: lifecycle tests green; ruff check clean."
+      ],
+      "priority": "P2",
+      "passes": false,
+      "branchName": "raphy/arch-20261020-0745",
+      "notes": "Strength: Worth exploring. Duplication class (secondary per assess rules), found on the friction walk. Dependencies: only execute()/resume() in the same module."
+    },
+    {
+      "id": "RA-173",
+      "title": "Own the resume-bundle field inventory in one place (write/read/validate agree)",
+      "description": "As an LCA maintainer, I want the resume bundle's ~24-field inventory owned in one place, because today write_resume_bundle and _restore_from_bundle in lca/plugins/transport/webserver/carrier/runs/recovery.py hand-mirror the same field list: write enumerates session attrs, read re-lists the same keys via bundle.get(k) or '' defaults. Only 4 keys are fail-closed in validate_bundle; the other ~20 drift silently — a field added on write but not mirrored on read degrades to '' (a zombie session with empty question/user_text), exactly the failure validate_bundle's docstring claims to prevent but does not cover for those fields. Two hand-synced mirrors = a real seam; the docstring/behavior mismatch is already in the tree.",
+      "acceptanceCriteria": [
+        "One field inventory owned by the recovery seam (e.g. a _BUNDLE_FIELDS spec with name + session-attr extractor + read default + required flag) is walked by both write_resume_bundle and _restore_from_bundle.",
+        "Required fields missing from a bundle are rejected by validate_bundle (fails today for e.g. missing 'question'); genuinely optional fields keep their defaults with the intent documented (pre-2026-10-19 bundles without loaded_namespaces keep loading per RA-161).",
+        "The write side stays best-effort (never raises on the pause path); validate_bundle remains the load seam (RA-121) — extended, not bypassed.",
+        "test_run_restart_recovery.py green; new test asserts write->read round-trips every inventoried field; ruff check clean."
+      ],
+      "priority": "P2",
+      "passes": false,
+      "branchName": "raphy/arch-20261020-0745",
+      "notes": "Strength: Worth exploring. Duplication class (secondary per assess rules), found on the friction walk Q5. Constraints: RA-161 backward-compat; RA-121 load-seam ownership; best-effort write path."
     }
   ]
 }

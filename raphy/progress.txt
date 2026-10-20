@@ -4721,3 +4721,55 @@ Files changed: `lca/runtime/session/run_session_writer.py`（-16/+4）。
   drop 是真实行为。
 
 Tests: orphan-drop + writer + developer-convergence 16 passed; ruff clean.
+
+
+---
+
+## 2026-10-20 night — assess 07:45 round (3 candidates: RA-171/172/173)
+
+Branch `raphy/arch-20261020-0745` from main `22c7552d0`. YAGNI scope over last
+~40 commits; friction-walked 3 hot areas end-to-end: run lifecycle / resume /
+recovery (carrier lifecycle, recovery, resume point, terminal lifecycle — full
+read), tool defer session (full read), runtime loop resume + reducer pause
+budget (PR #47). run_session_writer and browser tools skipped — converged the
+last two rounds, re-scanned only. Runtime verification: mock-LLM smoke
+(a)+(c) -> RUN1: completed | RUN2: completed; 01:45 round's scripted harness
+already covered (b) tool-call and (d) non-converging (Result failed, no
+exception, RA-023 pinned) — no new crash/hang found.
+
+Findings:
+- **RA-171 (Strong, P1)**: "pending tool calls for the waiting_input
+  checkpoint" is derived twice from the same `approval_request["tool_calls"]`
+  shape with three silent drifts — `emit_approval_pause_from_result`
+  (lifecycle_emit.py, fresh pause) vs `_pending_tools_calling`
+  (recovery.py, restart recovery): fresh skips empty tool_name/call_id
+  (recovery keeps ""), fresh injects `lca_run_id` into askUserQuestion args
+  (recovery drops it — the frontend submit handler cannot resume a
+  recovered run: silent failure on a production path), fresh records
+  `step.tool_call.record`/pending_approval facts (recovery skips). No
+  locality for the concept; two derivations = a real seam already hurting.
+- **RA-172 (Worth exploring, P2)**: twin ~15-line TrustEnvelope bind rituals
+  in `RunLifecycleCoordinator.execute()` / `resume()` (lifecycle.py:185–193
+  vs 327–335) — ADR-0292 §10 P3 policy edits must land twice. Two = real
+  seam, un-owned.
+- **RA-173 (Worth exploring, P2)**: the resume bundle's ~24-field inventory
+  is hand-mirrored between `write_resume_bundle` and `_restore_from_bundle`;
+  only 4 keys are fail-closed in `validate_bundle` while the other ~20 get
+  silent `""` defaults on read — the zombie session `validate_bundle`'s
+  docstring claims to prevent but doesn't cover.
+
+Not candidates (recorded with reasons): tool defer session is deep
+(`new_defer_session` single derivation home, RA-160); reducer pause budget
+is one seam one direction; `_assemble_runnable`'s inline assembler
+construction is deliberate (recovery runs outside the composition root —
+Speculative only); `task_cancelled` helpers and `apply_driver`/`RunTerminalizer`
+aliases are compat hygiene (deletion test moves a one-liner inline); the
+second `RunSessionWriter` in `resume()` is a same-method micro-dup.
+
+Diversity quota satisfied (RA-171 leaky-seam/no-locality from the friction
+walk — Strong; RA-172/173 the secondary duplication findings).
+Not all-duplication.
+
+Top recommendation: RA-171 first (only candidate with measurable silent
+behavioral divergence on a production path; zero locality; drift already
+three concrete differences). RA-172 and RA-173 are safe same-area follow-ups.
