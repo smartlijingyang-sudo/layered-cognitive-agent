@@ -5021,3 +5021,20 @@ three concrete differences). RA-172 and RA-173 are safe same-area follow-ups.
     through `new_defer_session(...).policy.namespace_approval` exactly like the
     lifecycle.py:99 consumer does.
 ---
+
+## 2026-10-21 - RA-178
+- Implemented: `_capture_defer_pause_facts(session)` seam added in
+  handlers/runs/terminal/lifecycle.py:74; both `apply_driver_outcome` and
+  `apply_resume_outcome` now call it instead of repeating the two
+  `session.loaded_namespaces / session.namespace_approval` capture lines.
+  The two `_capture_*` helpers and the apply_driver/apply_resume aliases
+  are untouched (fail-soft contracts preserved).
+- Files changed: lca/plugins/transport/webserver/handlers/runs/terminal/lifecycle.py,
+  tests/lca_plugins/transport/webserver/test_run_terminal_coordinator.py
+- Tests: 6/6 green (incl. new test_ra178 pinning identical fact sets on both
+  pause paths with deterministic stubbed captures). ruff check clean.
+- **Learnings for future iterations:**
+  - Pure convergence diffs still deserve a behavioral pin: the new test drives
+    the real apply_* paths with stubbed _capture_* helpers, so a future
+    third fact landing on only one path would fail the identity assertion.
+---

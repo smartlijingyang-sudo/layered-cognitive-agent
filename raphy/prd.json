@@ -2626,9 +2626,9 @@
         "Existing terminal lifecycle tests green; ruff check clean."
       ],
       "priority": "P2",
-      "passes": false,
+      "passes": true,
       "branchName": "raphy/arch-20261021-0545",
-      "notes": "Strength: Worth exploring. Friction-walk Q3 (locality). Constraints: helper fail-soft contracts (empty set / None with no bound defer session) must not change."
+      "notes": "Strength: Worth exploring. Friction-walk Q3 (locality). Constraints: helper fail-soft contracts (empty set / None with no bound defer session) must not change.\nDONE 2026-10-21: implemented exactly as assessed. Added module-level _capture_defer_pause_facts(session) owning both assignments; apply_driver_outcome and apply_resume_outcome both call it. The two _capture_* helpers keep their fail-soft contracts; the apply_driver/apply_resume aliases are unchanged. New test test_ra178_both_pause_paths_capture_identical_fact_sets pins identical fact sets on the fresh-pause and resume-then-pause-again paths. 6/6 terminal lifecycle tests green, ruff clean."
     },
     {
       "id": "RA-179",

@@ -115,3 +115,52 @@ def test_inv_arch_02_apply_resume_outcome_input_required() -> None:
     assert session.status == RunLifecycleStatus.WAITING_INPUT
     assert session.snapshot == {"count": 2}
     assert session.approval_request == "approved?"
+def test_ra178_both_pause_paths_capture_identical_fact_sets(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """RA-178: fresh pause and resume-then-pause-again capture identical facts.
+
+    The pause-fact pairing lives in _capture_defer_pause_facts; both pause
+    paths must converge on the same fact set so a future third fact cannot
+    land on one path and be forgotten on the other.
+    """
+    from lca.plugins.transport.webserver.handlers.runs.terminal import (
+        lifecycle as _lc,
+    )
+
+    monkeypatch.setattr(
+        _lc, "_capture_loaded_namespaces", lambda: frozenset({"shell", "file"})
+    )
+    monkeypatch.setattr(
+        _lc, "_capture_namespace_approval", lambda: {"shell": "allow"}
+    )
+
+    coordinator = RunTerminalCoordinator(MagicMock())
+
+    # Fresh pause via the driver outcome path.
+    driver_session = _make_mock_session()
+    outcome = DriverOutcome(
+        success=False,
+        waiting_input=True,
+        resumable=MagicMock(),
+        snapshot={"step": 1},
+        approval_request="need confirmation",
+    )
+    assert coordinator.apply_driver_outcome(driver_session, outcome) is True
+
+    # Resume-then-pause-again via the resume outcome path.
+    resume_session = _make_mock_session()
+    result = MagicMock()
+    result.status = TaskStatus.INPUT_REQUIRED
+    result.extra = {"state_snapshot": {"count": 2}, "approval_request": "approved?"}
+    assert coordinator.apply_resume_outcome(resume_session, result) is True
+
+    expected = (frozenset({"shell", "file"}), {"shell": "allow"})
+    assert (
+        driver_session.loaded_namespaces,
+        driver_session.namespace_approval,
+    ) == expected
+    assert (
+        resume_session.loaded_namespaces,
+        resume_session.namespace_approval,
+    ) == expected
