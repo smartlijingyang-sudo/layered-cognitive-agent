@@ -39,6 +39,37 @@ def content_hash(content: bytes) -> str:
     return sha256_hex(content)
 
 
+def sniff_mime(content: bytes) -> str:
+    """Detect a known file type from magic bytes, else ``application/octet-stream``.
+
+    Never returns ``text/html``: an HTML error page must remain detectable as
+    a non-file so ``validate_file_integrity`` can reject it.
+    """
+    for mime, magic in _MAGIC_BYTES.items():
+        if len(content) >= len(magic) and content[: len(magic)] == magic:
+            return mime
+    return "application/octet-stream"
+
+
+def resolve_actual_mime(content: bytes, declared: str, http_mime: str) -> str:
+    """Derive the MIME used for validation and storage at the ingest boundary.
+
+    A wire-declared MIME (``fileList``/``fileType``/data URI) is authoritative.
+    LobeHub ``imageList`` items carry no MIME, so the content's magic bytes
+    decide; only when neither the declared nor the content is known do we
+    fall back to the HTTP Content-Type. ``text/html`` is never chosen here —
+    a HTML fallback page served for an upload URL must stay detectable.
+    """
+    if declared and declared not in {"", "undefined", "plain/txt", "application/octet-stream"}:
+        return declared
+    detected = sniff_mime(content)
+    if detected != "application/octet-stream":
+        return detected
+    if http_mime.lower().startswith("text/html"):
+        return "application/octet-stream"
+    return http_mime or "application/octet-stream"
+
+
 def validate_file_integrity(
     content: bytes,
     declared_mime: str,
@@ -116,5 +147,7 @@ __all__ = [
     "content_hash",
     "decode_data_uri",
     "looks_like_html",
+    "resolve_actual_mime",
+    "sniff_mime",
     "validate_file_integrity",
 ]

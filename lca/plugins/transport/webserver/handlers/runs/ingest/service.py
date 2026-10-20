@@ -21,6 +21,7 @@ from lca.plugins.transport.webserver.handlers.runs.ingest.fetcher import (
     HttpxFileFetcher,
     content_hash,
     decode_data_uri,
+    resolve_actual_mime,
     validate_file_integrity,
 )
 from lca.plugins.transport.webserver.handlers.runs.ingest.models import (
@@ -67,6 +68,13 @@ class LobeHubRunInput:
     skipped_files: tuple[str, ...] = field(default_factory=tuple)
 
 
+_ATTACHMENT_ONLY_TASK_TEXT = "请查看用户上传的附件"
+"""Task text for an attachment-only current turn (LobeHub imageList/fileList
+messages carry empty ``content``). Without this, ``_last_user_message`` would
+make the run fall back to the previous user text and re-answer an old
+question instead of handling the upload."""
+
+
 def parse_messages(
     messages: list[Any],
     *,
@@ -80,8 +88,8 @@ def parse_messages(
         collect_file_refs as _collect_file_refs,
     )
 
-    user_text = _extract_last_user_text(messages)
     last_user = _last_user_message(messages)
+    user_text = _visible_user_text(last_user.get("content")) if last_user else ""
     file_refs = _collect_file_refs([last_user] if last_user is not None else [])
     prior_turns = extract_prior_turns(
         messages,
@@ -115,14 +123,15 @@ async def prepare_run_from_messages(
 ) -> LobeHubRunInput:
     """Parse, mirror current-turn files, and compose a final LCA run task."""
     parsed = parse_messages(messages, assistant_home=assistant_home, topic_id=topic_id)
-    if not parsed.user_text:
+    if not parsed.user_text and not parsed.file_refs:
         return LobeHubRunInput(user_text="", question="")
     ingest = await ingest_file_refs(
         parsed.file_refs, store, fetcher=fetcher, conversation_id=topic_id or None
     )
-    question = compose_run_question(parsed.user_text, ingest.attachment_ids, store)
+    user_text = parsed.user_text or _ATTACHMENT_ONLY_TASK_TEXT
+    question = compose_run_question(user_text, ingest.attachment_ids, store)
     return LobeHubRunInput(
-        user_text=parsed.user_text,
+        user_text=user_text,
         question=question,
         prior_turns=parsed.prior_turns,
         attachment_ids=ingest.attachment_ids,
@@ -218,15 +227,13 @@ async def load_bytes(ref: FileRef, fetcher: FileFetcher) -> tuple[bytes, str]:
     url = ref.url.strip()
     if url.startswith("data:"):
         data, mime = decode_data_uri(url)
-        validate_file_integrity(data, ref.mime_type, mime, ref.name)
-        return data, mime
+        resolved = resolve_actual_mime(data, ref.mime_type, mime)
+        validate_file_integrity(data, resolved, mime, ref.name)
+        return data, resolved
     data, actual_mime = await fetcher.fetch(url)
-    declared = ref.mime_type
-    if declared and declared not in {"", "undefined", "plain/txt"}:
-        validate_file_integrity(data, declared, actual_mime, ref.name)
-        return data, declared
-    validate_file_integrity(data, actual_mime, actual_mime, ref.name)
-    return data, actual_mime
+    resolved = resolve_actual_mime(data, ref.mime_type, actual_mime)
+    validate_file_integrity(data, resolved, actual_mime, ref.name)
+    return data, resolved
 
 
 def try_resolve_local_file(ref: FileRef, store: FileStore | None) -> str | None:
@@ -247,16 +254,6 @@ def _last_user_message(messages: list[Any]) -> dict[str, Any] | None:
         if isinstance(item, dict) and item.get("role") == "user":
             return item
     return None
-
-
-def _extract_last_user_text(messages: list[Any]) -> str:
-    for item in reversed(messages):
-        if not isinstance(item, dict) or item.get("role") != "user":
-            continue
-        text = _visible_user_text(item.get("content"))
-        if text:
-            return text
-    return ""
 
 
 __all__ = [

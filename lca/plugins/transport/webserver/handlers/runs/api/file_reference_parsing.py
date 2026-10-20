@@ -45,7 +45,7 @@ def collect_file_refs(messages: list[Any]) -> list[FileRef]:
                     file_ref_from_attrs(
                         match.group(1),
                         source="image_tag",
-                        default_mime="image/png",
+                        default_mime="",
                     )
                 )
         content = item.get("content")
@@ -65,7 +65,7 @@ def collect_file_refs(messages: list[Any]) -> list[FileRef]:
                     FileRef(
                         name=name_from_url(url),
                         url=url,
-                        mime_type=mime_from_data_uri(url) or "image/png",
+                        mime_type=mime_from_data_uri(url) or "",
                         source="image_url",
                     )
                 )
@@ -96,7 +96,7 @@ def structured_file_refs(item: dict[str, Any]) -> list[FileRef]:
                 FileRef(
                     name=name or name_from_url(url),
                     url=url,
-                    mime_type=str(part.get("mime_type") or part.get("fileType") or "image/png"),
+                    mime_type=str(part.get("mime_type") or part.get("fileType") or "").strip(),
                     lobehub_id=str(part.get("id", "")),
                     source="imageList",
                 )
