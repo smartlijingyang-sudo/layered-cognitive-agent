@@ -33,6 +33,8 @@ _NATIVE_EXTENSIONS = {
     ".js",
     ".html",
     ".sh",
+    ".sql",
+    ".xml",
 }
 _CONVERTED_EXTENSIONS = {
     ".pdf",
@@ -61,7 +63,7 @@ def derive_visibility(path: str) -> VisibilityTier:
 def classify_readability(filename: str, mime: str = "") -> ReadabilityTier:
     ext = os.path.splitext(filename)[1].lower()
     mime_lower = (mime or "").lower()
-    if ext in _NATIVE_EXTENSIONS or mime_lower.startswith("text/"):
+    if ext in _NATIVE_EXTENSIONS or mime_lower.startswith("text/") or "sql" in mime_lower:
         return ReadabilityTier.NATIVE
     if (
         ext in _CONVERTED_EXTENSIONS

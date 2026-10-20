@@ -11,14 +11,23 @@ Mirrors the LobeHub pattern of id → metadata + blob without S3 for MVP.
 from __future__ import annotations
 
 import json
+import os
 import re
 from collections.abc import Sequence
 from dataclasses import asdict, dataclass
 from pathlib import Path
-from typing import Protocol
+from typing import Any, Protocol
 
 from lca.contracts.atoms.ids.ids import new_id
+from lca.contracts.models.core.workspace.file_record import (
+    FileRecord,
+    VisibilityTier,
+    classify_readability,
+)
 from lca.infrastructure.path.locator import assistant_workspace_root
+
+if False:
+    from lca.infrastructure.file.registry import FileIndexRegistry
 
 _SAFE_NAME_RE = re.compile(r"[^A-Za-z0-9._-]+")
 _MAX_NAME_LEN = 180
@@ -129,18 +138,37 @@ def _is_previewable(mime_type: str, name: str) -> bool:
 
 
 class LocalFileStore:
-    """Filesystem-backed FileStore with JSON sidecars."""
+    """Filesystem-backed FileStore with JSON sidecars and workspace/user/ alignment."""
 
-    def __init__(self, root: Path | None = None, *, public_url_prefix: str = "/files") -> None:
-        self._root = (
+    def __init__(
+        self,
+        root: Path | None = None,
+        *,
+        public_url_prefix: str = "/files",
+        registry: Any = None,
+    ) -> None:
+        raw_root = (
             root if root is not None else assistant_workspace_root() / "uploads"
         ).resolve()
-        self._root.mkdir(parents=True, exist_ok=True)
+        # If root points to workspace directly, or an uploads subdir, determine workspace root
+        if raw_root.name == "uploads":
+            self._workspace_root = raw_root.parent
+            self._legacy_root = raw_root
+        else:
+            self._workspace_root = raw_root
+            self._legacy_root = raw_root / "uploads"
+        self._root = self._legacy_root
+        self._legacy_root.mkdir(parents=True, exist_ok=True)
         self._url_prefix = public_url_prefix.rstrip("/")
+        self._registry = registry
 
     @property
     def root(self) -> Path:
         return self._root
+
+    @property
+    def workspace_root(self) -> Path:
+        return self._workspace_root
 
     def put(
         self,
@@ -151,36 +179,62 @@ class LocalFileStore:
         conversation_id: str | None = None,
     ) -> StoredFile:
         attachment_id = new_id("file")
-        directory = self._root / attachment_id
-        directory.mkdir(parents=True, exist_ok=False)
         safe_name = _safe_filename(name)
+        mime = (mime_type or "application/octet-stream").strip() or "application/octet-stream"
+
+        # 1. Physical placement into workspace/user/
+        user_dir = self._workspace_root / "user"
+        user_dir.mkdir(parents=True, exist_ok=True)
+        
+        dest_path = user_dir / safe_name
+        final_name = safe_name
+        if dest_path.exists():
+            from datetime import datetime, timezone
+            base, ext = os.path.splitext(safe_name)
+            ts = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
+            final_name = f"{base}_{ts}{ext}"
+            dest_path = user_dir / final_name
+            
+        dest_path.write_bytes(data)
+
+        # 2. Legacy mirror storage for backward-compatibility lookup by attachment_id
+        directory = self._legacy_root / attachment_id
+        directory.mkdir(parents=True, exist_ok=True)
         blob_path = directory / "blob"
         blob_path.write_bytes(data)
-        mime = (mime_type or "application/octet-stream").strip() or "application/octet-stream"
+
         stored = StoredFile(
             attachment_id=attachment_id,
-            name=safe_name if safe_name != "file" or not name else Path(name).name,
+            name=final_name,
             mime_type=mime,
             size_bytes=len(data),
             url=f"{self._url_prefix}/{attachment_id}",
             conversation_id=conversation_id,
-            previewable=_is_previewable(mime, name),
-        )
-        # Prefer original display name (sanitized path segment already on disk name)
-        display_name = Path(name).name.strip() or stored.name
-        stored = StoredFile(
-            attachment_id=stored.attachment_id,
-            name=display_name,
-            mime_type=stored.mime_type,
-            size_bytes=stored.size_bytes,
-            url=stored.url,
-            conversation_id=conversation_id,
-            previewable=stored.previewable,
+            previewable=_is_previewable(mime, final_name),
         )
         (directory / "meta.json").write_text(
             json.dumps(asdict(stored), ensure_ascii=False, indent=2),
             encoding="utf-8",
         )
+
+        # 3. Register in SQLite FileIndexRegistry if present
+        if self._registry is not None:
+            from datetime import datetime, timezone
+            now = datetime.now(timezone.utc)
+            record = FileRecord(
+                file_id=attachment_id,
+                path=f"user/{final_name}",
+                origin="upload",
+                visibility=VisibilityTier.INTERNAL,
+                mime=mime,
+                size_bytes=len(data),
+                readability=classify_readability(final_name, mime),
+                created_at=now,
+                updated_at=now,
+                source_chat_id=conversation_id,
+            )
+            self._registry.register(record)
+
         return stored
 
     def get(self, attachment_id: str) -> StoredFile | None:

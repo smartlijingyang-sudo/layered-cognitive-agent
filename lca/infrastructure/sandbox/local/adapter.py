@@ -316,12 +316,12 @@ class LocalSandboxAdapter(Sandbox):
             else self._host_root
         )
         sid = new_id("lsess")
-        # Canonical SSOT: the assistant workspace itself is the persistent root.
-        # Ephemeral isolation (.sessions/sid) is only used if explicitly requested (e.g. config.isolated).
-        if config and getattr(config, "isolated", False):
-            path = Path(root) / ".sessions" / sid
-        else:
+        # Canonical SSOT: when bound to an assistant workspace, the workspace itself is the persistent root.
+        # Anonymous sessions (no workspace_root) or explicitly isolated tasks use .sessions/sid.
+        if config and config.workspace_root and not getattr(config, "isolated", False):
             path = Path(root)
+        else:
+            path = Path(root) / ".sessions" / sid
         self._ensure_tree(path)
         self._sessions[sid] = path
         _log.info("local_sandbox_session_created", session_id=sid, root=str(path))
