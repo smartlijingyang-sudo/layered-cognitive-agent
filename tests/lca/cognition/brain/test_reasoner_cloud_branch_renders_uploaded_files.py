@@ -84,7 +84,9 @@ def test_empty_tool_catalog_still_lists_uploaded_guest_path(tmp_path: Path) -> N
     with bind_run_ambit(RunAmbit(file_store=store)), run_attachment_scope([aid]):
         built = render_plane_prompt(())
         rendered = PromptSurface.default().render_sandbox_block(())
-    guest = "/mnt/data/可以合为一个表格吗 能兼容这些所有内容.xlsx"
+    # New store (c8d82192e) sanitizes upload names via _safe_filename:
+    # space -> underscore, so the guest path carries the sanitized name.
+    guest = "/mnt/data/可以合为一个表格吗_能兼容这些所有内容.xlsx"
     assert guest in built
     assert guest in rendered
     assert "Your Workspace (your persistent working directory; guest path: /mnt/data)" in rendered
