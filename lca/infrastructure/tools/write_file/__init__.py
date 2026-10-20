@@ -78,7 +78,7 @@ class WriteFileExecutor:
         data = content.encode("utf-8")
 
         try:
-            stored = self._store.put(data=data, name=name, mime_type=mime_type)
+            stored = self._store.put(data=data, name=name, mime_type=mime_type, origin="agent_created")
         except OSError as exc:
             latency_ms = int((time.monotonic() - start) * 1000)
             return Observation(

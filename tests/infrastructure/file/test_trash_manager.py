@@ -1,74 +1,97 @@
-import pytest
-import time
-from datetime import datetime, timedelta, timezone
-from pathlib import Path
-from lca.infrastructure.file.registry import FileIndexRegistry
-from lca.infrastructure.file.trash import TrashManager
-from lca.contracts.models.core.workspace.file_record import FileRecord, VisibilityTier, ReadabilityTier
+"""RA-176: deletion is owned by the FileStore.delete seam.
 
-def test_trash_and_restore_cycle(tmp_path: Path):
+TrashManager.trash_file delegates path -> attachment id -> store.delete();
+the move+sidecar+flag ritual lives in LocalFileStore.delete. Restore and
+TTL purge still live on the manager over the .trash/ sidecars.
+"""
+
+from pathlib import Path
+
+import pytest
+
+from lca.infrastructure.file.registry import FileIndexRegistry
+from lca.infrastructure.file.store import LocalFileStore
+from lca.infrastructure.file.trash import TrashManager
+
+
+def _seam(tmp_path: Path):
     workspace = tmp_path / "workspace"
     workspace.mkdir()
-    target = workspace / "your_files" / "report.pdf"
-    target.parent.mkdir(parents=True)
-    target.write_bytes(b"report bytes v1")
-    
     registry = FileIndexRegistry(db_path=tmp_path / "test.db")
-    # Register the file
-    registry.register(
-        FileRecord(
-            file_id="f_rep1",
-            path="your_files/report.pdf",
-            origin="agent_created",
-            visibility=VisibilityTier.USER,
-            size_bytes=len(b"report bytes v1"),
-            readability=ReadabilityTier.CONVERTED,
-        )
+    store = LocalFileStore(root=workspace, registry=registry)
+    trash = TrashManager(workspace_root=workspace, registry=registry, store=store)
+    return workspace, registry, store, trash
+
+
+def test_delete_seam_trash_and_restore_cycle(tmp_path: Path):
+    """Delete seam owns the ritual; reads go dark via the registry flag."""
+    workspace, registry, store, trash = _seam(tmp_path)
+
+    stored = store.put(
+        data=b"report bytes v1",
+        name="report.pdf",
+        mime_type="application/pdf",
+        origin="agent_created",
     )
-    
-    trash = TrashManager(workspace_root=workspace, registry=registry)
-    
-    # 1. Trash the file
-    res = trash.trash_file("your_files/report.pdf")
-    assert res is True
+    target = workspace / "user" / "report.pdf"
+    assert target.is_file()
+
+    # 1. Delete through the seam (manager delegates path -> id -> seam)
+    assert trash.trash_file("user/report.pdf") is True
     assert not target.exists()
-    
-    # File in registry must have trashed_at set
-    rec = registry.get_by_path("your_files/report.pdf")
-    assert rec is not None
-    assert rec.trashed_at is not None
-    # Must not show up in active listing
-    active_files = registry.list_files(include_trashed=False)
-    assert not any(f.path == "your_files/report.pdf" for f in active_files)
-    
-    # 2. Restore the file
-    restored = trash.restore_file("your_files/report.pdf")
-    assert restored is True
+
+    # Registry flags trashed_at; active listing hides it
+    rec = registry.get_by_path("user/report.pdf")
+    assert rec is not None and rec.trashed_at is not None
+    active = registry.list_files(include_trashed=False)
+    assert not any(f.path == "user/report.pdf" for f in active)
+
+    # Reads go dark through the interface...
+    assert store.get(stored.attachment_id) is None
+    assert store.read_bytes(stored.attachment_id) is None
+    assert all(s.attachment_id != stored.attachment_id for s in store.list())
+    # ...while the {attachment_id}/ mirror blob deliberately survives:
+    # the /files/{attachment_id} stable address stays recoverable.
+    assert (store.root / stored.attachment_id / "blob").is_file()
+
+    # Trash sidecar written through the shared helper (one meta.json + one blob)
+    assert len(list(trash.trash_dir.glob("*.meta.json"))) == 1
+    assert len(list(trash.trash_dir.glob("*.blob"))) == 1
+
+    # 2. Restore brings the file back and clears the flag
+    assert trash.restore_file("user/report.pdf") is True
     assert target.is_file()
     assert target.read_bytes() == b"report bytes v1"
-    
-    # Registry must clear trashed_at
-    rec_after = registry.get_by_path("your_files/report.pdf")
-    assert rec_after is not None
-    assert rec_after.trashed_at is None
-    active_files_after = registry.list_files(include_trashed=False)
-    assert any(f.path == "your_files/report.pdf" for f in active_files_after)
+    rec_after = registry.get_by_path("user/report.pdf")
+    assert rec_after is not None and rec_after.trashed_at is None
+    assert store.read_bytes(stored.attachment_id) == b"report bytes v1"
 
-def test_trash_purge_expired(tmp_path: Path):
+
+def test_delete_unknown_or_rerun_returns_false(tmp_path: Path):
+    _, _, store, _ = _seam(tmp_path)
+    assert store.delete("file_nope") is False
+    stored = store.put(data=b"x", name="x.txt", mime_type="text/plain")
+    assert store.delete(stored.attachment_id) is True
+    assert store.delete(stored.attachment_id) is False  # already trashed
+
+
+def test_trash_file_without_store_fails_loud(tmp_path: Path):
+    """The standalone ritual is gone; trash_file without a store raises."""
     workspace = tmp_path / "workspace"
     workspace.mkdir()
-    target = workspace / "your_files" / "old.txt"
-    target.parent.mkdir(parents=True)
-    target.write_text("old")
-    
     registry = FileIndexRegistry(db_path=tmp_path / "test.db")
     trash = TrashManager(workspace_root=workspace, registry=registry)
-    
-    trash.trash_file("your_files/old.txt")
-    trash_dir = workspace.parent / ".trash" if workspace.name == "workspace" else workspace / ".trash"
+    with pytest.raises(RuntimeError):
+        trash.trash_file("user/report.pdf")
+
+
+def test_trash_purge_expired(tmp_path: Path):
+    _, _, store, trash = _seam(tmp_path)
+    store.put(data=b"old", name="old.txt", mime_type="text/plain")
+
+    assert trash.trash_file("user/old.txt") is True
     assert len(list(trash.trash_dir.glob("*.blob"))) == 1
-    
+
     # Purge with TTL = 0 (immediately expire everything)
-    purged = trash.purge_expired(ttl_seconds=-1)
-    assert purged == 1
+    assert trash.purge_expired(ttl_seconds=-1) == 1
     assert len(list(trash.trash_dir.glob("*.blob"))) == 0

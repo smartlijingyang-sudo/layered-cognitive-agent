@@ -138,27 +138,40 @@ def test_inv_fs_05_and_06_delivery_stat_and_tmp_security(tmp_path: Path):
 
 
 def test_inv_fs_07_and_08_trash_cycle_and_expiration(tmp_path: Path):
-    """INV-FS-07 & 08: Soft-delete moves to .trash/ with original path restore, and supports TTL purge."""
+    """INV-FS-07 & 08: Soft-delete moves to .trash/ with original path restore, and supports TTL purge.
+
+    RA-176: deletion goes through the FileStore.delete seam (TrashManager
+    delegates path -> attachment id -> seam); restore/purge stay on the manager.
+    """
     workspace = tmp_path / "workspace"
     workspace.mkdir()
-    target = workspace / "your_files" / "obsolete.pdf"
-    target.parent.mkdir()
-    target.write_bytes(b"obsolete content")
-    
+
     registry = FileIndexRegistry(db_path=tmp_path / "trash.db")
-    trash = TrashManager(workspace_root=workspace, registry=registry)
-    
-    # Soft delete
-    assert trash.trash_file("your_files/obsolete.pdf") is True
+    store = LocalFileStore(root=workspace, registry=registry)
+    trash = TrashManager(workspace_root=workspace, registry=registry, store=store)
+
+    stored = store.put(
+        data=b"obsolete content",
+        name="obsolete.pdf",
+        mime_type="application/pdf",
+        origin="upload",
+    )
+    target = workspace / "user" / "obsolete.pdf"
+
+    # Soft delete through the seam
+    assert trash.trash_file("user/obsolete.pdf") is True
     assert not target.exists()
-    
+    # Reads go dark through the interface
+    assert store.get(stored.attachment_id) is None
+    assert store.read_bytes(stored.attachment_id) is None
+
     # Restore
-    assert trash.restore_file("your_files/obsolete.pdf") is True
+    assert trash.restore_file("user/obsolete.pdf") is True
     assert target.is_file()
     assert target.read_bytes() == b"obsolete content"
-    
+
     # Re-trash and purge with negative TTL
-    trash.trash_file("your_files/obsolete.pdf")
+    trash.trash_file("user/obsolete.pdf")
     assert trash.purge_expired(ttl_seconds=-1) == 1
     assert len(list(trash.trash_dir.glob("*.blob"))) == 0
 

@@ -4864,3 +4864,101 @@ three concrete differences). RA-172 and RA-173 are safe same-area follow-ups.
 - **Learnings**：
   - bundle 这类"写枚举/读重列"的手工镜像，收敛方向是 spec 三元组（extract/read/required）而不是简单的"抽一个公共 dict"——因为写侧要 session→JSON、读侧要 bundle→typed value、校验侧要 required 集合，三方消费形状不同，一个带默认值的 read 闭包比共享常量更贴合。
   - required 集合宁小勿大：只标 story 点名的 zombie 根因（question）；user_text/mode 等有合法空值或历史默认的字段标 required 会误伤老 bundle——"缺失即拒"只适用于"缺了就一定不是合法暂停态"的字段。
+---
+
+## Round — assess (2026-10-20 23:45, branch raphy/arch-20261020-2345)
+- **范围**：YAGNI 取近 ~40 commits 热点。本轮唯一大热点是 canonical filesystem & storage（dc63652d1→17d3eeea2，15 commits：FileRecord schema、store 迁 workspace/user、SQLite index registry、FilesystemPromptSection、delivery gate、TrashManager、e2e 10 invariants），上一轮（07:45）评估过的 run lifecycle / resume / defer session / browser 区域本次跳过（RA-171/172/173 刚收敛，无新摩擦）。
+- **摩擦走查**（端到端细读：file/store.py、file/trash.py、file/registry.py、file_record.py、delivery_gate.py、prompts/sections/filesystem.py、approval_engine.py、tool_defer/policy.py、0bb3878f1 diff）：
+  - RA-174（Strong/P1）：`NamespaceApprovalStrategy.evaluate()`（approval_engine.py:224）在无 defer session 时手写 `{"shell": "require_approval"}` 字面量，而 SSOT 是 `DEFAULT_NAMESPACE_APPROVAL`（tool_defer/policy.py:46）——per-assistant override（0bb3878f1）之后，这是唯一绕过 override 感知接缝的路径；SSOT 加命名空间/改级别时该 fallback 会静默漂移。RA-167 同构（re-source 到 SSOT）。
+  - RA-175（Strong/P2）：`LocalFileStore.put()` 硬编码 `origin="upload"`，但模块 docstring 称 store 由 gateway upload 和 write_file tool 共享；真实调用方 write_file（agent_created）、sandbox observation（agent_created）、computer exec（agent_created）的产物全部被错标为 upload，污染 registry 的 Provenance tracking。
+  - RA-176（Worth exploring/P2）：FileStore Protocol 无 delete 接缝；TrashManager 走裸 rel_path + 自有 workspace_root + 自有 sidecar 格式绕过协议——trash 后 store.list()/read_bytes() 仍从 {attachment_id}/ mirror 读出该文件；id→meta.json+blob sidecar 手写了两遍（store 与 trash），two = real seam。注意：TrashManager 目前零生产调用方（仅测试），故事先钉接缝、不负责接线。
+  - 评估后排除（记入 assessment.md）：_is_previewable vs classify_readability（回答不同问题：UI 直渲 vs agent 转换分级，PDF 即例）、store 的 /files/{id} 与 sandbox:// narrative 链接双寻址（互补设计：id 寻址在 user/ 时间戳改名后仍稳定）、validate_bundle 内联格式校验（RA-173 清单的 extract/read/required 三元组表达不了格式校验，收敛需第四成员，判 Speculative）。
+- **运行时验证**：mock LLM agent.run smoke x2 → RUN1: completed | RUN2: completed（(a)(c) 通过；(b) 工具调用流由 01:45 轮 scripted-LLM 验证覆盖）；评估区域 e2e `tests/e2e/test_canonical_filesystem_invariants.py` 8/8 全绿。
+- **Learnings**：
+  - SSOT 旁的手写 fallback 是 fail-closed 语义下最危险的漂移点：DeferPolicy 的 default_factory 读 SSOT，而 approval engine 的无 session 分支手写字面量——两个"全局默认"一旦分家，静默 fail-open。以后任何"全局默认"只许存在于 SSOT，消费侧一律 `dict(SSOT)` 拷贝（可变模块级默认不得共享）。
+  - provenance（origin）这类"调用方才知道的事实"绝不能由被调模块硬编码默认值冒充：store 的 `origin="upload"` 硬编码让 registry 的 Provenance tracking 从第一天就是错的。接口设计时问一句"这个值的知识在谁手里"，知识不在场的一方只给透传参数、不给默认值语义。
+  - 新模块先有测试后有生产调用方是诚实状态（delivery gate / TrashManager），评估时不把"未接线"当架构缺陷写故事——但"接缝缺失"（protocol 无 delete）是真问题：接线迟早要来，接缝现在就该钉。
+- Stories written: RA-174, RA-175, RA-176 (passes: false). Top: RA-174.
+
+## 2026-10-21 00:07 CST - RA-174
+- Re-sourced the no-defer-session fallback in NamespaceApprovalStrategy.evaluate()
+  from hand-written {"shell": "require_approval"} to dict(DEFAULT_NAMESPACE_APPROVAL)
+  (function-local import from lca.infrastructure.tool_defer.policy, next to the
+  existing defer imports; copied, not shared, per the mutable-default constraint).
+- New test test_no_session_fallback_resourced_from_ssot: pins fail-closed default
+  with no session bound, then monkeypatches the SSOT and asserts the fallback
+  follows — proving derivation, not a second literal copy.
+- Files changed: lca/infrastructure/runtime_plane/access/approval_engine.py,
+  tests/infrastructure/runtime_plane/test_namespace_approval_strategy.py,
+  raphy/prd.json.
+- **Learnings for future iterations:**
+  - SSOT-follow test pattern (RA-174 实证): 证明 fallback 派生自 SSOT 而非手写
+    拷贝，最强的 pin 不是"值相等"而是"monkeypatch SSOT 后行为跟随"。
+    函数内 import 让这成为可能（每次调用重新读模块属性）。
+  - Gotcha: prd.json 是 2 空格缩进 + \uXXXX 转义，json round-trip 会整文件
+    diff——一律用 surgical text edit（按 story id 边界切片替换），写完用
+    json.load 校验有效性。
+---
+
+## 2026-10-21 00:12 CST - RA-175
+- FileStore Protocol put() / LocalFileStore.put() / capability files passthrough
+  gain keyword origin (default "upload", backward compatible); the FileRecord
+  now records the caller-passed origin instead of the store's hardcoded
+  "upload". Callers pass true provenance: write_file tool, sandbox
+  observation (_stored_part), computer exec export -> "agent_created";
+  gateway ingest service -> "upload" (explicit).
+- persist_generated_files (conduit for 4 harvest paths: office_works,
+  computer/machine harvest, exec + lca_computer observations) threads origin
+  with default "agent_created" -- otherwise harvested files would still be
+  mislabeled via the store default.
+- New test test_put_origin_owned_by_caller: explicit agent_created registers
+  agent_created; default put() still records upload.
+- Files changed: lca/infrastructure/file/store.py,
+  lca/infrastructure/tools/write_file/__init__.py,
+  lca/infrastructure/tools/sandbox/observation.py,
+  lca/infrastructure/computer/runtime/exec.py,
+  lca/infrastructure/capability/files/files.py,
+  lca/plugins/transport/webserver/handlers/runs/ingest/service.py,
+  tests/infrastructure/file/test_file_store_workspace_user.py, raphy/prd.json.
+- **Learnings for future iterations:**
+  - 改"决定权位置"的故事要顺藤摸到 conduit helper：persist_generated_files
+    是 4 条 harvest 路径的共同漏斗，只改 5 个点名 put 调用会漏掉它——
+    grep `.put(` 全仓 + grep helper 的调用方，两张网都要撒。
+  - ruff 的"clean"口径：touched files 上 0 new issues 即可；预先存在的
+    16 个（W293/UP017/F401/I001）不动——修它们是评估之外的顺手改。
+---
+
+## 2026-10-21 00:23 CST - RA-176
+- FileStore Protocol gains delete(attachment_id) soft-delete; LocalFileStore
+  implements the full ritual: resolve registry record -> retire the live
+  workspace copy into .trash/ (fall back to mirror blob) -> write the trash
+  sidecar through the ONE shared write_sidecar_pair helper -> flag
+  registry trashed_at. get()/read_bytes()/list() honor trash state via the
+  registry (list() via get()); exists() stays physical (ingest dedup relies
+  on it; AC only named list/get/read_bytes).
+- Twin id->meta+blob pattern converged: write_sidecar_pair (JSON meta +
+  raw blob) now serves both store.put()'s {attachment_id}/ mirror and the
+  trash flat sidecars; trash_dir_for() shares the .trash/ location rule.
+- Explicit mirror decision (assessment 要求): {attachment_id}/ mirror
+  (meta.json + blob) is deliberately KEPT on delete -- stable
+  /files/{attachment_id} address stays recoverable; reads go dark through
+  the interface via the flag. Known follow-up: purge_expired cleans .trash/
+  only, kept mirrors of purged files orphan (out of scope).
+- TrashManager kept as path-addressed adapter (not deleted): trash_file
+  resolves path->id via registry and delegates to store.delete(); no store
+  -> fail-loud RuntimeError (the old standalone ritual was the bypass).
+  restore_file/purge_expired unchanged (same sidecar format).
+- FileStoreService gains delete passthrough (faithful FileStore).
+- Files changed: lca/infrastructure/file/store.py,
+  lca/infrastructure/file/trash.py,
+  lca/infrastructure/capability/files/files.py,
+  tests/infrastructure/file/test_trash_manager.py (rewritten through the seam),
+  tests/e2e/test_canonical_filesystem_invariants.py (INV-FS-07/08 through seam),
+  raphy/prd.json.
+- **Learnings for future iterations:**
+  - "delegates or deleted" 二选一时：看被删对象是否还承载独立 ritual
+    （本轮 restore/purge 是独立的）——有独立价值就 delegate，无才删。
+    AC 的 deletion test 只审判了 path-addressed trash_file ritual。
+  - 反斜杠编辑走 stdin 时直接写 chr(92) 构造，绝不走 sed 穿 exec 的
+    多层转义（本轮 sed 把 "\\\\" 吃成 "\"" 写坏一行，靠 ast.parse 发现）。
+---

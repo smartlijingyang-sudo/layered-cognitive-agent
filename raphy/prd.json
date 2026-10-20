@@ -2551,6 +2551,54 @@
       "passes": true,
       "branchName": "raphy/arch-20261020-0745",
       "notes": "Strength: Worth exploring. Duplication class (secondary per assess rules), found on the friction walk Q5. Constraints: RA-161 backward-compat; RA-121 load-seam ownership; best-effort write path. Landed 2026-10-20: _BUNDLE_FIELDS inventory (20 session-derived fields) walked by write_resume_bundle and _restore_from_bundle; question required (missing/None rejected by validate_bundle); optional defaults documented per field; 2 new tests (inventory round-trip, required-field rejection); 16/16 green, ruff clean."
+    },
+    {
+      "id": "RA-174",
+      "title": "Re-source the inline shell=require_approval fallback in NamespaceApprovalStrategy onto DEFAULT_NAMESPACE_APPROVAL",
+      "description": "As an LCA maintainer, I want the global fail-closed approval default owned in exactly one place, because today it is hand-derived twice: DEFAULT_NAMESPACE_APPROVAL ({\"shell\": \"require_approval\"}) in lca/infrastructure/tool_defer/policy.py is the SSOT consumed by DeferPolicy's default_factory, but NamespaceApprovalStrategy.evaluate() in lca/infrastructure/runtime_plane/access/approval_engine.py:224 hand-writes the same literal as the no-defer-session fallback. The 2026-10-20 per-assistant namespace override (0bb3878f1) merged per-assistant values into DeferPolicy.namespace_approval, so the engine's fallback is now the one path that bypasses the override-aware seam. If the SSOT ever gains a namespace or changes a level, this fallback silently drifts (fail-open or fail-closed without anyone noticing). Two derivations of one policy = a real seam; this is the RA-167 shape (re-source the copy to the SSOT).",
+      "acceptanceCriteria": [
+        "approval_engine.py no longer contains a hand-written {\"shell\": \"require_approval\"} literal; the no-session fallback is dict(DEFAULT_NAMESPACE_APPROVAL) imported from lca.infrastructure.tool_defer.policy.",
+        "Behavior unchanged for the default case: with no defer session bound, shell-namespace tool calls still require approval (fail-closed).",
+        "New test pins the fallback equals dict(DEFAULT_NAMESPACE_APPROVAL) — importing the SSOT, not a second literal copy in the test.",
+        "tests/infrastructure/runtime_plane/test_namespace_approval_strategy.py and tests/scenario/test_namespace_approval.py green; ruff check clean."
+      ],
+      "priority": "P1",
+      "passes": true,
+      "branchName": "raphy/arch-20261020-2345",
+      "notes": "Strength: Strong. Friction-walk Q4 (leaky seam: the global default leaks across the defer-session boundary into the approval engine). Constraints: ADR-0292 §10 fail-closed; the explicit approval_mapping override still takes precedence; copy the dict, do not share the mutable module-level default. Deletion test: the inline literal concentrates nothing — policy.py owns the default.",
+      "implemented": "2026-10-20: no-session fallback now dict(DEFAULT_NAMESPACE_APPROVAL) imported from lca.infrastructure.tool_defer.policy; hand-written literal deleted. New test test_no_session_fallback_resourced_from_ssot pins fail-closed default + monkeypatch-SSOT follow. 10 tests green, ruff clean."
+    },
+    {
+      "id": "RA-175",
+      "title": "Own the FileRecord origin at the FileStore.put() call site instead of hardcoding upload",
+      "description": "As an LCA maintainer, I want FileRecord.origin decided by the caller that knows the provenance, because LocalFileStore.put() (lca/infrastructure/file/store.py) hardcodes origin=\"upload\" when building the registry record, while the module docstring says the store is \"shared by gateway upload and write_file tool\". Real put() callers today: the write_file tool (lca/infrastructure/tools/write_file/__init__.py:81 -> agent_created), the gateway ingest service (lca/plugins/transport/webserver/handlers/runs/ingest/service.py:209 -> upload), sandbox observation harvest (lca/infrastructure/tools/sandbox/observation.py:30 -> agent_created), and computer exec (lca/infrastructure/computer/runtime/exec.py:382 -> agent_created). Every agent-generated file is mislabeled \"upload\" in the SQLite index, poisoning the registry's advertised \"Provenance tracking\". No locality: the answer to \"where did this file come from\" is known at the call site but decided (wrongly) inside the store.",
+      "acceptanceCriteria": [
+        "FileStore Protocol put() gains a keyword param origin (default \"upload\" — backward compatible); LocalFileStore.put() uses it for the FileRecord.",
+        "Each caller passes its true provenance: write_file -> \"agent_created\", ingest service -> \"upload\", sandbox observation -> \"agent_created\", computer exec -> \"agent_created\" (capability/files/files.py:29 passes the provider's put through).",
+        "New test asserts put(origin=\"agent_created\") registers a record with origin agent_created, and a default put() still records upload.",
+        "tests/e2e/test_canonical_filesystem_invariants.py green; ruff check clean."
+      ],
+      "priority": "P2",
+      "passes": true,
+      "branchName": "raphy/arch-20261020-2345",
+      "notes": "Strength: Strong. Friction-walk Q3/Q4 (provenance decision lives away from the knowledge). FileRecord.origin Literal already carries the vocabulary (upload/agent_created/browser_download/artifact_build) — no new values needed. No existing test pins the buggy hardcode (e2e only builds FileRecords directly).",
+      "implemented": "2026-10-21: FileStore.put + LocalFileStore.put + capability passthrough gain origin keyword (default upload, backward compatible); FileRecord uses the caller-passed origin. Callers: write_file/sandbox observation/computer exec -> agent_created; ingest service -> upload (explicit). persist_generated_files (harvest conduit for office_works/computer harvest/exec+lca_computer observations) threads origin with default agent_created. New test test_put_origin_owned_by_caller: explicit agent_created + default upload. 13 tests green, ruff: 0 new issues (16 pre-existing)."
+    },
+    {
+      "id": "RA-176",
+      "title": "Give the FileStore Protocol its delete seam — TrashManager bypasses the store interface today",
+      "description": "As an LCA maintainer, I want deletion owned behind the FileStore interface, because today the FileStore Protocol (put/get/read_bytes/exists/list in lca/infrastructure/file/store.py) has no delete seam at all, and TrashManager (lca/infrastructure/file/trash.py) bypasses the protocol entirely: it takes a raw relative path plus its own workspace_root, writes its own {trash_id}.meta.json + {trash_id}.blob sidecars, and flags the registry directly. Consequences visible in the tree: (1) after trash_file(\"user/x\"), store.list()/get()/read_bytes() keep serving the file from the {attachment_id}/ mirror — trash state and the read path disagree through the interface; (2) the id->(meta.json + blob) sidecar pattern is hand-rolled twice (the store's {attachment_id}/ dirs and trash's flat sidecar files) — two = real seam, currently un-owned. \"The interface is the test surface\": deletion cannot be exercised through the FileStore interface today.",
+      "acceptanceCriteria": [
+        "FileStore Protocol gains a delete/trash seam (e.g. delete(attachment_id) soft-delete); LocalFileStore implements the full ritual: retire the user/ copy, write the trash sidecar through ONE shared sidecar helper (converging the twin id->meta+blob pattern), mark the registry trashed_at.",
+        "store.list()/read_bytes()/get() honor trash state via the registry — a trashed file is no longer listed or readable through the interface.",
+        "TrashManager either delegates to the new seam or is deleted (deletion test: the standalone path-addressed manager concentrates nothing once the protocol owns deletion).",
+        "tests/infrastructure/file/test_trash_manager.py and tests/e2e/test_canonical_filesystem_invariants.py green through the new seam; ruff check clean."
+      ],
+      "priority": "P2",
+      "passes": true,
+      "branchName": "raphy/arch-20261020-2345",
+      "notes": "Strength: Worth exploring. Friction-walk Q4/Q5 (seam without an owner; deletion not testable through the interface). Constraints: TrashManager currently has zero production callers (tests only) — this story pins the seam; wiring tools to it is a separate product decision. The /files/{attachment_id} deliverable URL is the stable address (survives user/ timestamp renames) — delete must decide explicitly whether the mirror blob survives for recoverability while reads go dark. Deletion test: concentrates — the move+sidecar+flag ritual is currently split across TrashManager, the registry, and the store's unaware reads.",
+      "implemented": "2026-10-21: FileStore Protocol gains delete(attachment_id) soft-delete; LocalFileStore implements the ritual (retire live copy -> .trash/ sidecar via shared write_sidecar_pair helper -> registry trashed_at); the {attachment_id}/ mirror is deliberately KEPT (recoverable, stable address), reads go dark via the registry flag in get/read_bytes/list. Twin sidecar pattern converged onto write_sidecar_pair (put() too). TrashManager kept as path-addressed adapter: trash_file delegates path->id->seam (fail-loud without store); restore/purge unchanged. FileStoreService.delete passthrough added. 21 tests green (file/ + e2e invariants + ingest pipeline + write_file guard); ruff 0 new issues. Known: purge_expired does not clean kept mirrors (follow-up)."
     }
   ]
 }

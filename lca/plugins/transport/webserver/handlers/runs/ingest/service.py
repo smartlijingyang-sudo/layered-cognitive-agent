@@ -211,6 +211,7 @@ async def ingest_file_refs(
             name=ref.name,
             mime_type=mime or ref.mime_type,
             conversation_id=conversation_id,
+            origin="upload",
         )
         active_cache.remember(
             ref,
