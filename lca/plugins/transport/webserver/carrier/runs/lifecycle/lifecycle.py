@@ -96,6 +96,7 @@ def bind_resume_capabilities(session, bindings):
                 new_defer_session(
                     vocal_mode,
                     loaded_namespaces=session.loaded_namespaces,
+                    namespace_approval=getattr(session, "namespace_approval", None),
                 )
             )
     try:

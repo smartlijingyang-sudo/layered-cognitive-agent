@@ -104,6 +104,7 @@ def test_write_and_load_resume_bundle(tmp_path: Path) -> None:
     session = _paused_session()
     session.locator.run_dir.return_value = run_dir
     session.loaded_namespaces = frozenset({"shell", "file"})
+    session.namespace_approval = {"shell": "allow"}
 
     write_resume_bundle(session)
 
@@ -119,6 +120,7 @@ def test_write_and_load_resume_bundle(tmp_path: Path) -> None:
     assert bundle["resume_point"]["approval_id"] == "plan-ref-1:intervene.interrupt:1"
     assert bundle["resume_point"]["state_ref"] == "mem://trace-rec-1/0"
     assert bundle["loaded_namespaces"] == ["file", "shell"]
+    assert bundle["namespace_approval"] == {"shell": "allow"}
 
     loaded = load_resume_bundle("run-rec-1", session.locator)
     assert loaded == bundle
@@ -232,6 +234,35 @@ def test_ra161_validate_bundle_rejects_mistyped_loaded_namespaces(tmp_path: Path
         assert validate_bundle(mutated, "run-rec-1") is None
 
 
+def test_namespace_approval_bundle_rejects_mistyped(tmp_path: Path) -> None:
+    """namespace_approval 与 loaded_namespaces 同一 load seam 原则。
+
+    缺键（旧 bundle）允许；存在但非 dict[str,str] 判 corrupt，避免把错误策略
+    静默恢复成全局默认。
+    """
+    from lca.plugins.transport.webserver.carrier.runs.recovery import validate_bundle
+
+    run_dir = tmp_path / "traces" / "run-rec-1"
+    run_dir.mkdir(parents=True, exist_ok=True)
+    session = _paused_session()
+    session.locator.run_dir.return_value = run_dir
+    session.namespace_approval = {"shell": "allow"}
+    write_resume_bundle(session)
+    bundle = json.loads((run_dir / "resume_bundle.json").read_text(encoding="utf-8"))
+
+    # 合法 dict[str,str] 通过
+    assert validate_bundle(bundle, "run-rec-1") == bundle
+    # 缺键（旧 bundle）仍通过
+    no_key = dict(bundle)
+    del no_key["namespace_approval"]
+    assert validate_bundle(no_key, "run-rec-1") == no_key
+    # 错类型一律判 corrupt
+    for bad in ("shell", {"shell": True}, [1, 2], [["shell"]], [None]):
+        mutated = dict(bundle)
+        mutated["namespace_approval"] = bad
+        assert validate_bundle(mutated, "run-rec-1") is None
+
+
 def test_ra173_bundle_field_inventory_round_trip(tmp_path: Path) -> None:
     """RA-173: write -> read round-trips every inventoried field.
 
@@ -265,6 +296,7 @@ def test_ra173_bundle_field_inventory_round_trip(tmp_path: Path) -> None:
     session.attachment_ids = ("att-1", "att-2")
     session.started_at = 4242.5
     session.loaded_namespaces = frozenset({"shell"})
+    session.namespace_approval = {"shell": "allow"}
 
     write_resume_bundle(session)
     bundle = json.loads((run_dir / "resume_bundle.json").read_text(encoding="utf-8"))
@@ -290,6 +322,7 @@ def test_ra173_bundle_field_inventory_round_trip(tmp_path: Path) -> None:
         "attachment_ids": ("att-1", "att-2"),
         "started_at": 4242.5,
         "loaded_namespaces": frozenset({"shell"}),
+        "namespace_approval": {"shell": "allow"},
     }
     restored = {f.name: f.read(bundle) for f in _BUNDLE_FIELDS}
     # Dict equality pins both directions: no inventoried field may be

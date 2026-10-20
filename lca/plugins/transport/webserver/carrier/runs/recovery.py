@@ -136,6 +136,14 @@ _BUNDLE_FIELDS: tuple[_BundleField, ...] = (
         lambda s: sorted(s.loaded_namespaces),
         lambda b: frozenset(b.get("loaded_namespaces") or ()),
     ),
+    # 生效的 namespace_approval 策略（per-assistant 覆盖后）。可选：旧 bundle
+    # 缺省允许，resume 用全局默认；格式错误由 validate_bundle 拒绝。
+    _BundleField(
+        "namespace_approval",
+        False,
+        lambda s: dict(s.namespace_approval or {}),
+        lambda b: dict(b.get("namespace_approval") or {}),
+    ),
 )
 
 
@@ -251,6 +259,14 @@ def validate_bundle(data: Any, run_id: str) -> dict[str, Any] | None:
     if loaded_namespaces is not None and (
         not isinstance(loaded_namespaces, list)
         or not all(isinstance(item, str) for item in loaded_namespaces)
+    ):
+        return None
+    namespace_approval = data.get("namespace_approval")
+    # 与 loaded_namespaces 同一原则：缺省允许（旧 bundle），但格式错误必须
+    # 在 load seam 拒绝，避免把非 dict 策略静默恢复成全局默认。
+    if namespace_approval is not None and (
+        not isinstance(namespace_approval, dict)
+        or not all(isinstance(k, str) and isinstance(v, str) for k, v in namespace_approval.items())
     ):
         return None
     for field in _BUNDLE_FIELDS:

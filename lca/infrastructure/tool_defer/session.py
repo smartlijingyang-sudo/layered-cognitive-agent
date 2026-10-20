@@ -14,8 +14,9 @@ from __future__ import annotations
 
 import difflib
 import logging
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from contextvars import ContextVar, Token
+from dataclasses import replace
 from typing import TYPE_CHECKING, Any
 
 from lca.contracts.models.cognition.prompt_leak_markers import DEFER_CATALOG_HEADER
@@ -120,8 +121,7 @@ class ToolDeferSession:
             ns = getattr(tool, "namespace", "") or ""
             if not ns:
                 log.warning(
-                    "tool_defer: tool %r has no namespace; "
-                    "parking under 'unknown' (deferred)",
+                    "tool_defer: tool %r has no namespace; parking under 'unknown' (deferred)",
                     tool.name,
                 )
                 ns = "unknown"
@@ -136,8 +136,7 @@ class ToolDeferSession:
                 ),
                 mode=(
                     DeferMode.DEFERRED
-                    if namespace == "unknown"
-                    or namespace not in self._policy.eager_namespaces
+                    if namespace == "unknown" or namespace not in self._policy.eager_namespaces
                     else DeferMode.EAGER
                 ),
                 tool_names=tuple(tool_names),
@@ -158,11 +157,8 @@ class ToolDeferSession:
         if override:
             return override
         if namespace.startswith(MCP_NAMESPACE_PREFIX):
-            server = namespace[len(MCP_NAMESPACE_PREFIX):]
-            return (
-                f"MCP 本地服务「{server}」的工具"
-                f"（{len(tool_names)} 个），按需加载"
-            )
+            server = namespace[len(MCP_NAMESPACE_PREFIX) :]
+            return f"MCP 本地服务「{server}」的工具（{len(tool_names)} 个），按需加载"
         raise ValueError(
             f"namespace {namespace!r} has no description in policy; "
             f"known: {sorted(self._policy.namespace_descriptions)}"
@@ -171,7 +167,7 @@ class ToolDeferSession:
     def _mcp_aliases(self) -> dict[str, str]:
         """Server-name alias -> canonical namespace, e.g. ``{'corp': 'mcp_corp'}``."""
         return {
-            ns.name[len(MCP_NAMESPACE_PREFIX):]: ns.name
+            ns.name[len(MCP_NAMESPACE_PREFIX) :]: ns.name
             for ns in self._namespaces
             if ns.name.startswith(MCP_NAMESPACE_PREFIX)
         }
@@ -201,8 +197,7 @@ class ToolDeferSession:
                     rendered.append(f"'{s}'")
             detail = "；您是想找 " + "、".join(rendered) + " 吗？"
         raise KeyError(
-            f"unknown tool namespace {name!r}{detail}"
-            f"；已知命名空间：{', '.join(known) or '(none)'}"
+            f"unknown tool namespace {name!r}{detail}；已知命名空间：{', '.join(known) or '(none)'}"
         )
 
     def search_catalog(self, query: str) -> list[dict[str, Any]]:
@@ -225,8 +220,7 @@ class ToolDeferSession:
             ns_desc = ns.description.lower()
             tool_descs = {
                 tname: (
-                    self._specs.get(tname, {}).get("function", {}).get("description", "")
-                    or ""
+                    self._specs.get(tname, {}).get("function", {}).get("description", "") or ""
                 ).lower()
                 for tname in ns.tool_names
             }
@@ -343,7 +337,8 @@ class ToolDeferSession:
         catalog = ""
         if catalog_lines:
             catalog = (
-                DEFER_CATALOG_HEADER + "\n"
+                DEFER_CATALOG_HEADER
+                + "\n"
                 + "\n".join(catalog_lines)
                 + f"\n{self._policy.discovery_rule}"
             )
@@ -379,6 +374,7 @@ def new_defer_session(
     vocal_mode: str | None,
     *,
     loaded_namespaces: Sequence[str] = (),
+    namespace_approval: Mapping[str, str] | None = None,
 ) -> ToolDeferSession:
     """Build the per-run defer session for a vocal mode (RA-160).
 
@@ -387,9 +383,19 @@ def new_defer_session(
     gated vocal mode keeps the ``agent`` namespace eager so the run's vocal
     contract and visible tool schema agree (ADR-0248). The resume path passes
     the pause-time loaded set as the seed; create-run passes nothing.
+
+    ``namespace_approval`` 是 per-assistant 覆盖（profile_runtime
+    ``namespace_approval`` 键）：合并进 ``DeferPolicy.namespace_approval``，
+    键级覆盖全局默认。None 表示用全局默认（shell=require_approval）。
     """
+    policy = DeferPolicy.for_vocal_mode(vocal_mode or "direct")
+    if namespace_approval:
+        policy = replace(
+            policy,
+            namespace_approval={**policy.namespace_approval, **namespace_approval},
+        )
     return ToolDeferSession(
-        DeferPolicy.for_vocal_mode(vocal_mode or "direct"),
+        policy,
         loaded_namespaces=loaded_namespaces,
     )
 

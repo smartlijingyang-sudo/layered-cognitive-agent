@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, cast
@@ -56,6 +56,7 @@ from lca.session.lifecycle.bind import (
 #         tracking: ADR-0183 PR-11 RunLifecycleStatus rename)
 RunStatus = RunLifecycleStatus
 
+
 def _runs_root() -> Path:
     """Locator root; ``runs/`` is its child (ADR-0065 §七).
 
@@ -63,7 +64,6 @@ def _runs_root() -> Path:
     ``LCA_RUNS_ROOT``; a module constant would freeze the production path.
     """
     return default_runs_root().parent
-
 
 
 @dataclass
@@ -102,6 +102,10 @@ class RunSession:
     # 的 ToolDeferSession，必须把这里恢复进去，否则模型恢复后对已加载工具的
     # 调用会被 namespace_not_loaded 拒绝。
     loaded_namespaces: frozenset[str] = frozenset()
+    # 暂停前 defer session 生效的 namespace_approval 策略（per-assistant 覆盖
+    # 后的结果）。resume 创建全新 ToolDeferSession 时必须恢复同一策略，否则
+    # 覆盖了 shell=allow 的 run 在 resume 后会被默认策略重新要求审批。
+    namespace_approval: Mapping[str, str] | None = None
     # Same hot-cache class: RuntimePlane handles published per-turn by the
     # execution environment. A HIL resume runs in a new task without the
     # environment, so it re-publishes these instead of re-resolving

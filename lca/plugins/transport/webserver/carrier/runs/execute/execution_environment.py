@@ -7,7 +7,7 @@ enter carrier-side scopes before a loop driver executes.
 
 from __future__ import annotations
 
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Mapping
 from contextlib import asynccontextmanager, nullcontext, suppress
 from dataclasses import dataclass
 from typing import Any, cast
@@ -227,6 +227,12 @@ class RunExecutionEnvironment:
                 profile_runtime = spec.profile_runtime if spec is not None else {}
                 vocal_mode = str(profile_runtime.get("vocal_mode", "direct"))
                 auto_review_mode = str(profile_runtime.get("auto_review_mode", "off"))
+                # per-assistant 命名空间审批覆盖（ADR-0256 §7 配置面扩展）。
+                # 非 dict 已在 AssistantSpec resolve 期拒绝；这里防御性忽略。
+                namespace_approval = profile_runtime.get("namespace_approval")
+                namespace_approval = (
+                    dict(namespace_approval) if isinstance(namespace_approval, Mapping) else None
+                )
                 vocal_gate = None
                 auto_review_gate = None
                 factory_disposers: list[Any] = []
@@ -326,7 +332,12 @@ class RunExecutionEnvironment:
                 # think.reason's per-turn fork only refreshes the turn view.
                 # RA-160: the vocal-mode -> defer-session derivation is shared
                 # with the resume-rebind path in new_defer_session (ADR-0248).
-                defer_token = set_current_defer_session(new_defer_session(vocal_mode))
+                defer_token = set_current_defer_session(
+                    new_defer_session(
+                        vocal_mode,
+                        namespace_approval=namespace_approval,
+                    )
+                )
                 with (
                     run_workspace_scope(session.run_id) as workspace,
                     run_scope(ambit.scope) if ambit.scope is not None else nullcontext(),

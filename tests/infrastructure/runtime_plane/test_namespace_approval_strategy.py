@@ -114,6 +114,58 @@ def test_file_namespace_auto_pass() -> None:
     assert requirement is None
 
 
+def test_namespace_approval_override_allows_shell() -> None:
+    """Per-assistant override ``{"shell": "allow"}`` 让 shell 工具免审批。
+
+    覆盖合并进 DeferPolicy.namespace_approval 后，NamespaceApprovalStrategy
+    读到非 ``require_approval`` 的值，直接放行；全局默认不受影响。
+    """
+    from lca.infrastructure.tool_defer.session import (
+        new_defer_session,
+        reset_current_defer_session,
+        set_current_defer_session,
+    )
+
+    session = new_defer_session("direct", namespace_approval={"shell": "allow"})
+    assert dict(session.policy.namespace_approval) == {"shell": "allow"}
+
+    class _Tool:
+        def __init__(self, name: str, namespace: str) -> None:
+            self.name = name
+            self.namespace = namespace
+            self.description = name
+            self.parameters = {"type": "object", "properties": {}}
+
+        async def execute(self, args: dict[str, object]) -> dict[str, object]:
+            return {"ok": True}
+
+    session.update_turn([_Tool("runCommand", "shell")])
+    session.load_namespace("shell")
+    token = set_current_defer_session(session)
+    try:
+        strategy = NamespaceApprovalStrategy()
+        req = strategy.evaluate(
+            [
+                ToolCall(
+                    tool_name="runCommand",
+                    call_id="c1",
+                    arguments={"command": "pdftotext file.pdf -"},
+                )
+            ]
+        )
+        assert req is None
+    finally:
+        reset_current_defer_session(token)
+
+
+def test_default_policy_still_requires_shell_approval() -> None:
+    """无 override 时全局默认保持 fail-closed（shell=require_approval）。"""
+    from lca.infrastructure.tool_defer.session import new_defer_session
+
+    session = new_defer_session("direct")
+    assert dict(session.policy.namespace_approval) == {"shell": "require_approval"}
+
+
 def test_shell_delete_vectors_require_approval_via_default_engine() -> None:
     """S6 回归（todo-10a）+ RA-167：_STANDARD_SHELL_TOOLS 已删除，其 13 个成员
     在新双拼写策略下仍全部要求审批（8c1624fc7 的回归网）。

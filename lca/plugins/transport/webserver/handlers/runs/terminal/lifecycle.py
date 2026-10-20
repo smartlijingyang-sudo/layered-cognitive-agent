@@ -54,6 +54,23 @@ def _capture_loaded_namespaces() -> frozenset[str]:
     return session.loaded_namespaces
 
 
+def _capture_namespace_approval() -> dict[str, str] | None:
+    """Capture the defer session's effective namespace approval policy.
+
+    A resumed run creates a fresh ``ToolDeferSession``; the effective
+    ``namespace_approval`` (after any per-assistant override) must be
+    persisted with the resume bundle and restored on resume, otherwise a run
+    that paused under ``shell=allow`` would be re-gated by the global default.
+    Returns ``None`` when no defer session is bound (legacy paths).
+    """
+    from lca.infrastructure.tool_defer.session import current_defer_session
+
+    session = current_defer_session()
+    if session is None:
+        return None
+    return dict(session.policy.namespace_approval)
+
+
 # ---------------------------------------------------------------------------
 # Status derivation helpers
 # ---------------------------------------------------------------------------
@@ -169,6 +186,7 @@ class RunTerminalCoordinator:
             session.runnable = outcome.resumable
             session.approval_request = outcome.approval_request
             session.loaded_namespaces = _capture_loaded_namespaces()
+            session.namespace_approval = _capture_namespace_approval()
             return True
         return False
 
@@ -182,6 +200,7 @@ class RunTerminalCoordinator:
             session.snapshot = extra.get("state_snapshot")
             session.approval_request = extra.get("approval_request")
             session.loaded_namespaces = _capture_loaded_namespaces()
+            session.namespace_approval = _capture_namespace_approval()
             return True
         return False
 

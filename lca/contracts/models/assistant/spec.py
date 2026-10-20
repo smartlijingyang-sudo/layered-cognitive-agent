@@ -19,6 +19,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
@@ -34,6 +35,12 @@ PROFILE_RUNTIME_AUTO_REVIEW_MODE = "auto_review_mode"
 """工具副作用自动审查：``off`` / ``shadow`` / ``enforce``。"""
 PROFILE_RUNTIME_WAKE_SOURCE = "wake_source"
 """唤醒源（可选）：``user_input`` / ``routine`` / ``inbound`` / ``revival`` 等。"""
+PROFILE_RUNTIME_NAMESPACE_APPROVAL = "namespace_approval"
+"""按命名空间的审批策略覆盖（可选）：``{"shell": "allow"}`` 等。
+
+覆盖 ``DeferPolicy.namespace_approval``：键是命名空间名，值是非
+``require_approval`` 即放行的审批级别。未配置时用全局默认（shell 为
+``require_approval``，fail-closed）。"""
 
 _VOCAL_MODES: frozenset[str] = frozenset({"direct", "gated"})
 _AUTO_REVIEW_MODES: frozenset[str] = frozenset({"off", "shadow", "enforce"})
@@ -159,6 +166,25 @@ class AssistantSpec:
                 f"profile_runtime['{PROFILE_RUNTIME_AUTO_REVIEW_MODE}'] 必须是 "
                 f"{sorted(_AUTO_REVIEW_MODES)} 之一，得到 {auto_review_mode!r}"
             )
+        # per-assistant namespace approval override（ADR-0256 §7 的配置面扩展）：
+        # 必须是 namespace -> approval level 的映射；非 dict 或键值非字符串在
+        # resolve 期 fail-closed 拒绝，防止静默回退到全局默认掩盖配置错误。
+        namespace_approval = self.profile_runtime.get(PROFILE_RUNTIME_NAMESPACE_APPROVAL)
+        if namespace_approval is not None:
+            if not isinstance(namespace_approval, Mapping):
+                raise ValueError(
+                    f"profile_runtime['{PROFILE_RUNTIME_NAMESPACE_APPROVAL}'] 必须是 "
+                    f"命名空间到审批级别的映射，得到 {type(namespace_approval).__name__}"
+                )
+            for ns, level in namespace_approval.items():
+                if not isinstance(ns, str) or not ns.strip():
+                    raise ValueError(
+                        f"profile_runtime['{PROFILE_RUNTIME_NAMESPACE_APPROVAL}'] 的键必须是非空字符串"
+                    )
+                if not isinstance(level, str) or not level.strip():
+                    raise ValueError(
+                        f"profile_runtime['{PROFILE_RUNTIME_NAMESPACE_APPROVAL}'] 的值必须是非空字符串"
+                    )
 
 
 __all__ = ["AssistantBootstrapRefs", "AssistantSpec"]

@@ -249,3 +249,18 @@ class TestProfileRuntimeAdr0248:
     def test_empty_profile_runtime_still_valid(self) -> None:
         spec = replace(_spec(), profile_runtime={})
         assert spec.profile_runtime == {}
+
+    def test_accepts_valid_namespace_approval(self) -> None:
+        spec = replace(
+            _spec(),
+            profile_runtime={"namespace_approval": {"shell": "allow"}},
+        )
+        assert spec.profile_runtime["namespace_approval"] == {"shell": "allow"}
+
+    def test_rejects_non_mapping_namespace_approval(self) -> None:
+        with pytest.raises(ValueError, match="namespace_approval"):
+            replace(_spec(), profile_runtime={"namespace_approval": "shell"})
+
+    def test_rejects_non_string_namespace_approval_value(self) -> None:
+        with pytest.raises(ValueError, match="namespace_approval"):
+            replace(_spec(), profile_runtime={"namespace_approval": {"shell": 123}})
