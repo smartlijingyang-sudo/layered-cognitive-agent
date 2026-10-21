@@ -61,6 +61,37 @@ async def test_inv_arch_10_pipeline_caching_and_local_resolution(tmp_path: Path)
         assert_ingest_url_allowed("ftp://evil.com/file")
 
 
+def test_get_ingest_cache_keyed_on_mirror_root_not_object_id(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The webserver creates a fresh LocalFileStore per POST /runs; the
+    process-local cache must be shared across stores with the same mirror
+    root instead of being rebuilt (re-reading the JSON file) per request."""
+    from lca.plugins.transport.webserver.handlers.runs.ingest.cache import (
+        get_ingest_cache,
+        reset_ingest_cache_for_tests,
+    )
+
+    monkeypatch.setenv("LCA_LOBEHUB_INGEST_CACHE_PATH", str(tmp_path / "cache.json"))
+    reset_ingest_cache_for_tests()
+    try:
+        mirror = tmp_path / "global" / "uploads"
+        store1 = LocalFileStore(root=mirror)
+        # A per-run store rooted at the assistant workspace but mirroring to
+        # the same global root — exactly what decode_create_run builds.
+        store2 = LocalFileStore(
+            root=tmp_path / "assistants" / "asst_x" / "workspace" / "uploads",
+            legacy_root=mirror,
+        )
+        assert get_ingest_cache(store1) is get_ingest_cache(store2)
+
+        other_mirror = tmp_path / "other" / "uploads"
+        store3 = LocalFileStore(root=other_mirror)
+        assert get_ingest_cache(store3) is not get_ingest_cache(store1)
+    finally:
+        reset_ingest_cache_for_tests()
+
+
 def test_inv_arch_11_no_micro_directories_remain() -> None:
     """INV-ARCH-11: lca/plugins/transport/webserver/handlers/runs/ingest/ contains zero subdirectories (except __pycache__)."""
     ingest_dir = Path("lca/plugins/transport/webserver/handlers/runs/ingest")

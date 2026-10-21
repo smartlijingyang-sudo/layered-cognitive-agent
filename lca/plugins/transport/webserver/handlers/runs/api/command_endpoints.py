@@ -18,6 +18,7 @@ the ``lca-llm-resolver`` plugin setup.
 from __future__ import annotations
 
 import json
+import re
 from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
@@ -34,7 +35,11 @@ from starlette.responses import JSONResponse
 from lca.cognition.team.modes_catalog import resolve_profile_mode
 from lca.contracts.models.core.conversation.conversation import ConversationTurn
 from lca.contracts.protocols.assistant.ownership import AssistantOwnership
-from lca.infrastructure.file.store import LocalFileStore
+from lca.infrastructure.file.store import (
+    FileStore,
+    LocalFileStore,
+    file_store_mirror_root,
+)
 from lca.infrastructure.persistence.assistant_binding import (
     resolve_assistant_binding,
 )
@@ -150,7 +155,7 @@ async def decode_create_run(
     body: dict[str, Any],
     *,
     ctx: object,
-    file_store: LocalFileStore,
+    file_store: FileStore | None,
     resolve_mode: Any,
     user_id: str = "",
     ownership: AssistantOwnership | None = None,
@@ -193,6 +198,18 @@ async def decode_create_run(
             or ""
         )
 
+    # Workspace SSOT 写路径的安全边界：assistant_id 直接参与
+    # ``{lca_home}/assistants/<id>/workspace`` 拼路径（上传落盘 + 历史读取）。
+    # 只允许目录安全字符，拒绝路径分隔符与前导点，防止 ``..`` 逃逸到其它
+    # 助理或任意目录。合法 id 由 catalog 生成（``asst_<hex>``），agent 绑定
+    # 映射的 ``asst_*`` / ``agt_*`` 也在此字符集内。
+    if assistant_id and not _is_safe_assistant_id(assistant_id):
+        return _err(
+            f"invalid assistant_id {assistant_id!r}",
+            status_code=400,
+            code="invalid_assistant_id",
+        )
+
     mode = str(body.get("mode") or body.get("model") or "solo")
     resolved_mode = resolve_mode(ctx, mode)
 
@@ -214,7 +231,7 @@ async def decode_create_run(
         from lca.infrastructure.path.locator import assistant_workspace_root
 
         workspace_root = assistant_workspace_root(assistant_id)
-        mirror_root = _local_file_store_root(file_store)
+        mirror_root = file_store_mirror_root(file_store)
         if workspace_root and mirror_root:
             run_store = LocalFileStore(
                 root=workspace_root / "uploads",
@@ -255,6 +272,20 @@ async def decode_create_run(
     )
 
 
+_SAFE_ASSISTANT_ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_-]*$")
+
+
+def _is_safe_assistant_id(assistant_id: str) -> bool:
+    """Return whether ``assistant_id`` is safe to join under ``assistants/``.
+
+    Rejects path separators (``/`` ``\\``), a leading dot (``..`` escape) and
+    other directory-hostile characters while keeping the alnum/underscore/
+    hyphen id shapes produced by the catalog (``asst_<hex>``) and agent
+    bindings (``asst_*`` / ``agt_*``).
+    """
+    return bool(_SAFE_ASSISTANT_ID_RE.match(assistant_id))
+
+
 def _assistant_home_of(assistant_id: str) -> Path | None:
     """Resolve ``{lca_home}/assistants/{assistant_id}``; None when unbound.
 
@@ -265,25 +296,6 @@ def _assistant_home_of(assistant_id: str) -> Path | None:
     from lca.infrastructure.path.locator import get_lca_home
 
     return get_lca_home() / "assistants" / assistant_id
-
-
-def _local_file_store_root(store: Any) -> Path | None:
-    """Resolve the id-mirror root from a possibly service-wrapped FileStore.
-
-    ``app.state.file_store`` is normally a ``LocalFileStore``, but the
-    kernel seam may wrap it in ``FileStoreService`` (which forwards to the
-    active ``LocalFileStore`` provider). Both shapes expose the mirror root
-    used by ``/files/{id}``; returning ``None`` keeps the classic single-root
-    upload path untouched when the store is not a local file store.
-    """
-    if isinstance(store, LocalFileStore):
-        return store.root
-    current = getattr(store, "current", None)
-    if callable(current):
-        inner = current()
-        if isinstance(inner, LocalFileStore):
-            return inner.root
-    return None
 
 
 def _decode_resume_approval(raw: Any) -> dict[str, Any] | JSONResponse | None:

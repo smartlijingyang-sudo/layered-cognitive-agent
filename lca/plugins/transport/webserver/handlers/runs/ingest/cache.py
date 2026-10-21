@@ -11,7 +11,7 @@ from typing import Any
 
 import structlog
 
-from lca.infrastructure.file.store import FileStore
+from lca.infrastructure.file.store import FileStore, file_store_mirror_root
 from lca.plugins.transport.webserver.handlers.runs.ingest.fetcher import content_hash
 from lca.plugins.transport.webserver.handlers.runs.ingest.models import (
     FileRef,
@@ -170,10 +170,22 @@ def get_ingest_cache(
     store: FileStore,
     settings: LobeHubBridgeSettings | None = None,
 ) -> IngestCache:
-    """Return the process-local cache for a store/settings pair."""
+    """Return the process-local cache for a store/settings pair.
+
+    The cache is keyed on the store's id-mirror root (``LocalFileStore.root``
+    or the active provider's root through ``FileStoreService``), not on the
+    object identity: the webserver creates a fresh ``LocalFileStore`` per
+    ``POST /runs``, and object-id keying would rebuild the cache (re-reading
+    the JSON file) on every request and let concurrent requests race on the
+    same cache file. Stores without a resolvable root fall back to object id.
+    """
     global _default_cache, _default_cache_key
     cfg = settings if settings is not None else bridge_settings()
-    cache_key_value = (cfg.ingest_cache_path, id(store))
+    mirror_root = file_store_mirror_root(store)
+    cache_key_value = (
+        cfg.ingest_cache_path,
+        str(mirror_root) if mirror_root is not None else f"id:{id(store)}",
+    )
     with _default_cache_lock:
         if _default_cache is None or _default_cache_key != cache_key_value:
             _default_cache = IngestCache(

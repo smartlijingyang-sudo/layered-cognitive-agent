@@ -113,6 +113,29 @@ def trash_dir_for(workspace_root: Path) -> Path:
     return trash_dir
 
 
+def file_store_mirror_root(store: Any) -> Path | None:
+    """Resolve the id-mirror root from a possibly service-wrapped FileStore.
+
+    ``LocalFileStore`` exposes the mirror as ``root``; the kernel seam's
+    ``FileStoreService`` forwards to the active provider via ``current()``.
+    Returns ``None`` when the root cannot be resolved so callers can keep
+    the classic single-root path (fail-soft, never raises).
+    """
+    root = getattr(store, "root", None)
+    if isinstance(root, Path):
+        return root
+    current = getattr(store, "current", None)
+    if callable(current):
+        try:
+            inner = current()
+        except Exception:
+            return None
+        root = getattr(inner, "root", None)
+        if isinstance(root, Path):
+            return root
+    return None
+
+
 def file_part_from_stored(stored: StoredFile) -> dict[str, object]:
     """Canonical product part — one shape for plugin_state.files and ToolInvoked.files."""
     return {
