@@ -393,8 +393,6 @@ class AssistantMemory(MemorySystem):
                     MemoryLayer.PROCEDURAL,
                     content=content,
                     state=state,
-                    observation=observation,
-                    reflection=reflection,
                     metadata={"candidate_id": str(getattr(procedural, "candidate_id", "") or "")},
                 )
                 return
@@ -407,8 +405,6 @@ class AssistantMemory(MemorySystem):
                 MemoryLayer.EPISODIC,
                 content=content,
                 state=state,
-                observation=observation,
-                reflection=reflection,
                 importance=0.7,
                 metadata={"step": getattr(state, "step", 0)},
             )
@@ -419,8 +415,6 @@ class AssistantMemory(MemorySystem):
                 f"step={state.step} success={observation.success} verdict={reflection.verdict}"
             ),
             state=state,
-            observation=observation,
-            reflection=reflection,
         )
 
     @staticmethod
@@ -659,8 +653,6 @@ class AssistantMemory(MemorySystem):
         *,
         content: str,
         state: AgentState,
-        observation: Observation,
-        reflection: Reflection,
         importance: float = 0.5,
         metadata: dict[str, Any] | None = None,
     ) -> None:
