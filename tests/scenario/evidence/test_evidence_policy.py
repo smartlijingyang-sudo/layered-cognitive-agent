@@ -43,7 +43,7 @@ def test_classify_default_internal_for_text(policy: DefaultEvidencePolicy) -> No
     assert policy.classify(b"hello world", media_type="text/plain") == Classification.INTERNAL
 
 
-def test_classify_extra_keywords(policy: DefaultEvidencePolicy) -> None:
+def test_classify_extra_keywords() -> None:
     """可扩展关键字集合。"""
     custom = DefaultEvidencePolicy(extra_restricted_keywords=(b"my-tenant-secret",))
     assert custom.classify(b"my-tenant-secret=oops") == Classification.RESTRICTED

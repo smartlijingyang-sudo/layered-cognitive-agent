@@ -532,7 +532,6 @@ class TestToolSelfManage:
     def test_create_tool_writes_home(
         self,
         catalog: AssistantCatalogImpl,
-        emitted: list[tuple[str, dict[str, Any]]],
     ) -> None:
         from lca.infrastructure.tools.assistant.self_manage_tools import (
             CreateAssistantToolTool,
