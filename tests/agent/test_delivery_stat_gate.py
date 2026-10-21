@@ -24,17 +24,17 @@ def test_delivery_gate_blocks_missing_or_tmp_files(tmp_path: Path):
     workspace.mkdir()
     (workspace / "your_files").mkdir()
     (workspace / "your_files" / "real.pdf").write_bytes(b"content")
-    
+
     # 1. Valid delivery with existing file passes
     valid_text = "Here is your plan: ![Plan](sandbox://workspace/your_files/real.pdf)"
     assert verify_delivery_attachments(valid_text, workspace_root=workspace) is True
-    
+
     # 2. Missing file delivery raises DeliveryVerificationError
     fake_text = "Generated: ![Fake](sandbox://workspace/your_files/ghost.pdf)"
     with pytest.raises(DeliveryVerificationError) as exc_info:
         verify_delivery_attachments(fake_text, workspace_root=workspace)
     assert "ghost.pdf" in str(exc_info.value)
-        
+
     # 3. Ephemeral /tmp leak raises DeliverySecurityError
     tmp_leak_text = "Here: ![Temp](sandbox://workspace//tmp/scratch.pdf)"
     with pytest.raises(DeliverySecurityError):

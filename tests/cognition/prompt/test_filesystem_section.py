@@ -17,7 +17,7 @@ def test_filesystem_prompt_section_rendering():
     section = FilesystemPromptSection(uploaded_files=files)
     output = section.render()
     rendered = output.text
-    
+
     assert "## Filesystem" in rendered
     assert "~/workspace/your_files/" in rendered
     assert "~/workspace/goals/<goal-slug>/files/" in rendered

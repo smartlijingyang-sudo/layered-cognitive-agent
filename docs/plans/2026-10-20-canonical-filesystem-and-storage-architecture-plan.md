@@ -57,7 +57,7 @@ def test_to_sandbox_uri():
 
 **Step 2: Run test to verify it fails**
 
-Run: `pytest tests/contracts/test_file_record_contract.py -v`  
+Run: `pytest tests/contracts/test_file_record_contract.py -v`
 Expected: FAIL with `ModuleNotFoundError: No module named '...file_record'`
 
 **Step 3: Write minimal implementation**
@@ -127,7 +127,7 @@ class FileRecord(BaseModel):
 
 **Step 4: Run test to verify it passes**
 
-Run: `pytest tests/contracts/test_file_record_contract.py -v`  
+Run: `pytest tests/contracts/test_file_record_contract.py -v`
 Expected: PASS
 
 **Step 5: Commit**
@@ -164,7 +164,7 @@ async def test_sandbox_mounts_persistent_workspace_directly(tmp_path: Path):
     workspace = tmp_path / "workspace"
     workspace.mkdir()
     adapter = LocalSandboxAdapter(host_root=str(workspace))
-    
+
     # Session creation must now map directly to workspace, not create isolated .sessions subdirs
     session = await adapter.create_session()
     paths = adapter._paths_for(session.session_id)
@@ -174,7 +174,7 @@ async def test_sandbox_mounts_persistent_workspace_directly(tmp_path: Path):
 
 **Step 2: Run test to verify it fails**
 
-Run: `pytest tests/infrastructure/sandbox/test_local_sandbox_workspace_mount.py -v`  
+Run: `pytest tests/infrastructure/sandbox/test_local_sandbox_workspace_mount.py -v`
 Expected: FAIL (currently creates `.sessions/lsess_xxx`)
 
 **Step 3: Write minimal implementation**
@@ -188,7 +188,7 @@ In `lca/infrastructure/sandbox/local/adapter.py`:
 
 **Step 4: Run test to verify it passes**
 
-Run: `pytest tests/infrastructure/sandbox/test_local_sandbox_workspace_mount.py -v`  
+Run: `pytest tests/infrastructure/sandbox/test_local_sandbox_workspace_mount.py -v`
 Expected: PASS
 
 **Step 5: Commit**
@@ -226,14 +226,14 @@ def test_upload_lands_in_user_directory_and_indexes(tmp_path: Path):
     workspace = tmp_path / "workspace"
     registry = FileIndexRegistry(db_path=tmp_path / "test_files.db")
     store = LocalFileStore(root=workspace, registry=registry)
-    
+
     # Put file
     record = store.put(data=b"hello sql", name="uuids.sql", mime_type="application/sql", conversation_id="conv_123")
     expected_path = workspace / "user" / "uuids.sql"
     assert expected_path.exists()
     assert expected_path.read_bytes() == b"hello sql"
     assert record.path == "user/uuids.sql"
-    
+
     # Collision test
     record2 = store.put(data=b"hello sql 2", name="uuids.sql", mime_type="application/sql")
     assert record2.path != "user/uuids.sql"
@@ -242,7 +242,7 @@ def test_upload_lands_in_user_directory_and_indexes(tmp_path: Path):
 
 **Step 2: Run test to verify it fails**
 
-Run: `pytest tests/infrastructure/file/test_file_store_workspace_user.py -v`  
+Run: `pytest tests/infrastructure/file/test_file_store_workspace_user.py -v`
 Expected: FAIL with `ModuleNotFoundError: No module named '...registry'`
 
 **Step 3: Write minimal implementation**
@@ -268,7 +268,7 @@ Update `LocalFileStore` in `lca/infrastructure/file/store.py` to write into `use
 
 **Step 4: Run test to verify it passes**
 
-Run: `pytest tests/infrastructure/file/test_file_store_workspace_user.py -v`  
+Run: `pytest tests/infrastructure/file/test_file_store_workspace_user.py -v`
 Expected: PASS
 
 **Step 5: Commit**
@@ -314,7 +314,7 @@ def test_filesystem_prompt_section_rendering():
     ]
     section = FilesystemPromptSection(uploaded_files=files)
     rendered = section.render()
-    
+
     assert "## Filesystem" in rendered
     assert "~/workspace/your_files/" in rendered
     assert "~/workspace/user/" in rendered
@@ -325,7 +325,7 @@ def test_filesystem_prompt_section_rendering():
 
 **Step 2: Run test to verify it fails**
 
-Run: `pytest tests/cognition/prompt/test_filesystem_section.py -v`  
+Run: `pytest tests/cognition/prompt/test_filesystem_section.py -v`
 Expected: FAIL with `ModuleNotFoundError`
 
 **Step 3: Write minimal implementation**
@@ -335,7 +335,7 @@ Update `lca/plugins/assistant/templates/CONSTITUTION.md` to append the Storage &
 
 **Step 4: Run test to verify it passes**
 
-Run: `pytest tests/cognition/prompt/test_filesystem_section.py -v`  
+Run: `pytest tests/cognition/prompt/test_filesystem_section.py -v`
 Expected: PASS
 
 **Step 5: Commit**
@@ -372,16 +372,16 @@ def test_delivery_gate_blocks_missing_or_tmp_files(tmp_path: Path):
     workspace.mkdir()
     (workspace / "your_files").mkdir()
     (workspace / "your_files" / "real.pdf").write_bytes(b"content")
-    
+
     # Valid delivery
     valid_text = "Here is your plan: ![Plan](sandbox://workspace/your_files/real.pdf)"
     assert verify_delivery_attachments(valid_text, workspace_root=workspace) is True
-    
+
     # Missing file delivery
     fake_text = "Generated: ![Fake](sandbox://workspace/your_files/ghost.pdf)"
     with pytest.raises(DeliveryVerificationError):
         verify_delivery_attachments(fake_text, workspace_root=workspace)
-        
+
     # Ephemeral /tmp leak
     tmp_leak_text = "Here: ![Temp](sandbox://workspace//tmp/scratch.pdf)"
     with pytest.raises(DeliverySecurityError):
@@ -390,7 +390,7 @@ def test_delivery_gate_blocks_missing_or_tmp_files(tmp_path: Path):
 
 **Step 2: Run test to verify it fails**
 
-Run: `pytest tests/agent/test_delivery_stat_gate.py -v`  
+Run: `pytest tests/agent/test_delivery_stat_gate.py -v`
 Expected: FAIL with `ModuleNotFoundError`
 
 **Step 3: Write minimal implementation**
@@ -399,7 +399,7 @@ Implement `verify_delivery_attachments` in `lca/runtime/delivery/delivery_gate.p
 
 **Step 4: Run test to verify it passes**
 
-Run: `pytest tests/agent/test_delivery_stat_gate.py -v`  
+Run: `pytest tests/agent/test_delivery_stat_gate.py -v`
 Expected: PASS
 
 **Step 5: Commit**
@@ -437,15 +437,15 @@ def test_trash_and_restore_cycle(tmp_path: Path):
     target = workspace / "your_files" / "report.pdf"
     target.parent.mkdir()
     target.write_bytes(b"report bytes")
-    
+
     registry = FileIndexRegistry(db_path=tmp_path / "test.db")
     trash = TrashManager(workspace_root=workspace, registry=registry)
-    
+
     # Delete
     trash.trash_file("your_files/report.pdf")
     assert not target.exists()
     assert len(list((workspace.parent / ".trash").iterdir())) == 1
-    
+
     # Restore
     trash.restore_file("your_files/report.pdf")
     assert target.exists()
@@ -454,7 +454,7 @@ def test_trash_and_restore_cycle(tmp_path: Path):
 
 **Step 2: Run test to verify it fails**
 
-Run: `pytest tests/infrastructure/file/test_trash_manager.py -v`  
+Run: `pytest tests/infrastructure/file/test_trash_manager.py -v`
 Expected: FAIL with `ModuleNotFoundError`
 
 **Step 3: Write minimal implementation**
@@ -463,7 +463,7 @@ Implement `TrashManager` in `lca/infrastructure/file/trash.py` with 30-day purge
 
 **Step 4: Run test to verify it passes**
 
-Run: `pytest tests/infrastructure/file/test_trash_manager.py -v`  
+Run: `pytest tests/infrastructure/file/test_trash_manager.py -v`
 Expected: PASS
 
 **Step 5: Commit**
@@ -499,7 +499,7 @@ async def test_cross_turn_workspace_continuity_e2e(tmp_path: Path):
 
 **Step 2: Run test to verify it passes with the new unified architecture**
 
-Run: `pytest tests/e2e/test_canonical_filesystem_invariants.py -v`  
+Run: `pytest tests/e2e/test_canonical_filesystem_invariants.py -v`
 Expected: PASS
 
 **Step 3: Commit**

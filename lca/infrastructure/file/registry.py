@@ -173,7 +173,7 @@ class FileIndexRegistry:
                 mime = mime or "application/octet-stream"
                 vis = derive_visibility(rel_path)
                 readability = classify_readability(f, mime)
-                
+
                 # Check if existing record exists to keep original file_id and created_at
                 existing = self.get_by_path(rel_path)
                 file_id = existing.file_id if existing else new_id("file")

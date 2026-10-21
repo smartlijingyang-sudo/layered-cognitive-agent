@@ -1,10 +1,10 @@
 # Canonical Filesystem & Storage Architecture Design (Layered Cognitive Agent)
 
-> **Document ID**: `LCA-DESIGN-2026-10-20-FS-STORAGE`  
-> **Target System**: `/home/lichao/layered-cognitive-agent` (252 & Production LCA Nodes)  
-> **Author**: Antigravity Pair Programming & System Architecture  
-> **Date**: 2026-10-20  
-> **Status**: APPROVED (Ready for Implementation Planning)  
+> **Document ID**: `LCA-DESIGN-2026-10-20-FS-STORAGE`
+> **Target System**: `/home/lichao/layered-cognitive-agent` (252 & Production LCA Nodes)
+> **Author**: Antigravity Pair Programming & System Architecture
+> **Date**: 2026-10-20
+> **Status**: APPROVED (Ready for Implementation Planning)
 > **Autopilot Blast Radius**: `DRAFT` (Core runtime & sandbox mount refactor; gated by automated verification suites)
 
 ---
@@ -32,7 +32,7 @@ When the user asked *"Are my uploaded file and your generated file saved in your
 ### 1.1 Boundaries
 - **Owns (In-Scope)**:
   - **`contracts`**: Definition of `FileRecord`, `ReadabilityTier`, `VisibilityTier`, and `sandbox://` URI specification.
-  - **`infrastructure`**: 
+  - **`infrastructure`**:
     - Refactor `LocalSandboxAdapter` to bind-mount `{assistant_home}/workspace/` directly to `/mnt/data`, deprecating per-run session fragmentation.
     - Migrate `FileStore` root from `traces/files/` directly to `{assistant_home}/workspace/user/`.
     - Implement SQLite file index registry (`workspace_files.db` or metadata table) with full fs-scan recovery capability.

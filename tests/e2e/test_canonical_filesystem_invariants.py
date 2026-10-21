@@ -31,15 +31,15 @@ async def test_inv_fs_01_upload_survival_and_index_integrity(tmp_path: Path):
     """INV-FS-01: Uploaded files persist in workspace/user/ across restarts, indexed in SQLite."""
     workspace = tmp_path / "workspace"
     db_path = tmp_path / "files.db"
-    
+
     # Instance 1: Upload
     registry1 = FileIndexRegistry(db_path=db_path)
     store1 = LocalFileStore(root=workspace, registry=registry1)
     stored = store1.put(data=b"dummy sql", name="uuids.sql", mime_type="application/sql", conversation_id="chat_1")
-    
+
     assert (workspace / "user" / "uuids.sql").is_file()
     assert (workspace / "user" / "uuids.sql").read_bytes() == b"dummy sql"
-    
+
     # Instance 2: Simulate complete restart with fresh store & registry
     registry2 = FileIndexRegistry(db_path=db_path)
     store2 = LocalFileStore(root=workspace, registry=registry2)
@@ -57,11 +57,11 @@ def test_inv_fs_02_compaction_immunity(tmp_path: Path):
     report_bytes = b"%PDF-1.4 sample content for compaction immunity test"
     report_file.write_bytes(report_bytes)
     original_sha = hashlib.sha256(report_bytes).hexdigest()
-    
+
     # Simulate aggressive dialogue compaction event
     dialogue_context = ["Turn 1: user upload", "Turn 2: summary"]
     dialogue_context = ["[COMPACTED SUMMARY of Turns 1-2]"]
-    
+
     # Assert physical disk byte checksum is 100% invariant
     assert hashlib.sha256(report_file.read_bytes()).hexdigest() == original_sha
 
@@ -74,7 +74,7 @@ async def test_inv_fs_03_write_in_place_no_duplicate_drift(tmp_path: Path):
     adapter = LocalSandboxAdapter(root=str(workspace))
     config = SessionConfig(workspace_root=str(workspace))
     session = await adapter.create_session(config=config)
-    
+
     # Write directly to /mnt/data/goals/growth/files/q4_plan.md
     code = (
         "import os\n"
@@ -84,7 +84,7 @@ async def test_inv_fs_03_write_in_place_no_duplicate_drift(tmp_path: Path):
     )
     res = await adapter.run_in_session(session.session_id, code)
     assert res.success
-    
+
     # Physical file is exactly at goals/growth/files/q4_plan.md
     assert (workspace / "goals" / "growth" / "files" / "q4_plan.md").is_file()
     assert (workspace / "goals" / "growth" / "files" / "q4_plan.md").read_text() == "# Q4 Plan\nTarget: 100k"
@@ -96,7 +96,7 @@ def test_inv_fs_04_visibility_isolation(tmp_path: Path):
     """INV-FS-04: Library projection isolates user deliverables from internal bookkeeping and raw uploads."""
     db_path = tmp_path / "vis.db"
     registry = FileIndexRegistry(db_path=db_path)
-    
+
     # Register 4 files of different categories
     files = [
         FileRecord(file_id="1", path="your_files/public_report.pdf", origin="agent_created", visibility=derive_visibility("your_files/public_report.pdf")),
@@ -106,13 +106,13 @@ def test_inv_fs_04_visibility_isolation(tmp_path: Path):
     ]
     for f in files:
         registry.register(f)
-        
+
     # Library projection: ONLY visibility == USER
     library_items = registry.list_files(visibility=VisibilityTier.USER)
     assert len(library_items) == 2
     paths = {item.path for item in library_items}
     assert paths == {"your_files/public_report.pdf", "goals/growth/files/goal_doc.md"}
-    
+
     # Internal bookkeeping is hidden
     assert "goals/growth/hidden_files/watermark.json" not in paths
     assert "user/raw_data.xlsx" not in paths
@@ -124,14 +124,14 @@ def test_inv_fs_05_and_06_delivery_stat_and_tmp_security(tmp_path: Path):
     workspace.mkdir()
     (workspace / "your_files").mkdir()
     (workspace / "your_files" / "valid.pdf").write_bytes(b"pdf data")
-    
+
     # Valid delivery passes
     assert verify_delivery_attachments("Here: ![Report](sandbox://workspace/your_files/valid.pdf)", workspace_root=workspace)
-    
+
     # Missing file fails fast
     with pytest.raises(DeliveryVerificationError):
         verify_delivery_attachments("Here: ![Report](sandbox://workspace/your_files/phantom.pdf)", workspace_root=workspace)
-        
+
     # /tmp leak fails fast
     with pytest.raises(DeliverySecurityError):
         verify_delivery_attachments("Here: [Temp](/tmp/report.pdf)", workspace_root=workspace)
@@ -182,21 +182,21 @@ def test_inv_fs_09_full_index_reconstruction(tmp_path: Path):
     (workspace / "your_files").mkdir(parents=True)
     (workspace / "user").mkdir(parents=True)
     (workspace / "goals" / "marketing" / "files").mkdir(parents=True)
-    
+
     (workspace / "your_files" / "report.pdf").write_bytes(b"pdf")
     (workspace / "user" / "sheet.xlsx").write_bytes(b"xlsx")
     (workspace / "goals" / "marketing" / "files" / "doc.md").write_text("# Title")
-    
+
     db_path = tmp_path / "reconstruct.db"
     registry = FileIndexRegistry(db_path=db_path)
     count = registry.rebuild_index_from_fs(workspace_root=workspace)
     assert count == 3
-    
+
     user_file = registry.get_by_path("user/sheet.xlsx")
     assert user_file is not None
     assert user_file.readability == ReadabilityTier.CONVERTED
     assert user_file.visibility == VisibilityTier.INTERNAL
-    
+
     report_file = registry.get_by_path("your_files/report.pdf")
     assert report_file is not None
     assert report_file.visibility == VisibilityTier.USER
@@ -214,18 +214,18 @@ async def test_inv_fs_10_cross_turn_workspace_continuity_incident_reproduction(t
     workspace = tmp_path / "workspace"
     workspace.mkdir()
     db_path = tmp_path / "incident.db"
-    
+
     registry = FileIndexRegistry(db_path=db_path)
     store = LocalFileStore(root=workspace, registry=registry)
     adapter = LocalSandboxAdapter(root=str(workspace))
     config = SessionConfig(workspace_root=str(workspace))
-    
+
     # Turn 1: User uploads 快乐通宝-法大大公有云电子签报价单0622.xlsx
     excel_name = "快乐通宝-法大大公有云电子签报价单0622.xlsx"
     excel_bytes = b"sample excel quotation spreadsheet bytes"
     stored = store.put(data=excel_bytes, name=excel_name, mime_type="application/vnd.openxmlformats", conversation_id="tpc_incident")
     assert (workspace / "user" / excel_name).is_file()
-    
+
     # Turn 2: Run 0ea6003ede3c executes Python code in sandbox reading the Excel
     sess_turn2 = await adapter.create_session(config=config)
     code_read_excel = (
@@ -236,7 +236,7 @@ async def test_inv_fs_10_cross_turn_workspace_continuity_incident_reproduction(t
     res_turn2 = await adapter.run_in_session(sess_turn2.session_id, code_read_excel)
     assert res_turn2.success
     assert "Read 40 bytes from quotation" in res_turn2.stdout
-    
+
     # Turn 3: Run 371c9edba126 executes Python code generating the analysis PDF directly in your_files/
     sess_turn3 = await adapter.create_session(config=config)
     pdf_name = "法大大电子签报价分析报告.pdf"
@@ -248,7 +248,7 @@ async def test_inv_fs_10_cross_turn_workspace_continuity_incident_reproduction(t
     res_turn3 = await adapter.run_in_session(sess_turn3.session_id, code_gen_pdf)
     assert res_turn3.success
     assert (workspace / "your_files" / pdf_name).is_file()
-    
+
     # Turn 4: Run 58d183038130 (Where the previous system failed with empty outputs!)
     # Under the unified architecture, a new session still connects to the same workspace:
     sess_turn4 = await adapter.create_session(config=config)
