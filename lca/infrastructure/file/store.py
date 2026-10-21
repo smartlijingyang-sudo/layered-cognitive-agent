@@ -21,9 +21,10 @@ from typing import Any, Protocol
 
 from lca.contracts.atoms.ids.ids import new_id
 from lca.contracts.models.core.workspace.file_record import (
+    READ_TEXT_PREVIEW_EXCLUDED_MIMES,
     FileRecord,
     VisibilityTier,
-    classify_readability,
+    readability_profile,
 )
 from lca.infrastructure.path.locator import assistant_workspace_root
 
@@ -149,43 +150,6 @@ def persist_generated_files(
     return parts
 
 
-def _is_previewable(mime_type: str, name: str) -> bool:
-    """UI may open an in-app preview (iframe / markdown / image), not download-only.
-
-    Aligns with LobeHub FilePreview coverage for common agent products.
-    """
-    mime = mime_type.lower().split(";")[0].strip()
-    lower = name.lower()
-    if mime.startswith("image/"):
-        return True
-    if mime.startswith("text/"):
-        return True
-    if mime in {
-        "application/json",
-        "application/javascript",
-        "application/xml",
-        "application/xhtml+xml",
-        "application/pdf",
-    }:
-        return True
-    return lower.endswith(
-        (
-            ".html",
-            ".htm",
-            ".md",
-            ".markdown",
-            ".txt",
-            ".csv",
-            ".json",
-            ".xml",
-            ".svg",
-            ".png",
-            ".jpg",
-            ".jpeg",
-            ".gif",
-            ".webp",
-        )
-    )
 
 
 class LocalFileStore:
@@ -254,6 +218,7 @@ class LocalFileStore:
         # sidecar helper, converging the twin hand-rolled pattern.)
         directory = self._legacy_root / attachment_id
 
+        profile = readability_profile(final_name, mime)
         stored = StoredFile(
             attachment_id=attachment_id,
             name=final_name,
@@ -261,7 +226,7 @@ class LocalFileStore:
             size_bytes=len(data),
             url=f"{self._url_prefix}/{attachment_id}",
             conversation_id=conversation_id,
-            previewable=_is_previewable(mime, final_name),
+            previewable=profile.ui_preview,
         )
         write_sidecar_pair(directory / "meta.json", directory / "blob", asdict(stored), data)
 
@@ -276,7 +241,7 @@ class LocalFileStore:
                 visibility=VisibilityTier.INTERNAL,
                 mime=mime,
                 size_bytes=len(data),
-                readability=classify_readability(final_name, mime),
+                readability=profile.tier,
                 created_at=now,
                 updated_at=now,
                 source_chat_id=conversation_id,
@@ -405,7 +370,7 @@ class LocalFileStore:
             return None
         mime = meta.mime_type.lower().split(";", 1)[0].strip()
         # Hint only — never dump HTML/XML the agent will read via tools.
-        if mime in {"text/html", "text/xml", "application/xml", "application/xhtml+xml"}:
+        if mime in READ_TEXT_PREVIEW_EXCLUDED_MIMES:
             return None
         if not (
             mime.startswith("text/")

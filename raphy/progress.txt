@@ -5133,3 +5133,19 @@ three concrete differences). RA-172 and RA-173 are safe same-area follow-ups.
   - The RA-175 origin-vocabulary convergence is now a reusable precedent:
     whenever two vocabularies answer the same (filename, mime)-shaped
     question, check divergence on the intersection before proposing a merge.
+
+## RA-181 DONE 2026-10-21 — Converge the twin readability vocabularies onto one contracts seam
+- Implemented exactly as assessed. `contracts/models/core/workspace/file_record.py` now owns the per-audience
+  readability seam: frozen `ReadabilityProfile(tier, ui_preview)` + `readability_profile(filename, mime)`.
+- Deleted `infrastructure/file/store.py::_is_previewable`; its LobeHub-aligned rules moved verbatim into contracts
+  (`_UI_PREVIEW_MIMES` / `_UI_PREVIEW_EXTENSIONS`); `put()` wires both wire fields from one profile call.
+- `read_text_preview`'s HTML/XML exclusion set moved into contracts as `READ_TEXT_PREVIEW_EXCLUDED_MIMES`.
+- `bootstrap.py` artifact-closure `previewable` re-sourced onto the public seam; no private cross-seam import remains.
+- Implementer decision (documented in module): NATIVE-but-not-previewable (.py/.sql/.yaml + unknown mime) is
+  intentional — tier answers the agent audience, ui_preview the UI audience; convergence is at rule ownership.
+  22-case old-vs-new equivalence matrix: 0 mismatches; wire shapes unchanged.
+- Tests: 11/11 green (test_file_record_contract, test_file_store_and_write_tool, test_local_sandbox_output_mime);
+  tests/scenario/file/ 7/7 green; ruff clean on touched files (UP042/UP017 in file_record.py pre-existing at HEAD).
+- Learnings: 收敛"同一个问题两个词表"时先实证答案是否必须一致——本轮两个受众（agent 可读性 vs UI 内联渲染）
+  的问题语义本就不同，硬合并会改行为；收敛形态取"规则所有权收敛、答案各表其受众"，分歧用文档化决策固定，
+  再用 old-vs-new 矩阵实证零行为变更，这比机械合并表更安全。

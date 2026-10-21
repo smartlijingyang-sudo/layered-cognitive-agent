@@ -145,7 +145,7 @@ def install_bootstrap_state(
     app.state.device_hub = boot.device_hub
     app.state.machine_resolver = boot.machine_resolver
 
-    from lca.infrastructure.file.store import _is_previewable
+    from lca.contracts.models.core.workspace.file_record import readability_profile
     from lca.infrastructure.observability.running_operation_store import (
         resolve_running_operation_store,
     )
@@ -169,7 +169,7 @@ def install_bootstrap_state(
                 "mimeType": art.mime_type,
                 "sizeBytes": art.size_bytes,
                 "attachmentId": art.url.rsplit("/", 1)[-1],
-                "previewable": _is_previewable(art.mime_type, art.name),
+                "previewable": readability_profile(art.name, art.mime_type).ui_preview,
             }
             for art in snapshot.artifacts
             if art.url
