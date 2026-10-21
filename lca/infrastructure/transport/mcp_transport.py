@@ -40,7 +40,9 @@ class MCPTransport(AgentTransport):
         self._default_tool_name = default_tool_name
         self._task_results: dict[str, Observation] = {}
         self._task_statuses: dict[str, str] = {}
-        self._sessions: dict[str, Any] = {}
+        # Per server URL: (ClientSession, AsyncExitStack owning the full
+        # lifetime — streamablehttp_client cm + ClientSession cm).
+        self._sessions: dict[str, tuple[Any, contextlib.AsyncExitStack]] = {}
 
     def _resolve_config(self, agent_card: AgentCard | str) -> tuple[str, str]:
         """从 agent_card 解析 server_url 和 tool_name。"""
@@ -57,9 +59,17 @@ class MCPTransport(AgentTransport):
         return str(server_url), str(tool_name)
 
     async def _get_mcp_session(self, server_url: str) -> Any:
-        """获取或创建 MCP client session。"""
-        if server_url in self._sessions:
-            return self._sessions[server_url]
+        """获取或创建 MCP client session。
+
+        Acquire and release are owned by one seam (RA-182): the AsyncExitStack
+        enters the streamablehttp_client cm first, then the ClientSession cm,
+        and close() unwinds them inner-then-outer through the same stack — so
+        the outer HTTP client can no longer leak when only the inner session
+        was exited.
+        """
+        cached = self._sessions.get(server_url)
+        if cached is not None:
+            return cached[0]
 
         try:
             # mcp 是可选依赖，未安装时由 except ImportError 处理
@@ -70,11 +80,20 @@ class MCPTransport(AgentTransport):
         except ImportError as exc:
             raise NotImplementedError(_MCP_SDK_MISSING_MSG) from exc
 
-        read_stream, write_stream, _ = await streamablehttp_client(server_url).__aenter__()
-        session = ClientSession(read_stream, write_stream)
-        await session.__aenter__()
-        await session.initialize()
-        self._sessions[server_url] = session
+        stack = contextlib.AsyncExitStack()
+        try:
+            read_stream, write_stream, _ = await stack.enter_async_context(
+                streamablehttp_client(server_url)
+            )
+            session = ClientSession(read_stream, write_stream)
+            await stack.enter_async_context(session)
+            await session.initialize()
+        except BaseException:
+            # Partial acquire (e.g. initialize() blew up): unwind whatever was
+            # entered instead of caching a half-built session.
+            await stack.aclose()
+            raise
+        self._sessions[server_url] = (session, stack)
         return session
 
     async def send_task(
@@ -141,7 +160,9 @@ class MCPTransport(AgentTransport):
         return await self.receive_result(task_id)
 
     async def close(self) -> None:
-        for session in self._sessions.values():
+        for _session, stack in self._sessions.values():
             with contextlib.suppress(Exception):
-                await session.__aexit__(None, None, None)
+                # LIFO: ClientSession.__aexit__ (inner) runs before
+                # streamablehttp_client.__aexit__ (outer).
+                await stack.aclose()
         self._sessions.clear()

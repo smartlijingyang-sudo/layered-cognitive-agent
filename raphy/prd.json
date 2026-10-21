@@ -2683,9 +2683,9 @@
         "New test pins close() with a fake streamablehttp cm asserting both __aexit__s ran (existing tests in tests/scenario/external/test_external_transports.py pin protocol/config/no-SDK only); ruff check clean."
       ],
       "priority": "P2",
-      "passes": false,
+      "passes": true,
       "branchName": "raphy/arch-20261021-0853",
-      "notes": "Strength: Worth exploring. Friction-walk class (leaky adapter seam: acquire without full release). Needs the SDK's cm protocol pinned in the test. Deletion test: concentrates -- lifetime ownership moves from scattered __aenter__/__aexit__ asymmetry into one acquire/release seam."
+      "notes": "Strength: Worth exploring. Friction-walk class (leaky adapter seam: acquire without full release). Needs the SDK's cm protocol pinned in the test. Deletion test: concentrates -- lifetime ownership moves from scattered __aenter__/__aexit__ asymmetry into one acquire/release seam.\nDONE 2026-10-21: implemented exactly as assessed. _get_mcp_session now acquires through one seam: a per-server-URL contextlib.AsyncExitStack enters the streamablehttp_client cm first, then the ClientSession cm; the stack (not just the inner session) is cached as (session, stack) in _sessions. close() unwinds each stack LIFO (inner session __aexit__ before outer http cm __aexit__), suppressing per-URL exceptions and always clearing _sessions — the outer HTTP client can no longer leak. Partial acquire (e.g. initialize() raises) now unwinds whatever was entered instead of caching a half-built session (the old code leaked there too). No-SDK NotImplementedError path, broad-catch -> failed-Observation, and send_task's synchronous-completion contract untouched. New tests TestMCPTransportCloseOwnsLifetime pin close() with fake streamablehttp/SDK cms: (1) both __aexit__s ran, inner-before-outer order, cache-hit returns same session, state cleared; (2) one URL's __aexit__ raising does not stop the other URL's release and state is still cleared. Both new tests fail against the pre-fix implementation (leak reproduced), 23/23 pass with the fix (full test_external_transports.py). ruff clean."
     }
   ]
 }

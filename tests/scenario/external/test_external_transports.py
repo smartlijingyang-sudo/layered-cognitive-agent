@@ -238,6 +238,112 @@ class TestMCPTransportWithoutSDK(unittest.IsolatedAsyncioTestCase):
             self.assertIn("mcp", str(ctx.exception).lower())
 
 
+class TestMCPTransportCloseOwnsLifetime(unittest.IsolatedAsyncioTestCase):
+    """RA-182: close() 释放完整会话生命周期，而非只退出内层 ClientSession。"""
+
+    @staticmethod
+    def _fake_sdk_modules(session_cls, http_cm_cls):
+        from types import ModuleType
+
+        mcp_mod = ModuleType("mcp")
+        mcp_mod.ClientSession = session_cls
+        http_mod = ModuleType("mcp.client.streamable_http")
+        http_mod.streamablehttp_client = http_cm_cls
+        return {
+            "mcp": mcp_mod,
+            "mcp.client": ModuleType("mcp.client"),
+            "mcp.client.streamable_http": http_mod,
+        }
+
+    async def test_close_exits_inner_then_outer(self) -> None:
+        exit_order: list = []
+        http_cms: list = []
+
+        class _FakeHttpCM:
+            def __init__(self, url: str) -> None:
+                self.exited = False
+                http_cms.append(self)
+
+            async def __aenter__(self):
+                return (object(), object(), None)
+
+            async def __aexit__(self, *exc_info) -> bool:
+                self.exited = True
+                exit_order.append("http")
+                return False
+
+        class _FakeSession:
+            def __init__(self, read_stream, write_stream) -> None:
+                self.exited = False
+
+            async def __aenter__(self):
+                return self
+
+            async def __aexit__(self, *exc_info) -> bool:
+                self.exited = True
+                exit_order.append("session")
+                return False
+
+            async def initialize(self) -> None:
+                return None
+
+        transport = MCPTransport()
+        with patch.dict("sys.modules", self._fake_sdk_modules(_FakeSession, _FakeHttpCM)):
+            session = await transport._get_mcp_session("http://fake-mcp:8080")
+            self.assertIsInstance(session, _FakeSession)
+            # cache hit returns the same session without re-entering the cms
+            self.assertIs(await transport._get_mcp_session("http://fake-mcp:8080"), session)
+            self.assertEqual(len(http_cms), 1)
+
+            await transport.close()
+
+        # both __aexit__s ran, inner (session) before outer (http cm)
+        self.assertTrue(session.exited)
+        self.assertTrue(http_cms[0].exited)
+        self.assertEqual(exit_order, ["session", "http"])
+        self.assertEqual(transport._sessions, {})
+
+    async def test_close_clears_state_even_on_partial_failure(self) -> None:
+        closed: list = []
+
+        class _FakeHttpCM:
+            def __init__(self, url: str) -> None:
+                self.url = url
+
+            async def __aenter__(self):
+                return (object(), object(), None)
+
+            async def __aexit__(self, *exc_info) -> bool:
+                closed.append(self.url)
+                if self.url == "http://bad:8080":
+                    raise RuntimeError("http cm blew up on exit")
+                return False
+
+        class _FakeSession:
+            def __init__(self, read_stream, write_stream) -> None:
+                pass
+
+            async def __aenter__(self):
+                return self
+
+            async def __aexit__(self, *exc_info) -> bool:
+                return False
+
+            async def initialize(self) -> None:
+                return None
+
+        transport = MCPTransport()
+        with patch.dict("sys.modules", self._fake_sdk_modules(_FakeSession, _FakeHttpCM)):
+            await transport._get_mcp_session("http://bad:8080")
+            await transport._get_mcp_session("http://good:8080")
+            # one url's __aexit__ raises — close() must not propagate and must
+            # still release the other url and clear all state
+            await transport.close()
+
+        self.assertEqual(sorted(closed), ["http://bad:8080", "http://good:8080"])
+        self.assertEqual(transport._sessions, {})
+
+
 class TestTransportRegistration(unittest.TestCase):
     """A2A/MCP 已注册到默认 TransportRegistry。"""
 
