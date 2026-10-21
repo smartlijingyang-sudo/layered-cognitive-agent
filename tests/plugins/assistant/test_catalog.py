@@ -981,7 +981,6 @@ class TestOwnershipScoping:
     def test_create_writes_user_id_to_manifest(
         self,
         catalog: AssistantCatalogImpl,
-        request_default: CreateAssistantRequest,
     ) -> None:
         handle = catalog.create(CreateAssistantRequest(name="Demo", owner_user_id="alice"))
         manifest = json.loads(
