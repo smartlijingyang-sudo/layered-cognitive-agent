@@ -197,17 +197,31 @@ class LocalFileStore:
         *,
         public_url_prefix: str = "/files",
         registry: Any = None,
+        legacy_root: Path | None = None,
     ) -> None:
-        raw_root = (
-            root if root is not None else assistant_workspace_root() / "uploads"
-        ).resolve()
+        """Build a LocalFileStore.
+
+        ``root`` is the workspace uploads root (``{workspace}/uploads``) and
+        decides the ``workspace/user/`` ownership target. ``legacy_root``
+        overrides the id-mirror directory (``{attachment_id}/meta.json`` +
+        ``blob``) that ``/files/{id}`` serves from; it defaults to ``root``
+        itself so plain ``LocalFileStore(root=workspace)`` keeps the classic
+        layout. The webserver upload path passes ``legacy_root`` so uploads
+        belong to the run assistant's workspace while the mirror stays on the
+        process-wide store for download compatibility.
+        """
+        raw_root = (root if root is not None else assistant_workspace_root() / "uploads").resolve()
         # If root points to workspace directly, or an uploads subdir, determine workspace root
         if raw_root.name == "uploads":
-            self._workspace_root = raw_root.parent
-            self._legacy_root = raw_root
+            workspace_root = raw_root.parent
+            default_legacy = raw_root
         else:
-            self._workspace_root = raw_root
-            self._legacy_root = raw_root / "uploads"
+            workspace_root = raw_root
+            default_legacy = raw_root / "uploads"
+        self._workspace_root = workspace_root.resolve()
+        self._legacy_root = (
+            Path(legacy_root).resolve() if legacy_root is not None else default_legacy.resolve()
+        )
         self._root = self._legacy_root
         self._legacy_root.mkdir(parents=True, exist_ok=True)
         self._url_prefix = public_url_prefix.rstrip("/")
@@ -242,6 +256,7 @@ class LocalFileStore:
         final_name = safe_name
         if dest_path.exists():
             from datetime import datetime
+
             base, ext = os.path.splitext(safe_name)
             ts = datetime.now(UTC).strftime("%Y%m%d_%H%M%S")
             final_name = f"{base}_{ts}{ext}"
@@ -268,6 +283,7 @@ class LocalFileStore:
         # 3. Register in SQLite FileIndexRegistry if present
         if self._registry is not None:
             from datetime import datetime
+
             now = datetime.now(UTC)
             record = FileRecord(
                 file_id=attachment_id,

@@ -204,9 +204,25 @@ async def decode_create_run(
         return resume_tool_result
 
     topic_id = topic_id_from_body(body)
+    # Workspace SSOT (ADR-0187 / WSOT-08): uploads belong to the run
+    # assistant's workspace (`workspace/user/`), not to the process-wide
+    # FileStore root that webserver boot resolved from the global
+    # LCA_ASSISTANT_ID default. The id-mirror stays on the global store so
+    # `/files/{id}` downloads and attachment staging keep working.
+    run_store = file_store
+    if assistant_id and file_store is not None:
+        from lca.infrastructure.path.locator import assistant_workspace_root
+
+        workspace_root = assistant_workspace_root(assistant_id)
+        mirror_root = _local_file_store_root(file_store)
+        if workspace_root and mirror_root:
+            run_store = LocalFileStore(
+                root=workspace_root / "uploads",
+                legacy_root=mirror_root,
+            )
     run_input: LobeHubRunInput = await prepare_run_from_messages(
         messages,
-        file_store,
+        run_store,
         assistant_home=_assistant_home_of(assistant_id),
         topic_id=topic_id,
     )
@@ -249,6 +265,25 @@ def _assistant_home_of(assistant_id: str) -> Path | None:
     from lca.infrastructure.path.locator import get_lca_home
 
     return get_lca_home() / "assistants" / assistant_id
+
+
+def _local_file_store_root(store: Any) -> Path | None:
+    """Resolve the id-mirror root from a possibly service-wrapped FileStore.
+
+    ``app.state.file_store`` is normally a ``LocalFileStore``, but the
+    kernel seam may wrap it in ``FileStoreService`` (which forwards to the
+    active ``LocalFileStore`` provider). Both shapes expose the mirror root
+    used by ``/files/{id}``; returning ``None`` keeps the classic single-root
+    upload path untouched when the store is not a local file store.
+    """
+    if isinstance(store, LocalFileStore):
+        return store.root
+    current = getattr(store, "current", None)
+    if callable(current):
+        inner = current()
+        if isinstance(inner, LocalFileStore):
+            return inner.root
+    return None
 
 
 def _decode_resume_approval(raw: Any) -> dict[str, Any] | JSONResponse | None:
