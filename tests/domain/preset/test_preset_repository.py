@@ -190,3 +190,48 @@ def test_delete_preset_preserves_shared_plugin_copies(tmp_path: Path) -> None:
     # Delete preset_2: now shared_tool is truly orphan and gets cleaned up
     repo.delete("preset_2", assistant_home=assistant_home)
     assert not (assistant_home / "plugins" / "shared_tool.py").is_file()
+def test_ra180_legacy_flat_dir_loads_through_shared_seam(tmp_path: Path) -> None:
+    """RA-180: the legacy flat layout loads through _load_plugins_from.
+
+    The twin per-file ritual now lives in one parameterized seam; the flat
+    dir differs from the plugins/ subdir only in the glob source and the
+    dunder/test_* skip filter. This pins both: the real plugin loads with
+    its preset.json descriptor merged, and __init__/test_* files are skipped.
+    """
+    import json as _json
+
+    preset_dir = tmp_path / "legacy_preset"
+    preset_dir.mkdir()
+    (preset_dir / "preset.json").write_text(
+        _json.dumps(
+            {
+                "description": "legacy flat layout",
+                "plugins": [
+                    {
+                        "name": "calc",
+                        "capabilities": ["custom.calc"],
+                        "side_effects": "none",
+                        "policy_class": "execute",
+                    }
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+    (preset_dir / "calc.py").write_text("def factory():\n    return 1\n", encoding="utf-8")
+    (preset_dir / "test_calc.py").write_text("def test_x():\n    pass\n", encoding="utf-8")
+    (preset_dir / "__init__.py").write_text("", encoding="utf-8")
+
+    repo = FileSystemPresetRepository()
+    package = repo._load_from_dir("legacy-x", PresetScope.PRIVATE, preset_dir)
+
+    assert package is not None
+    assert package.description == "legacy flat layout"
+    names = [plg.name for plg in package.plugins]
+    assert names == ["calc"], f"dunder/test_* files must be skipped, got {names}"
+    calc = package.plugins[0]
+    assert calc.capabilities == ("custom.calc",)
+    assert calc.side_effects == "none"
+    assert calc.policy_class == "execute"
+    assert "def factory():" in calc.code
+    assert calc.path.endswith("calc.py")

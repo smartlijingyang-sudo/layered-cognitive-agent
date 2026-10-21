@@ -15,7 +15,7 @@ import os
 import re
 from collections.abc import Sequence
 from dataclasses import asdict, dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, Protocol
 
@@ -28,7 +28,7 @@ from lca.contracts.models.core.workspace.file_record import (
 from lca.infrastructure.path.locator import assistant_workspace_root
 
 if False:
-    from lca.infrastructure.file.registry import FileIndexRegistry
+    pass
 
 _SAFE_NAME_RE = re.compile(r"[^\w.\-_]+", re.UNICODE)
 _MAX_NAME_LEN = 180
@@ -237,16 +237,16 @@ class LocalFileStore:
         # 1. Physical placement into workspace/user/
         user_dir = self._workspace_root / "user"
         user_dir.mkdir(parents=True, exist_ok=True)
-        
+
         dest_path = user_dir / safe_name
         final_name = safe_name
         if dest_path.exists():
-            from datetime import datetime, timezone
+            from datetime import datetime
             base, ext = os.path.splitext(safe_name)
-            ts = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
+            ts = datetime.now(UTC).strftime("%Y%m%d_%H%M%S")
             final_name = f"{base}_{ts}{ext}"
             dest_path = user_dir / final_name
-            
+
         dest_path.write_bytes(data)
 
         # 2. Legacy mirror storage for backward-compatibility lookup by attachment_id
@@ -267,8 +267,8 @@ class LocalFileStore:
 
         # 3. Register in SQLite FileIndexRegistry if present
         if self._registry is not None:
-            from datetime import datetime, timezone
-            now = datetime.now(timezone.utc)
+            from datetime import datetime
+            now = datetime.now(UTC)
             record = FileRecord(
                 file_id=attachment_id,
                 path=f"user/{final_name}",
@@ -324,6 +324,11 @@ class LocalFileStore:
         return blob.read_bytes()
 
     def exists(self, attachment_id: str) -> bool:
+        # RA-179: the read surface must agree -- get()/read_bytes()/list()
+        # go dark on trashed files, so exists() (which every consumer reads
+        # as "is this file still usable") does too. Fail-closed.
+        if self._is_trashed(attachment_id):
+            return False
         return (self._root / attachment_id / "meta.json").is_file()
 
     def delete(self, attachment_id: str) -> bool:
@@ -345,7 +350,7 @@ class LocalFileStore:
         if record is None or record.trashed_at is not None:
             return False
 
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         trash_id = new_id("trash")
 
         # Retire the live workspace copy; fall back to the mirror blob so the

@@ -95,3 +95,29 @@ def test_trash_purge_expired(tmp_path: Path):
     # Purge with TTL = 0 (immediately expire everything)
     assert trash.purge_expired(ttl_seconds=-1) == 1
     assert len(list(trash.trash_dir.glob("*.blob"))) == 0
+def test_ra179_exists_goes_dark_on_trash(tmp_path: Path):
+    """RA-179: exists() must honor trash state like get()/read_bytes()/list().
+
+    Before the fix exists(id) stayed True after delete(id) -- the interface
+    disagreed with itself (get(id) is None while exists(id) is True), and
+    both production consumers (ingest try_resolve_local_file, sandbox
+    runtime_tools.validate) read exists() as validity, so trashed attachments
+    passed their checks. Fail-closed: exists() consults _is_trashed first.
+    """
+    _, _, store, _ = _seam(tmp_path)
+
+    stored = store.put(
+        data=b"secret bytes",
+        name="secret.txt",
+        mime_type="text/plain",
+        origin="upload",
+    )
+    aid = stored.attachment_id
+    assert store.exists(aid) is True
+
+    assert store.delete(aid) is True
+    assert store.exists(aid) is False
+
+    # The {attachment_id}/ mirror blob deliberately survives for
+    # recoverability; only the interface view goes dark.
+    assert (store.root / aid / "blob").is_file()

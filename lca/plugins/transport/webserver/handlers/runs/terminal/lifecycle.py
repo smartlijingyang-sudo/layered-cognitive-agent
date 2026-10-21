@@ -71,6 +71,18 @@ def _capture_namespace_approval() -> dict[str, str] | None:
     return dict(session.policy.namespace_approval)
 
 
+def _capture_defer_pause_facts(session: RunSession) -> None:
+    """Capture both pause-time defer facts in one seam (RA-178).
+
+    The two pause paths (``apply_driver_outcome`` / ``apply_resume_outcome``)
+    must capture the same fact pair; a third future fact lands here once,
+    not on each call site. The two ``_capture_*`` helpers keep their
+    fail-soft contracts (empty set / None with no bound session).
+    """
+    session.loaded_namespaces = _capture_loaded_namespaces()
+    session.namespace_approval = _capture_namespace_approval()
+
+
 # ---------------------------------------------------------------------------
 # Status derivation helpers
 # ---------------------------------------------------------------------------
@@ -185,8 +197,7 @@ class RunTerminalCoordinator:
             session.snapshot = outcome.snapshot
             session.runnable = outcome.resumable
             session.approval_request = outcome.approval_request
-            session.loaded_namespaces = _capture_loaded_namespaces()
-            session.namespace_approval = _capture_namespace_approval()
+            _capture_defer_pause_facts(session)
             return True
         return False
 
@@ -199,8 +210,7 @@ class RunTerminalCoordinator:
             extra = getattr(result, "extra", {}) or {}
             session.snapshot = extra.get("state_snapshot")
             session.approval_request = extra.get("approval_request")
-            session.loaded_namespaces = _capture_loaded_namespaces()
-            session.namespace_approval = _capture_namespace_approval()
+            _capture_defer_pause_facts(session)
             return True
         return False
 
