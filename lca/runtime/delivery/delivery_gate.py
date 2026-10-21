@@ -58,7 +58,7 @@ def verify_delivery_attachments(text: str, workspace_root: Path | str) -> bool:
         except ValueError:
             raise DeliverySecurityError(
                 f"Security violation: path traversal detected outside workspace root: '{rel_path}'"
-            )
+            ) from None
 
         if not target.exists():
             raise DeliveryVerificationError(

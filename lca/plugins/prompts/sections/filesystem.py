@@ -14,7 +14,6 @@ from lca.contracts.models.cognition.prompt_assembly import SectionOutput
 from lca.contracts.models.core.execution.sandbox import SANDBOX_MOUNT_ROOT
 from lca.contracts.models.core.workspace.file_record import FileRecord
 
-
 _FILESYSTEM_CORE_TEMPLATE = """## Filesystem
 
 Your home directory is `~` and your workspace is `~/workspace` (mapped inside your execution sandbox as `{mount}`). File tools resolve relative paths from `~`.

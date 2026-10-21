@@ -13,9 +13,8 @@ from __future__ import annotations
 import mimetypes
 import os
 import sqlite3
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Sequence
 
 from lca.contracts.atoms.ids.ids import new_id
 from lca.contracts.models.core.workspace.file_record import (
@@ -33,6 +32,7 @@ class FileIndexRegistry:
     def __init__(self, db_path: Path | str | None = None) -> None:
         if db_path is None:
             from lca.infrastructure.path.locator import assistant_home
+
             db_path = assistant_home() / "workspace_files.db"
         self._db_path = Path(db_path)
         self._db_path.parent.mkdir(parents=True, exist_ok=True)
@@ -66,7 +66,9 @@ class FileIndexRegistry:
                 """
             )
             con.execute("CREATE INDEX IF NOT EXISTS idx_files_path ON workspace_files(path);")
-            con.execute("CREATE INDEX IF NOT EXISTS idx_files_visibility ON workspace_files(visibility);")
+            con.execute(
+                "CREATE INDEX IF NOT EXISTS idx_files_visibility ON workspace_files(visibility);"
+            )
 
     def register(self, record: FileRecord) -> None:
         with self._get_connection() as con:
@@ -111,7 +113,9 @@ class FileIndexRegistry:
 
     def get_by_id(self, file_id: str) -> FileRecord | None:
         with self._get_connection() as con:
-            cur = con.execute("SELECT * FROM workspace_files WHERE file_id = ? LIMIT 1;", (file_id,))
+            cur = con.execute(
+                "SELECT * FROM workspace_files WHERE file_id = ? LIMIT 1;", (file_id,)
+            )
             row = cur.fetchone()
             if not row:
                 return None
@@ -137,15 +141,19 @@ class FileIndexRegistry:
 
     def mark_trashed(self, path: str, trashed_at: datetime | None = None) -> bool:
         clean = path.replace("\\", "/").lstrip("/")
-        ts = (trashed_at or datetime.now(timezone.utc)).isoformat()
+        ts = (trashed_at or datetime.now(UTC)).isoformat()
         with self._get_connection() as con:
-            cur = con.execute("UPDATE workspace_files SET trashed_at = ? WHERE path = ?;", (ts, clean))
+            cur = con.execute(
+                "UPDATE workspace_files SET trashed_at = ? WHERE path = ?;", (ts, clean)
+            )
             return cur.rowcount > 0
 
     def clear_trashed(self, path: str) -> bool:
         clean = path.replace("\\", "/").lstrip("/")
         with self._get_connection() as con:
-            cur = con.execute("UPDATE workspace_files SET trashed_at = NULL WHERE path = ?;", (clean,))
+            cur = con.execute(
+                "UPDATE workspace_files SET trashed_at = NULL WHERE path = ?;", (clean,)
+            )
             return cur.rowcount > 0
 
     def rebuild_index_from_fs(self, workspace_root: Path | str) -> int:
@@ -155,7 +163,6 @@ class FileIndexRegistry:
             return 0
 
         count = 0
-        now = datetime.now(timezone.utc)
         for cur_root, dirs, files in os.walk(root):
             # Ignore hidden or internal dirs
             dirs[:] = [d for d in dirs if not d.startswith(".")]
@@ -177,7 +184,11 @@ class FileIndexRegistry:
                 # Check if existing record exists to keep original file_id and created_at
                 existing = self.get_by_path(rel_path)
                 file_id = existing.file_id if existing else new_id("file")
-                created_at = existing.created_at if existing else datetime.fromtimestamp(stat.st_ctime, tz=timezone.utc)
+                created_at = (
+                    existing.created_at
+                    if existing
+                    else datetime.fromtimestamp(stat.st_ctime, tz=UTC)
+                )
 
                 record = FileRecord(
                     file_id=file_id,
@@ -188,7 +199,7 @@ class FileIndexRegistry:
                     size_bytes=stat.st_size,
                     readability=readability,
                     created_at=created_at,
-                    updated_at=datetime.fromtimestamp(stat.st_mtime, tz=timezone.utc),
+                    updated_at=datetime.fromtimestamp(stat.st_mtime, tz=UTC),
                 )
                 self.register(record)
                 count += 1

@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 import os
-from datetime import datetime, timezone
-from enum import Enum
+from datetime import UTC, datetime
+from enum import StrEnum
 from pathlib import PurePosixPath
 from typing import Literal
 
@@ -11,14 +11,14 @@ from pydantic import BaseModel, Field
 from lca.contracts.models.core.execution.sandbox import SANDBOX_MOUNT_ROOT
 
 
-class ReadabilityTier(str, Enum):
+class ReadabilityTier(StrEnum):
     NATIVE = "native"
     CONVERTED = "converted"
     VISUAL = "visual"
     OPAQUE = "opaque"
 
 
-class VisibilityTier(str, Enum):
+class VisibilityTier(StrEnum):
     USER = "user"
     INTERNAL = "internal"
 
@@ -94,8 +94,8 @@ class FileRecord(BaseModel):
     mime: str = "application/octet-stream"
     size_bytes: int = 0
     readability: ReadabilityTier = ReadabilityTier.OPAQUE
-    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     source_chat_id: str | None = None
     trashed_at: datetime | None = None
 

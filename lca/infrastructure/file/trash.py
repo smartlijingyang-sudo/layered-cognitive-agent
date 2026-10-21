@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import json
 import shutil
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -89,7 +89,7 @@ class TrashManager:
 
     def purge_expired(self, ttl_seconds: int = 30 * 86400) -> int:
         """Physically unlink items whose trashed_at age exceeds ttl_seconds."""
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         purged = 0
         for meta_file in list(self._trash_dir.glob("*.meta.json")):
             try:
