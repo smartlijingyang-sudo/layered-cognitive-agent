@@ -280,7 +280,6 @@ class TestFire:
     def test_fire_each_call_creates_fresh_work_item(
         self,
         jobs: AssistantJobsImpl,
-        factory: _FakeFactory,
         assistant_id: str,
         job_spec: JobSpec,
     ) -> None:
