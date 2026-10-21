@@ -1,267 +1,205 @@
-# Raphy Assessment — 2026-10-21 night (05:45 round)
+# Raphy Assessment — 2026-10-21 night (08:53 round)
 
-Branch: `raphy/arch-20261021-0545` (from main `37cd74ab2`).
-Scope rule: YAGNI over the last ~40 commits. Hot spots since the 23:45 assess
-(`dd82cde2c` assess of RA-174/175/176, merged as `4e85b3f97`):
-- **Resume-bundle machinery** (0bb3878f1 per-assistant namespace approval
-  override + a514de47e `paused_at` stamp): the write/read contract around
-  `resume_bundle.json` is the round's friction-walk area — it was touched
-  but not re-walked since the override feature landed.
-- **File store delete seam, post-RA-176**: TrashManager now delegates to
-  `FileStore.delete`; checked whether the read side honors trash state
-  uniformly through the interface.
-- **Preset repository** (`37cd74ab2` refactor of `_build_default_bundle_manifest`
-  in fs_repository.py; RA-162 landed the dual importlib exec convergence):
-  creator/preset pipeline file, freshly touched — third friction-walk area.
+Branch: `raphy/arch-20261021-0853` (from main `eab08cb4c`).
 
-Read CONTEXT.md (domain glossary) first. 禁区 respected: ralph Round 2 领地
-(ingest/DecisionGates/ContextFiles shims) / lca-1000 迁移 /
-`gate_chain_strategy.py` / `computer/guest/preamble.py` untouched. No ADR
-re-litigation: the per-assistant override design
-(`docs/20-namespace-approval-per-assistant-override.md`, ADR-0292 §10
-fail-closed) is deepened, not re-litigated — RA-177 fixes the recovery path
-the override feature missed; the fail-closed default stays the default.
+Scope rule: YAGNI over the last ~40 commits. Since the 05:45 assess
+(`6364afe40` → merged as `eab08cb4c` with RA-177~180), the only changes are
+the four RA implementations plus two cosmetic refactors (0983f038e
+mcp_transport `+=` loop, c1352772a runtime_binding_validator extras_section).
+The 05:45 round already friction-walked resume-bundle, the file-store delete
+seam, and the preset repository, so this round picks fresh hot areas adjacent
+to the landed work:
+
+- **RunTerminalCoordinator post-RA-178** (the pause-fact capture seam landed cleanly)
+- **File store read surface post-RA-176/179** (trash-state uniformity just fixed)
+- **mcp_transport.py** (freshly refactored tool-result accumulation — the adjacent adapter seam)
+- **runtime_binding_validator.py** (`MissingBindingError` extras refactor)
+
+Read CONTEXT.md (domain glossary) first. 禁区 respected: ralph Round 2
+(ingest/DecisionGates/ContextFiles shims), lca-1000 migration,
+`gate_chain_strategy.py`, `computer/guest/preamble.py` untouched. No ADR
+re-litigation. No `raphy/hidden_files/runtime-findings-*` files exist (checked).
 
 ## Phase 1 — Explore
 
 Read end-to-end (not grep):
-- `lca/plugins/transport/webserver/carrier/runs/recovery.py`
-  (resume-bundle inventory, write_resume_bundle/validate_bundle/
-  _restore_from_bundle) — full read.
-- `lca/plugins/transport/webserver/handlers/runs/terminal/lifecycle.py`
-  (RunTerminalCoordinator pause paths) — full read.
-- `lca/plugins/session/runtime/resume/point.py` (resume point
-  serialize/deserialize, paused_at round-trip) — full read.
-- `lca/runtime/projection/result_projection.py` (TerminalResultProjection,
-  a514de47e `paused_at` stamp) — full read.
-- `lca/infrastructure/tool_defer/session.py` (ToolDeferSession,
-  new_defer_session override merge) — full read.
-- `lca/infrastructure/file/store.py` (post-RA-176: delete seam, `_is_trashed`)
-  — full read.
-- `lca/infrastructure/file/trash.py` (post-RA-176 adapter) — full read.
-- `lca/infrastructure/preset/fs_repository.py` (FileSystemPresetRepository)
-  — full read.
-- `lca/infrastructure/runtime_plane/access/approval_engine.py` (RA-174
-  landing: uses `namespace_of_tool`, fallback re-sourced) — read.
 
-### Area A: resume-bundle write/read contract (the hot spot)
+- `lca/plugins/transport/webserver/handlers/runs/terminal/lifecycle.py` (294 lines) — full read
+- `lca/infrastructure/file/store.py` (422 lines) — full read
+- `lca/contracts/models/core/workspace/file_record.py` (110 lines) — full read
+- `lca/infrastructure/transport/mcp_transport.py` (147 lines) — full read
+- `lca/harness/profile/validate/runtime_binding_validator.py` — full read
+- `lca/infrastructure/file/registry.py` (backfill section) — read
+- `lca/plugins/transport/webserver/bootstrap/bootstrap.py` (artifact-closure section) — read
 
-- Q1 (bounce): write side (lifecycle.py pause → write_resume_bundle →
-  `_BUNDLE_FIELDS` inventory) and read side (load_resume_bundle →
-  validate_bundle → `_restore_from_bundle`) are anchored on the RA-173
-  inventory — one list, walked both ways. The bounce is disciplined, not
-  sprawl.
-- Q2 (shallow): `_bundle_str`, `_agent_id_of`, `_agent_name_of` are thin
-  helpers; deletion test moves them inline — concentrates nothing.
-  Not stories.
-- Q3 (pure functions / locality): **`apply_driver_outcome` and
-  `apply_resume_outcome` (terminal/lifecycle.py:189,203) repeat the same
-  pause-time fact capture verbatim**: `session.loaded_namespaces =
-  _capture_loaded_namespaces()` + `session.namespace_approval =
-  _capture_namespace_approval()`. The two pause paths must freeze the same
-  defer facts; adding a third fact to one path and missing the other is a
-  divergence bug waiting to happen — "two = real". → candidate RA-178.
-- Q4 (leaky seams): **the bundle inventory extracts `namespace_approval`
-  on the write side (recovery.py:141-146) but `_restore_from_bundle`
-  never applies it to the rebuilt RunSession** — `session.loaded_namespaces
-  = restored["loaded_namespaces"]` is there; the sibling line for
-  `namespace_approval` is missing. The consumer exists and is real:
-  `carrier/runs/lifecycle/lifecycle.py:99` passes
-  `getattr(session, "namespace_approval", None)` into
-  `new_defer_session(namespace_approval=...)` on the resume rebind, and
-  `_capture_namespace_approval`'s own docstring warns that dropping it
-  re-gates a run that paused under e.g. `shell=allow` with the global
-  default `shell=require_approval`. On the in-process path the paused
-  session keeps the field; on the kernel-restart recovery path it is
-  silently lost. The bundle carries a field its own read side never
-  consumes — write/read divergence at the load seam. → candidate RA-177
-  (Strong).
-- Q4 (checked, not a candidate): `paused_at` round-trip (RA-159/a514de47e)
-  is complete: result_projection stamps `paused_at=utc_now()` on the
-  WAITING_INPUT snapshot; `resume_point_from_state_snapshot` reads the
-  explicit field (not created_at); deserialize/rebuild
-  (`resume_point_to_state_snapshot`) restores it onto the StateSnapshot.
-  No divergence.
-- Q5 (testability): `test_run_restart_recovery.py` (17) pins restore
-  behavior, but no test exercises the recovery path with a per-assistant
-  `namespace_approval` override in the bundle — the gap is exactly where
-  RA-177's regression test goes. The failure mode (silent re-gate) is
-  only observable end-to-end on kernel restart, so the interface needs a
-  unit-level pin at `_restore_from_bundle`.
+### Area A: RunTerminalCoordinator post-RA-178
 
-### Area B: file store delete seam, post-RA-176
+- Q1 (bounce): the outcome-translation seam holds — `apply_driver_outcome` /
+  `apply_resume_outcome` both delegate pause-fact capture to
+  `_capture_defer_pause_facts` (RA-178). No sprawl.
+- Q2 (shallow): `resolve_live_terminal_hint_dto` (5 lines) is thin but a
+  one-use DTO adapter at a real seam; deletion test fails it. Not a story.
+  `_capture_loaded_namespaces` / `_capture_namespace_approval` share the
+  identical lazy-import ritual
+  (`from lca.infrastructure.tool_defer.session import current_defer_session`);
+  "two = real" but the seam is ~3 lines each — recorded, not written (below).
+- Q3 (pure functions / locality): the RA-178 convergence is complete; both
+  pause paths call the seam. No third fact pending.
+- Q4 (leaky seams): terminalize()'s finally choreography (registry clear,
+  conversation-log append, materializer, projection persist, export disposal,
+  session close) is intentionally best-effort per INV-ARCH-01/02 — not friction.
+- Q5 (testability): `test_run_terminal_coordinator.py` pins both pause paths
+  through the seam (RA-178 regression). Adequate.
 
-- **`LocalFileStore.exists()` does not honor trash state.**
-  get()/read_bytes()/list() all go through `_is_trashed` and go dark after
-  delete; `exists()` checks only the `{attachment_id}/meta.json` sidecar —
-  which RA-176 deliberately keeps for recoverability. Net: `exists(id)` is
-  True while `get(id)` is None. Its two production consumers both treat
-  `exists()` as interface-level validity and get *better* with the fix:
-  ingest `try_resolve_local_file` (service.py:248-250) resolves
-  `/files/{id}` and LobeHub-ID references, and sandbox `runtime_tools`
-  `validate` (runtime_tools.py:119,122) gates `attachment_ids` — today a
-  trashed attachment passes both checks while downstream reads fail.
-  No test pins `exists()` on a trashed file
-  (test_file_store_and_write_tool.py:31 pins it on a live file only).
-  → candidate RA-179 (Worth exploring).
-- The `if False:` conditional import of FileIndexRegistry (store.py:35-36)
-  is dead — a circular-import guard left behind. Deletion test: it
-  concentrates nothing. Speculative-grade hygiene; recorded, not written
-  (merge into RA-179's diff only if the implementer judges it churn-free).
-- TrashManager is now a clean path-addressed adapter (delegates to the
-  seam, restore + TTL purge owned locally). No candidate.
-- The two `from datetime import datetime, timezone` re-imports inside
-  `put()` (module already imports them) are hygiene, not stories.
+### Area B: file store read surface post-RA-179
 
-### Area C: preset repository
+- Q1 (bounce): put()/get()/read_bytes()/exists()/list()/delete() are one
+  coherent interface over the sidecar layout; the trash-state rule is now
+  uniform (RA-179). No sprawl.
+- Q2/Q4 (shallow + leaky): **two divergent "readability" vocabularies own
+  the same question.** `_is_previewable` (store.py, private, UI-preview rule)
+  vs `classify_readability` (contracts, ReadabilityTier). The same
+  (filename, mime) input gets different answers: a `.py` file with unknown
+  mime is NATIVE per contracts but *not* previewable (`.py` is absent from
+  the preview extension set and the mime matches neither `image/` nor
+  `text/`). And the interface is missing the seam entirely:
+  bootstrap.py:148 imports the *private* `_is_previewable` across the seam
+  to build the artifact-closure "previewable" flag — "the interface is the
+  test surface": callers reaching past it prove the interface is wrong.
+  → candidate RA-181.
+- Q4 (checked, not a candidate): `put()` writes two physical copies
+  (`workspace/user/{final_name}` + `{attachment_id}/blob` mirror) while
+  reads pin to the mirror. Checked for an out-of-band writer of the live
+  copy: sandbox harvest goes through `persist_generated_files` →
+  `store.put()`; the write_file tool goes through the store; adapter.py:295's
+  direct `write_bytes` targets sandbox session dirs, not `workspace/user`.
+  No divergence consumer exists; `delete()` keeping the mirror is deliberate
+  recoverability. Not a story — documented so future rounds don't re-suggest.
+- Q5 (testability): `read_text_preview` has NO production caller — only a
+  test pins its None case. A speculative interface riding the same
+  readability tables; noted as context for RA-181, not its own story.
+- Duplication (secondary): the dead `if False: pass` guard (RA-179 replaced
+  the import with `pass` but left the guard) and two redundant function-level
+  `from datetime import datetime` re-imports in `put()` are hygiene —
+  recorded, not written.
 
-- **`FileSystemPresetRepository._load_from_dir` carries two twin plugin-load
-  loops (~25 lines each)**: the `plugins/` subdir branch and the legacy
-  flat-dir branch differ only in the glob source (`plugins_dir/*.py` vs
-  `preset_dir/*.py`) and the name filter (flat branch skips `__*`/`test_*`).
-  The per-file body (read code, merge `meta.get("plugins")` descriptors,
-  build AuthoredPlugin) is identical — "two = real". One parameterized
-  seam `_load_plugins_from(source_dir, *, skip_dunders: bool)` concentrates
-  it. → candidate RA-180 (Worth exploring; duplication class, secondary).
-- `save()`/`find_by_id`/`list_presets`/`delete()`/`_resolve_dir` are one
-  coherent seam over the three-scope topology; the scope-resolution shape
-  (PRIVATE vs SHARED vs PLATFORM) is genuinely different per branch —
-  not a twin.
-- `validate_preset_id` is a deep module (single invariant, enforced at
-  every entry); deletion test passes.
-- approval_engine.py: already consumes `namespace_of_tool` and the RA-174
-  SSOT fallback — the seam is honored; no candidate.
+### Area C: mcp_transport.py + runtime_binding_validator.py
+
+- **MCPTransport leaks the outer HTTP client session.** `_get_mcp_session`
+  manually enters the `streamablehttp_client` context manager
+  (`await streamablehttp_client(url).__aenter__()`) but caches only the inner
+  `ClientSession`; `close()` exits only the ClientSession — the outer cm's
+  `__aexit__` is never invoked, leaking one HTTP client per server URL. The
+  adapter owns acquisition but not the full lifetime it created.
+  → candidate RA-182.
+- `send_task`'s text join drops non-text (image/binary) MCP result content
+  silently — recorded as Speculative; no evidence of production MCP binary
+  results; the FileStore is the natural sink if it ever matters. Not written.
+- runtime_binding_validator.py: `validate()` and `allows_test_defaults()`
+  both build the projection via `reuse_or_build` — normal shared-seam use,
+  not a twin. The extras_section list-comprehension refactor (c1352772a) is
+  local and clean. No candidate.
 
 ### Runtime verification (mandatory)
 
-- Agent smoke (branch tip == main tip, MockLLMAdapter, LLM_API_KEY=dummy):
+- Clean worktree at main tip, MockLLMAdapter, LLM_API_KEY=<redacted>:
   `agent.run("smoke")` x2 on one Agent → RUN1: completed | RUN2: completed.
-  (a) and (c) pass. (b) tool-call flow: covered by the 01:45 round's
-  scripted-LLM verification; no new crash/hang/silent-failure in core flows.
-- Area-specific: `tests/plugins/transport/webserver/test_run_restart_recovery.py`
-  17/17 green (recovery path healthy at runtime — RA-177 is a silent-gap
-  finding, not a crash).
-- `tests/e2e/test_canonical_filesystem_invariants.py` +
-  `tests/infrastructure/file/test_trash_manager.py`: 12/12 green.
+  (a) and (c) pass.
+- (b) tool-call flow: `tests/scenario/browser/test_browser_preview_and_takeover_e2e.py`
+  → 1 passed in 1.76s.
+- No crash/hang/silent-failure in core flows.
 
-### Duplication scan (secondary)
+### Duplication scan (secondary, not primary)
 
-- The `_load_from_dir` twin plugin loops are recorded inside RA-180.
-- Remaining mechanical duplication: none found worth writing up
-  (the `_tool_to_spec` docstring self-declares its deliberate twin with
-  `think.history.assemble` — "one adapter = hypothetical seam"; the
-  `_is_previewable` vs `classify_readability` split was ruled deliberate
-  separation by the 23:45 round).
+- store.py: dead `if False: pass` + two redundant datetime re-imports (hygiene).
+- lifecycle.py: `apply_driver`/`apply_resume` method aliases and
+  `RunTerminalizer`/`RunOutcomeApplier` class aliases — backward-compat
+  surface, not a story.
+- mcp_transport: the two Observation constructions in `send_task` differ
+  (success vs error) — not twins.
+- No duplication candidate written this round (quota satisfied by friction findings).
 
-## Phase 2 — Self-grilling (per candidate)
+## Phase 2 — Self-grilling
 
-### RA-177 (Strong)
-- Constraints: `bind_resume_capabilities` rebind semantics must not change
-  for runs that paused under the global default; ADR-0292 §10 fail-closed
-  keeps `shell=require_approval` as the no-override fallback; the
-  `validate_bundle` format checks (str→str dict) stay the gate;
-  `RunSession.namespace_approval` is `Mapping[str, str] | None = None`;
-  old bundles (pre-override) read `{}` via the inventory default and must
-  keep resolving to the global default.
-- Dependencies: `_restore_from_bundle` ← `RunSessionBuilder.build` ←
-  `restore_waiting_run`; consumer `carrier/runs/lifecycle/lifecycle.py:99`
-  `getattr(session, "namespace_approval", None)` → `new_defer_session`;
-  RA-174's `DEFAULT_NAMESPACE_APPROVAL` SSOT remains the default owner.
-- Shape of the deepened module: in `_restore_from_bundle`, next to the
-  existing `session.loaded_namespaces = restored["loaded_namespaces"]`,
-  add `session.namespace_approval = restored["namespace_approval"] or None`
-  (None = legacy/empty keeps the "no override" semantics; `{}` and None are
-  equivalent downstream in `new_defer_session`'s merge).
-- Test survival: the 17 recovery tests pin restore behavior; new test pins
-  a bundle carrying `{"shell": "allow"}` (with a defer session whose
-  effective policy had the per-assistant override) rebuilding a session
-  whose namespace_approval survives into a `new_defer_session`-equivalent
-  rebind (`policy.namespace_approval["shell"] == "allow"`), plus an
-  old-bundle regression asserting the global default is kept.
-- Deletion test verdict: concentrates — the inventory owns the field;
-  the read side currently walks every inventoried field except one,
-  which is drift by omission.
+### RA-181: Converge the twin readability vocabularies onto one contracts seam
 
-### RA-178 (Worth exploring)
-- Constraints: `apply_driver_outcome`/`apply_resume_outcome` signatures and
-  the `apply_driver`/`apply_resume` aliases stay; the two `_capture_*`
-  helpers keep their fail-soft contracts (empty set / None with no bound
-  session).
-- Dependencies: terminal/lifecycle.py internal only; RunSession fields.
-- Shape: `_capture_defer_pause_facts(session) -> None` sets both
-  `session.loaded_namespaces` and `session.namespace_approval`; both
-  apply_* call it. The pairing of pause-time facts is owned in one place.
-- Test survival: existing terminal lifecycle tests; new test pins both
-  pause paths capturing identical fact sets.
-- Deletion test verdict: concentrates — the two-fact pairing lives in one
-  seam instead of two call sites; a third future fact cannot land on one
-  path and be forgotten on the other.
+- **Constraints**: `StoredFile.previewable` is a public DTO field
+  (gateway/tests consume it); the artifact-closure payload's "previewable"
+  flag is UI-consumed. `FileRecord.readability` (ReadabilityTier) is
+  registry state. Wire shapes must not change — only rule ownership moves.
+- **Dependencies**: `_is_previewable` callers: `put()`
+  (StoredFile.previewable), bootstrap.py:148,172 (artifact closure).
+  `classify_readability` callers: `put()` (FileRecord.readability),
+  registry.py:175 (backfill). `read_text_preview` callers: none in
+  production (test only).
+- **Shape of the deepened module**: contracts owns the rules once — extend
+  the readability seam to answer per-audience (tier + `ui_preview: bool`),
+  with `read_text_preview`'s HTML/XML exclusion deriving from the same
+  tables. Delete `_is_previewable`; re-source bootstrap onto the public
+  seam; the interface stops being bypassed.
+- **Test survival**: `tests/contracts/test_file_record_contract.py` pins
+  `classify_readability` (4 asserts — the reconciliation must keep them
+  green or re-source them with the implementer's verdict);
+  `tests/scenario/file/test_file_store_and_write_tool.py:70` pins a
+  `read_text_preview` None case; tests pinning `previewable` behavior must
+  be grepped before touching.
+- **Deletion test verdict**: concentrates. Deleting `_is_previewable` and
+  unifying the extension/mime tables in contracts removes a real divergence
+  class (a new mime/extension currently needs up to two updates) and kills
+  the cross-seam private import. → **Worth exploring** (the two tables
+  genuinely encode different audiences — UI preview vs readability tier —
+  so the reconciliation shape needs a real design decision, not mechanical
+  merging).
 
-### RA-179 (Worth exploring)
-- Constraints: `delete()` soft-delete semantics unchanged (mirror
-  meta.json+blob kept for recoverability; reads go dark); the registry
-  remains the trash-state owner; `exists()` signature unchanged. Both
-  consumers (`try_resolve_local_file`, `runtime_tools.validate`) treat
-  `exists()` as validity — the fix makes them fail-closed on trashed
-  files; no test pins the old behavior.
-- Dependencies: FileStore Protocol, LocalFileStore, FileStoreService
-  forward, the two consumers above.
-- Shape: `exists()` consults `_is_trashed` first — the same gate
-  get()/read_bytes()/list() already honor; the whole read surface agrees.
-- Test survival: filesystem e2e invariants + trash tests +
-  `test_file_store_and_write_tool.py` (pins exists() on live files) stay
-  green; new test pins `exists(id) is False` after `delete(id)` while the
-  mirror blob remains on disk.
-- Deletion test verdict: concentrates — "is this file visible through the
-  interface" becomes one question answered once, not per-method.
+### RA-182: Own the full MCP session lifetime in MCPTransport
 
-### RA-180 (Worth exploring)
-- Constraints: `save()` writes the `plugins/` layout; `_load_from_dir`
-  must keep reading both layouts (subdir + legacy flat); the
-  `meta.get("plugins")` descriptor merge and the AuthoredPlugin shape are
-  unchanged; discovery (`list_presets`) semantics unchanged.
-- Dependencies: FileSystemPresetRepository internal; preset tests
-  (`tests/domain/preset/test_preset_repository.py`,
-  `tests/infrastructure/preset/test_plugin_loading.py`,
-  `tests/infrastructure/preset/test_preset_discovery.py`) pin both layouts.
-- Shape: `_load_plugins_from(source_dir, *, skip_name_filters: bool)` —
-  the identical per-file body (read code, merge descriptors, build
-  AuthoredPlugin) lives behind the seam; the two call sites differ only in
-  glob source + dunder/test skip.
-- Test survival: both-layout fixture tests stay green; new test pins a
-  legacy flat-dir preset loading through the same seam.
-- Deletion test verdict: concentrates — ~25 lines of identical
-  per-file ritual owned once ("two = real").
+- **Constraints**: the MCP SDK is an optional dependency; the no-SDK path
+  (NotImplementedError) and the broad-catch → failed-Observation behavior
+  must stay. `send_task`'s synchronous-completion contract stays.
+- **Dependencies**: `_get_mcp_session` (acquire, per server URL), `close()`
+  (release). No other module touches `_sessions`.
+- **Shape of the deepened module**: keep the entered context-manager
+  handles (or an AsyncExitStack) per server URL alongside the
+  ClientSession; `close()` exits inner then outer, clearing state even on
+  partial failure. Acquisition and release owned by the same seam.
+- **Test survival**: `tests/scenario/external/test_external_transports.py`
+  pins protocol conformance, config resolution, and the no-SDK error — none
+  pins `close()` today. The new test pins `close()` with a fake
+  streamablehttp cm asserting both `__aexit__`s ran.
+- **Deletion test verdict**: concentrates (lifetime ownership moves from
+  scattered `__aenter__`/`__aexit__` asymmetry into one acquire/release
+  seam). → **Worth exploring** (needs the SDK's cm protocol pinned in the test).
 
-### Not written (Speculative / hygiene)
-- `store.py:35-36` dead `if False:` conditional import of
-  FileIndexRegistry — deletion concentrates nothing; folded into RA-179's
-  diff only if churn-free, otherwise a drive-by.
-- The two function-level `from datetime import datetime, timezone`
-  re-imports inside `LocalFileStore.put()` (module already imports them) —
-  hygiene, not a story.
+## Phase 3 — Candidate table
 
-## Phase 3 — Present and record
+| Files | Problem | Solution | Benefits (locality + leverage) | Strength |
+|---|---|---|---|---|
+| `lca/contracts/models/core/workspace/file_record.py`, `lca/infrastructure/file/store.py` (`_is_previewable`), `lca/plugins/transport/webserver/bootstrap/bootstrap.py` | Two divergent readability vocabularies answer the same (filename, mime) question: `_is_previewable` (UI preview) vs `classify_readability` (ReadabilityTier) disagree — e.g. `.py` with unknown mime is NATIVE but not previewable. The FileStore Protocol exposes no previewability seam, so bootstrap.py imports the *private* `_is_previewable` across the seam. | Own the rules once in contracts — per-audience readability seam (tier + ui_preview); delete `_is_previewable`; re-source bootstrap onto the public seam; `read_text_preview`'s exclusion rules derive from the same tables. | Locality: "what can be shown/read of this file" answered once; the interface stops being bypassed. Leverage: RA-175 converged the origin vocabulary; readability is the same shape — a new mime/extension lands in one table, not two. | Worth exploring |
+| `lca/infrastructure/transport/mcp_transport.py` (`_get_mcp_session`, `close`) | `_get_mcp_session` manually enters the `streamablehttp_client` context manager but caches only the inner ClientSession; `close()` exits only the ClientSession — the outer HTTP client's `__aexit__` never runs, leaking one HTTP client per server URL. | Keep the entered cm handles (or an AsyncExitStack) per server URL; `close()` exits inner then outer. | Locality: session lifetime owned by one seam (acquire + release together). Leverage: no slow socket/connection leak for long-lived transports; a pinned `close()` test proves it. | Worth exploring |
 
-| # | Files | Problem | Solution | Benefits (locality + leverage) | Strength |
-|---|-------|---------|----------|-------------------------------|----------|
-| RA-177 | recovery.py (`_restore_from_bundle`), terminal/lifecycle.py:99 consumer | The resume-bundle inventory extracts `namespace_approval` on the write side but `_restore_from_bundle` never applies it to the rebuilt RunSession — the read side walks every inventoried field except one; the kernel-restart recovery path silently drops the per-assistant approval override and the resume rebind falls back to the global default (`shell=require_approval`) even when the run paused under `shell=allow` | Apply the inventoried field on restore (`session.namespace_approval = restored["namespace_approval"] or None`), next to the loaded_namespaces line; add a bundle-round-trip regression test | Locality: the bundle inventory stays the single owner of pause facts — the read side walks it fully. Leverage: the override feature's safety contract (no silent re-gate) holds on the recovery path too | Strong |
-| RA-178 | terminal/lifecycle.py | `apply_driver_outcome` and `apply_resume_outcome` repeat the same two pause-time capture lines verbatim; a third future fact can land on one pause path and be forgotten on the other | Converge the twin call sites into `_capture_defer_pause_facts(session)`; both apply_* call it | Locality: the pause-fact pairing owned in one seam. Leverage: future facts are added once | Worth exploring |
-| RA-179 | file/store.py (+ ingest/service.py, sandbox/runtime_tools.py consumers) | Post-RA-176, `get()`/`read_bytes()`/`list()` honor trash state but `exists()` does not — the interface disagrees with itself (`exists(id)` True while `get(id)` is None); both consumers treat `exists()` as validity and pass trashed attachments through today | Gate `exists()` on the same `_is_trashed` check the other reads honor; verify the two consumers' tests | Locality: "is this file visible" answered once. Leverage: `try_resolve_local_file` and attachment validation go fail-closed on trashed files | Worth exploring |
-| RA-180 | preset/fs_repository.py | `_load_from_dir` carries two twin ~25-line plugin-load loops (plugins/ subdir vs legacy flat dir) differing only in glob source and the dunder/test skip filter | Converge into `_load_plugins_from(source_dir, *, skip_name_filters: bool)` | Locality: the per-file load ritual owned once. Leverage: "two = real" — the next layout variant reuses the seam | Worth exploring |
+**Top recommendation**: do RA-181 first. It is the round's only friction-walk
+finding with a demonstrated behavioral divergence (NATIVE-but-not-previewable)
+plus a cross-seam private import proving the interface is missing the seam —
+the RA-175 origin-vocabulary convergence is the direct precedent, and the
+deletion verdict is clean. RA-182 is a real lifetime bug at the adapter seam
+but narrower and SDK-protocol-dependent.
 
-Top recommendation: do RA-177 first — it is a real behavioral divergence
-with a safety edge (a paused-under-`shell=allow` run silently re-gated to
-`require_approval` on kernel-restart recovery), it follows the proven
-RA-167/RA-174 re-source pattern family, and the fix is one line plus a
-regression test that the interface currently cannot pin. Then RA-179
-(the delete seam's read surface must agree with itself), RA-178 (cheap
-twin convergence that guards a future third fact), RA-180 last (mechanical
-twin, duplication-class).
+**Diversity quota**: satisfied. Both stories come from the friction walk
+(shallow-module / leaky-seam findings); neither is duplication-class.
 
-Diversity quota: all four stories come from the friction walk
-(Q3/Q4/Q5); RA-180 is duplication-class but is one of four, not the only
-class.
+## Not written (recorded for future rounds)
 
-Stories written: RA-177, RA-178, RA-179, RA-180 (passes: false).
-Assessment complete: 4 stories written, top is RA-177.
+- Twin lazy imports in `_capture_loaded_namespaces` / `_capture_namespace_approval`
+  (lifecycle.py) — identical ~3-line `current_defer_session` ritual; "two =
+  real" but the seam is too small for its own story; fold into the next
+  lifecycle touch if any.
+- store.py `if False: pass` dead guard + two redundant function-level
+  `from datetime import datetime` re-imports in `put()` (left by RA-179) — hygiene.
+- `trash_dir_for` mkdir side effect inside a "locate" helper — hygiene.
+- mcp `send_task` silently drops non-text result content (text-only join) —
+  Speculative; no production evidence of MCP binary results; FileStore is the
+  natural sink if it ever matters.
+- put() mirror/live dual-copy read pinning — checked: no out-of-band writer
+  of the live copy exists (sandbox harvest and write_file go through the
+  store; adapter.py:295 writes sandbox session dirs); `delete()` keeping the
+  mirror is deliberate recoverability. Do not re-suggest.
