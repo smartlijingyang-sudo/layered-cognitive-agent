@@ -87,7 +87,7 @@ def test_llm_marks_failure(projector: ConsoleJournalProjector) -> None:
     assert "FAIL" in line
 
 
-def test_llm_verbose_unlocks_prompt_and_response(projector: ConsoleJournalProjector) -> None:
+def test_llm_verbose_unlocks_prompt_and_response() -> None:
     proj_v = ConsoleJournalProjector(verbosity=Verbosity.VERBOSE)
     event = LlmCallCompleted(
         model="qwen3.7-plus",
