@@ -146,7 +146,6 @@ class TestCreate:
     def test_create_seed_user_md_overrides_default(
         self,
         catalog: AssistantCatalogImpl,
-        root: Path,
     ) -> None:
         req = CreateAssistantRequest(
             name="Demo",
