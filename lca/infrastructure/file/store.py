@@ -27,9 +27,6 @@ from lca.contracts.models.core.workspace.file_record import (
 )
 from lca.infrastructure.path.locator import assistant_workspace_root
 
-if False:
-    pass
-
 _SAFE_NAME_RE = re.compile(r"[^\w.\-_]+", re.UNICODE)
 _MAX_NAME_LEN = 180
 
