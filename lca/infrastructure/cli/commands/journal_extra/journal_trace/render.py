@@ -599,7 +599,7 @@ def _render_human(
                     j += 1
                 block = kids[i : j + 1]
                 rendered.update(block)
-                output.append(_build_fold_line(events, block, ep_name, depth, anchor))
+                output.append(_build_fold_line(events, block, ep_name, depth))
                 i = j + 1
                 continue
             if ep_name == "runtime.reducer.apply":
@@ -612,7 +612,7 @@ def _render_human(
                     j += 1
                 block = kids[i : j + 1]
                 rendered.update(block)
-                output.append(_build_fold_line(events, block, ep_name, depth, anchor))
+                output.append(_build_fold_line(events, block, ep_name, depth))
                 i = j + 1
                 continue
             if (
@@ -623,7 +623,7 @@ def _render_human(
                 nxt_idx = kids[i + 1]
                 rendered.add(idx)
                 rendered.add(nxt_idx)
-                output.append(_render_transport_pair(events, idx, nxt_idx, depth, anchor))
+                output.append(_render_transport_pair(events, idx, nxt_idx, depth))
                 i += 2
                 continue
             rendered.add(idx)
@@ -631,7 +631,6 @@ def _render_human(
                 _render_single(
                     events[idx],
                     marker=marker,
-                    depth=depth,
                     anchor=anchor,
                     max_detail_per_node=max_detail_per_node,
                 )
@@ -675,7 +674,7 @@ def _render_human(
                 j += 1
             block = list(range(i, j + 1))
             rendered.update(block)
-            output.append(_build_fold_line(events, block, ep_name, depth_of[idx], anchor))
+            output.append(_build_fold_line(events, block, ep_name, depth_of[idx]))
             i = j + 1
             continue
         if ep_name == "runtime.reducer.apply":
@@ -687,7 +686,7 @@ def _render_human(
                 j += 1
             block = list(range(i, j + 1))
             rendered.update(block)
-            output.append(_build_fold_line(events, block, ep_name, depth_of[idx], anchor))
+            output.append(_build_fold_line(events, block, ep_name, depth_of[idx]))
             i = j + 1
             continue
         if (
@@ -697,7 +696,7 @@ def _render_human(
         ):
             rendered.add(i)
             rendered.add(i + 1)
-            output.append(_render_transport_pair(events, i, i + 1, depth_of[idx], anchor))
+            output.append(_render_transport_pair(events, i, i + 1, depth_of[idx]))
             i += 2
             continue
         rendered.add(idx)
@@ -707,7 +706,6 @@ def _render_human(
             _render_single(
                 events[idx],
                 marker=marker,
-                depth=depth,
                 anchor=anchor,
                 max_detail_per_node=max_detail_per_node,
             )
@@ -767,7 +765,6 @@ def _render_single(
     event: dict[str, Any],
     *,
     marker: str,
-    depth: int,
     anchor: datetime,
     max_detail_per_node: int,
 ) -> str:
@@ -784,11 +781,11 @@ def _render_single(
     if block.truncated:
         # ``… (+N more lines)`` so the operator knows detail was elided
         # and where to re-run with ``--max-detail-per-node`` raised.
-        out.append(f"  … (+{_estimate_extra(ep, payload)} more lines)")
+        out.append(f"  … (+{_estimate_extra(payload)} more lines)")
     return "\n".join(out)
 
 
-def _estimate_extra(ep: str, payload: dict[str, Any]) -> int:
+def _estimate_extra(payload: dict[str, Any]) -> int:
     """Rough estimate of how many more lines the EP would emit without the cap."""
     if not payload:
         return 0
@@ -804,7 +801,6 @@ def _build_fold_line(
     indices: list[int],
     ep_name: str,
     depth: int,
-    anchor: datetime,
 ) -> str:
     if not indices:
         return ""
@@ -834,7 +830,6 @@ def _render_transport_pair(
     in_idx: int,
     out_idx: int,
     depth: int,
-    anchor: datetime,
 ) -> str:
     e_in = events[in_idx]
     e_out = events[out_idx]
