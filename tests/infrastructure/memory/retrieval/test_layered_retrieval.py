@@ -82,7 +82,7 @@ def test_top_by_recency_descending(layers) -> None:
     # p1 (0.3) > s0 (0.4) 但 s0 不在 top 4，所以 p1 入选
 
 
-def test_empty_layers(layers) -> None:
+def test_empty_layers() -> None:
     """空 layers 返回空列表。"""
     policy = LayeredRetrievalPolicy()
     result = policy.retrieve({}, budget=10)
