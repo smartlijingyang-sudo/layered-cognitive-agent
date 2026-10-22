@@ -492,7 +492,7 @@ def test_section_digest_first_16_chars(tmp_path: Path) -> None:
     assert digest_full not in step_section
 
 
-def test_default_fold_provider_returns_none_when_no_run_dir(tmp_path: Path) -> None:
+def test_default_fold_provider_returns_none_when_no_run_dir() -> None:
     """``StepNarrativeWriter(Path(""))`` —— 无 run_dir,默认 fold_provider 返回 None。
 
     守护:CLI 直接调 render() 而不落盘时,默认 provider 不应抛。
