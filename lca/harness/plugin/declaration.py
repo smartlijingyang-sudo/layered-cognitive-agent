@@ -504,9 +504,10 @@ def _normalize_effects(
         items: Sequence[EffectClass | str] = (effects,)
     else:
         items = effects
-    out: set[EffectClass] = set()
-    for item in items:
-        out.add(EffectClass(item) if not isinstance(item, EffectClass) else item)
+    out: set[EffectClass] = {
+        EffectClass(item) if not isinstance(item, EffectClass) else item
+        for item in items
+    }
     if EffectClass.NONE in out and len(out) > 1:
         out.discard(EffectClass.NONE)
     return frozenset(out)
