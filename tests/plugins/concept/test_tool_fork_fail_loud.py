@@ -47,9 +47,7 @@ def test_sandbox_plane_without_sandbox_capability_fails_in_default_tools() -> No
 
 
 @pytest.mark.asyncio
-async def test_tool_fork_dispatch_fail_loud_when_sandbox_tools_missing(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
+async def test_tool_fork_dispatch_fail_loud_when_sandbox_tools_missing() -> None:
     executor = ToolForkDispatchExecutor()
 
     class _Runtime:
