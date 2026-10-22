@@ -179,7 +179,7 @@ async def test_full_collaboration_system_lifecycle_flow(tmp_path: Path):
 
 
 @pytest.mark.asyncio
-async def test_full_collaboration_degradation_and_handoff_flow(tmp_path: Path):
+async def test_full_collaboration_degradation_and_handoff_flow():
     """测试单点转交与专家异常/超时降级容错串联流程。"""
     # 1. 单点转交工具测试
     handoff_tool = HandoffToPeerTool()
