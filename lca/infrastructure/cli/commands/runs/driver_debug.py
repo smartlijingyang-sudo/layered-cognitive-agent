@@ -556,9 +556,9 @@ def cmd_debug_driver_chain(run_id: str, json_mode: bool) -> None:
         chain = [e for e in chain if (parse_ts(e.ts) or 0) >= lo - 1 and (parse_ts(e.ts) or 0) <= hi + 1]
     # Sequence the chain: outer driver.start + loop_iter + node.executing/executed
     # + edge_selected + subgraph close_out. Render as ordered timeline.
-    rows: list[dict[str, Any]] = []
-    for entry in chain:
-        rows.append({"ts": entry.ts, "event": entry.event, **entry.fields})
+    rows: list[dict[str, Any]] = [
+        {"ts": entry.ts, "event": entry.event, **entry.fields} for entry in chain
+    ]
     report = {
         "run_id": run_id,
         "stderr_path": str(stderr),

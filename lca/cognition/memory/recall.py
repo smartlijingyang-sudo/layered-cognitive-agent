@@ -66,9 +66,7 @@ class SystemTwoRecallEngine:
                     max_hop_reached = max(max_hop_reached, len(path))
 
         # 3. 收集关联实体事实陈述
-        claims: list[str] = []
-        for hit in hits:
-            claims.append(f"[{hit.domain}/{hit.slug}] {hit.content}")
+        claims: list[str] = [f"[{hit.domain}/{hit.slug}] {hit.content}" for hit in hits]
 
         return RecallResult(
             has_recalled=True,

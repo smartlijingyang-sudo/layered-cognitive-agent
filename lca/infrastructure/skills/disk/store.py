@@ -132,11 +132,11 @@ class DiskSkillPackageStore(SkillPackageInstaller, SkillPackageStore):
 
     def resource_files(self, skill_id: str) -> dict[str, bytes]:
         package = self.get(skill_id)
-        out: dict[str, bytes] = {}
-        for rel in package.resource_paths:
-            # 挂载键带 ``resources/`` 前缀，与 SKILL.md references 声明一致，
-            # 使 run_skill_script 在 skill 根目录执行 ``resources/<file>`` 可达。
-            out[rel] = self._read_resource_bytes(skill_id, rel)
+        # 挂载键带 ``resources/`` 前缀，与 SKILL.md references 声明一致，
+        # 使 run_skill_script 在 skill 根目录执行 ``resources/<file>`` 可达。
+        out: dict[str, bytes] = {
+            rel: self._read_resource_bytes(skill_id, rel) for rel in package.resource_paths
+        }
         return out
 
     def _read_resource_bytes(self, skill_id: str, rel_path: str) -> bytes:
