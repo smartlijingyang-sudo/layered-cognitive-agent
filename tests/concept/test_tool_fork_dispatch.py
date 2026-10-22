@@ -371,7 +371,7 @@ async def test_assistant_id_filters_forked_tools_by_home_policy(tmp_path) -> Non
 
 
 @pytest.mark.asyncio
-async def test_no_assistant_id_leaves_fork_untouched(tmp_path) -> None:
+async def test_no_assistant_id_leaves_fork_untouched() -> None:
     """I-B8:无 assistant_id 时工具 fork 不套用 Home 过滤。"""
     from lca.contracts.models.cognition.boundary import BindingsView
 

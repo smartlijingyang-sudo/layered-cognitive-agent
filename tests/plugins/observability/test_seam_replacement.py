@@ -325,7 +325,7 @@ def test_from_profile_raises_when_provider_key_missing() -> None:
 
 
 def test_from_profile_uses_default_provider_when_profile_has_no_hints(
-    tmp_path: Path, seam_ctx: Any
+    seam_ctx: Any,
 ) -> None:
     """Profile without ``observability.loop_cursor.implementation`` → standard provider is used."""
     from lca.infrastructure.observability.loop_cursor.factory.factory import LoopCursorFactory

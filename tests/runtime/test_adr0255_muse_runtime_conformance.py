@@ -262,7 +262,7 @@ def test_t6_volatile_fact_revalidation_constraint() -> None:
 # ── T8: 子 Agent 上下文继承 ────────────────────────────────────────────────
 
 
-def test_t8_subagent_transcript_and_standing_inheritance(tmp_path: Path) -> None:
+def test_t8_subagent_transcript_and_standing_inheritance() -> None:
     """T8: 子 Agent 继承包含 Standing 文件的完整装配快照。"""
     layout = packaged_layout()
     assert len(layout.standing_files) == 10

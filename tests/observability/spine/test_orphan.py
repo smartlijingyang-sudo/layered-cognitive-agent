@@ -11,7 +11,6 @@ orphan events 携带 ``phase="orphan"`` + ``reason``,仍写到 spine.jsonl
 from __future__ import annotations
 
 from datetime import UTC, datetime
-from pathlib import Path
 
 import pytest
 
@@ -46,7 +45,7 @@ def _make_event(**overrides: object) -> EventRecord:
     return EventRecord(**base)  # type: ignore[arg-type]
 
 
-def test_orphan_phase_skipped_by_step_tree_fold(tmp_path: Path) -> None:
+def test_orphan_phase_skipped_by_step_tree_fold() -> None:
     """orphan event 不应被 fold 当成 step 累积(ADR-0212 收口后 fold SSOT)。"""
     rec = _make_event(phase="orphan", reason=CANCEL_PRE_BOOT)
     assert rec.phase == "orphan"

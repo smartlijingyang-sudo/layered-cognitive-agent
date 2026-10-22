@@ -156,7 +156,7 @@ class TestToolsFromScopeFiltersByAssistant:
         )
         assert [t.name for t in result] == ["alpha"]
 
-    def test_no_assistant_id_returns_full_set(self, tmp_path: Path) -> None:
+    def test_no_assistant_id_returns_full_set(self) -> None:
         """I-B8:无 assistant_id 路径返回原始工具集，不做过滤。"""
         from lca.plugins.transport.webserver.carrier.runs.lifecycle.runnable_assembly import (
             tools_from_scope,

@@ -126,7 +126,7 @@ def test_manifest_includes_health_summary_and_hash(tmp_path) -> None:
     assert len(payload["health_hash"]) == 64  # sha256 hex
 
 
-def test_manifest_marks_legacy_fields_deprecated(tmp_path) -> None:
+def test_manifest_marks_legacy_fields_deprecated() -> None:
     """The 3 legacy Session/Catalog vocabulary fields are marked
     ``@deprecated`` (G-6 / G-7 / G-8).
 

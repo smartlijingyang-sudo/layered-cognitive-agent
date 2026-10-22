@@ -341,7 +341,7 @@ class TestEvolveImplementsSkillAcquirer:
         _, evolve, _ = _make_env(tmp_path)
         assert isinstance(evolve, SkillAcquirer)
 
-    def test_impl_is_not_global_auto_acquire_service(self, tmp_path: Path) -> None:
+    def test_impl_is_not_global_auto_acquire_service(self) -> None:
         """同一 Protocol、独立实现；两者不得是同一个类。"""
         from lca.plugins.assistant.evolve.evolve import AssistantEvolveImpl
         from lca.plugins.skill.auto_acquire import AutoAcquireSkillService

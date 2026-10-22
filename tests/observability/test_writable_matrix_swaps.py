@@ -191,7 +191,7 @@ def test_swap_coalescer_is_isolated(tmp_path: Path) -> None:
     assert len(spine_a.calls) == len(spine_b.calls)
 
 
-def test_swap_emitter_requires_same_protocol_surface(tmp_path: Path) -> None:
+def test_swap_emitter_requires_same_protocol_surface() -> None:
     """I-PLUG3-d: 任意遵循 EventEmitter Protocol 的实例可换入。"""
     from lca.contracts.observability.cursor.writable_matrix import EventEmitter
 

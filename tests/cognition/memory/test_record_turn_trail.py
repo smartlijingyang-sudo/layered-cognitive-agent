@@ -90,7 +90,7 @@ def test_overlong_utterance_is_truncated(tmp_path: Path) -> None:
     assert len(lines[0]) <= 210
 
 
-def test_missing_home_returns_false(tmp_path: Path) -> None:
+def test_missing_home_returns_false() -> None:
     assert record_turn_trail(_runtime(None), _state("还是简洁一点好"), now_ms=_NOW_MS) is False
 
 

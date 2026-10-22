@@ -166,9 +166,7 @@ class TestWebAssistantE2E:
             )
 
     @pytest.mark.asyncio
-    async def test_web_standard_boot_has_no_assistant_capability(
-        self, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
+    async def test_web_standard_boot_has_no_assistant_capability(self) -> None:
         """web-standard profile boot 后 ctx 不暴露 assistant.* capability。"""
         from lca_kernel import run_kernel
 

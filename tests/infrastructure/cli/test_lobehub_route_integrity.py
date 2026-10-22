@@ -84,9 +84,7 @@ def test_state_running_when_signin_answers_200(
     assert routes_check.ok is True
 
 
-def test_heal_forces_stop_on_route_collapse(
-    lobehub_service, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_heal_forces_stop_on_route_collapse(lobehub_service) -> None:
     """Route collapse must stop the still-responding listener before start.
 
     ``current.is_running`` is False for DEGRADED, so heal would otherwise skip
