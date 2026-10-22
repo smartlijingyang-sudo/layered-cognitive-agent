@@ -47,7 +47,7 @@ def lobehub_service(monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
 
 
 def test_child_env_injects_next_public_lca_gateway_url(
-    lobehub_service, monkeypatch: pytest.MonkeyPatch
+    lobehub_service,
 ) -> None:
     """NEXT_PUBLIC_LCA_GATEWAY_URL must be in the dev subprocess env.
 
@@ -71,7 +71,7 @@ def test_child_env_injects_next_public_lca_gateway_url(
 
 
 def test_child_env_injects_next_public_lca_host_console_default(
-    lobehub_service, monkeypatch: pytest.MonkeyPatch
+    lobehub_service,
 ) -> None:
     """NEXT_PUBLIC_LCA_HOST_CONSOLE defaults to '0' (production-off).
 
