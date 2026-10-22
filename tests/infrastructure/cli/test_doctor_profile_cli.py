@@ -509,9 +509,7 @@ def test_module_docstring_cites_adr_0199() -> None:
 # ─────────── 9. --ci --json reference (canonical CI form) ───────────
 
 
-def test_ci_json_reference_command_against_real_profile(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_ci_json_reference_command_against_real_profile(tmp_path: Path) -> None:
     """Smoke: ``doctor profile --ci --json`` on a real path executes end-to-end.
 
     The :class:`DoctorFacade` default passes are stubbed so this test
