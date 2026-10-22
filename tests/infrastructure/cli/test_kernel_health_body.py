@@ -95,7 +95,7 @@ def test_health_body_omits_plugin_block_when_ctx_missing() -> None:
 # ── _read_plugin_health direct ─────────────────────────────────────
 
 
-def test_read_plugin_health_returns_full_block(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_read_plugin_health_returns_full_block() -> None:
     """Direct call returns the 6 keys with concrete values when ctx is wired."""
     fake_registry = MagicMock()
     fake_registry._plugins = {"lca.x": object(), "lca.y": object(), "lca.z": object()}
@@ -132,9 +132,7 @@ def test_read_plugin_health_returns_full_block(monkeypatch: pytest.MonkeyPatch) 
     assert block["cognitive_driver_registered"] is True
 
 
-def test_read_plugin_health_pipeline_registered_false_when_empty(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
+def test_read_plugin_health_pipeline_registered_false_when_empty() -> None:
     fake_registry = MagicMock()
     fake_registry._plugins = {}
     fake_bus = MagicMock()
@@ -148,9 +146,7 @@ def test_read_plugin_health_pipeline_registered_false_when_empty(
     assert block["pipeline_registered"] is False
 
 
-def test_read_plugin_health_cognitive_driver_missing(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
+def test_read_plugin_health_cognitive_driver_missing() -> None:
     """When ctx does not provide run_loop_driver_registry, block still returns."""
     fake_registry = MagicMock()
     fake_registry._plugins = {}
@@ -184,9 +180,7 @@ def test_read_plugin_health_graceful_when_bus_explodes() -> None:
     assert result is None
 
 
-def test_read_plugin_health_expected_uses_resolved_profile_plugins(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
+def test_read_plugin_health_expected_uses_resolved_profile_plugins() -> None:
     """Expected count = plugins in resolved profile with marker_class set."""
     from dataclasses import dataclass
     from typing import ClassVar

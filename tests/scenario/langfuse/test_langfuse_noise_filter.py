@@ -153,7 +153,7 @@ class _FakeLangfuse:
     "plugin factory. Rewrite the bridge assertions to inspect the factory's "
     "``should_export_span`` output directly (see lca.plugins.observability.fact_reader_langfuse_provider)."
 )
-def test_bridge_applies_noise_filter_by_default(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_bridge_applies_noise_filter_by_default() -> None:
     pytest.importorskip("langfuse")
     pytest.fail("skipped — see skip reason")
 
@@ -164,6 +164,6 @@ def test_bridge_applies_noise_filter_by_default(monkeypatch: pytest.MonkeyPatch)
     "plugin factory. Rewrite the bridge assertions to inspect the factory's "
     "``should_export_span`` output directly."
 )
-def test_bridge_verbose_exports_everything(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_bridge_verbose_exports_everything() -> None:
     pytest.importorskip("langfuse")
     pytest.fail("skipped — see skip reason")
