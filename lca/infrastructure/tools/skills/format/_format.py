@@ -31,7 +31,8 @@ def to_market_skill_items(items: tuple[SkillIndexEntry, ...]) -> list[dict[str, 
 def format_skill_index_rows(items: tuple[Any, ...]) -> str:
     if not items:
         return "（无匹配结果）"
-    lines: list[str] = []
-    for idx, item in enumerate(items, start=1):
-        lines.append(f"{idx}. {item.name} ({item.skill_id})\n   {item.summary or '（无摘要）'}")
+    lines: list[str] = [
+        f"{idx}. {item.name} ({item.skill_id})\n   {item.summary or '（无摘要）'}"
+        for idx, item in enumerate(items, start=1)
+    ]
     return "\n".join(lines)
