@@ -91,7 +91,7 @@ def test_read_step_document_round_trip(tmp_path: Path) -> None:
 # ── spine 重放:同 spine 流 fold 两次 → 同 doc(回归 run_3cf06424f0b7) ─────
 
 
-def test_spine_replay_no_duplicate_step_id(tmp_path: Path) -> None:
+def test_spine_replay_no_duplicate_step_id() -> None:
     """spine 流 fold 两次 → step_id 严格 unique,无 duplicate step_id。
 
     回归 run_3cf06424f0b7:journal.json 出现 step-001 / step-001 / step-002
