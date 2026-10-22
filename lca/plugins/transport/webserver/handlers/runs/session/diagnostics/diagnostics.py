@@ -99,9 +99,7 @@ class RunBootSnapshotRecorder:
     def record(self, session: RunSession) -> None:
         plugins = plugin_inventory_from_boot_products(self._ctx)
         # Capability map: best-effort; consumers should treat missing keys as False
-        capabilities: dict[str, bool] = {}
-        for entry in plugins:
-            capabilities[str(entry["id"])] = True
+        capabilities: dict[str, bool] = {str(entry["id"]): True for entry in plugins}
         outdir = _snapshot_outdir_for(str(session.run_id), self._ctx)
         try:
             RunBootSnapshot().write(
