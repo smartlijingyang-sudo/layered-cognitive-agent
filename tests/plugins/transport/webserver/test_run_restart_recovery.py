@@ -198,7 +198,7 @@ async def test_restore_waiting_run_reuses_existing_session(tmp_path: Path) -> No
     assert result is session
 
 
-def test_bundle_write_failure_is_contained(tmp_path: Path) -> None:
+def test_bundle_write_failure_is_contained() -> None:
     """A paused run must not fail because the bundle cannot be written."""
     session = _paused_session()
     session.locator = None  # no locator -> best-effort skip, no raise
