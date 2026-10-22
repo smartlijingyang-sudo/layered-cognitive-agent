@@ -87,12 +87,13 @@ def _row_iter_to_table(rows: Iterable[TraceRow], *, with_locals: bool) -> str:
     }
 
     materialised = list(rows)
-    widths: dict[str, int] = {}
-    for col, header in base_columns:
-        widths[col] = max(
+    widths: dict[str, int] = {
+        col: max(
             len(header),
             max((len(field_map[col](r)) for r in materialised), default=0),
         )
+        for col, header in base_columns
+    }
 
     lines: list[str] = []
     header_line = "  ".join(f"{header:<{widths[col]}}" for col, header in base_columns)
