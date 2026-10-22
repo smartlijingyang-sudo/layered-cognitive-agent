@@ -48,7 +48,7 @@ def test_sequence_skips_owner_and_mode_when_none(tmp_path: Path) -> None:
     assert not _staging_tempfile(sudo).exists()
 
 
-def test_ensure_wrapper_delegates_to_seam(tmp_path: Path, monkeypatch) -> None:
+def test_ensure_wrapper_delegates_to_seam(tmp_path: Path) -> None:
     """_ensure_wrapper routes through the staging seam (fake run_sudo via seam)."""
     from lca.infrastructure.host_runtime.config import HostRuntimeConfig, UserConfig
     from lca.infrastructure.host_runtime.providers.user_cli import CLIProvider
