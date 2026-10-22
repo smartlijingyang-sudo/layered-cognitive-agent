@@ -95,7 +95,7 @@ def test_health_body_omits_plugin_block_when_ctx_missing() -> None:
 # ── _read_plugin_health direct ─────────────────────────────────────
 
 
-def test_read_plugin_health_returns_full_block(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_read_plugin_health_returns_full_block() -> None:
     """Direct call returns the 6 keys with concrete values when ctx is wired."""
     fake_registry = MagicMock()
     fake_registry._plugins = {"lca.x": object(), "lca.y": object(), "lca.z": object()}
