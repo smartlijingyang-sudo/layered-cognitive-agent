@@ -333,7 +333,7 @@ def test_diagnose_rejects_unknown_suffix(tmp_path: Path) -> None:
         diagnose(None, path, mode="backend")
 
 
-def test_doctor_report_outcome_exposed_as_top_level_field(tmp_path: Path) -> None:
+def test_doctor_report_outcome_exposed_as_top_level_field() -> None:
     """Regression: DoctorReport.outcome 不再是 null。
 
     早先 as_dict() 没暴露 outcome,manifest.doctor_report.outcome 读不到;
