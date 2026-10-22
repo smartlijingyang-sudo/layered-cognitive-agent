@@ -82,7 +82,7 @@ def test_client():
 
 
 @pytest.mark.asyncio
-async def test_connector_capability_intent_full_e2e_flow(monkeypatch, test_client):
+async def test_connector_capability_intent_full_e2e_flow(test_client):
     """INV-CAP-01 ~ INV-CAP-06: Full End-to-End validation of zero model exposure & async resolve."""
     vault = get_default_intent_vault()
     vault._intents.clear()
