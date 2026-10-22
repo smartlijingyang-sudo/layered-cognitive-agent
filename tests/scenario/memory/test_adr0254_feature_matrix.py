@@ -182,7 +182,7 @@ def test_f8_privacy_firewall_renders_for_a_bound_home() -> None:
     assert "side-chats/<id>/MEMORY.md" in text
 
 
-def test_f9_standing_snapshot_carries_the_parent_rule(tmp_path: Path) -> None:
+def test_f9_standing_snapshot_carries_the_parent_rule() -> None:
     rule = "严禁未经基准测试擅自引入依赖"
     files = [
         ("SOUL.md", "我是助手。"),
