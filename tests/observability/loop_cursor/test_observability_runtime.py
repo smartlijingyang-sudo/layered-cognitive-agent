@@ -192,7 +192,7 @@ def test_runtime_projection_host_initial_keys(tmp_path: Path) -> None:
     assert len(keys) >= 1
 
 
-def test_runtime_persistence_injected_unchanged(tmp_path: Path) -> None:
+def test_runtime_persistence_injected_unchanged() -> None:
     """Runtime 不构造 persistence —— 调用方注入的实例被原样持有(PR-15 边界)。"""
     persistence = _StubPersistence()
     runtime = ObservabilityRuntime.from_profile(
