@@ -20,7 +20,7 @@ def _pack_dirs(root: Path) -> list[Path]:
     return [c for c in root.iterdir() if c.is_dir() and (c / "SKILL.md").is_file()]
 
 
-def test_resolve_skill_store_writes_nothing(tmp_path: Path, monkeypatch) -> None:
+def test_resolve_skill_store_writes_nothing() -> None:
     """纯 resolve 不得落盘任何技能包（autouse fixture 已隔离到 tmp）。"""
     from lca.infrastructure.skills.settings.settings import get_skill_settings
 
