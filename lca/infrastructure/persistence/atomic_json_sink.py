@@ -29,9 +29,7 @@ class AtomicJsonFileSink(WriteBehindSink):
     def append_batch(self, events: Sequence[AtomicJsonSnapshot]) -> None:
         if not events:
             return
-        coalesced: dict[Path, str] = {}
-        for item in events:
-            coalesced[item.path] = item.encoded
+        coalesced: dict[Path, str] = {item.path: item.encoded for item in events}
         for path, encoded in coalesced.items():
             _write_atomic(path, encoded)
 
