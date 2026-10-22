@@ -38,5 +38,5 @@ def test_extra_projectors_see_journal_events() -> None:
     "Rewrite to assert the Langfuse plugin factory is skipped (not raised) when keys "
     "are blank, and that an in-process probe sees the recorded event."
 )
-def test_unavailable_langfuse_is_skipped_not_fatal(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_unavailable_langfuse_is_skipped_not_fatal() -> None:
     pytest.fail("skipped — see skip reason")
