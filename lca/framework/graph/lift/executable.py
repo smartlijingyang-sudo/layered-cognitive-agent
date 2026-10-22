@@ -66,16 +66,15 @@ def lift_executable_plan(executable: object) -> Plan:
                 subgraph_ref=subgraph_ref,
             )
         )
-    edges: list[PlanEdge] = []
-    for raw in raw_edges:
-        edges.append(
-            PlanEdge(
-                source=str(getattr(raw, "source", "")),
-                target=str(getattr(raw, "target", "")),
-                when=coerce_when(getattr(raw, "when", "true")),
-                loop=coerce_loop(getattr(raw, "loop", None)),
-            )
+    edges: list[PlanEdge] = [
+        PlanEdge(
+            source=str(getattr(raw, "source", "")),
+            target=str(getattr(raw, "target", "")),
+            when=coerce_when(getattr(raw, "when", "true")),
+            loop=coerce_loop(getattr(raw, "loop", None)),
         )
+        for raw in raw_edges
+    ]
     return Plan(
         id=str(getattr(plan_obj, "id", "lifted")),
         nodes=tuple(nodes),
