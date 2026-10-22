@@ -68,12 +68,10 @@ def _row_iter_to_table(rows: Iterable[TraceRow], *, with_locals: bool) -> str:
         ("source", "source"),
     ]
     if with_locals:
-        base_columns.extend(
-            [
-                ("next_frame", "next_frame"),
-                ("locals", "locals"),
-            ]
-        )
+        base_columns += [
+            ("next_frame", "next_frame"),
+            ("locals", "locals"),
+        ]
 
     field_map = {
         "seq": lambda r: str(r.seq),

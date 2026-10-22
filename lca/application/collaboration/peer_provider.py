@@ -86,11 +86,11 @@ class PeerProfileResolver:
         if card.department:
             caps.append(f"{card.department}_domain")
         if "契约" in card.summary or "边界" in card.summary:
-            caps.extend(["contracts", "adr_guard", "domain_boundary"])
+            caps += ["contracts", "adr_guard", "domain_boundary"]
         elif "状态机" in card.summary or "不变量" in card.summary:
-            caps.extend(["state_machine", "invariants", "reducer_guard"])
+            caps += ["state_machine", "invariants", "reducer_guard"]
         elif "审计" in card.summary or "反模式" in card.summary:
-            caps.extend(["antipattern_audit", "adversarial_review", "code_hygiene"])
+            caps += ["antipattern_audit", "adversarial_review", "code_hygiene"]
         else:
             caps.append("general_analysis")
         return tuple(dict.fromkeys(caps))

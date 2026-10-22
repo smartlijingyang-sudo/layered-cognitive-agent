@@ -25,7 +25,7 @@ class Sudo:
     ) -> subprocess.CompletedProcess[str]:
         prefix = ["sudo", "-S", "-p", ""]
         if user:
-            prefix.extend(["-u", user])
+            prefix += ["-u", user]
         return subprocess.run(
             [*prefix, *cmd],
             input=self._password(),
