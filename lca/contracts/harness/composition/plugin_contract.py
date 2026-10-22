@@ -160,10 +160,8 @@ class LifecycleContract:
 
     def __post_init__(self) -> None:
         if not isinstance(self.allowed_scopes, tuple):
-            scopes: list[Scope] = []
             raw_scopes = cast("Sequence[Scope | str]", self.allowed_scopes)
-            for s in raw_scopes:
-                scopes.append(s if isinstance(s, Scope) else parse_scope(s))
+            scopes = [s if isinstance(s, Scope) else parse_scope(s) for s in raw_scopes]
             object.__setattr__(self, "allowed_scopes", tuple(scopes))
 
 
