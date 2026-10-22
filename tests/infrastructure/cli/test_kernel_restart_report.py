@@ -122,7 +122,8 @@ def test_boot_check_fails_when_profile_does_not_resolve(
 
 
 def test_fiber_report_counts_layers_and_flags_failures(
-    monkeypatch: _pytest.MonkeyPatch, fake_stdout: Path, fake_stderr: Path,
+    fake_stdout: Path,
+    fake_stderr: Path,
 ) -> None:
     _write_fake_stdout(
         fake_stdout,
@@ -147,7 +148,8 @@ def test_fiber_report_counts_layers_and_flags_failures(
 
 
 def test_fiber_report_reads_full_stdout_after_supervisor_truncate(
-    monkeypatch: _pytest.MonkeyPatch, fake_stdout: Path, fake_stderr: Path,
+    fake_stdout: Path,
+    fake_stderr: Path,
 ) -> None:
     # The supervisor truncates its stdout log on every start() so the file
     # only contains events from the current boot — no PID-based slicing
