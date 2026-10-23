@@ -138,6 +138,16 @@ if tool.namespace not in session.loaded_namespaces and tool.namespace not in eag
 
 新工具进入 `shell` 自动继承审批——这就是"审批边界与 namespace 同粒度"的价值。
 
+### 8.1 审批随执行平面隔离性收敛（业界范式）
+
+`REQUIRE_APPROVAL` 的语义是"该操作可能影响宿主机/敏感资源"，而非"该命名空间所有调用一律人工审批"。因此审批门按**执行平面的隔离性**收敛：
+
+- **容器级隔离沙箱**（Onlyboxes，`PlaneRef.isolated=True`）：沙箱本身就是安全边界，沙箱内 `executeCode`/`runCommand` 等 shell 工具**自动放行**，不触发人工审批（与 OpenAI Code Interpreter / Gemini Code Execution / Claude Code sandbox 的业界范式一致）。
+- **机器平面 / 未知平面**：保持 `REQUIRE_APPROVAL`，fail-closed。
+- **非隔离本地沙箱回退**（LocalSandboxAdapter，与宿主机共享进程空间）：保持 `REQUIRE_APPROVAL`，安全不降级。
+
+实现：`PlaneRef.isolated` 标记隔离性；`NamespaceApprovalStrategy.evaluate(plane=...)` 在隔离沙箱平面直接跳过命名空间级审批。`MachineAccessStrategy` 不变（宿主机操作仍按命令/路径风险分级）。
+
 ## 9. 落地 checklist（按序）
 
 1. contracts：`Tool.namespace`、`DeferPolicy.namespace_descriptions` 必填化 + `namespace_approval`；

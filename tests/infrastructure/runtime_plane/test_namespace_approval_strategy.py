@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from lca.contracts.models.core.execution.approval import ApprovalReasonKind
 from lca.contracts.models.core.execution.decision import ToolCall
+from lca.contracts.models.core.state.plane import PlaneKind, PlaneRef
 from lca.infrastructure.runtime_plane.access.approval_engine import NamespaceApprovalStrategy
 
 
@@ -236,3 +237,107 @@ def test_no_session_fallback_resourced_from_ssot(monkeypatch) -> None:
     monkeypatch.setattr(policy_mod, "DEFAULT_NAMESPACE_APPROVAL", {"shell": "allow"})
     req2 = strategy.evaluate([call])
     assert req2 is None
+
+
+def _isolated_sandbox_plane() -> PlaneRef:
+    return PlaneRef(
+        id="onlyboxes-sandbox",
+        label="Onlyboxes",
+        kind=PlaneKind.SANDBOX,
+        root="/mnt/data",
+        outputs_dir="/mnt/data/outputs",
+        platform="linux",
+        isolated=True,
+    )
+
+
+def _local_sandbox_plane() -> PlaneRef:
+    return PlaneRef(
+        id="local-sandbox",
+        label="Local sandbox",
+        kind=PlaneKind.SANDBOX,
+        root="/mnt/data",
+        outputs_dir="/mnt/data/outputs",
+        platform="linux",
+        isolated=False,
+    )
+
+
+def _machine_plane() -> PlaneRef:
+    return PlaneRef(
+        id="machine-default",
+        label="Local Machine",
+        kind=PlaneKind.MACHINE,
+        root="",
+        outputs_dir="outputs",
+        platform="",
+    )
+
+
+def test_isolated_sandbox_skips_namespace_approval() -> None:
+    """Onlyboxes 容器级隔离沙箱内执行 shell 工具不再要求人工审批。
+
+    业界范式：隔离沙箱本身就是安全边界，沙箱内代码/命令执行自动放行。
+    """
+    from lca.infrastructure.tool_defer.session import reset_current_defer_session
+
+    token = _loaded_shell_session(["executeCode", "runCommand"])
+    try:
+        strategy = NamespaceApprovalStrategy()
+        for tool_name in ("executeCode", "runCommand"):
+            req = strategy.evaluate(
+                [ToolCall(tool_name=tool_name, call_id="c1", arguments={"command": "ls"})],
+                plane=_isolated_sandbox_plane(),
+            )
+            assert req is None, tool_name
+    finally:
+        reset_current_defer_session(token)
+
+
+def test_non_isolated_local_sandbox_keeps_approval() -> None:
+    """本地回退沙箱与宿主机共享进程空间，保持 fail-closed 审批。"""
+    from lca.infrastructure.tool_defer.session import reset_current_defer_session
+
+    token = _loaded_shell_session(["executeCode"])
+    try:
+        strategy = NamespaceApprovalStrategy()
+        req = strategy.evaluate(
+            [ToolCall(tool_name="executeCode", call_id="c1", arguments={})],
+            plane=_local_sandbox_plane(),
+        )
+        assert req is not None and req.required is True
+    finally:
+        reset_current_defer_session(token)
+
+
+def test_machine_plane_keeps_namespace_approval() -> None:
+    """机器平面（宿主机）执行 shell 工具仍要求审批。"""
+    from lca.infrastructure.tool_defer.session import reset_current_defer_session
+
+    token = _loaded_shell_session(["runCommand"])
+    try:
+        strategy = NamespaceApprovalStrategy()
+        req = strategy.evaluate(
+            [ToolCall(tool_name="runCommand", call_id="c1", arguments={"command": "rm x"})],
+            plane=_machine_plane(),
+        )
+        assert req is not None and req.required is True
+        assert req.reason_kind == ApprovalReasonKind.ELEVATED_COMMAND
+    finally:
+        reset_current_defer_session(token)
+
+
+def test_unknown_plane_keeps_namespace_approval() -> None:
+    """无 plane（未知执行环境）保持 fail-closed 审批。"""
+    from lca.infrastructure.tool_defer.session import reset_current_defer_session
+
+    token = _loaded_shell_session(["runCommand"])
+    try:
+        strategy = NamespaceApprovalStrategy()
+        req = strategy.evaluate(
+            [ToolCall(tool_name="runCommand", call_id="c1", arguments={"command": "ls"})],
+            plane=None,
+        )
+        assert req is not None and req.required is True
+    finally:
+        reset_current_defer_session(token)

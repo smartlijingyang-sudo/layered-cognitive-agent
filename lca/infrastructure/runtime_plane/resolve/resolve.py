@@ -30,7 +30,13 @@ def ref_of(bindings: PlaneBindings, kind: PlaneKind) -> PlaneRef | None:
 
 
 def make_sandbox_ref(*, name: str = "onlyboxes") -> PlaneRef:
-    """The only writer of a sandbox PlaneRef. Disk identity is GuestLayout."""
+    """The only writer of a sandbox PlaneRef. Disk identity is GuestLayout.
+
+    ``isolated`` reflects the backend: Onlyboxes runs a container-level
+    isolated Linux environment, while the local host-backed fallback shares
+    the host process space. Approval gates use this to exempt sandboxed
+    execution from per-namespace human approval (ADR-0256 refinement).
+    """
     ident = name.strip() or "onlyboxes"
     lowered = ident.lower()
     if "local" in lowered:
@@ -44,6 +50,7 @@ def make_sandbox_ref(*, name: str = "onlyboxes") -> PlaneRef:
         root=ONLYBOXES.root,
         outputs_dir=ONLYBOXES.outputs_dir,
         platform="linux",
+        isolated="local" not in lowered,
     )
 
 

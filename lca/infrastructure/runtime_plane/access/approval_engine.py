@@ -207,7 +207,15 @@ class NamespaceApprovalStrategy:
         tool_calls: Sequence[ToolCall],
         plane: PlaneRef | None = None,
     ) -> ApprovalRequirement | None:
-        del plane
+        # 隔离沙箱（容器级，如 Onlyboxes）本身就是安全边界：沙箱内执行的
+        # shell 工具不再触发命名空间级人工审批（业界范式）。机器平面、未知
+        # 平面、非隔离本地沙箱保持 fail-closed 审批。
+        if (
+            plane is not None
+            and plane.kind is PlaneKind.SANDBOX
+            and getattr(plane, "isolated", False)
+        ):
+            return None
         if not isinstance(tool_calls, (list, tuple)):
             return None
 
@@ -269,9 +277,7 @@ class NamespaceApprovalStrategy:
                 ns = self._tool_namespaces[tool_name]
             elif defer_session is not None:
                 ns = defer_session.namespace_of_tool(tool_name) or (
-                    defer_session.namespace_of_tool(alternate)
-                    if alternate != tool_name
-                    else None
+                    defer_session.namespace_of_tool(alternate) if alternate != tool_name else None
                 )
 
             if ns and approval_rules.get(ns) == "require_approval":
