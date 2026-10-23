@@ -80,10 +80,11 @@ class WechatChannelWorker:
 
         # Extract text items
         item_list = msg.get("item_list", [])
-        text_parts = []
-        for item in item_list:
-            if item.get("type") == 1 and "text_item" in item:
-                text_parts.append(item["text_item"].get("text", ""))
+        text_parts = [
+            item["text_item"].get("text", "")
+            for item in item_list
+            if item.get("type") == 1 and "text_item" in item
+        ]
 
         inbound_text = "\n".join(text_parts).strip()
         if not inbound_text:
