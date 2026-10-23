@@ -308,12 +308,11 @@ class AssistantMemory(MemorySystem):
             existing = store.read_text(relative)
         except OSError:
             existing = ""
-        lines = []
-        for claim in omitted:
-            marker = f"{claim.claim_id}:"
-            if marker in existing:
-                continue
-            lines.append(f"- {claim.claim_id}: {claim.body}")
+        lines = [
+            f"- {claim.claim_id}: {claim.body}"
+            for claim in omitted
+            if f"{claim.claim_id}:" not in existing
+        ]
         if not lines:
             return
         body = existing if existing.endswith("\n") or not existing else f"{existing}\n"
