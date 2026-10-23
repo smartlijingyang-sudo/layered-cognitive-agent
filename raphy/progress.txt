@@ -1,4 +1,23 @@
 ## Codebase Patterns
+- **readability 这类"同一个问题、两个词表"先查分歧再谈收敛（RA-181 评估实证）：**
+  `_is_previewable`（UI 预览规则）vs `classify_readability`（ReadabilityTier）
+  答同一个 (filename, mime) 问题，扩展名表/mime 表各自为政（.py + 未知
+  mime → NATIVE 但 not previewable）。评估时不要只看名字像，要逐条比对两套
+  规则表的交集输出；且 bootstrap.py:148 跨 seam import 私有的
+  `_is_previewable`——"the interface is the test surface"：调用方绕过接口，
+  说明接口缺了这个 seam，收敛方向取公开 seam。
+
+- **手动 __aenter__ 的 adapter，acquire 和 release 必须同 seam 拥有（RA-182 评估实证）：**
+  `_get_mcp_session` 手动 `await cm.__aenter__()` 只缓存内层 ClientSession，
+  `close()` 只 exit 内层，外层 streamablehttp_client 的 `__aexit__` 永远没跑
+  ——HTTP client 按 server URL 泄漏。评估 acquire/release 不对称的代码时，把
+  两端都 grep 出来对一遍；测试只 pin 协议/配置不 pin close() 时，leak 会一直隐身。
+
+- **ssh252 的 stdout 头部是 main 工作目录的 git status 长格式块，不是你命令的输出（本轮实证）：**
+  看 worktree 状态必须 `git -C <worktree> diff --stat` / `status --porcelain`
+  显式定位，只看包装器头部会把 main 的 modified 误读成 worktree 的（本轮因此
+  差点把故事写进主树，及时用 checkout 恢复、改道 worktree 重做）。解析输出时
+  先定位自己的 marker 行，marker 之前的全是包装器头（见 AGENTS.md 同条）。
 - **resume bundle 的 write/read 两侧必须一起走完 inventory（RA-177 评估实证）：**
   RA-173 的 `_BUNDLE_FIELDS` inventory 让写侧不再手写镜像，但读侧
   `_restore_from_bundle` 是手写的 `session.x = restored["x"]` 赋值链——新字段
@@ -5083,3 +5102,68 @@ three concrete differences). RA-172 and RA-173 are safe same-area follow-ups.
     than threading predicates -- the call sites stay readable and a third
     layout variant reuses the seam by passing a flag.
 ---
+
+---
+
+## 2026-10-21 - assess (08:53, branch raphy/arch-20261021-0853)
+
+- Assessed only; no code changes. Friction walk over 4 fresh hot areas
+  (post-RA-178 terminal lifecycle coordinator, post-RA-176/179 file store
+  read surface, mcp_transport.py, runtime_binding_validator.py).
+- 2 stories written (both Worth exploring, both friction-walk class, none
+  duplication-class; quota satisfied):
+  - RA-181 (top): Converge the twin readability vocabularies onto one
+    contracts seam — `_is_previewable` vs `classify_readability` diverge on
+    e.g. .py + unknown mime (NATIVE but not previewable); bootstrap.py:148
+    imports the private `_is_previewable` across the seam.
+  - RA-182: Own the full MCP session lifetime in MCPTransport —
+    `streamablehttp_client` cm entered manually, outer `__aexit__` never
+    runs (one leaked HTTP client per server URL per close()).
+- Runtime verification: MockLLM smoke RUN1/RUN2 both completed ((a)(c) green);
+  tests/scenario/browser/test_browser_preview_and_takeover_e2e.py 1 passed ((b) green).
+- Recorded, not written: twin lazy imports in `_capture_*` (too small);
+  store.py dead `if False: pass` + redundant datetime re-imports (hygiene);
+  `trash_dir_for` mkdir side effect (hygiene); mcp `send_task` dropping
+  non-text content (Speculative, no evidence); mirror/live dual-copy read
+  pinning (checked: no out-of-band writer of the live copy; delete() keeping
+  the mirror is deliberate recoverability).
+- **Learnings for future iterations:**
+  - Assess rounds must scope greps to `lca tests` — repo-root `grep -rn`
+    hangs scanning .git/huge dirs (two greps backgrounded then killed this round).
+  - The RA-175 origin-vocabulary convergence is now a reusable precedent:
+    whenever two vocabularies answer the same (filename, mime)-shaped
+    question, check divergence on the intersection before proposing a merge.
+
+## RA-181 DONE 2026-10-21 — Converge the twin readability vocabularies onto one contracts seam
+- Implemented exactly as assessed. `contracts/models/core/workspace/file_record.py` now owns the per-audience
+  readability seam: frozen `ReadabilityProfile(tier, ui_preview)` + `readability_profile(filename, mime)`.
+- Deleted `infrastructure/file/store.py::_is_previewable`; its LobeHub-aligned rules moved verbatim into contracts
+  (`_UI_PREVIEW_MIMES` / `_UI_PREVIEW_EXTENSIONS`); `put()` wires both wire fields from one profile call.
+- `read_text_preview`'s HTML/XML exclusion set moved into contracts as `READ_TEXT_PREVIEW_EXCLUDED_MIMES`.
+- `bootstrap.py` artifact-closure `previewable` re-sourced onto the public seam; no private cross-seam import remains.
+- Implementer decision (documented in module): NATIVE-but-not-previewable (.py/.sql/.yaml + unknown mime) is
+  intentional — tier answers the agent audience, ui_preview the UI audience; convergence is at rule ownership.
+  22-case old-vs-new equivalence matrix: 0 mismatches; wire shapes unchanged.
+- Tests: 11/11 green (test_file_record_contract, test_file_store_and_write_tool, test_local_sandbox_output_mime);
+  tests/scenario/file/ 7/7 green; ruff clean on touched files (UP042/UP017 in file_record.py pre-existing at HEAD).
+- Learnings: 收敛"同一个问题两个词表"时先实证答案是否必须一致——本轮两个受众（agent 可读性 vs UI 内联渲染）
+  的问题语义本就不同，硬合并会改行为；收敛形态取"规则所有权收敛、答案各表其受众"，分歧用文档化决策固定，
+  再用 old-vs-new 矩阵实证零行为变更，这比机械合并表更安全。
+
+## RA-182 DONE 2026-10-21 — Own the full MCP session lifetime in MCPTransport
+- Implemented exactly as assessed. `_get_mcp_session` acquires through one seam: per-server-URL
+  `contextlib.AsyncExitStack` enters the `streamablehttp_client` cm first, then the `ClientSession` cm;
+  the stack (not just the inner session) is cached as `(session, stack)` in `_sessions`.
+- `close()` unwinds each stack LIFO (inner session `__aexit__` before outer http cm `__aexit__`),
+  suppressing per-URL exceptions and always clearing `_sessions` — the outer HTTP client can no longer leak.
+- Partial acquire (e.g. `initialize()` raises) now unwinds whatever was entered instead of caching a
+  half-built session (the old code leaked there too).
+- No-SDK NotImplementedError path, broad-catch -> failed-Observation, send_task synchronous-completion
+  contract all untouched.
+- New tests `TestMCPTransportCloseOwnsLifetime` pin close() with fake streamablehttp/SDK cms: (1) both
+  `__aexit__`s ran, inner-before-outer order, cache-hit returns same session, state cleared; (2) one URL's
+  `__aexit__` raising does not stop the other URL's release and state is still cleared. Both fail against
+  the pre-fix implementation (leak reproduced); 23/23 pass with the fix. ruff clean.
+- Learnings: 手动 `__aenter__` 的 adapter 是 acquire/release 不对称的高危形态——评估时把两端 grep 出来对一遍
+  还不够，本轮顺手查了 acquire 中途失败路径（initialize 抛错），发现旧代码连半成品 session 都缓存了；
+  AsyncExitStack 是这类"两个嵌套 cm + 缓存复用"的标准收敛形态，一次性解决泄漏、半成品缓存、退出顺序三个问题。
