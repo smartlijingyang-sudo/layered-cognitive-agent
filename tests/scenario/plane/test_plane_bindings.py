@@ -54,6 +54,14 @@ def test_only_sandbox_is_primary() -> None:
     assert bound.secondary is None
 
 
+def test_make_sandbox_ref_isolated_flag() -> None:
+    """Onlyboxes 沙箱标记 isolated=True；本地回退沙箱 isolated=False。"""
+    assert make_sandbox_ref().isolated is True
+    local = make_sandbox_ref(name="local-sandbox")
+    assert local.isolated is False
+    assert local.label == "Local sandbox"
+
+
 def test_only_machine_is_primary() -> None:
     bound = resolve_plane_bindings(_machine(), None)
     assert bound.primary is not None

@@ -22,6 +22,10 @@ class PlaneRef:
     platform: str = ""
     home: str = ""
     capability_summary: tuple[str, ...] = field(default_factory=tuple)  # ADR-0246 M1
+    #: True when the plane is a container-level isolated sandbox (e.g. Onlyboxes
+    #: Docker). The sandbox itself is the safety boundary, so approval gates may
+    #: treat code execution inside it differently from host/machine execution.
+    isolated: bool = False
 
 
 @dataclass(frozen=True)
