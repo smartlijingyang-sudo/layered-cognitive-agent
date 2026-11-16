@@ -4,9 +4,9 @@
 
 **Goal:** 基于 LCA 插件化微内核，在零修改底层核心代码的前提下，构建自适应双轨鉴权中间件（无侵入兼容 LobeHub 原生测试与公司 Gateway 鉴权）、Projects 存储引擎（SQLite/Postgres 双后端）、增量项目路由与会话项目关联扩展、真实的 Tool 协议与 MCP 集群配置，以及纯内网离线自包含的 Playground 验证单页。
 
-**Architecture:** 纯外围插件扩展（Seam/Provider 范式）。全盘复用现有的 `/runs`、`/runs/{id}/live`、`/v1/sessions`、`/files`、`/v1/models`，不建平行 URL 副本；通过 `SmartAdaptiveAuthMiddleware` 智能识别流量并完成身份桥接；外部数据通过原生 `mcp_servers` 声明式挂载；全链路事实由 Session 追加单轨保障。
+**Architecture:** 纯外围插件扩展（Seam/Provider 范式）。全盘复用成熟的原生端点（`/runs`、`/v1/runs/{id}/ws`、`/files`、`/v1/models` 等），不建平行 URL 副本；通过 `SmartAdaptiveAuthMiddleware` 智能识别流量并完成身份桥接；外部数据通过原生 `mcp_servers` 声明式挂载；增量提供企业级 `Projects` 与 `Sessions` 存储与管理服务。
 
-**Tech Stack:** Python 3.12, Starlette, Pydantic, Cryptography (AES-ECB-PKCS7), HTTPX (Async Permissions), Server-Sent Events (SSE), SQLite3, HTML5/Native CSS (离线自包含).
+**Tech Stack:** Python 3.12, Starlette, Pydantic, Cryptography (AES-ECB-PKCS7), HTTPX (Async Permissions), WebSocket, SQLite3, HTML5/Native CSS (离线自包含).
 
 ---
 
@@ -206,9 +206,9 @@ git commit -m "feat(persistence): implement ProjectStore with session binding an
 - Test: `tests/plugins/transport/test_routes_mangli_projects.py`
 - Does NOT own: `lca/contracts/`, `lca/cognition/`, `lca/runtime/`, `lca/loop/`, `lca_kernel/` (AP-01)
 - Invariants to test:
-  - 增量挂载 `GET/POST /projects`；
-  - 扩展 `/v1/sessions` 允许通过 `?project_id=...` 过滤，或 `?unassigned=true` 查询游离会话；
-  - 现存的所有 `/runs`, `/runs/{id}/live`, `/files`, `/v1/models` 100% 保持原生不重复包装。
+  - 增量挂载 `GET/POST /projects`、`GET/DELETE /projects/{id}`、`GET/POST /projects/{id}/sessions`；
+  - 增量挂载 `GET/POST /sessions`（支持 `?unassigned=true` 查询个人游离会话）；
+  - 现存的所有 `/runs`, `/v1/runs/{id}/ws`, `/files`, `/v1/models` 100% 保持原生不重复包装。
 
 **Step 1: Write the failing test**
 

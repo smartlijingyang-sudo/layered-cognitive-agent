@@ -11,17 +11,17 @@
 
 ### 1.1 拒绝双套 URL，全面复用既有标准端点
 系统**坚决不新建平行冗余的 `/api/v1` URL 副本**。无论是公司前端组、公司 Gateway、Playground 还是既有的 LobeHub 测试端，统一直接复用成熟的原生端点：
-- **发起任务**：`POST /runs`（直接复用 `command_endpoints:create_run`）
-- **实时打字机流式输出**：`GET /runs/{id}/live`（直接复用 `live.py:live_endpoint`，带 15s 心跳防 Spring Cloud Gateway 断连）
+- **发起任务**：`POST /runs`（直接复用 `command_endpoints:create_run`，返回 `run_id` 与 `ws_token`）
+- **实时全双工流式输出**：`WS /v1/runs/{run_id}/ws?token={ws_token}`（直接复用原生基于 Redis Stream 的 WebSocket 通道，带 30s 双向心跳防 Spring Cloud Gateway 断连）
 - **取消任务**：`POST /runs/{id}/cancel`（直接复用 `cancel_run`）
-- **会话管理**：`GET /v1/sessions`、`POST /v1/sessions`、`GET /v1/sessions/{id}`
+- **人机交互答复**：`POST /runs/{id}/answer`（直接复用 `answer_run`）
 - **文件下载**：`GET /files/{attachment_id}`（直接复用 `download_file`）
 - **模型枚举**：`GET /v1/models`（直接复用 `list_models`）
 
-**仅增量新增全仓唯一缺失的领域实体**：
-- **`Projects` 领域端点**：`GET /projects`、`POST /projects`（由 `ProjectStore` 支撑）；
-- **会话关联扩展**：`/v1/sessions` 增加可选的 `?project_id=...` 过滤参数，`POST /v1/sessions` 增加可选的 `project_id` 绑定字段（缺省即为游离会话）；
-- **验证控制台**：`GET /playground`（纯静态 HTML 控制台，兼测两套身份）。
+**仅增量新增全仓缺失的企业级项目与会话管理领域实体**：
+- **`Projects` 领域端点**：`GET /projects`、`POST /projects`、`GET /projects/{id}`（由 `ProjectStore` 支撑）；
+- **企业会话管理端点**：`GET /projects/{id}/sessions`、`POST /projects/{id}/sessions`，以及个人游离会话 `GET /sessions?unassigned=true`；
+- **验证控制台**：`GET /playground`（纯静态 HTML 控制台，兼测两套身份与 WebSocket 打字机）。
 
 ---
 
@@ -48,7 +48,7 @@ flowchart TD
         NativeAuth[完全走原生 handlers/auth/user.py<br>校验 x-lca-user-id + Bearer lca-local<br>0 改动、0 影响、测试环境开箱即用]
     end
 
-    ContextInject --> CoreHandler[统一进入现有底层 Handler: create_run / live_endpoint]
+    ContextInject --> CoreHandler[统一进入现有底层 Handler: create_run / ws_handler]
     NativeAuth --> CoreHandler
 ```
 
@@ -95,7 +95,7 @@ CREATE INDEX IF NOT EXISTS idx_lca_project_sessions_proj ON lca_project_sessions
 
 ### 3.2 项目与游离会话隔离规则
 1. **项目会话**：创建会话时传入 `project_id`，写入 `lca_project_sessions` 关系表。项目内仅允许创建者及同部门成员访问；
-2. **游离会话（个人独立会话）**：创建会话时 `project_id` 为空，不写入关系表。通过 `GET /v1/sessions?unassigned=true` 仅返回当前用户的游离会话；不带参数则返回当前用户可见的全部会话。
+2. **游离会话（个人独立会话）**：创建会话时 `project_id` 为空，不写入关系表。通过 `GET /sessions?unassigned=true` 仅返回当前用户的游离会话；通过 `GET /projects/{project_id}/sessions` 查询指定项目的会话。
 
 ---
 
@@ -104,12 +104,13 @@ CREATE INDEX IF NOT EXISTS idx_lca_project_sessions_proj ON lca_project_sessions
 | 路径 | 方法 | 说明 | 实现归属 |
 |---|---|---|---|
 | **`/projects`** | `GET/POST` | 项目列表查询 / 项目创建 | **新增**：读写 `ProjectStore` |
-| **`/v1/sessions`** | `GET` | 会话列表查询（支持 `?project_id=...` 与 `?unassigned=true` 过滤） | **增强复用**：结合 `ProjectStore` 过滤 |
-| **`/v1/sessions`** | `POST` | 创建会话（请求体支持传入可选的 `project_id`） | **增强复用**：底层会话创建 + 绑定表写入 |
-| **`/v1/sessions/{id}`** | `GET/DELETE` | 获取单个会话详情 / 删除会话 | **原生复用**：`routes_runs_sessions.py` |
-| **`/runs`** | `POST` | 发起提问与任务执行 | **原生复用**：`command_endpoints:create_run` |
-| **`/runs/{id}/live`** | `GET` | SSE 实时流式打字机（带 15s 心跳保活防超时） | **原生复用**：`live.py:live_endpoint` |
+| **`/projects/{id}`** | `GET/DELETE` | 单个项目详情 / 删除项目 | **新增**：读写 `ProjectStore` |
+| **`/projects/{id}/sessions`** | `GET/POST` | 项目会话列表查询 / 项目下创建会话 | **新增**：`ProjectStore` 会话关系维护 |
+| **`/sessions`** | `GET/POST` | 用户会话列表（`?unassigned=true` 查个人游离会话） / 创建会话 | **新增**：`ProjectStore` 企业会话服务 |
+| **`/runs`** | `POST` | 发起提问与任务执行（返回 `run_id` 与 `ws_token`） | **原生复用**：`command_endpoints:create_run` |
+| **`/v1/runs/{id}/ws`** | `WS` | WebSocket 实时全双工流式打字机（带 30s 双向心跳防超时） | **原生复用**：`routes_agent_gateway_ws.py` |
 | **`/runs/{id}/cancel`**| `POST` | 取消任务运行 | **原生复用**：`cancel_run` |
+| **`/runs/{id}/answer`**| `POST` | 人机交互确认 / 回复继续执行 | **原生复用**：`answer_run` |
 | **`/files/{attachment_id}`** | `GET` | 下载生成的文件 | **原生复用**：`download_file` |
 | **`/v1/models`** | `GET` | 可用模型枚举 | **原生复用**：`list_models` |
 | **`/playground`** | `GET` | 离线自包含的单页验证控制台 | **新增静态挂载** |
