@@ -1,8 +1,8 @@
 | Task ID | Description | Status | Evidence |
 |---|---|---|---|
-| MANGLI-TASK-1 | Mangli 鉴权与用户上下文 (Java 向量对齐 + 标准库无依赖 LRU 缓存 + 路径豁免中间件) | Pending | 待执行 |
+| MANGLI-TASK-1 | 智能自适应双轨鉴权中间件 (Java 向量对齐 + 无依赖 LRU 缓存 + 兼容 LobeHub 原生与网关) | Pending | 待执行 |
 | MANGLI-TASK-2 | Projects 领域模型与存储引擎实现 (SQLite/Postgres 双后端 + 会话关联与隔离) | Pending | 待执行 |
-| MANGLI-TASK-3 | 企业 Thin Façade 路由插件 (复用底层 Handlers + 补齐 Projects 与会话过滤) | Pending | 待执行 |
+| MANGLI-TASK-3 | Projects 路由与会话项目扩展插件 (挂载 /projects + 扩展 /v1/sessions + 复用原生 runs/live/files) | Pending | 待执行 |
 | MANGLI-TASK-4 | 真实 LCA Tool 契约实现与企业能力 (继承 Tool + 返回 Observation + 沙箱文件) | Pending | 待执行 |
 | MANGLI-TASK-5 | 离线自包含的 Playground 验证控制台单页 (纯原生 CSS + 无外部 CDN + 200 HTTP 响应) | Pending | 待执行 |
 | MANGLI-TASK-6 | 声明式编排配置与真实 Merge-Base 零修改门禁 (origin/main...HEAD 对比 + plan compile 校验) | Pending | 待执行 |

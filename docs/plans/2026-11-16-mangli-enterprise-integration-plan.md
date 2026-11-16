@@ -2,24 +2,24 @@
 
 > **For Antigravity:** REQUIRED WORKFLOW: Use `.agent/workflows/execute-plan.md` to execute this plan in single-flow mode.
 
-**Goal:** 基于 LCA 插件化微内核，在零修改底层核心代码的前提下，构建企业统一鉴权中间件（AES-ECB-PKCS5Padding + 标准库 LRU 缓存）、Projects 存储引擎（SQLite/Postgres 双后端）、收敛的 Thin Façade 接口（复用底层 Runs/Stream/Cancel/Files/Models）、真实的 Tool 协议与 MCP 集群配置，以及纯内网离线自包含的 Playground 验证单页。
+**Goal:** 基于 LCA 插件化微内核，在零修改底层核心代码的前提下，构建自适应双轨鉴权中间件（无侵入兼容 LobeHub 原生测试与公司 Gateway 鉴权）、Projects 存储引擎（SQLite/Postgres 双后端）、增量项目路由与会话项目关联扩展、真实的 Tool 协议与 MCP 集群配置，以及纯内网离线自包含的 Playground 验证单页。
 
-**Architecture:** 纯外围插件扩展（Thin Façade 模式）。Starlette 网关挂载路径隔离的中间件与企业门面路由，复用现有 `command_endpoints`、`live.py` 与 `files.py`；外部数据通过原生 `mcp_servers` 声明式挂载；全链路事实由 Session 追加单轨保障。
+**Architecture:** 纯外围插件扩展（Seam/Provider 范式）。全盘复用现有的 `/runs`、`/runs/{id}/live`、`/v1/sessions`、`/files`、`/v1/models`，不建平行 URL 副本；通过 `SmartAdaptiveAuthMiddleware` 智能识别流量并完成身份桥接；外部数据通过原生 `mcp_servers` 声明式挂载；全链路事实由 Session 追加单轨保障。
 
-**Tech Stack:** Python 3.12, Starlette, Pydantic, Cryptography (AES-ECB-PKCS7), HTTPX (Async Permissions), Server-Sent Events (SSE), SQLite3, HTML5/Native CSS (离线免构建).
+**Tech Stack:** Python 3.12, Starlette, Pydantic, Cryptography (AES-ECB-PKCS7), HTTPX (Async Permissions), Server-Sent Events (SSE), SQLite3, HTML5/Native CSS (离线自包含).
 
 ---
 
-### Task 1: Mangli 鉴权与用户上下文模块 (Java 向量对齐 + 标准库缓存)
+### Task 1: 智能自适应鉴权中间件与用户上下文模块
 
 **Files:**
 - Create: `lca/plugins/transport/webserver/handlers/auth/mangli_auth.py`
 - Test: `tests/plugins/transport/test_mangli_auth.py`
 - Does NOT own: `lca/contracts/`, `lca/cognition/`, `lca/runtime/`, `lca/loop/`, `lca_kernel/`, `vendor/` (AP-01)
 - Invariants to test:
-  - INV-01: Java 原生编译运行生成的静态密文向量解密一致性；纯 Hex 16 字节密钥主路；SHA1PRNG 兼容辅路；
+  - INV-01: Java 原生编译运行生成的静态密文向量解密一致性（包含 16 字节 Hex 密钥主路与 SHA1PRNG 兼容辅路）；
   - INV-02: 权限微服务异步调用，纯标准库实现的 `ExpiringLruCache` 5 分钟 TTL 缓存命中与网络容灾降级；
-  - INV-03: 中间件路径隔离（非 `/api/v1/*` 路径 100% 豁免放行）。
+  - INV-03: 自适应双轨鉴权：无 `X-Mangli-User` 时 LobeHub 100% 原样放行，LobeHub 测试 0 影响；有 `X-Mangli-User` 时自动解密并桥接注入底层 `user_id`。
 
 **Step 1: Write the failing test**
 
@@ -28,24 +28,19 @@
 import pytest
 from lca.plugins.transport.webserver.handlers.auth.mangli_auth import (
     ExpiringLruCache,
-    MangliAuthMiddleware,
     MangliAuthService,
     MangliUserContext,
+    SmartAdaptiveAuthMiddleware,
     decrypt_mangli_user_header,
     derive_sha1prng_key,
 )
 
 
 def test_java_cross_compatibility_vector():
-  # 使用由 Java 原生 KeyGenerator("AES") + SecureRandom("SHA1PRNG") + password "mangli_test_key_2026"
-  # 生成的已知 Hex 密文向量进行跨语言对齐校验
   password = b"mangli_test_key_2026"
   key = derive_sha1prng_key(password)
   assert len(key) == 16
-
-  # 纯 Hex 模式验证
-  key_hex = key.hex()
-  assert len(bytes.fromhex(key_hex)) == 16
+  assert len(bytes.fromhex(key.hex())) == 16
 
 
 def test_expiring_lru_cache_standard_library():
@@ -69,24 +64,46 @@ async def test_permission_cache_ttl_and_error_handling():
   assert call_count == 1
   assert "user:read" in perms
 
-  # 命中 5min 缓存，不产生重复网络调用
+  # 命中 5min 缓存
   perms2, roles2 = await service.get_permissions("ticket_123", "U1001")
   assert call_count == 1
 
 
 @pytest.mark.asyncio
-async def test_middleware_path_exemption():
-  app_called = False
+async def test_adaptive_auth_double_track():
+  captured_headers = {}
 
   async def dummy_app(scope, receive, send):
-    nonlocal app_called
-    app_called = True
+    nonlocal captured_headers
+    captured_headers = dict(scope.get("headers", []))
 
-  mw = MangliAuthMiddleware(dummy_app)
-  # 非 /api/v1 路径（如 /health）应直接放行，不检查 Header
-  scope = {"type": "http", "path": "/health", "headers": []}
-  await mw(scope, None, None)
-  assert app_called is True
+  mw = SmartAdaptiveAuthMiddleware(dummy_app)
+
+  # 1. 无 X-Mangli-User (LobeHub 流量)：原封不动放行
+  scope_lobehub = {
+      "type": "http",
+      "path": "/runs",
+      "headers": [(b"x-lca-user-id", b"usr_lobe"), (b"authorization", b"Bearer lca-local")],
+  }
+  await mw(scope_lobehub, None, None)
+  assert captured_headers.get(b"x-lca-user-id") == b"usr_lobe"
+
+  # 2. 有 X-Mangli-User (公司 Gateway 流量)：自动解密并桥接为底层 x-lca-user-id
+  from lca.plugins.transport.webserver.handlers.auth.mangli_auth import (
+      encrypt_mangli_user_header_for_test,
+  )
+
+  key = derive_sha1prng_key(b"test_pwd")
+  enc = encrypt_mangli_user_header_for_test(
+      '{"user_id":"U888","name":"张三","dept_id":"D01"}', key
+  )
+  scope_gateway = {
+      "type": "http",
+      "path": "/runs",
+      "headers": [(b"x-mangli-user", enc.encode()), (b"ticket", b"t123")],
+  }
+  await mw(scope_gateway, None, None)
+  assert captured_headers.get(b"x-lca-user-id") == b"U888"
 ```
 
 **Step 2: Run test to verify it fails**
@@ -99,7 +116,7 @@ Expected: FAIL with `ModuleNotFoundError` or `ImportError`.
 - `decrypt_mangli_user_header(hex_str: str, key: bytes) -> dict`；
 - `ExpiringLruCache`（纯标准库 `collections.OrderedDict` + `time.monotonic()` 实现）；
 - `MangliAuthService`；
-- `MangliAuthMiddleware`（纯 ASGI，非 `/api/v1` 100% 放行，拦截 `/api/v1` 解密并注入 `scope["state"]["user_id"]` 与 `ContextVar`）。
+- `SmartAdaptiveAuthMiddleware`（无 `X-Mangli-User` 原样放行保障 LobeHub；有 `X-Mangli-User` 解密并桥接注入底层 `scope["headers"]` 与 `ContextVar`）。
 
 **Step 4: Run test to verify it passes**
 Run: `pytest tests/plugins/transport/test_mangli_auth.py -v`
@@ -108,7 +125,7 @@ Expected: PASS (4/4 passed).
 **Step 5: Commit**
 ```bash
 git add lca/plugins/transport/webserver/handlers/auth/mangli_auth.py tests/plugins/transport/test_mangli_auth.py
-git commit -m "feat(auth): implement Mangli auth with Java vector alignment and path exemption"
+git commit -m "feat(auth): implement smart adaptive auth middleware supporting LobeHub and Mangli gateway"
 ```
 
 ---
@@ -182,71 +199,64 @@ git commit -m "feat(persistence): implement ProjectStore with session binding an
 
 ---
 
-### Task 3: 企业 Thin Façade 路由插件 (`routes_mangli_api.py`)
+### Task 3: Projects 路由与会话项目扩展插件
 
 **Files:**
-- Create: `lca/plugins/transport/webserver/routes_mangli_api.py`
-- Test: `tests/plugins/transport/test_routes_mangli_api.py`
+- Create: `lca/plugins/transport/webserver/routes_mangli_projects.py`
+- Test: `tests/plugins/transport/test_routes_mangli_projects.py`
 - Does NOT own: `lca/contracts/`, `lca/cognition/`, `lca/runtime/`, `lca/loop/`, `lca_kernel/` (AP-01)
 - Invariants to test:
-  - INV-05: Thin Façade 严格复用底层现成 Handler（`create_run`, `live_endpoint`, `cancel_run`, `list_models`, `download_file`），不造重复轮子；
-  - 会话查询支持 `project_id` 过滤与游离会话（`unassigned=true`）过滤。
+  - 增量挂载 `GET/POST /projects`；
+  - 扩展 `/v1/sessions` 允许通过 `?project_id=...` 过滤，或 `?unassigned=true` 查询游离会话；
+  - 现存的所有 `/runs`, `/runs/{id}/live`, `/files`, `/v1/models` 100% 保持原生不重复包装。
 
 **Step 1: Write the failing test**
 
 ```python
-# tests/plugins/transport/test_routes_mangli_api.py
+# tests/plugins/transport/test_routes_mangli_projects.py
 import pytest
 from starlette.testclient import TestClient
-from starlette.applications import Starlette
 
 
-def test_mangli_facade_route_specs_exist():
-  from lca.plugins.transport.webserver.routes_mangli_api import (
-      MANGLI_ROUTE_SPECS,
+def test_projects_route_specs_exist():
+  from lca.plugins.transport.webserver.routes_mangli_projects import (
+      PROJECTS_ROUTE_SPECS,
   )
 
-  paths = {spec.path for spec in MANGLI_ROUTE_SPECS}
-  assert "/api/v1/projects" in paths
-  assert "/api/v1/sessions" in paths
-  assert "/api/v1/sessions/{session_id}/runs" in paths
-  assert "/api/v1/runs/{run_id}/stream" in paths
-  assert "/api/v1/runs/{run_id}/cancel" in paths
-  assert "/api/v1/models" in paths
-  assert "/api/v1/files/{attachment_id}/download" in paths
+  paths = {spec.path for spec in PROJECTS_ROUTE_SPECS}
+  assert "/projects" in paths
 ```
 
 **Step 2: Run test to verify it fails**
-Run: `pytest tests/plugins/transport/test_routes_mangli_api.py -v`
+Run: `pytest tests/plugins/transport/test_routes_mangli_projects.py -v`
 Expected: FAIL.
 
 **Step 3: Write minimal implementation**
-实现 `lca/plugins/transport/webserver/routes_mangli_api.py`：
-- 导入现有底层 handlers：`create_run`, `cancel_run`, `live_endpoint`, `list_models`, `download_file`；
-- 暴露 Thin Façade 路由；
-- 插件 setup(ctx) 挂载 `MangliAuthMiddleware` 并注册路由。
+实现 `lca/plugins/transport/webserver/routes_mangli_projects.py`：
+- 注册 `GET /projects`、`POST /projects`；
+- 插件 setup(ctx) 挂载 `SmartAdaptiveAuthMiddleware`，并向 `route_registry` 注册项目路由。
 
 **Step 4: Run test to verify it passes**
-Run: `pytest tests/plugins/transport/test_routes_mangli_api.py -v`
+Run: `pytest tests/plugins/transport/test_routes_mangli_projects.py -v`
 Expected: PASS.
 
 **Step 5: Commit**
 ```bash
-git add lca/plugins/transport/webserver/routes_mangli_api.py tests/plugins/transport/test_routes_mangli_api.py
-git commit -m "feat(routes): implement Mangli thin facade routes reusing existing handlers"
+git add lca/plugins/transport/webserver/routes_mangli_projects.py tests/plugins/transport/test_routes_mangli_projects.py
+git commit -m "feat(routes): implement Projects domain routes and session project binding"
 ```
 
 ---
 
-### Task 4: 真实的 LCA Tool 契约实现与 MCP 集群配置
+### Task 4: 真实 LCA Tool 契约实现与企业能力插件
 
 **Files:**
 - Create: `lca/plugins/tools/mangli_enterprise_tools.py`
 - Test: `tests/plugins/tools/test_mangli_enterprise_tools.py`
 - Does NOT own: `lca/contracts/`, `lca/cognition/`, `lca/runtime/`, `lca/loop/`, `lca_kernel/` (AP-01)
 - Invariants to test:
-  - INV-06: 严格继承 `lca.contracts.protocols.Tool`，声明 `parameters`（非 `parameters_schema`），`execute(args)` 返回 `Observation`；
-  - 问数 Agent A2A 委托自动附带当前调用者上下文；受控工作区安全文件沙箱读写回执闭环。
+  - INV-05: 严格继承 `lca.contracts.protocols.Tool`，声明 `parameters`，`execute(args)` 返回 `Observation`；
+  - 问数 Agent 委托自动附带当前调用者上下文；受控工作区安全文件沙箱读写回执闭环。
 
 **Step 1: Write the failing test**
 
@@ -325,20 +335,17 @@ git commit -m "feat(tools): implement Mangli enterprise tools strictly conformin
 
 **Files:**
 - Create: `lca/plugins/transport/webserver/static/mangli_playground.html`
-- Modify: `lca/plugins/transport/webserver/routes_mangli_api.py` (注册 `GET /playground`)
+- Modify: `lca/plugins/transport/webserver/routes_mangli_projects.py` (注册 `GET /playground`)
 - Test: `tests/plugins/transport/test_playground_endpoint.py`
 - Does NOT own: `lca/contracts/`, `lca/cognition/`, `lca/runtime/`, `lca/loop/`, `lca_kernel/` (AP-01)
 - Invariants to test:
-  - INV-08: `GET /playground` 严格返回 200 及 `text/html`；HTML 纯原生 CSS 自包含，无外部 Tailwind 等外网 CDN 引用。
+  - INV-07: `GET /playground` 严格返回 200 及 `text/html`；HTML 纯原生 CSS 自包含，无外部 Tailwind 等外网 CDN 引用。
 
 **Step 1: Write the failing test**
 
 ```python
 # tests/plugins/transport/test_playground_endpoint.py
 from pathlib import Path
-from starlette.testclient import TestClient
-from starlette.applications import Starlette
-from starlette.responses import HTMLResponse
 
 
 def test_playground_offline_render():
@@ -350,7 +357,7 @@ def test_playground_offline_render():
   # 验证零外网 CDN 依赖（内网离线保证）
   assert "cdn.tailwindcss.com" not in content
   assert "googleapis.com" not in content
-  assert "<style>" in content  # 包含内置原生样式
+  assert "<style>" in content
   assert "X-Mangli-User" in content
   assert "EventSource" in content
 ```
@@ -361,7 +368,7 @@ Expected: FAIL.
 
 **Step 3: Write minimal implementation**
 - 编写 `lca/plugins/transport/webserver/static/mangli_playground.html`；
-- 在 `routes_mangli_api.py` 中挂载 `RouteSpec("/playground", playground_endpoint, ("GET",))`。
+- 在 `routes_mangli_projects.py` 中挂载 `RouteSpec("/playground", playground_endpoint, ("GET",))`。
 
 **Step 4: Run test to verify it passes**
 Run: `pytest tests/plugins/transport/test_playground_endpoint.py -v`
@@ -369,7 +376,7 @@ Expected: PASS.
 
 **Step 5: Commit**
 ```bash
-git add lca/plugins/transport/webserver/static/mangli_playground.html lca/plugins/transport/webserver/routes_mangli_api.py tests/plugins/transport/test_playground_endpoint.py
+git add lca/plugins/transport/webserver/static/mangli_playground.html lca/plugins/transport/webserver/routes_mangli_projects.py tests/plugins/transport/test_playground_endpoint.py
 git commit -m "feat(playground): add self-contained offline verification console"
 ```
 
@@ -383,8 +390,8 @@ git commit -m "feat(playground): add self-contained offline verification console
 - Test: `tests/plugins/test_mangli_core_zero_mutation_guard.py`
 - Does NOT own: `lca/contracts/`, `lca/cognition/`, `lca/runtime/`, `lca/loop/`, `lca_kernel/` (AP-01)
 - Invariants to test:
-  - INV-07: 对比 `origin/main...HEAD`，核心目录 `lca/contracts`, `lca/cognition`, `lca/runtime`, `lca/loop`, `lca/framework`, `lca_kernel`, `vendor` 严格 0 改动！
-  - 编排验证：使用 `./scripts/lca-ops plan compile profiles/mangli-enterprise.yaml`（或 python 静态编译）成功通过。
+  - INV-06: 对比 `origin/main...HEAD`，核心目录 `lca/contracts`, `lca/cognition`, `lca/runtime`, `lca/loop`, `lca/framework`, `lca_kernel`, `vendor` 严格 0 改动！
+  - 编排验证：使用 `./scripts/lca-ops plan compile profiles/mangli-enterprise.yaml` 成功通过。
 
 **Step 1: Write the failing test**
 
@@ -427,7 +434,7 @@ def test_enterprise_yaml_configs_exist():
 
 **Step 2: Run test to verify it fails**
 Run: `pytest tests/plugins/test_mangli_core_zero_mutation_guard.py -v`
-Expected: FAIL because YAMLs don't exist yet.
+Expected: FAIL.
 
 **Step 3: Write minimal implementation**
 - 编写 `bundles/mangli-enterprise.yaml`；
