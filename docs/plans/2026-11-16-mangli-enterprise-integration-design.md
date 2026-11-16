@@ -70,12 +70,13 @@ flowchart TD
         SafeExec[SafeExecutor 隔离沙箱]
     end
 
-    subgraph EnterpriseTools [企业数据工具池 (mangli_enterprise_tools.py)]
-        T_Data[1. 问数 Agent A2A 委托]
-        T_OA[2. OA 协同 MCP 客户端]
-        T_Wiki[3. Wiki / Jira 检索工具]
-        T_KB[4. 企业知识库 RAG 检索]
-        T_File[5. 受控工作区文件读写]
+    subgraph EnterpriseData [企业能力与数据网格 (MCP-First 架构)]
+        T_OA[1. OA 协同 MCP Server]
+        T_Wiki[2. Wiki / Confluence MCP Server]
+        T_Jira[3. Jira 任务协同 MCP Server]
+        T_KB[4. 企业知识库 MCP Server]
+        T_Data[5. 问数 Agent (A2A 或 MCP)]
+        T_File[6. 受控工作区安全文件沙箱]
     end
 
     SCG -->|携带 X-Mangli-User & ticket| AuthMid
@@ -84,8 +85,7 @@ flowchart TD
     ContextVar --> APIRoutes
     
     APIRoutes --> CoreEngine
-    CoreEngine --> EnterpriseTools
-    EnterpriseTools --> CoreEngine
+    CoreEngine <-->|MCP JSON-RPC / SSE| EnterpriseData
     CoreEngine -->|SSE 打字机增量 + 工具回执| R_Stream
 ```
 
@@ -168,23 +168,21 @@ flowchart TD
 
 ---
 
-### 4.3 五大企业数据工具与能力集成
+### 4.3 企业能力与数据网格集成 (MCP-First 优先架构)
 
-所有工具定义在 `lca/plugins/tools/mangli_enterprise_tools.py` 中，严格遵循 LCA 强类型输入/输出契约：
+为彻底消解手写 REST 胶水代码的脆弱性与高维护成本，外部系统集成全面采用业界标准的 **MCP (Model Context Protocol)** 协议栈：
 
-1. **智能问数 Agent 工具 (`query_data_agent`)**：
-   - 走 HTTP 委托协议调用外部问数 Agent。
-   - 自动附带调用者的 `user_id` 与 `dept_id` 作为数据查询过滤条件，防止越权。
-2. **OA 协同工具 (`oa_mcp_tools`)**：
-   - 复用 LCA 原生内置的 `_mcp_factory`，连接 OA MCP Server。
-   - 动态暴露待办审批查询、流程发起等标准能力。
-3. **Wiki & Jira 协同工具 (`search_wiki`, `search_jira`)**：
-   - 基于 REST API 封装对企业 Wiki 与 Jira 的只读检索与状态追踪。
-4. **企业知识库工具 (`search_knowledge_base`)**：
-   - 连接企业内部 RAG 检索服务，返回带原文出处与溯源链接的切片。
-5. **受控工作区文件读写工具 (`read_workspace_file`, `write_workspace_file`)**：
-   - 基于当前 `session_id` 与 `project_id` 的受控沙箱目录读写。
-   - 写入文件自动向事实日志追加回执，并生成对外的下载 `file_id`。
+1. **企业系统统一 MCP 服务集群 (OA / Wiki / Jira / 知识库)**：
+   - 复用 LCA 原生内置的 MCP 基础设施（`lca/infrastructure/mcp/` 中的 `MCPClient` 与 `MCPHub`，原生支持 HTTP/SSE 与 stdio）；
+   - **动态工具发现（Tool Discovery）**：LCA 启动时自动与各系统的 MCP Server 握手，调用 `tools/list` 动态拉取工具元数据与 JSON Schema，**零 Python 业务适配代码**即可直接暴露：
+     - **OA MCP**：`oa_get_pending_tasks`、`oa_submit_approval`、`oa_query_calendar` 等；
+     - **Wiki/Confluence MCP**：`confluence_search_articles`、`confluence_get_page_content` 等；
+     - **Jira MCP**：`jira_search_by_jql`、`jira_get_issue`、`jira_update_issue` 等；
+     - **企业知识库 MCP**：`kb_semantic_search`、`kb_read_document_chunk` 等。
+2. **智能问数 Agent 工具 (`query_data_agent`)**：
+   - 若问数 Agent 提供 MCP，则作为 MCP Server 挂载；若为独立 Agent 接口，则通过轻量 A2A 委托协议调用，自动附带调用者的 `user_id` 与 `dept_id` 进行数据权限校验。
+3. **受控工作区文件沙箱工具 (`workspace_file_ops`)**：
+   - 基于当前 `session_id` 与 `project_id` 的受控沙箱安全读写，写入文件自动追加不可变事实日志回执，并生成对外的下载 `file_id`。
 
 ---
 
@@ -224,6 +222,22 @@ bundles:
   - bundles/session-runtime.yaml
   - bundles/observability-default.yaml
   - bundles/mangli-enterprise.yaml
+
+# 统一配置企业外部 MCP 服务集群（零代码动态发现）
+mcp_servers:
+  - name: oa_service
+    transport: sse
+    url: "http://10.36.6.252:8000/sse"
+  - name: wiki_confluence
+    transport: sse
+    url: "http://10.36.6.252:8001/sse"
+  - name: jira_tasks
+    transport: sse
+    url: "http://10.36.6.252:8002/sse"
+  - name: enterprise_knowledge
+    transport: sse
+    url: "http://10.36.6.252:8003/sse"
+
 patch:
   - id: mangli-enterprise-routes
     config:

@@ -155,14 +155,14 @@ git commit -m "feat(routes): implement Mangli enterprise REST and SSE streaming 
 
 ---
 
-### Task 3: 5 大企业数据与能力工具插件 (`mangli_enterprise_tools.py`)
+### Task 3: 企业 MCP 集群接入与专用工具插件 (`mangli_enterprise_tools.py`)
 
 **Files:**
 - Create: `lca/plugins/tools/mangli_enterprise_tools.py`
 - Test: `tests/plugins/tools/test_mangli_enterprise_tools.py`
 - Does NOT own: `lca/contracts/`, `lca/cognition/`, `lca/runtime/`, `lca/loop/`, `lca_kernel/` (AP-01)
 - Invariants to test:
-  - INV-05: 5 大工具入参强类型契约校验；上下文透传（自动带入当前调用者 `user_id` 与 `dept_id`）；文件安全沙箱读写回执闭环。
+  - INV-05: 企业 MCP 集群 (OA/Wiki/Jira/KB) 声明式发现与握手；问数 Agent A2A 委托与调用者用户上下文 (`user_id`, `dept_id`) 透传；受控工作区文件安全沙箱读写回执闭环。
 
 **Step 1: Write the failing test**
 
@@ -171,9 +171,8 @@ git commit -m "feat(routes): implement Mangli enterprise REST and SSE streaming 
 import pytest
 from lca.plugins.tools.mangli_enterprise_tools import (
     QueryDataAgentTool,
-    SearchWikiTool,
-    SearchKnowledgeBaseTool,
     WorkspaceFileOpsTool,
+    build_mangli_mcp_configs,
 )
 
 
@@ -182,8 +181,20 @@ def test_tools_schema_and_metadata():
   assert tool.name == "query_data_agent"
   assert "query" in tool.parameters_schema["properties"]
 
-  kb_tool = SearchKnowledgeBaseTool()
-  assert kb_tool.name == "search_knowledge_base"
+
+def test_mcp_cluster_configs_builder():
+  # 验证 4 大外部系统 (OA/Wiki/Jira/KB) 的标准 MCP 连接配置结构
+  configs = build_mangli_mcp_configs(
+      oa_url="http://oa.internal/sse",
+      wiki_url="http://wiki.internal/sse",
+      jira_url="http://jira.internal/sse",
+      kb_url="http://kb.internal/sse",
+  )
+  names = {c.name for c in configs}
+  assert "oa_service" in names
+  assert "wiki_confluence" in names
+  assert "jira_tasks" in names
+  assert "enterprise_knowledge" in names
 
 
 @pytest.mark.asyncio
@@ -210,9 +221,8 @@ Expected: FAIL.
 
 **Step 3: Write minimal implementation**
 实现 `lca/plugins/tools/mangli_enterprise_tools.py`：
-- `QueryDataAgentTool` (HTTP A2A 委托)
-- `SearchWikiTool` & `SearchJiraTool` (REST 工具)
-- `SearchKnowledgeBaseTool` (企业知识库检索)
+- `build_mangli_mcp_configs` (生成 OA/Wiki/Jira/KB 的标准 MCP 连接配置)
+- `QueryDataAgentTool` (HTTP A2A / MCP 委托)
 - `WorkspaceFileOpsTool` (受控工作区安全读写)
 - `@plugin(id="mangli-enterprise-tools", requires=("tools",))` 工厂注册入口
 
@@ -223,7 +233,7 @@ Expected: PASS.
 **Step 5: Commit**
 ```bash
 git add lca/plugins/tools/mangli_enterprise_tools.py tests/plugins/tools/test_mangli_enterprise_tools.py
-git commit -m "feat(tools): implement 5 Mangli enterprise data and workspace tools"
+git commit -m "feat(tools): implement Mangli MCP cluster config builder and enterprise tools"
 ```
 
 ---

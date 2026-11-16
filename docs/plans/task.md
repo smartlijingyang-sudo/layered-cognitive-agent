@@ -2,7 +2,7 @@
 |---|---|---|---|
 | MANGLI-TASK-1 | Mangli 鉴权中间件与用户上下文 (AES-ECB-PKCS5Padding + 5min TTL 权限缓存) | Pending | 待执行 |
 | MANGLI-TASK-2 | 企业统一 REST + SSE 路由插件 (项目/会话/流式/文件/取消/模型) | Pending | 待执行 |
-| MANGLI-TASK-3 | 5 大企业数据与能力工具插件 (问数A2A/OA MCP/Wiki/知识库/沙箱文件) | Pending | 待执行 |
+| MANGLI-TASK-3 | 企业 MCP 集群接入与专用工具插件 (OA/Wiki/Jira/KB MCP + 问数A2A + 沙箱文件) | Pending | 待执行 |
 | MANGLI-TASK-4 | 声明式编排配置与核心零修改门禁 (Bundle & Profile YAML) | Pending | 待执行 |
 | MANGLI-TASK-5 | 极简单页验证控制台 (Playground UI 与静态挂载) | Pending | 待执行 |
 | BRAINSTORM-HARDCODING-CONTEXT | 深度梳理近期提交硬编码问题与相关模块上下文 | Completed | 已完成近期 40+ commit 深度排查，定位 7 大类硬编码缺陷（模板宿主机IP、Prompt伪造、路径魔数、正则误杀等） |
