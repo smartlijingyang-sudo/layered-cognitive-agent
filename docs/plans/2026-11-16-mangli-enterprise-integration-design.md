@@ -1,21 +1,26 @@
 # 企业级应用集成与统一接口封装设计 (Mangli Enterprise Integration Design)
 
-> **设计状态：** Approved (用户已确认)  
+> **设计状态：** Approved (针对架构评审意见完成全量硬伤修复与深化)  
 > **设计日期：** 2026-11-16  
 > **自治等级：** DRAFT (纯外围扩展与声明式编排，零侵入核心)  
-> **核心原则：** 核心封板零修改；外围插件化；声明式编排；强类型契约闭环；开箱即用单页验证。
+> **宪法约束：** 遵照根目录 `AGENTS.md`（C1 认知闭集、C2 双平面、C4 Reducer单写、C5 能力单调、C6 最小化、C10 执行窄门、C13 信息血统闭合、C14 图与业务隔离）。
 
 ---
 
-## 1. 业务目标与第一性原理
+## 1. 架构定位：Thin Façade 聚合门面原则
 
-### 1.1 业务诉求
-针对企业生产环境下的智能体落地，本方案解决以下核心诉求：
-1. **企业统一鉴权对齐**：支持通过公司统一 API Gateway 传入的 `X-Mangli-User`（AES/ECB/PKCS5Padding 经 Hex 编码）进行解密，并使用透传的 `ticket` 调用内部权限微服务拉取角色与权限点，将身份安全注入运行上下文；
-2. **多数据源自主编排**：支持无缝集成智能问数 Agent（A2A）、OA 系统（MCP 协议）、Wiki/Jira（REST API）、企业知识库（RAG）以及受控文件沙箱（安全读写与回执）；
-3. **接口高度收敛与时序解耦**：彻底消除前端直接面对数十个异构业务接口的复杂性，由 Agent 认知闭环自主完成时序规划，对外统一封装为项目、会话、消息流式（SSE）与文件四大标准 REST+SSE 接口；
-4. **灵活多维隔离**：支持基于“项目（Project）”的团队隔离空间，同时天然兼容不属于任何项目的“游离会话（个人独立会话）”；
-5. **极简开箱即用验证**：提供独立的单页测试控制台（Playground），支持模拟 Header 输入、项目/会话切换、打字机流式查看、工具调用折叠卡片与文件一键下载。
+### 1.1 明确与现有 API 的主从关系（拒绝造轮子）
+系统**严禁重写或平行造一套运行执行逻辑**。现有 `lca/plugins/transport/webserver/` 已经具备成熟稳定的执行与流式基础设施：
+- `/runs`（创建/查询/取消/answer/feedback/doctor/evidence/live SSE 流式）定义在 [`routes_runs_sessions.py`](file:///H:/Workspace/KLTB/SourceCode/tongbao-ai/layered-cognitive-agent/lca/plugins/transport/webserver/routes_2/routes_runs_sessions.py)；
+- `/files/{attachment_id}`（文件下载）与 `/v1/models`（模型枚举）定义在 [`routes_openai_compat_files.py`](file:///H:/Workspace/KLTB/SourceCode/tongbao-ai/layered-cognitive-agent/lca/plugins/transport/webserver/routes_1/routes_openai_compat_files.py)；
+- `/v1/sessions` 具备 8 条完整的底层会话管理路由。
+
+**`/api/v1` 的唯一正确定位是：企业级薄门面（Thin Façade）与上下文适配层：**
+1. **纯转发复用**：`/api/v1/runs/{id}/stream` 直接复用底层的 `live_endpoint`（SSE）；`/api/v1/runs/{id}/cancel` 直接复用底层的 `cancel_run`；`/api/v1/models` 直接复用 `list_models`；`/api/v1/files/{id}/download` 直接复用 `download_file`；
+2. **只增量补齐缺失域**：
+   - **`Projects` 领域**（全仓此前无此概念，本方案独立提供持久化与成员隔离）；
+   - **Mangli 企业专属鉴权**（解密 Gateway 请求头，获取权限并完成身份映射）；
+   - **项目与会话关联绑定**（支持指定 `project_id` 过滤或查询个人游离会话）。
 
 ---
 
@@ -23,253 +28,157 @@
 
 ### 2.1 强制责任边界 (AP-01)
 - **Owns (本设计负责构建的内容)**：
-  1. `lca/plugins/transport/webserver/routes_mangli_api.py`：企业网关专属路由与鉴权插件；
-  2. `lca/plugins/tools/mangli_enterprise_tools.py`：5 大企业数据与能力工具插件；
-  3. `bundles/mangli-enterprise.yaml`：企业 Bundle 组合清单；
-  4. `profiles/mangli-enterprise.yaml`：企业 Profile 配置与参数补丁；
-  5. `lca/infrastructure/web/static/mangli_playground.html`：轻量单页测试控制台；
-  6. `tests/plugins/transport/test_routes_mangli_api.py` 与 `tests/plugins/tools/test_mangli_tools.py`：全量自动化回归与不变量测试。
+  1. `lca/plugins/transport/webserver/handlers/auth/mangli_auth.py`：AES-ECB-PKCS5Padding 解密、Java 向量对齐、权限服务调用、基于标准库的无依赖 `ExpiringLruCache`；
+  2. `lca/plugins/transport/webserver/routes_mangli_api.py`：`/api/v1` 薄门面路由插件，仅补齐 Projects、会话过滤，其余直接代理复用已有 Handler；
+  3. `lca/infrastructure/persistence/project_store.py`：`ProjectStore`（SQLite/Postgres 双后端）负责项目实体与 `project_id ↔ session_id` 关联映射；
+  4. `lca/plugins/tools/mangli_enterprise_tools.py`：严格遵循 `ToolManifest` + `ParameterSpec` + `Tool` 契约（继承 `lca.contracts.protocols.Tool`，返回 `Observation`）的企业工具与 MCP 集群配置器；
+  5. `lca/plugins/transport/webserver/static/mangli_playground.html`：**零外网依赖（纯内置现代化原生 CSS，无 Tailwind CDN）**的单页验证控制台；
+  6. `bundles/mangli-enterprise.yaml` 与 `profiles/mangli-enterprise.yaml`：纯环境变量解耦的声明式编排；
+  7. 全量自动化测试（含 Java 真实密文向量测试、真实 merge-base 核心零修改门禁）。
 
-- **Does NOT Own (严格禁止修改或外部系统范围)**：
+- **Does NOT Own (严格禁止侵入或交由外部负责的范围)**：
   1. 严格禁止修改 LCA 核心层代码（`lca/contracts/`, `lca/cognition/`, `lca/runtime/`, `lca/loop/`, `lca/framework/`, `lca_kernel/`, `vendor/`）；
-  2. 严格禁止修改企业内部已有的 Spring Cloud Gateway、权限服务、OA MCP Server、问数 Agent 的代码实现，仅以标准化客户端协议对接。
+  2. 严禁改动或破坏现有的 `/runs`、`/files`、`/v1/chat/completions` 等存量路由与鉴权逻辑。
 
 ### 2.2 自治等级 (AP-05)
-- **评级：DRAFT 级**。
-- **依据**：新功能完全落在外围插件层与配置文件中，遵守 C14（图与业务隔离）、C6（最小化）与 C13（强类型契约），不引发核心架构退化与冲突。
+- **评级：DRAFT 级**（纯外围插件与配置扩展，核心零侵入）。
 
 ---
 
-## 3. 架构全景与组件设计
+## 3. 鉴权架构与双身份体系共存机制
 
-```mermaid
-flowchart TD
-    subgraph ClientLayer [客户端接入层]
-        SCG[企业 Spring Cloud Gateway]
-        Playground[轻量单页验证控制台 /playground]
-    end
+### 3.1 路径隔离与中间件挂载机制
+中间件必须严格实施**路径前缀隔离**，杜绝干扰存量接口：
+1. **挂载点**：在 `routes_mangli_api.py` 的 `@plugin` `setup(ctx)` 中通过 `ctx.require("web_server").app.add_middleware(MangliAuthMiddleware)` 挂载；
+2. **路径白名单/豁免规则**：
+   - 中间件入口首先检查 `scope["path"]`；
+   - **仅对 `/api/v1/*` 路径生效**；
+   - 对 `/health`、`/runs`、`/files`、`/v1/chat/completions`、`/playground` 等非 `/api/v1` 请求，中间件**无条件直接放行（Pass-Through）**，完全不触碰现有鉴权体系。
 
-    subgraph TransportLayer [LCA 传输与网关层 (routes_mangli_api.py)]
-        AuthMid[MangliAuthMiddleware<br>AES解密 + ticket查权限 + 5min LRU缓存]
-        ContextVar[MangliUserContext 注入]
-        
-        subgraph APIRoutes [标准 REST + SSE 路由]
-            R_Proj["/api/v1/projects (项目)"]
-            R_Sess["/api/v1/sessions (会话与历史)"]
-            R_Run["/api/v1/sessions/{id}/runs (发起任务)"]
-            R_Stream["/api/v1/runs/{id}/stream (SSE 流式输出)"]
-            R_Cancel["/api/v1/runs/{id}/cancel (取消任务)"]
-            R_Model["/api/v1/models (模型列表)"]
-            R_File["/api/v1/files (文件清单与下载)"]
-        end
-    end
+### 3.2 双身份体系共存与优先级规范
+现有身份体系基于 `x-lca-user-id` + `Bearer`（ADR-0252 D4），Mangli 引入 `X-Mangli-User` + `ticket`：
+- **在 `/api/v1/*` 路径下**：
+  - 生产环境：强制校验 `X-Mangli-User`。若缺失或解密失败，直接返回 401（Fail-Closed，安全优先）；
+  - 身份桥接映射：从 `X-Mangli-User` 解密获取 `user_id` 后，中间件**主动在请求 scope 中注入 `scope["state"]["user_id"] = user_id` 与 `scope["headers"]` 映射**，从而使底层复用的 `create_run` 等现有 Handler 能够透明获取到合法的 LCA 用户身份；
+  - 开发测试环境（`MANGLI_DEV_MOCK=true`）：允许通过直接填入 JSON Mock 用户调试；若 `MANGLI_DEV_MOCK=false`（生产默认），任何伪造或缺少加密头的请求必触发 Fail-Loud。
+- **在非 `/api/v1/*` 路径下**：
+  - 严格保持原有的 `x-lca-user-id` / Bearer 校验规则不变。
 
-    subgraph CoreEngine [LCA 封板微内核 (零修改)]
-        MTK[MTK 图解释器 & 认知循环]
-        Spine[Session.append 追加式事实日志流]
-        SafeExec[SafeExecutor 隔离沙箱]
-    end
+### 3.3 安全假设与加解密算法设计
+- **安全假设明示**：`AES/ECB` 模式缺乏密文完整性校验（无 MAC/Tag）。**本方案明确建立在“统一 API Gateway 与 LCA 后端运行在企业安全内网/受控 VPC 互联环境下，网络层由内网防火墙保障不可篡改”的安全边界假设之上**。
+- **解密双轨实现**：
+  - **主路（推荐且最高可靠性）**：直接配置 16 字节 Hex 原始对称密钥（通过环境变量 `MANGLI_AES_KEY_HEX` 传入），避免 Python 复现 Sun JRE 内部 `SHA1PRNG` 随机数生成的平台与版本漂移风险；
+  - **兼容辅路**：针对传入密码明文的情况，提供标准 SHA1PRNG 密钥派生算法；
+  - **向量测试强制**：单测必须包含一组由真实 Java 编译运行产出的密文向量（已知明文 $\to$ Java 加密 $\to$ Python 解密并断言一致）。
+- **零依赖高并发缓存**：
+  - 不引入未在 `pyproject.toml` 中的 `cachetools`；
+  - 使用 Python 标准库 `collections.OrderedDict` 与 `time.monotonic()` 编写轻量高效的 `ExpiringLruCache`（默认 5 分钟 TTL，上限 10,000 条），防止针对权限接口的网络穿透。
 
-    subgraph EnterpriseData [企业能力与数据网格 (MCP-First 架构)]
-        T_OA[1. OA 协同 MCP Server]
-        T_Wiki[2. Wiki / Confluence MCP Server]
-        T_Jira[3. Jira 任务协同 MCP Server]
-        T_KB[4. 企业知识库 MCP Server]
-        T_Data[5. 问数 Agent (A2A 或 MCP)]
-        T_File[6. 受控工作区安全文件沙箱]
-    end
+---
 
-    SCG -->|携带 X-Mangli-User & ticket| AuthMid
-    Playground -->|模拟 Header| AuthMid
-    AuthMid --> ContextVar
-    ContextVar --> APIRoutes
-    
-    APIRoutes --> CoreEngine
-    CoreEngine <-->|MCP JSON-RPC / SSE| EnterpriseData
-    CoreEngine -->|SSE 打字机增量 + 工具回执| R_Stream
+## 4. Projects 领域模型与存储设计
+
+由于当前全仓无 Project 概念，在 `lca/infrastructure/persistence/project_store.py` 中引入标准的双后端持久化引擎（对齐已有的 `UserAssistantStore` 范式）：
+
+### 4.1 存储 Schema 设计
+- **本地/开发（SQLite，存放在 `~/.lca/lca.sqlite3`） / 生产（Postgres，由 `LCA_DATABASE_URL` 注入）**：
+```sql
+CREATE TABLE IF NOT EXISTS lca_projects (
+    project_id    TEXT PRIMARY KEY,
+    name          TEXT NOT NULL,
+    description   TEXT,
+    owner_user_id TEXT NOT NULL,
+    dept_id       TEXT,
+    created_at    TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at    TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE TABLE IF NOT EXISTS lca_project_sessions (
+    project_id    TEXT NOT NULL REFERENCES lca_projects(project_id) ON DELETE CASCADE,
+    session_id    TEXT PRIMARY KEY,
+    created_at    TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_lca_projects_owner ON lca_projects(owner_user_id);
+CREATE INDEX IF NOT EXISTS idx_lca_project_sessions_proj ON lca_project_sessions(project_id);
 ```
 
----
-
-## 4. 详细模块设计
-
-### 4.1 认证与用户上下文链路
-
-#### 4.1.1 Java 对齐的 AES 解密算法
-- **算法模式**：`AES/ECB/PKCS5Padding`（对应 Python `AES.MODE_ECB` + PKCS7 填充，无 IV）。
-- **密钥推导兼容**：针对 Java `KeyGenerator + SecureRandom("SHA1PRNG")`，Python 提供等价推导函数，同时支持直接配置 16 字节 Hex 密钥，双重保险。
-- **输入流**：提取请求头 `X-Mangli-User` $\to$ `bytes.fromhex()` $\to$ AES 解密 $\to$ 反序列化为 JSON：
-  ```json
-  {
-    "user_id": "U10086",
-    "name": "张三",
-    "title": "系统架构师",
-    "dept_id": "D003",
-    "dept_name": "研发中心"
-  }
-  ```
-
-#### 4.1.2 权限补全与 LRU 缓存
-- **权限接口**：`http://host:port/inner/api/app/permissions`
-- **请求头**：自动透传 Gateway 传入的 `ticket` Header。
-- **性能优化**：采用 `cachetools.TTLCache(maxsize=10000, ttl=300)`（5 分钟过期），避免频繁请求权限微服务。
-- **用户模型定义**：
-  ```python
-  class MangliUserContext(BaseModel):
-    user_id: str
-    name: str
-    title: str
-    dept_id: str
-    dept_name: str
-    roles: list[str] = Field(default_factory=list)
-    permissions: list[str] = Field(default_factory=list)
-  ```
-- **注入生命周期**：封装进 Python `ContextVar[MangliUserContext]`，下游所有 Tool 执行均可通过 `get_current_user()` 获取当前调用者身份。
+### 4.2 项目与会话权限规则
+1. **项目隔离**：用户仅可查询自己创建的项目（`owner_user_id == current_user.user_id`）或所属部门共享的项目（`dept_id == current_user.dept_id`）；
+2. **游离会话支持**：当创建会话传入 `project_id = null` 或缺省时，不向 `lca_project_sessions` 写入关联记录。查询会话列表时：
+   - 传 `project_id`：仅返回该项目关联的会话；
+   - 传 `unassigned=true`：仅返回该用户不属于任何项目的游离会话；
+   - 不传参：返回该用户有权限的全部会话。
 
 ---
 
-### 4.2 统一 API 契约全景 (REST + SSE)
+## 5. 对外 API 契约全景 (Thin Façade 代理矩阵)
 
-所有接口统一挂载在 `/api/v1/` 命名空间下：
+统一挂载在 `/api/v1/` 下，底层复用关系严格映射如下：
 
-#### 4.2.1 项目域 (Projects)
-- `GET /api/v1/projects`：获取当前用户所属/有权限的项目列表。
-- `POST /api/v1/projects`：创建项目 `{ "name": "...", "description": "..." }`。
-
-#### 4.2.2 会话域 (Sessions)
-- `GET /api/v1/sessions?project_id={id}&unassigned={bool}`：获取会话列表。支持按项目筛选；`unassigned=true` 或不传 `project_id` 则查询个人游离会话。
-- `POST /api/v1/sessions`：创建会话 `{ "title": "...", "project_id": null }`。
-- `DELETE /api/v1/sessions/{session_id}`：删除/归档指定会话。
-- `GET /api/v1/sessions/{session_id}/messages?limit=50&cursor=...`：分页获取会话消息历史，包含用户输入、模型回答、工具卡片快照及生成的文件。
-
-#### 4.2.3 对话运行与流式 (Runs & Streaming)
-- `POST /api/v1/sessions/{session_id}/runs`：发起一次对话任务。
-  - Body: `{ "content": "查询上月华东区销售额并输出 markdown 报告", "attachments": [] }`
-  - Response: `{ "run_id": "run_01J9...", "status": "running" }`
-- `GET /api/v1/runs/{run_id}/stream`：**核心 SSE 长连接通道**。
-  - 响应头包含：`Content-Type: text/event-stream`、`Cache-Control: no-cache`、`X-Accel-Buffering: no`。
-  - **防 Spring Cloud Gateway 超时机制**：每 15 秒自动发送一次 `: ping\n\n` 心跳包。
-  - **事件类型**：
-    - `event: text_delta`：打字机文本增量；
-    - `event: tool_start`：工具执行开始（含入参摘要）；
-    - `event: tool_end`：工具执行结束（含回执与状态）；
-    - `event: file_created`：生成文件通知（含 `file_id`、文件名、大小）；
-    - `event: done`：任务收敛完成；
-    - `event: error`：异常中断提示。
-
-#### 4.2.4 任务控制与模型服务 (Control & Models)
-- `POST /api/v1/runs/{run_id}/cancel`：取消正在运行的任务（复用核心取消状态机）。
-- `GET /api/v1/models`：获取当前可用的模型列表（复用核心模型枚举）。
-
-#### 4.2.5 文件服务域 (Files)
-- `GET /api/v1/files?project_id={id}&session_id={id}`：列出指定范围内的生成或上传文件。
-- `POST /api/v1/files/upload`：上传本地文件挂载至当前会话或项目。
-- `GET /api/v1/files/{file_id}/download`：流式下载文件二进制流。
+| 方法 | 路径 | 业务说明 | 架构实现方式 (复用 vs 新增) |
+|---|---|---|---|
+| `GET` | `/api/v1/projects` | 查询用户有权访问的项目列表 | **新增**：查询 `ProjectStore` |
+| `POST` | `/api/v1/projects` | 创建新项目 | **新增**：写入 `ProjectStore` |
+| `GET` | `/api/v1/sessions` | 查询会话列表（支持 project_id / 游离筛选） | **薄封装**：查询底层 Session 列表 + `ProjectStore` 关联过滤 |
+| `POST` | `/api/v1/sessions` | 创建会话（可指定 project_id） | **薄封装**：调用底层创建会话 + 若传 project_id 写入绑定表 |
+| `GET` | `/api/v1/sessions/{id}/messages` | 会话消息历史分页 | **薄封装**：复用底层 `/runs` 事实读取逻辑 |
+| `POST` | `/api/v1/sessions/{id}/runs` | 发起任务运行 | **直接复用**：`command_endpoints.create_run` |
+| `GET` | `/api/v1/runs/{id}/stream` | SSE 流式输出（15s心跳防超时） | **直接复用**：`live.py:live_endpoint`（带有 `: ping\n\n` 心跳） |
+| `POST` | `/api/v1/runs/{id}/cancel` | 取消任务运行 | **直接复用**：`command_endpoints.cancel_run` |
+| `GET` | `/api/v1/models` | 可用模型枚举 | **直接复用**：`openai.shim:list_models` |
+| `GET` | `/api/v1/files/{id}/download` | 文件下载 | **直接复用**：`files.files:download_file` |
+| `GET` | `/playground` | 本地验证控制台单页 | **静态挂载**：返回无外部依赖的自包含 HTML |
 
 ---
 
-### 4.3 企业能力与数据网格集成 (MCP-First 优先架构)
+## 6. 工具体系：契约对齐与 MCP 集群
 
-为彻底消解手写 REST 胶水代码的脆弱性与高维护成本，外部系统集成全面采用业界标准的 **MCP (Model Context Protocol)** 协议栈：
+### 6.1 严格对齐真实的 LCA Tool 模型
+工具实现类继承 `lca.contracts.protocols.Tool`（参考 [`file_write.py`](file:///H:/Workspace/KLTB/SourceCode/tongbao-ai/layered-cognitive-agent/lca/plugins/tools/file_write.py)），杜绝伪造 API：
+```python
+class MangliTool(Tool):
+  name: str
+  namespace: str
+  description: str
+  parameters: ClassVar[dict[str, Any]]
+  is_idempotent: bool
+  default_timeout_s: int
 
-1. **企业系统统一 MCP 服务集群 (OA / Wiki / Jira / 知识库)**：
-   - 复用 LCA 原生内置的 MCP 基础设施（`lca/infrastructure/mcp/` 中的 `MCPClient` 与 `MCPHub`，原生支持 HTTP/SSE 与 stdio）；
-   - **动态工具发现（Tool Discovery）**：LCA 启动时自动与各系统的 MCP Server 握手，调用 `tools/list` 动态拉取工具元数据与 JSON Schema，**零 Python 业务适配代码**即可直接暴露：
-     - **OA MCP**：`oa_get_pending_tasks`、`oa_submit_approval`、`oa_query_calendar` 等；
-     - **Wiki/Confluence MCP**：`confluence_search_articles`、`confluence_get_page_content` 等；
-     - **Jira MCP**：`jira_search_by_jql`、`jira_get_issue`、`jira_update_issue` 等；
-     - **企业知识库 MCP**：`kb_semantic_search`、`kb_read_document_chunk` 等。
-2. **智能问数 Agent 工具 (`query_data_agent`)**：
-   - 若问数 Agent 提供 MCP，则作为 MCP Server 挂载；若为独立 Agent 接口，则通过轻量 A2A 委托协议调用，自动附带调用者的 `user_id` 与 `dept_id` 进行数据权限校验。
-3. **受控工作区文件沙箱工具 (`workspace_file_ops`)**：
-   - 基于当前 `session_id` 与 `project_id` 的受控沙箱安全读写，写入文件自动追加不可变事实日志回执，并生成对外的下载 `file_id`。
+  def validate(self, args: dict[str, Any]) -> str | None:
+    ...
 
----
-
-### 4.4 极简单页验证控制台 (Playground UI)
-
-文件路径：`lca/infrastructure/web/static/mangli_playground.html`。通过路由插件挂载于 `GET /playground`。
-- **免依赖打包**：采用现代标准纯 HTML + 原生 ES Module / Tailwind CDN，无需安装任何 Node.js/npm 模块；
-- **核心交互视图**：
-  1. **身份模拟器**：支持输入测试用 `X-Mangli-User` 十六进制串，或开启开发 Mock 模式一键切换角色；
-  2. **项目与会话树**：左侧展示“项目会话”与“游离会话”，支持一键新建和删除；
-  3. **对话主视窗**：支持流式打字机逐字渲染，动态展示工具调用的折叠卡片（状态、入参、执行耗时），提供红色的“终止任务”按钮；
-  4. **资产侧边栏**：展示当前会话生成的所有报表和文件卡片，点击直接下载。
-
----
-
-## 5. 声明式编排配置 (YAML)
-
-### 5.1 `bundles/mangli-enterprise.yaml`
-```yaml
-name: mangli-enterprise
-description: 企业专属插件与核心能力组合清单
-requires:
-  - base
-  - session-runtime
-  - observability-default
-plugins:
-  - mangli-enterprise-routes
-  - mangli-enterprise-tools
+  async def execute(self, args: dict[str, Any]) -> Observation:
+    ...
 ```
+返回对象必须是 `lca.contracts.models.core.execution.decision.Observation`。
 
-### 5.2 `profiles/mangli-enterprise.yaml`
-```yaml
-name: mangli-enterprise
-description: 企业运行配置与环境注入
-bundles:
-  - bundles/base.yaml
-  - bundles/session-runtime.yaml
-  - bundles/observability-default.yaml
-  - bundles/mangli-enterprise.yaml
-
-# 统一配置企业外部 MCP 服务集群（零代码动态发现）
-mcp_servers:
-  - name: oa_service
-    transport: sse
-    url: "http://10.36.6.252:8000/sse"
-  - name: wiki_confluence
-    transport: sse
-    url: "http://10.36.6.252:8001/sse"
-  - name: jira_tasks
-    transport: sse
-    url: "http://10.36.6.252:8002/sse"
-  - name: enterprise_knowledge
-    transport: sse
-    url: "http://10.36.6.252:8003/sse"
-
-patch:
-  - id: mangli-enterprise-routes
-    config:
-      aes_password:
-        from_env: MANGLI_AES_PASSWORD
-      permission_api_url: "http://10.36.6.252:8080/inner/api/app/permissions"
-      dev_mock:
-        from_env: MANGLI_DEV_MOCK
-        required: false
-```
+### 6.2 MCP-First 外部集群集成
+- OA、Wiki、Jira、企业知识库通过标准 MCP 协议挂载；
+- 采用 LCA 原生 `MCPClient`（`lca/infrastructure/mcp/`），支持 HTTP/SSE 与 stdio；
+- 启动时自动完成 `tools/list` 动态拉取，零手写业务胶水代码。
 
 ---
 
-## 6. 测试与架构不变量守护 (AP-02)
+## 7. 离线自包含的 Playground 验证控制台
 
-新增自动化测试套件必须严格覆盖以下核心不变量：
+文件路径：`lca/plugins/transport/webserver/static/mangli_playground.html`。
+- **零外部 CDN 依赖**：严禁引用 `cdn.tailwindcss.com`。采用纯手写的现代化原生 CSS（CSS Grid/Flexbox + System Fonts），在任何离线机房或受控内网均能保证 100% 完美渲染；
+- **自包含功能**：
+  1. 顶部 Header 调试模拟（AES 密文输入框 / Mock 身份切换）；
+  2. 左侧项目与会话树形导航；
+  3. 中间打字机实时文本输出与工具调用卡片；
+  4. 右侧生成文件下载列表与“一键取消运行”按钮。
 
-| 不变量编号 | 守护规则与断言 | 验证用例 |
+---
+
+## 8. 自动化测试不变量矩阵 (AP-02)
+
+| 不变量编号 | 守护规则与断言 | 验证实现用例 |
 |---|---|---|
-| **INV-01** | Java `AES/ECB/PKCS5Padding` 加解密一致性，包含 Hex 编解码 | `test_mangli_aes_decrypt_java_interop` |
-| **INV-02** | 权限服务调用与 5 分钟 TTL 缓存命中与过期刷新 | `test_mangli_permission_cache_ttl` |
-| **INV-03** | 项目会话与游离会话（`project_id is None`）隔离与访问边界 | `test_mangli_session_project_isolation` |
-| **INV-04** | SSE 6 类事件流式契约闭环与 15 秒心跳包格式 | `test_mangli_sse_event_stream_closure` |
-| **INV-05** | 5 大数据工具强类型入参校验与上下文透传 | `test_mangli_tools_context_injection` |
-| **INV-06** | **核心零修改铁律**：`git diff lca/contracts lca/cognition lca/runtime lca/loop lca/framework lca_kernel` 必须退出码为 0 且输出为空 | `test_core_zero_mutation_guard` |
-
----
-
-## 7. 实施路线规划
-
-1. **Phase 1**：实现 AES 解密与权限获取中间件，建立单测对齐 Java 加解密；
-2. **Phase 2**：实现对外 REST + SSE 路由插件（项目、会话、文件、取消、模型）；
-3. **Phase 3**：实现 5 大数据与能力插件，完成上下文透传；
-4. **Phase 4**：编排 YAML 配置，完成静态门禁校验（`kernel_check`）；
-5. **Phase 5**：实现单页 Playground 静态页面，端到端联调全链路。
+| **INV-01** | Java 真实密文向量解密一致性（包含 Java SHA1PRNG 生成的静态向量及纯 Hex 密钥模式） | `tests/plugins/transport/test_mangli_auth.py::test_java_cross_compatibility_vector` |
+| **INV-02** | 权限接口 5 分钟 TTL 缓存命中与网络容灾降级（纯标准库 `ExpiringLruCache`） | `tests/plugins/transport/test_mangli_auth.py::test_permission_cache_ttl_and_error_handling` |
+| **INV-03** | 中间件路径隔离（非 `/api/v1` 100% 豁免，不干扰存量 Bearer/x-lca-user-id） | `tests/plugins/transport/test_routes_mangli_api.py::test_middleware_path_exemption` |
+| **INV-04** | Projects 持久化 CRUD、游离会话与项目成员权限隔离 | `tests/plugins/persistence/test_project_store.py::test_project_isolation_and_unassigned_sessions` |
+| **INV-05** | Thin Façade 接口调用与真实底层 Handler 复用性（Runs/Stream/Cancel/Models/Files） | `tests/plugins/transport/test_routes_mangli_api.py::test_thin_facade_endpoints_and_sse_stream` |
+| **INV-06** | 真实工具契约符合性（继承 `Tool`，返回 `Observation`） | `tests/plugins/tools/test_mangli_enterprise_tools.py::test_tool_conforms_to_lca_contract` |
+| **INV-07** | **真实分支合并基线零修改铁律**：`git diff --name-only origin/main...HEAD -- lca/contracts lca/cognition lca/runtime lca/loop lca/framework lca_kernel vendor` 退出码必为 0 且输出必为空！ | `tests/plugins/test_mangli_core_zero_mutation_guard.py::test_core_zero_mutation_against_merge_base` |
+| **INV-08** | 单页 Playground 接口访问断言（`GET /playground` 返回 200，纯内网离线自包含无外部 CDN） | `tests/plugins/transport/test_playground_endpoint.py::test_playground_offline_render` |
