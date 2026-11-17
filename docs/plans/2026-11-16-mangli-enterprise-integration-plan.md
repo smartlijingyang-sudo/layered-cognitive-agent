@@ -175,6 +175,80 @@ async def test_unauthenticated_traffic_rejected_when_prod_mode():
   assert len(sent_messages) >= 1
   assert sent_messages[0]["type"] == "http.response.start"
   assert sent_messages[0]["status"] == 401
+
+
+@pytest.mark.asyncio
+async def test_adaptive_auth_decryption_failure_returns_401():
+  sent_messages = []
+
+  async def dummy_app(scope, receive, send):
+    pass
+
+  async def mock_send(message):
+    sent_messages.append(message)
+
+  class FakeAppState:
+    lca_auth_expected_token = "secret-token-123"
+    lca_auth_dev_mode = False
+
+  class FakeApp:
+    state = FakeAppState()
+
+  mw = SmartAdaptiveAuthMiddleware(dummy_app)
+  scope_bad_cipher = {
+      "type": "http",
+      "path": "/runs",
+      "app": FakeApp(),
+      "headers": [
+          (b"x-mangli-user", b"not_valid_hex_or_bad_padding"),
+      ],
+  }
+  await mw(scope_bad_cipher, None, mock_send)
+  assert len(sent_messages) >= 1
+  assert sent_messages[0]["type"] == "http.response.start"
+  assert sent_messages[0]["status"] == 401
+
+
+@pytest.mark.asyncio
+async def test_adaptive_auth_invalid_ticket_returns_401():
+  sent_messages = []
+
+  async def dummy_app(scope, receive, send):
+    pass
+
+  async def mock_send(message):
+    sent_messages.append(message)
+
+  async def mock_fetch_invalid(ticket: str, user_id: str):
+    raise ValueError("invalid ticket")
+
+  class FakeAppState:
+    lca_auth_expected_token = "secret-token-123"
+    lca_auth_dev_mode = False
+
+  class FakeApp:
+    state = FakeAppState()
+
+  service = MangliAuthService(fetch_fn=mock_fetch_invalid)
+  mw = SmartAdaptiveAuthMiddleware(dummy_app, auth_service=service)
+
+  key = bytes.fromhex("0123456789abcdef0123456789abcdef")
+  enc = encrypt_mangli_user_header_for_test(
+      '{"user_id":"U888","name":"zhangsan","dept_id":"D01"}', key
+  )
+  scope_invalid_ticket = {
+      "type": "http",
+      "path": "/runs",
+      "app": FakeApp(),
+      "headers": [
+          (b"x-mangli-user", enc.encode()),
+          (b"ticket", b"bad_ticket"),
+      ],
+  }
+  await mw(scope_invalid_ticket, None, mock_send)
+  assert len(sent_messages) >= 1
+  assert sent_messages[0]["type"] == "http.response.start"
+  assert sent_messages[0]["status"] == 401
 ```
 
 **Step 2: Run test to verify it fails**

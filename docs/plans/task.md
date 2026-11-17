@@ -1,10 +1,13 @@
 | Task ID | Description | Status | Evidence |
 |---|---|---|---|
-| MANGLI-TASK-1 | 标准 Principal 模型、智能自适应鉴权中间件与服务挂载 (Java 静态向量对齐 + 伪造头剥离 + Fail-Closed 权限服务 + server.py 中间件挂载) | Pending | 待执行 |
+| MANGLI-TASK-1 | 标准 Principal 模型、智能自适应鉴权中间件与服务挂载 (Java 静态向量对齐 + 伪造头剥离 + Fail-Closed 权限服务 + server.py 中间件挂载) | In Progress | 执行中：开始编写测试与实现 |
 | MANGLI-TASK-2 | 多租户 Run 并发去重隔离安全修复 (index.py 加入 user_id 维度 + commands.py 透传 + 跨租户隔离测试) | Pending | 待执行 |
 | MANGLI-TASK-3 | 真实 LCA Tool 契约实现与企业能力 (继承 Tool 协议 7 项 ClassVar + LocalFileStore 沙箱导出 + 预留 project_id 扩展槽位) | Pending | 待执行 |
 | MANGLI-TASK-4 | 离线自包含的 Playground 验证控制台单页 (纯原生 CSS + 无外部 CDN + 首帧 JWT 鉴权与心跳 WS 通信 + 真实 200 HTTP 测试) | Pending | 待执行 |
 | MANGLI-TASK-5 | 声明式编排配置与真实 Merge-Base 零修改门禁 (规范 entries 语法 + 生产 bundle 继承 + dev_mode 关闭 + origin/main...HEAD 对比门禁) | Pending | 待执行 |
+| MANGLI-FOLLOWUP-R9 | [二期规划] 企业 MCP 集群统一鉴权 (_meta 签名断言与健康检查) | Pending | 跟踪：设计与计划中已规约，二期实施 |
+| MANGLI-FOLLOWUP-R10 | [二期规划] FileStore 与 Topic 租户隔离 (owner_principal 校验与命名空间隔离) | Pending | 跟踪：设计与计划中已规约，二期实施 |
+| MANGLI-FOLLOWUP-R11 | [二期规划] 异步与长任务身份语义 (HITL 审批与 Cron 触发时 Principal 继承) | Pending | 跟踪：设计与计划中已规约，二期实施 |
 | BRAINSTORM-HARDCODING-CONTEXT | 深度梳理近期提交硬编码问题与相关模块上下文 | Completed | 已完成近期 40+ commit 深度排查，定位 7 大类硬编码缺陷（模板宿主机IP、Prompt伪造、路径魔数、正则误杀等） |
 | BRAINSTORM-HARDCODING-QUESTIONS | 澄清硬编码治理范围与演进策略（单步提问） | Completed | 用户选定全量系统性重构，覆盖全部 7 类硬编码问题，制定完整架构设计文档与落地计划 |
 | BRAINSTORM-HARDCODING-APPROACHES | 提炼 2-3 种具体架构治理方案与权衡对比 | Completed | 提出方案 A/B/C，用户明确选定方案 A（分层契约注入与上下文感知的纯正 DDD 架构） |
