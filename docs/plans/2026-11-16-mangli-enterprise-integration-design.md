@@ -1,6 +1,6 @@
 # 企业级应用集成与统一接口封装设计 (Mangli Enterprise Integration Design)
 
-> **设计状态：** Approved (聚焦核心闭环：Projects 暂缓但前瞻预留，全盘复用原生端点)  
+> **设计状态：** Approved (严格对齐 N1~N9 安全与实现细节闭环版)  
 > **设计日期：** 2026-11-17  
 > **自治等级：** DRAFT (外围插件 Seam/Provider 范式，严格守护底层核心单向依赖)  
 > **宪法约束：** 遵照根目录 `AGENTS.md`（C1 认知闭集、C2 双平面、C4 Reducer单写、C5 能力单调、C6 最小化、C10 执行窄门、C11 事件闭集、C13 信息血统闭合、C14 图与业务隔离）。
@@ -15,12 +15,12 @@
 - **实时全双工流式输出**：`WS /v1/runs/{run_id}/ws?token={ws_token}`（直接复用原生基于 Redis Stream 的 WebSocket 通道，带 30s 双向心跳防 Spring Cloud Gateway 断连）
 - **取消任务**：`POST /runs/{id}/cancel`（直接复用 `cancel_run`）
 - **人机交互答复**：`POST /runs/{id}/answer`（直接复用 `answer_run`）
-- **文件下载**：`GET /files/{attachment_id}`（直接复用 `download_file`）
+- **文件下载**：`GET /files/{attachment_id}`（直接复用 `_download_file`，见 `routes_openai_compat_files.py:41`）
 - **模型枚举**：`GET /v1/models`（直接复用 `list_models`）
 - **验证控制台**：`GET /playground`（纯静态 HTML 控制台，兼测两套身份与 WebSocket 打字机）
 
 ### 1.2 范围决策：Projects 功能暂缓实施，但完成前瞻性架构预留
-- **当前阶段**：Projects 实体表和独立 CRUD 接口暂不实施，简化交付路径，聚焦在鉴权打通、流式对话、数据源与工具调用闭环；
+- **当前阶段**：Projects 实体表和独立 CRUD 接口暂不实施，聚焦在鉴权打通、安全去重、流式对话、数据源与工具调用闭环；
 - **架构预留（提前考虑，保证未来无缝支持）**：
   1. **上下文槽位预留**：`MangliUserContext` 预留 `project_id: str | None = None`，中间件支持可选解析 `X-Mangli-Project-Id` 请求头；
   2. **Run 请求扩展预留**：`POST /runs` 的 `options` 字段天然支持传递 `{"project_id": "..."}`，无缝进入 Session 元数据；
@@ -31,46 +31,48 @@
 
 ## 2. 自适应双轨鉴权机制 (Smart Adaptive Auth Bridge)
 
-### 2.1 核心设计：智能流量识别与中间件 Seam 挂载 (M4)
-根据架构核实，`RouteRegistryProtocol` 仅负责 Route 注册而不管理中间件。为确保所有原生路由（特别是 `POST /runs`）无需逐一修改即可透明获得企业工号，我们在 `lca/plugins/transport/webserver/server/server.py` 中规范声明中间件 Seam：在 `install_trace_middleware(app)` 旁挂载 `install_adaptive_auth_middleware(app)`，并将 `server.py` 如实列入本次任务的 **Owns** 清单。
+### 2.1 核心设计：智能流量识别与中间件 Seam 挂载 (M4, N1, N2, N7)
+根据架构核实，`RouteRegistryProtocol` 仅负责 Route 注册而不管理中间件。为确保所有原生路由（特别是 `POST /runs`）无需逐一修改即可透明获得企业工号与合法 Bearer Token，我们在 `lca/plugins/transport/webserver/server/server.py` 中规范声明中间件 Seam：在 `install_trace_middleware(app)` 旁挂载 `install_adaptive_auth_middleware(app)`，并将 `server.py` 列入本次任务的 **Owns** 清单。
 
 ```mermaid
 flowchart TD
-    Req[客户端请求进入网关] --> CheckHeader{Header 中是否包含<br>X-Mangli-User ?}
+    Req[客户端请求进入服务] --> CheckHeader{Header 中是否包含<br>X-Mangli-User ?}
     
     CheckHeader -->|包含: 判定为公司 Gateway 流量| MangliTrack[公司专属鉴权链路]
-    CheckHeader -->|不包含: 判定为 LobeHub 测试流量| LobeHubTrack[LobeHub 原生鉴权链路]
+    CheckHeader -->|不包含: 判定为 LobeHub / 内网直连流量| LobeHubTrack[原生鉴权链路]
 
     subgraph MangliTrack [公司专属鉴权]
-        HexDec[1. Hex解码 + AES/ECB/PKCS5Padding 解密<br>提取 user_id, 部门, 姓名]
-        PermFetch[2. 透传 ticket 异步查权限微服务<br>标准库 ExpiringLruCache 5min 缓存]
-        ContextInject["3. 身份自动桥接:<br>将工号自动注入 scope['state']['user_id']<br>以及 x-lca-user-id / Bearer 请求头<br>注入 MangliUserContext(含可选 project_id) 到 ContextVar"]
+        HexDec[1. Hex解码 + AES/ECB/PKCS5Padding 解密<br>解密失败直接返回 401]
+        PermFetch[2. 透传 ticket 异步查权限微服务<br>标准库 5min LRU 缓存<br>服务不可用时 Fail-Closed 返回 502]
+        ContextInject["3. 身份与凭证桥接:<br>将工号写入 header: x-lca-user-id<br>动态注入合法 header: Authorization: Bearer &lt;expected_token&gt;<br>绑定 MangliUserContext 到 ContextVar"]
         HexDec --> PermFetch --> ContextInject
     end
 
     subgraph LobeHubTrack [LobeHub 原生测试轨]
-        NativeAuth[完全走原生 handlers/auth/user.py<br>校验 x-lca-user-id + Bearer lca-local<br>0 改动、0 影响、测试环境开箱即用]
+        NativeAuth[完全走原生 handlers/auth/user.py<br>校验 x-lca-user-id + Bearer token<br>0 改动、0 影响、测试环境开箱即用]
     end
 
     ContextInject --> CoreHandler[统一进入现有底层 Handler: create_run / ws_handler]
     NativeAuth --> CoreHandler
 ```
 
-### 2.2 运作细节与安全性 (M4 & M7)
-1. **LobeHub 测试界面零影响**：
-   - LobeHub 前端继续发送原生 `x-lca-user-id` 与 `Bearer lca-local`；
-   - 中间件检测到无 `X-Mangli-User`，**无条件直接放行（Pass-Through）**，由原有的 `handlers/auth/user.py` 处理；LobeHub 功能 100% 保持现状；
-2. **公司 Gateway 流量透明桥接**：
-   - 提取 `X-Mangli-User` 完成 AES 解密，提取用户工号；
-   - 中间件将该工号无缝桥接赋给底层的 `x-lca-user-id`；
-   - 若请求头带有 `X-Mangli-Project-Id`，同步解析存入 `MangliUserContext.project_id`，为未来项目级权限与数据隔离打好桩；
-   - 底层复用的 `create_run`、Session 事实流在完全不改动的情况下，自然将本次运行归属于该员工，实现数据隔离与审计；
-3. **加解密规范与安全假设 (M7)**：
-   - **安全假设**：`AES/ECB` 模式无 MAC/Tag，方案严格建立在“公司 Spring Cloud Gateway 与 LCA 后端部署在受信任内网”的前提下；
-   - **密钥对齐**：以 16 字节 Hex 原始密钥（`MANGLI_AES_KEY_HEX`）为主路（`bytes.fromhex(...)`），SHA1PRNG 动态派生为兼容辅路；
-   - **Java 静态向量金标准**：单元测试使用真实 Java 原生运行生成的**固定向量三元组（Plaintext, Key, Hex Ciphertext）**进行静态断言，证明与 Java 网关的确定性互通；
-4. **纯标准库零依赖缓存 (M8)**：
-   - 使用 Python 标准库 `collections.OrderedDict` + `time.monotonic()` 实现 `ExpiringLruCache`（5 分钟 TTL），防止权限接口被高频穿透，全仓不引入 `cachetools` 新依赖。
+### 2.2 运作细节与安全性 (N1, N2, N7, N8)
+1. **网络边界与生产安全策略 (N1)**：
+   * **生产环境必须关闭 dev_mode（`dev_mode=False`）**：由部署环境注入 `lca_auth_dev_mode=False`，强制所有原生请求执行 Fail-Closed 鉴权校验；
+   * **外网必须经由 Spring Cloud Gateway**：外网用户一律通过网关完成企业认证并附带 `X-Mangli-User` 密文头进入系统；
+   * **内网直连防御**：在 `dev_mode=False` 下，即使内网未经网关直连端口，缺少合法的 `Authorization: Bearer <expected_token>` 也会被底层 `handlers/auth/user.py` 立即 401 阻断，杜绝通过手写 `x-lca-user-id` 绕过网关假冒他人。
+2. **公司 Gateway 流量透明桥接与 Bearer 对齐 (N2, N7)**：
+   * 中间件解密 `X-Mangli-User` 提取工号，注入 `scope["headers"]` 中的 `x-lca-user-id`；**彻底废除无消费方的 `scope['state']['user_id']` 死代码**；
+   * 中间件动态读取 `request.app.state` 中的 `lca_auth_expected_token`（默认 `lca-local`），并在请求头中注入 `Authorization: Bearer <expected_token>`，保证无论生产如何配置密钥，Gateway 流量均能通过底层原生校验；
+   * 若携带 `X-Mangli-Project-Id`，同步存入 `MangliUserContext.project_id`；
+   * 通过 `ContextVar[MangliUserContext]` 将当前请求的上下文信息（工号、部门、姓名、项目ID）暴露给上层业务；
+3. **权限微服务 Fail-Closed 闭合语义 (N8)**：
+   * **缓存命中**：5 分钟 TTL 内优先复用纯标准库 `ExpiringLruCache` 的权限数据；
+   * **缓存未命中且远程调用失败/超时**：**绝对不静默放行**，抛出 `PermissionServiceUnavailableError`，中间件直接截断请求并返回 **HTTP 502 Bad Gateway**（`{"error": {"code": "permission_service_unavailable", "detail": "..."}}`）；
+   * **Ticket 校验返回 401**：中间件直接返回 **HTTP 401 Unauthorized**（`{"error": {"code": "invalid_ticket"}}`）；
+4. **加解密规范与 Java 静态向量金标准**：
+   * 以 16 字节 Hex 原始密钥为主路（`bytes.fromhex(...)`），SHA1PRNG 动态派生为兼容辅路；
+   * 单元测试使用真实 Java 原生运行生成的固定向量三元组进行静态断言。
 
 ---
 
@@ -90,12 +92,12 @@ flowchart TD
 
 ---
 
-## 4. Projects 架构预留与未来演进设计 (暂缓实施，架构预留)
+## 4. Projects 架构预留与未来演进设计 (暂缓实施，架构预留) (N3, N4)
 
-为保证未来无缝支持 Projects 体系，本次设计提前锁定扩展规范：
+为保证未来无缝支持 Projects 体系，本次设计参考成熟的 `SqliteUserAssistantStore` / `PostgresUserAssistantStore`（[user_store.py#L5-L8](file:///h:/Workspace/KLTB/SourceCode/tongbao-ai/layered-cognitive-agent/lca/infrastructure/persistence/user_store.py#L5-L8)），提前锁定通用标准 DDL 规范：
 
-### 4.1 预留 Schema 设计
-未来启用多项目时，将在 `lca/infrastructure/persistence/project_store.py` 中直接挂载该 Schema：
+### 4.1 预留 Schema 设计 (ANSI SQL 通用规范)
+采用 SQLite 与 PostgreSQL 均原生兼容的 `DEFAULT CURRENT_TIMESTAMP`：
 ```sql
 CREATE TABLE IF NOT EXISTS lca_projects (
     project_id    TEXT PRIMARY KEY,
@@ -103,13 +105,13 @@ CREATE TABLE IF NOT EXISTS lca_projects (
     description   TEXT,
     owner_user_id TEXT NOT NULL,
     dept_id       TEXT,
-    created_at    TEXT NOT NULL DEFAULT (datetime('now')),
-    updated_at    TEXT NOT NULL DEFAULT (datetime('now'))
+    created_at    TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at    TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 CREATE TABLE IF NOT EXISTS lca_project_sessions (
     project_id    TEXT NOT NULL REFERENCES lca_projects(project_id) ON DELETE CASCADE,
     session_id    TEXT PRIMARY KEY,
-    created_at    TEXT NOT NULL DEFAULT (datetime('now'))
+    created_at    TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 CREATE INDEX IF NOT EXISTS idx_lca_projects_owner ON lca_projects(owner_user_id);
 CREATE INDEX IF NOT EXISTS idx_lca_project_sessions_proj ON lca_project_sessions(project_id);
@@ -130,7 +132,7 @@ CREATE INDEX IF NOT EXISTS idx_lca_project_sessions_proj ON lca_project_sessions
 | **`/v1/runs/{id}/ws`** | `WS` | **当前生效** | WebSocket 实时全双工流式打字机（带 30s 双向心跳防超时） | **原生复用**：`routes_agent_gateway_ws.py` |
 | **`/runs/{id}/cancel`**| `POST` | **当前生效** | 取消任务运行 | **原生复用**：`cancel_run` |
 | **`/runs/{id}/answer`**| `POST` | **当前生效** | 人机交互确认 / 回复继续执行 | **原生复用**：`answer_run` |
-| **`/files/{attachment_id}`** | `GET` | **当前生效** | 下载生成的文件 | **原生复用**：`download_file` |
+| **`/files/{attachment_id}`** | `GET` | **当前生效** | 下载生成的文件 | **原生复用**：`_download_file` |
 | **`/v1/models`** | `GET` | **当前生效** | 可用模型枚举 | **原生复用**：`list_models` |
 | **`/playground`** | `GET` | **当前生效** | 离线自包含的单页验证控制台 | **新增静态挂载** |
 | `/projects` | `GET/POST` | *暂缓预留* | 未来项目列表查询与创建 | 架构已预留，后续开启 |
@@ -261,13 +263,13 @@ patch:
 
 ---
 
-## 9. 自动化测试不变量矩阵 (AP-02 & M7)
+## 9. 自动化测试不变量矩阵 (AP-02, M7, N5)
 
 | 不变量编号 | 守护规则与断言 | 验证用例 |
 |---|---|---|
 | **INV-01** | Java 原生静态密文向量解密一致性（包含 16 字节 Hex 密钥主路与固定 Java 向量三元组） | `test_java_cross_compatibility_vector` |
-| **INV-02** | 权限微服务 5 分钟 TTL 缓存命中与容灾（纯标准库 `ExpiringLruCache`） | `test_permission_cache_ttl_and_error_handling` |
-| **INV-03** | 自适应双轨鉴权隔离（无 `X-Mangli-User` 时 LobeHub 100% 原生放行；有 `X-Mangli-User` 时公司解密与桥接） | `test_adaptive_auth_double_track` |
+| **INV-02** | 权限微服务 5 分钟 TTL 缓存命中与 Fail-Closed 阻断（服务异常返回 502） | `test_permission_cache_ttl_and_error_handling` |
+| **INV-03** | 自适应双轨鉴权隔离（无头放行；有头解密 + 注入合法 Bearer Token + 提取 ContextVar）与非法密文 401 阻断 | `test_adaptive_auth_double_track` |
 | **INV-04** | 多租户 In-flight Run 并发去重隔离（不同用户的相同提问互不干扰） | `test_multitenant_inflight_run_dedup_isolation` |
 | **INV-05** | 真实工具契约符合性（继承 `Tool`，声明 `parameters`，返回 `Observation`，沙箱文件写入生成 `FileStore` 凭证） | `test_tool_conforms_to_lca_contract` |
 | **INV-06** | Playground 离线自包含（纯原生 CSS，无外网 CDN，`GET /playground` 严格返回 200） | `test_playground_offline_render` |

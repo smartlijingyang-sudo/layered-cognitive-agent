@@ -10,7 +10,7 @@
 
 ---
 
-### Task 1: 智能自适应鉴权中间件与服务挂载 (M4, M7, M8)
+### Task 1: 智能自适应鉴权中间件与服务挂载 (M4, M7, M8, N1, N2, N6, N7, N8)
 
 **Files:**
 - Create: `lca/plugins/transport/webserver/handlers/auth/mangli_auth.py`
@@ -19,22 +19,25 @@
 - Does NOT own: `lca/contracts/`, `lca/cognition/`, `lca/runtime/`, `lca/loop/`, `lca/framework/`, `lca_kernel/`, `vendor/` (AP-01)
 - Invariants to test:
   - INV-01: Java 原生编译运行生成的静态密文向量解密一致性（固定 Java 三元组：Plaintext, Key, Hex Ciphertext）；
-  - INV-02: 权限微服务异步调用，纯标准库实现的 `ExpiringLruCache` 5 分钟 TTL 缓存命中与网络容灾降级；
-  - INV-03: 自适应双轨鉴权：无 `X-Mangli-User` 时 LobeHub 100% 原样放行，LobeHub 测试 0 影响；有 `X-Mangli-User` 时自动解密并桥接注入底层 `user_id`（同时支持可选解析 `X-Mangli-Project-Id` 写入上下文备用）。
+  - INV-02: 权限微服务 5 分钟 TTL 缓存命中与 Fail-Closed 阻断（服务不可用时严禁放行，返回 502；ticket 错误返回 401）；
+  - INV-03: 自适应双轨鉴权：无 `X-Mangli-User` 时 LobeHub 100% 原样放行；有 `X-Mangli-User` 时自动解密、桥接注入 `x-lca-user-id` 与合法 `Authorization: Bearer <expected_token>` 请求头，并设置 `MangliUserContext` 到 ContextVar；非法密文直接阻断返回 401。
 
 **Step 1: Write the failing test**
 
 ```python
 # tests/plugins/transport/test_mangli_auth.py
+import json
 import pytest
 from lca.plugins.transport.webserver.handlers.auth.mangli_auth import (
     ExpiringLruCache,
     MangliAuthService,
     MangliUserContext,
+    PermissionServiceUnavailableError,
     SmartAdaptiveAuthMiddleware,
     decrypt_mangli_user_header,
     derive_sha1prng_key,
     encrypt_mangli_user_header_for_test,
+    get_current_mangli_user,
 )
 
 
@@ -76,6 +79,10 @@ async def test_permission_cache_ttl_and_error_handling():
   async def mock_fetch_permissions(ticket: str, user_id: str):
     nonlocal call_count
     call_count += 1
+    if ticket == "invalid":
+      raise ValueError("invalid ticket")
+    if ticket == "down":
+      raise PermissionServiceUnavailableError("service timeout")
     return ["user:read", "project:access"], ["engineer"]
 
   service = MangliAuthService(fetch_fn=mock_fetch_permissions)
@@ -88,14 +95,26 @@ async def test_permission_cache_ttl_and_error_handling():
   assert call_count == 1
   assert perms2 == perms
 
+  # 远程服务故障 -> Fail-Closed 抛出 PermissionServiceUnavailableError
+  with pytest.raises(PermissionServiceUnavailableError):
+    await service.get_permissions("down", "U1002")
+
 
 @pytest.mark.asyncio
 async def test_adaptive_auth_double_track():
   captured_headers = {}
+  captured_user_context = None
 
   async def dummy_app(scope, receive, send):
-    nonlocal captured_headers
+    nonlocal captured_headers, captured_user_context
     captured_headers = dict(scope.get("headers", []))
+    captured_user_context = get_current_mangli_user()
+
+  class FakeAppState:
+    lca_auth_expected_token = "secret-token-123"
+
+  class FakeApp:
+    state = FakeAppState()
 
   mw = SmartAdaptiveAuthMiddleware(dummy_app)
 
@@ -103,6 +122,7 @@ async def test_adaptive_auth_double_track():
   scope_lobehub = {
       "type": "http",
       "path": "/runs",
+      "app": FakeApp(),
       "headers": [
           (b"x-lca-user-id", b"usr_lobe"),
           (b"authorization", b"Bearer lca-local"),
@@ -110,8 +130,10 @@ async def test_adaptive_auth_double_track():
   }
   await mw(scope_lobehub, None, None)
   assert captured_headers.get(b"x-lca-user-id") == b"usr_lobe"
+  assert captured_headers.get(b"authorization") == b"Bearer lca-local"
+  assert captured_user_context is None
 
-  # 2. 有 X-Mangli-User (公司 Gateway 流量)：自动解密并桥接为底层 x-lca-user-id
+  # 2. 有 X-Mangli-User (公司 Gateway 流量)：自动解密，注入合法 Bearer 和 x-lca-user-id，并设置 ContextVar
   key = bytes.fromhex("0123456789abcdef0123456789abcdef")
   enc = encrypt_mangli_user_header_for_test(
       '{"user_id":"U888","name":"zhangsan","dept_id":"D01"}', key
@@ -119,14 +141,45 @@ async def test_adaptive_auth_double_track():
   scope_gateway = {
       "type": "http",
       "path": "/runs",
+      "app": FakeApp(),
       "headers": [
           (b"x-mangli-user", enc.encode()),
           (b"ticket", b"t123"),
-          (b"x-mangli-project-id", b"proj_future_01"),
+          (b"x-mangli-project-id", b"proj_reserved_01"),
       ],
   }
   await mw(scope_gateway, None, None)
   assert captured_headers.get(b"x-lca-user-id") == b"U888"
+  # 验证动态注入后端配置的 Bearer Token，彻底防止 dev_mode=False 时被 401
+  assert (
+      captured_headers.get(b"authorization") == b"Bearer secret-token-123"
+  )
+  # 验证 ContextVar 生效且 project_id 预留字段被正确提取
+  assert isinstance(captured_user_context, MangliUserContext)
+  assert captured_user_context.user_id == "U888"
+  assert captured_user_context.project_id == "proj_reserved_01"
+
+
+@pytest.mark.asyncio
+async def test_adaptive_auth_decryption_failure_returns_401():
+  sent_messages = []
+
+  async def dummy_app(scope, receive, send):
+    pass
+
+  async def mock_send(message):
+    sent_messages.append(message)
+
+  mw = SmartAdaptiveAuthMiddleware(dummy_app)
+  scope_bad = {
+      "type": "http",
+      "path": "/runs",
+      "headers": [(b"x-mangli-user", b"invalid_hex_or_cipher")],
+  }
+  await mw(scope_bad, None, mock_send)
+  assert len(sent_messages) >= 1
+  assert sent_messages[0]["type"] == "http.response.start"
+  assert sent_messages[0]["status"] == 401
 ```
 
 **Step 2: Run test to verify it fails**
@@ -136,11 +189,15 @@ Expected: FAIL with `ModuleNotFoundError` or `ImportError`.
 **Step 3: Write minimal implementation**
 - 实现 `lca/plugins/transport/webserver/handlers/auth/mangli_auth.py`：
   - `derive_sha1prng_key(password: bytes) -> bytes`；
-  - `decrypt_mangli_user_header(hex_str: str, key: bytes) -> dict` 与 `encrypt_mangli_user_header_for_test(...)`；
+  - `decrypt_mangli_user_header(hex_str: str, key: bytes) -> dict`；
+  - `encrypt_mangli_user_header_for_test(json_str: str, key: bytes) -> str`；
   - `ExpiringLruCache`（纯标准库 `collections.OrderedDict` + `time.monotonic()`）；
   - `MangliUserContext(user_id: str, name: str, dept_id: str, project_id: str | None = None)`；
-  - `MangliAuthService`；
-  - `SmartAdaptiveAuthMiddleware` 与 `install_adaptive_auth_middleware(app)`；
+  - `ContextVar[MangliUserContext | None]` 与 `get_current_mangli_user() -> MangliUserContext | None`；
+  - `PermissionServiceUnavailableError(Exception)`；
+  - `MangliAuthService`（Fail-Closed 闭合错误处理）；
+  - `SmartAdaptiveAuthMiddleware`（无头放行；有头解密 + 注入合法 Bearer Token + 提取 ContextVar；异常返回 401 或 502）；
+  - `install_adaptive_auth_middleware(app) -> None`；
 - 修改 `lca/plugins/transport/webserver/server/server.py`：在 `install_trace_middleware(app)` 旁调用 `install_adaptive_auth_middleware(app)`。
 
 **Step 4: Run test to verify it passes**
