@@ -1,11 +1,12 @@
 | Task ID | Description | Status | Evidence |
 |---|---|---|---|
-| MANGLI-TASK-1 | 智能自适应双轨鉴权中间件 (Java 向量对齐 + 无依赖 LRU 缓存 + 兼容 LobeHub 原生与网关) | Pending | 待执行 |
-| MANGLI-TASK-2 | Projects 领域模型与存储引擎实现 (SQLite/Postgres 双后端 + 会话关联与隔离) | Pending | 待执行 |
-| MANGLI-TASK-3 | Projects 与企业会话路由插件 (挂载 /projects + /sessions 增量服务 + 复用原生 runs/ws/files) | Pending | 待执行 |
-| MANGLI-TASK-4 | 真实 LCA Tool 契约实现与企业能力 (继承 Tool + 返回 Observation + 沙箱文件) | Pending | 待执行 |
-| MANGLI-TASK-5 | 离线自包含的 Playground 验证控制台单页 (纯原生 CSS + 无外部 CDN + 200 HTTP 响应) | Pending | 待执行 |
-| MANGLI-TASK-6 | 声明式编排配置与真实 Merge-Base 零修改门禁 (origin/main...HEAD 对比 + plan compile 校验) | Pending | 待执行 |
+| MANGLI-TASK-1 | 智能自适应双轨鉴权中间件与服务挂载 (Java 静态向量对齐 + 标准库 LRU 缓存 + server.py 中间件 Seam 挂载) | Pending | 待执行 |
+| MANGLI-TASK-2 | 多租户 Run 并发去重隔离安全修复 (index.py 加入 user_id 维度 + commands.py 透传 + 跨租户隔离测试) | Pending | 待执行 |
+| MANGLI-TASK-3 | Projects 领域模型与存储引擎实现 (SQLite/Postgres 双后端 + 会话关联与游离会话支持) | Pending | 待执行 |
+| MANGLI-TASK-4 | Projects 与企业会话路由插件 (挂载 /projects + /sessions 增量服务 + 规范 @plugin 声明) | Pending | 待执行 |
+| MANGLI-TASK-5 | 真实 LCA Tool 契约实现与企业能力 (继承 Tool 协议 + 返回 Observation + FileStore 沙箱导出) | Pending | 待执行 |
+| MANGLI-TASK-6 | 离线自包含的 Playground 验证控制台单页 (纯原生 CSS + 无外部 CDN + 双轨调试控制台) | Pending | 待执行 |
+| MANGLI-TASK-7 | 声明式编排配置与真实 Merge-Base 零修改门禁 (规范 entries 语法 + 14 生产 bundle 继承 + origin/main...HEAD 对比门禁) | Pending | 待执行 |
 | BRAINSTORM-HARDCODING-CONTEXT | 深度梳理近期提交硬编码问题与相关模块上下文 | Completed | 已完成近期 40+ commit 深度排查，定位 7 大类硬编码缺陷（模板宿主机IP、Prompt伪造、路径魔数、正则误杀等） |
 | BRAINSTORM-HARDCODING-QUESTIONS | 澄清硬编码治理范围与演进策略（单步提问） | Completed | 用户选定全量系统性重构，覆盖全部 7 类硬编码问题，制定完整架构设计文档与落地计划 |
 | BRAINSTORM-HARDCODING-APPROACHES | 提炼 2-3 种具体架构治理方案与权衡对比 | Completed | 提出方案 A/B/C，用户明确选定方案 A（分层契约注入与上下文感知的纯正 DDD 架构） |
