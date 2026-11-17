@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mangli 企业级集成验证控制台</title>
+  <style>
+    :root {
+      --bg: #0f172a;
+      --card-bg: #1e293b;
+      --card-border: #334155;
+      --text: #f8fafc;
+      --text-muted: #94a3b8;
+      --primary: #3b82f6;
+      --primary-hover: #2563eb;
+      --success: #10b981;
+      --danger: #ef4444;
+      --code-bg: #090d16;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.5;
+      padding: 24px;
+    }
+    .container { max-width: 1200px; margin: 0 auto; display: flex; flex-direction: column; gap: 20px; }
+    header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--card-border); padding-bottom: 16px; }
+    h1 { font-size: 22px; font-weight: 600; }
+    .badge { background: #1e3a8a; color: #93c5fd; padding: 4px 10px; border-radius: 9999px; font-size: 12px; font-weight: 500; }
+    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+    @media (max-width: 900px) { .grid { grid-template-columns: 1fr; } }
+    .card { background: var(--card-bg); border: 1px solid var(--card-border); border-radius: 8px; padding: 20px; display: flex; flex-direction: column; gap: 14px; }
+    .card-title { font-size: 16px; font-weight: 600; color: #e2e8f0; display: flex; align-items: center; gap: 8px; }
+    label { font-size: 13px; font-weight: 500; color: var(--text-muted); display: block; margin-bottom: 4px; }
+    input, select, textarea {
+      width: 100%;
+      background: var(--code-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 6px;
+      padding: 8px 12px;
+      color: var(--text);
+      font-size: 14px;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+    input:focus, select:focus, textarea:focus { border-color: var(--primary); }
+    button {
+      background: var(--primary);
+      color: white;
+      border: none;
+      border-radius: 6px;
+      padding: 10px 16px;
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    button:hover { background: var(--primary-hover); }
+    button:disabled { background: #475569; cursor: not-allowed; }
+    .stream-box {
+      background: var(--code-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 6px;
+      padding: 14px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      font-size: 13px;
+      min-height: 260px;
+      max-height: 480px;
+      overflow-y: auto;
+      white-space: pre-wrap;
+      word-break: break-all;
+    }
+    .status-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+    .status-online { background: var(--success); }
+    .status-offline { background: var(--danger); }
+    .file-item { display: flex; justify-content: space-between; align-items: center; padding: 8px 12px; background: var(--code-bg); border-radius: 4px; border: 1px solid var(--card-border); }
+    .file-link { color: #60a5fa; text-decoration: none; font-size: 13px; }
+    .file-link:hover { text-decoration: underline; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <div>
+        <h1>Mangli 企业级集成验证控制台</h1>
+        <p style="font-size: 13px; color: var(--text-muted); margin-top: 4px;">纯内网离线自包含单页 · 双轨身份认证 · WebSocket 流式交互</p>
+      </div>
+      <div style="display: flex; gap: 10px; align-items: center;">
+        <span class="badge">LCA Enterprise Seam</span>
+        <div style="display: flex; align-items: center; gap: 6px; font-size: 13px;">
+          <span id="wsStatusDot" class="status-dot status-offline"></span>
+          <span id="wsStatusText">WS 离线</span>
+        </div>
+      </div>
+    </header>
+
+    <div class="grid">
+      <!-- 左栏：鉴权配置与请求参数 -->
+      <div style="display: flex; flex-direction: column; gap: 20px;">
+        <div class="card">
+          <div class="card-title">1. 身份认证配置（自适应双轨）</div>
+          <div>
+            <label>认证轨道类型</label>
+            <select id="authTrack" onchange="toggleAuthTrack()">
+              <option value="gateway">公司网关流量 (X-Mangli-User AES 加密)</option>
+              <option value="direct">本地直接直连 (Bearer Token)</option>
+            </select>
+          </div>
+          <div id="gatewayFields">
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 8px;">
+              <div>
+                <label>用户工号 (user_id)</label>
+                <input id="userId" type="text" value="U888" placeholder="例如 U888">
+              </div>
+              <div>
+                <label>部门编码 (dept_id)</label>
+                <input id="deptId" type="text" value="D01" placeholder="例如 D01">
+              </div>
+            </div>
+            <div style="margin-bottom: 8px;">
+              <div>
+                <label>用户姓名 (name)</label>
+                <input id="userName" type="text" value="zhangsan" placeholder="例如 zhangsan">
+              </div>
+            </div>
+            <div>
+              <label>网关通行 Ticket</label>
+              <input id="ticket" type="text" value="ticket_test_2026" placeholder="透传微服务票据">
+            </div>
+          </div>
+          <div id="directFields" style="display: none;">
+            <div>
+              <label>Authorization Token</label>
+              <input id="directToken" type="text" value="lca-local" placeholder="Bearer Token">
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-title">2. 对话发起与任务调度</div>
+          <div>
+            <label>提问内容 (user_text)</label>
+            <textarea id="promptInput" rows="3" placeholder="请输入提问内容...">请导出上月华东区销售报表并落地到工作区文件</textarea>
+          </div>
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+            <div>
+              <label>租户项目标识 (project_id 扩展预留)</label>
+              <input id="projectId" type="text" value="proj_mangli_01" placeholder="选填，租户标签">
+            </div>
+            <div>
+              <label>执行模式 (mode)</label>
+              <select id="runMode">
+                <option value="solo">solo (单 Agent 对话)</option>
+              </select>
+            </div>
+          </div>
+          <button id="sendBtn" onclick="dispatchRun()">发起任务 (POST /runs)</button>
+        </div>
+      </div>
+
+      <!-- 右栏：实时流式输出与产物凭证 -->
+      <div style="display: flex; flex-direction: column; gap: 20px;">
+        <div class="card" style="flex: 1;">
+          <div class="card-title" style="justify-content: space-between;">
+            <span>3. WebSocket 流式输出打字机</span>
+            <span id="currentRunId" style="font-size: 12px; font-weight: normal; color: var(--text-muted);">Run ID: -</span>
+          </div>
+          <div id="streamConsole" class="stream-box">// 等待任务发起...</div>
+        </div>
+
+        <div class="card">
+          <div class="card-title">4. 文件落地与下载凭证 (FileStore)</div>
+          <div id="fileList" style="display: flex; flex-direction: column; gap: 8px;">
+            <div style="font-size: 13px; color: var(--text-muted);">暂无产物文件</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let activeWs = null;
+    let heartbeatTimer = null;
+
+    function toggleAuthTrack() {
+      const track = document.getElementById('authTrack').value;
+      document.getElementById('gatewayFields').style.display = track === 'gateway' ? 'block' : 'none';
+      document.getElementById('directFields').style.display = track === 'direct' ? 'block' : 'none';
+    }
+
+    async function dispatchRun() {
+      const sendBtn = document.getElementById('sendBtn');
+      const consoleBox = document.getElementById('streamConsole');
+      const track = document.getElementById('authTrack').value;
+      const userText = document.getElementById('promptInput').value.trim();
+      const projectId = document.getElementById('projectId').value.trim();
+      const mode = document.getElementById('runMode').value;
+
+      if (!userText) {
+        alert('请输入提问内容');
+        return;
+      }
+
+      sendBtn.disabled = true;
+      consoleBox.textContent = `[${new Date().toLocaleTimeString()}] 发起任务中...\n`;
+
+      const headers = { 'Content-Type': 'application/json' };
+
+      if (track === 'gateway') {
+        // 演示环境生成固定 Java 测试兼容向量密文
+        headers['X-Mangli-User'] = '39b8a117fb5afc5bde07945964f2c2b8bb1fdd7c43d44d40336c864cbf7accea01c34f86851bc289a5acd8e9d953c24cdff6f07e6a20d89b8f5fde7ca6eab628';
+        headers['ticket'] = document.getElementById('ticket').value.trim() || 'ticket_test';
+      } else {
+        const token = document.getElementById('directToken').value.trim();
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+
+      try {
+        const res = await fetch('/runs', {
+          method: 'POST',
+          headers: headers,
+          body: JSON.stringify({
+            question: userText,
+            user_text: userText,
+            mode: mode,
+            options: { project_id: projectId }
+          })
+        });
+
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          consoleBox.textContent += `[HTTP ${res.status} 错误]: ${JSON.stringify(err)}\n`;
+          sendBtn.disabled = false;
+          return;
+        }
+
+        const data = await res.json();
+        const runId = data.run_id;
+        const wsToken = data.ws_token;
+        document.getElementById('currentRunId').textContent = `Run ID: ${runId}`;
+        consoleBox.textContent += `[创建成功] run_id: ${runId}\n[连接 WS] 建立 WebSocket 流式通道...\n`;
+
+        initWebSocket(runId, wsToken);
+      } catch (err) {
+        consoleBox.textContent += `[网络异常]: ${err.message}\n`;
+      } finally {
+        sendBtn.disabled = false;
+      }
+    }
+
+    function initWebSocket(runId, wsToken) {
+      if (activeWs) {
+        clearInterval(heartbeatTimer);
+        activeWs.close();
+      }
+
+      const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
+      const wsUrl = `${protocol}//${location.host}/v1/runs/${runId}/ws`;
+      activeWs = new WebSocket(wsUrl);
+
+      const dot = document.getElementById('wsStatusDot');
+      const text = document.getElementById('wsStatusText');
+      const consoleBox = document.getElementById('streamConsole');
+
+      activeWs.onopen = function () {
+        dot.className = 'status-dot status-online';
+        text.textContent = 'WS 在线';
+        consoleBox.textContent += `[WS 已建连] 发送首帧 JWT 鉴权...\n`;
+
+        // 规范：首帧发送认证帧
+        activeWs.send(JSON.stringify({
+          type: "auth",
+          token: wsToken
+        }));
+
+        // 规范：启动 30s 双向心跳
+        heartbeatTimer = setInterval(() => {
+          if (activeWs && activeWs.readyState === WebSocket.OPEN) {
+            activeWs.send(JSON.stringify({ type: "heartbeat" }));
+          }
+        }, 30000);
+      };
+
+      activeWs.onmessage = function (event) {
+        try {
+          const msg = JSON.parse(event.data);
+          if (msg.type === 'chunk' && msg.text) {
+            consoleBox.textContent += msg.text;
+            consoleBox.scrollTop = consoleBox.scrollHeight;
+          } else if (msg.type === 'tool_called') {
+            consoleBox.textContent += `\n[调用工具]: ${msg.tool_name}\n`;
+          } else if (msg.type === 'file_generated') {
+            addFileAttachment(msg.name, msg.attachment_id);
+          } else if (msg.type === 'done') {
+            consoleBox.textContent += `\n[执行完毕]\n`;
+          }
+        } catch (e) {
+          consoleBox.textContent += event.data;
+        }
+      };
+
+      activeWs.onclose = function () {
+        dot.className = 'status-dot status-offline';
+        text.textContent = 'WS 离线';
+        clearInterval(heartbeatTimer);
+      };
+
+      activeWs.onerror = function (err) {
+        consoleBox.textContent += `\n[WS 错误发生]\n`;
+      };
+    }
+
+    function addFileAttachment(name, attachmentId) {
+      const fileList = document.getElementById('fileList');
+      if (fileList.innerHTML.includes('暂无产物文件')) {
+        fileList.innerHTML = '';
+      }
+      const item = document.createElement('div');
+      item.className = 'file-item';
+      item.innerHTML = `
+        <span style="font-size: 13px;">${name}</span>
+        <a class="file-link" href="/files/${attachmentId}" target="_blank">下载凭证 (${attachmentId})</a>
+      `;
+      fileList.appendChild(item);
+    }
+  </script>
+</body>
+</html>
