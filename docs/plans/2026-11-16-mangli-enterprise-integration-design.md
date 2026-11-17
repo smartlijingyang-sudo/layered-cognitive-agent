@@ -1,89 +1,108 @@
 # 企业级应用集成与统一接口封装设计 (Mangli Enterprise Integration Design)
 
-> **设计状态：** Approved (严格对齐 N1~N9 安全与实现细节闭环版)  
+> **设计状态：** Approved (严格对齐 R1~R19 架构审查、安全边界与运行时协议闭环版)  
 > **设计日期：** 2026-11-17  
 > **自治等级：** DRAFT (外围插件 Seam/Provider 范式，严格守护底层核心单向依赖)  
 > **宪法约束：** 遵照根目录 `AGENTS.md`（C1 认知闭集、C2 双平面、C4 Reducer单写、C5 能力单调、C6 最小化、C10 执行窄门、C11 事件闭集、C13 信息血统闭合、C14 图与业务隔离）。
 
 ---
 
-## 1. 架构定位：原生 URL 全面复用与双轨自适应鉴权
+## 1. 架构定位：原生 URL 全盘复用与系统归属边界
 
 ### 1.1 拒绝双套 URL，全面复用既有标准端点
 系统**坚决不新建平行冗余的 `/api/v1` URL 副本**。无论是公司前端组、公司 Gateway、Playground 还是既有的 LobeHub 测试端，统一直接复用成熟的原生端点：
 - **发起任务**：`POST /runs`（直接复用 `command_endpoints:create_run`，返回 `run_id` 与 `ws_token`）
-- **实时全双工流式输出**：`WS /v1/runs/{run_id}/ws?token={ws_token}`（直接复用原生基于 Redis Stream 的 WebSocket 通道，带 30s 双向心跳防 Spring Cloud Gateway 断连）
+- **实时全双工流式输出**：`WS /v1/runs/{run_id}/ws`（直接复用原生基于 Redis Stream 的 WebSocket 通道，建连首帧发送 `{type: "auth", token: ws_token}` 进行 JWT 校验，带 30s 双向心跳保活防断连）
 - **取消任务**：`POST /runs/{id}/cancel`（直接复用 `cancel_run`）
 - **人机交互答复**：`POST /runs/{id}/answer`（直接复用 `answer_run`）
-- **文件下载**：`GET /files/{attachment_id}`（直接复用 `_download_file`，见 `routes_openai_compat_files.py:41`）
+- **文件下载**：`GET /files/{attachment_id}`（直接复用 `_download_file`，见 `lca/plugins/transport/webserver/routes_1/routes_openai_compat_files.py:42, 56`）
 - **模型枚举**：`GET /v1/models`（直接复用 `list_models`）
 - **验证控制台**：`GET /playground`（纯静态 HTML 控制台，兼测两套身份与 WebSocket 打字机）
 
-### 1.2 范围决策：Projects 功能暂缓实施，但完成前瞻性架构预留
-- **当前阶段**：Projects 实体表和独立 CRUD 接口暂不实施，聚焦在鉴权打通、安全去重、流式对话、数据源与工具调用闭环；
-- **架构预留（提前考虑，保证未来无缝支持）**：
-  1. **上下文槽位预留**：`MangliUserContext` 预留 `project_id: str | None = None`，中间件支持可选解析 `X-Mangli-Project-Id` 请求头；
-  2. **Run 请求扩展预留**：`POST /runs` 的 `options` 字段天然支持传递 `{"project_id": "..."}`，无缝进入 Session 元数据；
-  3. **工具层注入槽位预留**：企业工具与文件导出工厂接收可选的 `project_id` 参数，未来开启多项目时无需重构工具逻辑；
-  4. **数据存储模型预留**：在 §4 归档标准 DDL 设计，后续启用时可直接作为独立模块加入。
+### 1.2 归属层架构决策（选定方案 A）
+- **实体归属边界**：项目（Project）、会话（Session）与消息历史（Message）由公司前端组或公司 Java 后端统一持有并持久化存储；LCA 作为底层无状态认知执行内核，专注于单次执行（Runs）、流式推送（WS）和产物文件下载（Files）；
+- **LCA 内部绝不引入 ProjectStore**：LCA 内部坚决不建任何项目或会话数据库表；
+- **租户上下文透传预留**：`project_id` 仅作为外部租户审计与沙箱隔离的元数据标签，通过 `Principal.project_id` 上下文随请求透传，在 `POST /runs` 的 `options={"project_id": ...}` 中进入 Session 元数据，并在文件导出工具中用于隔离目录。
 
 ---
 
-## 2. 自适应双轨鉴权机制 (Smart Adaptive Auth Bridge)
+## 2. 自适应双轨鉴权与安全闭环 (Smart Adaptive Auth Bridge)
 
-### 2.1 核心设计：智能流量识别与中间件 Seam 挂载 (M4, N1, N2, N7)
-根据架构核实，`RouteRegistryProtocol` 仅负责 Route 注册而不管理中间件。为确保所有原生路由（特别是 `POST /runs`）无需逐一修改即可透明获得企业工号与合法 Bearer Token，我们在 `lca/plugins/transport/webserver/server/server.py` 中规范声明中间件 Seam：在 `install_trace_middleware(app)` 旁挂载 `install_adaptive_auth_middleware(app)`，并将 `server.py` 列入本次任务的 **Owns** 清单。
+### 2.1 核心设计：标准化 `Principal` 模型与中间件 Seam 挂载 (R1, R3, R5, R7, R16)
+为了彻底解决原生 `/runs` 不校验 Token 的安全缺陷，所有安全校验前移至最外层的 `SmartAdaptiveAuthMiddleware`。同时建立标准强类型的 `Principal` 身份模型（遵照 C13 契约）：
+
+```python
+# lca/plugins/transport/webserver/handlers/auth/principal.py
+from pydantic import BaseModel, ConfigDict
+
+
+class Principal(BaseModel):
+  """全仓跨边界传递的统一可信身份模型（ADR-0195 §1.4 / C13 强类型闭合）。"""
+
+  model_config = ConfigDict(frozen=True, extra="forbid")
+
+  issuer: str  # "mangli" | "lobehub" | "system"
+  subject: str  # 用户工号或身份唯一标识
+  dept_id: str | None = None
+  roles: tuple[str, ...] = ()
+  project_id: str | None = None
+```
 
 ```mermaid
 flowchart TD
-    Req[客户端请求进入服务] --> CheckHeader{Header 中是否包含<br>X-Mangli-User ?}
+    Req[客户端请求进入 Web 容器] --> TraceMW[1. TraceIdMiddleware 最外层<br>生成全局 trace_id]
+    TraceMW --> AuthMW[2. SmartAdaptiveAuthMiddleware<br>自适应双轨鉴权与安全防护]
     
-    CheckHeader -->|包含: 判定为公司 Gateway 流量| MangliTrack[公司专属鉴权链路]
-    CheckHeader -->|不包含: 判定为 LobeHub / 内网直连流量| LobeHubTrack[原生鉴权链路]
+    AuthMW --> CheckHeader{Header 中是否包含<br>X-Mangli-User ?}
+    
+    CheckHeader -->|包含: 公司 Gateway 流量| MangliTrack[公司专属网关轨]
+    CheckHeader -->|不包含: 内网直连 / LobeHub 流量| LobeHubTrack[内网 / LobeHub 轨]
 
-    subgraph MangliTrack [公司专属鉴权]
-        HexDec[1. Hex解码 + AES/ECB/PKCS5Padding 解密<br>解密失败直接返回 401]
-        PermFetch[2. 透传 ticket 异步查权限微服务<br>标准库 5min LRU 缓存<br>服务不可用时 Fail-Closed 返回 502]
-        ContextInject["3. 身份与凭证桥接:<br>将工号写入 header: x-lca-user-id<br>动态注入合法 header: Authorization: Bearer &lt;expected_token&gt;<br>绑定 MangliUserContext 到 ContextVar"]
-        HexDec --> PermFetch --> ContextInject
+    subgraph MangliTrack [公司网关流量处理]
+        HexDec[a. Hex解码 + AES/ECB/PKCS5Padding 解密<br>失败直接拦截返回 401]
+        PermFetch[b. 透传 ticket 查权限微服务<br>5min LRU 缓存; 超时/故障 Fail-Closed 返回 502<br>ticket 无效返回 401]
+        StripSpoof[c. 强制剔除客户端伪造的 x-lca-user-id / authorization]
+        InjectReal[d. 注入真实 x-lca-user-id 与合法 Bearer expected_token<br>绑定 Principal 到 request.state.principal 与 ContextVar]
+        HexDec --> PermFetch --> StripSpoof --> InjectReal
     end
 
-    subgraph LobeHubTrack [LobeHub 原生测试轨]
-        NativeAuth[完全走原生 handlers/auth/user.py<br>校验 x-lca-user-id + Bearer token<br>0 改动、0 影响、测试环境开箱即用]
+    subgraph LobeHubTrack [内网直连处理]
+        CheckDev{是否处于生产环境<br>dev_mode == False ?}
+        CheckDev -->|是: 生产环境| VerifyBearer[强制校验 Authorization: Bearer<br>缺 Token 或 Token 错误直接拦截返回 401]
+        CheckDev -->|否: 本地开发| AllowDev[放行或回落 local-dev-user]
     end
 
-    ContextInject --> CoreHandler[统一进入现有底层 Handler: create_run / ws_handler]
-    NativeAuth --> CoreHandler
+    InjectReal --> Router[3. 进入路由层: create_run / ws / files]
+    VerifyBearer --> Router
+    AllowDev --> Router
 ```
 
-### 2.2 运作细节与安全性 (N1, N2, N7, N8)
-1. **网络边界与生产安全策略 (N1)**：
-   * **生产环境必须关闭 dev_mode（`dev_mode=False`）**：由部署环境注入 `lca_auth_dev_mode=False`，强制所有原生请求执行 Fail-Closed 鉴权校验；
-   * **外网必须经由 Spring Cloud Gateway**：外网用户一律通过网关完成企业认证并附带 `X-Mangli-User` 密文头进入系统；
-   * **内网直连防御**：在 `dev_mode=False` 下，即使内网未经网关直连端口，缺少合法的 `Authorization: Bearer <expected_token>` 也会被底层 `handlers/auth/user.py` 立即 401 阻断，杜绝通过手写 `x-lca-user-id` 绕过网关假冒他人。
-2. **公司 Gateway 流量透明桥接与 Bearer 对齐 (N2, N7)**：
-   * 中间件解密 `X-Mangli-User` 提取工号，注入 `scope["headers"]` 中的 `x-lca-user-id`；**彻底废除无消费方的 `scope['state']['user_id']` 死代码**；
-   * 中间件动态读取 `request.app.state` 中的 `lca_auth_expected_token`（默认 `lca-local`），并在请求头中注入 `Authorization: Bearer <expected_token>`，保证无论生产如何配置密钥，Gateway 流量均能通过底层原生校验；
-   * 若携带 `X-Mangli-Project-Id`，同步存入 `MangliUserContext.project_id`；
-   * 通过 `ContextVar[MangliUserContext]` 将当前请求的上下文信息（工号、部门、姓名、项目ID）暴露给上层业务；
-3. **权限微服务 Fail-Closed 闭合语义 (N8)**：
-   * **缓存命中**：5 分钟 TTL 内优先复用纯标准库 `ExpiringLruCache` 的权限数据；
-   * **缓存未命中且远程调用失败/超时**：**绝对不静默放行**，抛出 `PermissionServiceUnavailableError`，中间件直接截断请求并返回 **HTTP 502 Bad Gateway**（`{"error": {"code": "permission_service_unavailable", "detail": "..."}}`）；
-   * **Ticket 校验返回 401**：中间件直接返回 **HTTP 401 Unauthorized**（`{"error": {"code": "invalid_ticket"}}`）；
-4. **加解密规范与 Java 静态向量金标准**：
-   * 以 16 字节 Hex 原始密钥为主路（`bytes.fromhex(...)`），SHA1PRNG 动态派生为兼容辅路；
-   * 单元测试使用真实 Java 原生运行生成的固定向量三元组进行静态断言。
+### 2.2 中间件挂载顺序与 Starlette 运行时实测 (R16)
+Starlette 的 `app.add_middleware` 内部使用 `insert(0, ...)`，因此**后添加的中间件在请求到达时先执行（处于更外层）**。  
+在 `lca/plugins/transport/webserver/server/server.py` 中，执行如下挂载顺序：
+1. 先执行 `install_adaptive_auth_middleware(app)`（挂载到内层）；
+2. 后执行 `install_trace_middleware(app)`（挂载到最外层）。  
+**实际执行顺序（从外到内）**：
+`TraceIdMiddleware`（最先进入，生成全局 `trace_id`） → `SmartAdaptiveAuthMiddleware`（安全守门，即使返回 401/502 也带有合法 `trace_id`） → 路由层 Handler。
+
+### 2.3 伪造头剔除与 Bearer 注入规范 (R1, R5, R7)
+1. **伪造头强制剥离（Header Spoofing 防御）**：
+   * 客户端在携带 `X-Mangli-User` 时，可能恶意附加 `x-lca-user-id: admin`；
+   * 中间件在重构 `scope["headers"]` 时，首先剔除所有客户端传入的 `x-lca-user-id`、`authorization`、`x-lca-token`，绝不允许伪造头透传；
+2. **合法 Bearer 动态桥接**：
+   * 中间件从 `request.app.state` 读取 `lca_auth_expected_token`，并在桥接时注入 `Authorization: Bearer <expected_token>`，使网关流量能够 100% 通过下游原生鉴权；
+3. **生产环境关闭 `dev_mode` 绝不敞开**：
+   * 在 `profiles/mangli-enterprise.yaml` 中将 `dev_mode` 设为 `false`；对于未带 `X-Mangli-User` 的请求，缺少合法 Bearer 直接返回 401，彻底消除内网伪造身份绕过的隐患。
 
 ---
 
 ## 3. 多租户 Run 并发去重隔离 (M9)
 
-### 3.1 漏洞根因
-原生 `run_dedup_key`（位于 [index.py](file:///h:/Workspace/KLTB/SourceCode/tongbao-ai/layered-cognitive-agent/lca/plugins/transport/webserver/handlers/runs/session/index/index.py#L27-L42)）在计算正在执行的 In-flight Run 指纹时，哈希字段仅包含 `mode`、`principal`（`agent_id`）、`normalized`（`user_text`）和 `attachments`，**完全遗漏了 `user_id`**。  
+原生 `run_dedup_key`（[index.py](lca/plugins/transport/webserver/handlers/runs/session/index/index.py#L27-L42)）在计算正在执行的 In-flight Run 指纹时，哈希字段仅包含 `mode`、`principal`（`agent_id`）、`normalized`（`user_text`）和 `attachments`，遗漏了 `user_id`。  
 在企业多用户并发场景下，若员工 A 与员工 B 同时发送相同的问题，员工 B 会被错误合并入员工 A 的 Run 实例并监听其 WebSocket，造成跨租户数据泄露。
 
-### 3.2 治理方案
-将 `lca/plugins/transport/webserver/handlers/runs/session/index/index.py` 与 `lca/plugins/transport/webserver/handlers/runs/terminal/registry/commands.py` 纳入修改范围（属于 Transport 插件层）：
+**治理方案**：
+将 `lca/plugins/transport/webserver/handlers/runs/session/index/index.py` 与 `lca/plugins/transport/webserver/handlers/runs/terminal/registry/commands.py` 纳入修改范围：
 1. 修改 `run_dedup_key`，强制将 `user_id` 作为哈希首要维度：
    ```python
    payload = f"{user_id}\0{mode}\0{principal}\0{normalized}\0{attachments}"
@@ -92,95 +111,71 @@ flowchart TD
 
 ---
 
-## 4. Projects 架构预留与未来演进设计 (暂缓实施，架构预留) (N3, N4)
+## 4. WebSocket 流式通信原生协议标准 (R6, S1)
 
-为保证未来无缝支持 Projects 体系，本次设计参考成熟的 `SqliteUserAssistantStore` / `PostgresUserAssistantStore`（[user_store.py#L5-L8](file:///h:/Workspace/KLTB/SourceCode/tongbao-ai/layered-cognitive-agent/lca/infrastructure/persistence/user_store.py#L5-L8)），提前锁定通用标准 DDL 规范：
+LCA 生产环境的原生流式协议由 `agent_gateway.py` 支撑，严格遵循首帧鉴权长连接规范：
 
-### 4.1 预留 Schema 设计 (ANSI SQL 通用规范)
-采用 SQLite 与 PostgreSQL 均原生兼容的 `DEFAULT CURRENT_TIMESTAMP`：
-```sql
-CREATE TABLE IF NOT EXISTS lca_projects (
-    project_id    TEXT PRIMARY KEY,
-    name          TEXT NOT NULL,
-    description   TEXT,
-    owner_user_id TEXT NOT NULL,
-    dept_id       TEXT,
-    created_at    TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at    TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
-);
-CREATE TABLE IF NOT EXISTS lca_project_sessions (
-    project_id    TEXT NOT NULL REFERENCES lca_projects(project_id) ON DELETE CASCADE,
-    session_id    TEXT PRIMARY KEY,
-    created_at    TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
-);
-CREATE INDEX IF NOT EXISTS idx_lca_projects_owner ON lca_projects(owner_user_id);
-CREATE INDEX IF NOT EXISTS idx_lca_project_sessions_proj ON lca_project_sessions(project_id);
-```
-
-### 4.2 架构接入点预留
-1. **上下文层**：`MangliUserContext.project_id` 字段现已就位，中间件随时可承接前端或 Gateway 传入的 `X-Mangli-Project-Id`；
-2. **工具层**：`MangliWorkspaceExportTool` 构造时支持注入 `project_id: str | None = None`，后续一旦启用项目体系，直接按 `project_id` 进行目录与命名空间隔离，业务代码 0 修改；
-3. **前端控制台**：Playground 界面预留 Project 扩展槽位。
+1. **建立 WebSocket**：
+   客户端发起连接 `ws://<host>:<port>/v1/runs/{run_id}/ws`（**URL 不带 Token 参数**）；
+2. **首帧认证握手**：
+   客户端必须发送的第一帧报文为：
+   ```json
+   {"type": "auth", "token": "<ws_token>"}
+   ```
+   * 服务端调用 `verify_user_jwt(token, expected_operation_id=run_id)` 验证；
+   * 若 Token 的 `sub` 与该 Run 的所属用户不一致，服务端直接回送 `{"type": "auth_failed"}` 并切断连接；
+   * 校验通过回发 `{"type": "auth_success"}`；
+3. **心跳保活与重放**：
+   * 客户端每 30 秒发送 `{"type": "heartbeat"}`，服务端回复 `{"type": "heartbeat_ack"}`，防止网关连接超时断开；
+   * 实时事件以 `{"type": "agent_event", "event": ...}` 推送，执行结束以 `{"type": "session_complete"}` 关闭连接。
 
 ---
 
-## 5. 接口规范全景 (全盘复用成熟端点)
+## 5. 工具体系、执行窄门与 MCP 集群 (M5, M6, R8, S4)
 
-| 路径 | 方法 | 状态 | 说明 | 实现归属 |
-|---|---|---|---|---|
-| **`/runs`** | `POST` | **当前生效** | 发起提问与任务执行（返回 `run_id` 与 `ws_token`） | **原生复用**：`command_endpoints:create_run` |
-| **`/v1/runs/{id}/ws`** | `WS` | **当前生效** | WebSocket 实时全双工流式打字机（带 30s 双向心跳防超时） | **原生复用**：`routes_agent_gateway_ws.py` |
-| **`/runs/{id}/cancel`**| `POST` | **当前生效** | 取消任务运行 | **原生复用**：`cancel_run` |
-| **`/runs/{id}/answer`**| `POST` | **当前生效** | 人机交互确认 / 回复继续执行 | **原生复用**：`answer_run` |
-| **`/files/{attachment_id}`** | `GET` | **当前生效** | 下载生成的文件 | **原生复用**：`_download_file` |
-| **`/v1/models`** | `GET` | **当前生效** | 可用模型枚举 | **原生复用**：`list_models` |
-| **`/playground`** | `GET` | **当前生效** | 离线自包含的单页验证控制台 | **新增静态挂载** |
-| `/projects` | `GET/POST` | *暂缓预留* | 未来项目列表查询与创建 | 架构已预留，后续开启 |
-| `/projects/{id}` | `GET/DELETE` | *暂缓预留* | 未来单个项目详情与删除 | 架构已预留，后续开启 |
-
----
-
-## 6. 工具体系、执行窄门与 MCP 集群 (M5 & M6)
-
-### 6.1 严格符合 LCA `Tool` 协议 (M5)
-工具必须实现 [infra.py](file:///h:/Workspace/KLTB/SourceCode/tongbao-ai/layered-cognitive-agent/lca/contracts/protocols/runtime/infra/infra.py#L60-L79) 声明的 `Tool(Protocol)`：
+### 5.1 严格符合 LCA `Tool` 协议 (M5, R8)
+工具必须实现 `Tool(Protocol)`（`lca/contracts/protocols/runtime/infra/infra.py:60-79`）声明的 7 项 ClassVar：
 ```python
-class MangliEnterpriseTool(Tool):
-    name: ClassVar[str] = "mangli_workspace_export"
-    namespace: ClassVar[str] = "workspace"
-    description: ClassVar[str] = "Export text/data content to user workspace file."
-    parameters: ClassVar[dict[str, Any]] = {
-        "type": "object",
-        "properties": {
-            "path": {"type": "string", "description": "Relative filename"},
-            "content": {"type": "string", "description": "File text content"},
-        },
-        "required": ["path", "content"],
-    }
-    is_idempotent: ClassVar[bool] = False
-    effect_kind: ClassVar[Literal["ephemeral", "persistent", "stateful_once"]] = "persistent"
-    default_timeout_s: ClassVar[int] = 30
+class MangliWorkspaceExportTool(Tool):
+  name: ClassVar[str] = "mangli_workspace_export"
+  namespace: ClassVar[str] = "workspace"
+  description: ClassVar[str] = (
+      "Export text/data content to user workspace file."
+  )
+  parameters: ClassVar[dict[str, Any]] = {
+      "type": "object",
+      "properties": {
+          "path": {"type": "string", "description": "Relative filename"},
+          "content": {"type": "string", "description": "File text content"},
+      },
+      "required": ["path", "content"],
+  }
+  is_idempotent: ClassVar[bool] = False
+  effect_kind: ClassVar[Literal["ephemeral", "persistent", "stateful_once"]] = (
+      "persistent"
+  )
+  default_timeout_s: ClassVar[int] = 30
 
-    async def execute(self, args: dict[str, Any]) -> Observation:
-        ...
+  async def execute(self, args: dict[str, Any]) -> Observation:
+    ...
 ```
-并通过 `tools_seam.register_factory(name, factory)` 注册，工厂入参为 `bindings: BindingsView`。
+并通过 `tools_seam.register_factory("mangli_workspace_export", factory)` 注册，工厂入参为 `bindings: BindingsView`。
 
-### 6.2 执行窄门与租户边界防越权 (M6)
-1. **租户参数隔离**：模型的调用参数（`parameters`）中**严禁**包含 `project_id`、`session_id` 或 `user_id`，防止模型幻觉或注入造成跨租户越权访问；租户上下文统一在工厂构造工具实例时从 `bindings: BindingsView` / 运行时上下文静默注入；
-2. **遵守 C10/C11 窄门与事件闭集**：工具执行统一交由 `SimpleSafeExecutor` 调度并记录 `ToolStarted` / `ToolInvoked`，工具内部严禁私自发射非白名单的自定义 Journal 事件；
-3. **复用原生 `FileStore`**：文件落地调用系统成熟的 `FileStore.put(data=..., name=..., mime_type=..., origin="agent_created")`，返回标准的 `attachment_id`，前端统一通过原生 `/files/{attachment_id}` 接口下载。
+### 5.2 执行窄门与租户边界防越权 (M6, R8)
+1. **租户参数隔离**：模型的调用参数（`parameters`）中**严禁包含 `project_id`、`session_id` 或 `user_id`**，防止模型注入造成跨租户越权访问；租户上下文统一在工厂构造工具实例时从 `bindings: BindingsView` / 运行时上下文静默注入；
+2. **遵守 C10/C11 窄门与事件闭集**：工具执行统一交由 `SimpleSafeExecutor` 调度并自动记录 `ToolStarted` / `ToolInvoked`，工具内部严禁私自发射非白名单的自定义 Journal 事件；
+3. **复用原生 `LocalFileStore`**：文件落地调用成熟的 `file_store.put(data=..., name=..., mime_type=..., origin="agent_created")`，返回标准的 `attachment_id`，前端统一通过原生 `/files/{attachment_id}` 接口下载。
 
-### 6.3 外部数据 MCP-First 集群
-- OA、Wiki、Jira、企业知识库通过标准 MCP 协议挂载，由 LCA 内置的 `lca/infrastructure/mcp/` 客户端通过 `tools/list` 自动发现，零手写胶水代码；
+### 5.3 外部数据 MCP 集群现实约束 (S4)
+- OA、Wiki、Jira、企业知识库走标准 MCP 协议，采用服务账号（Service Account）+ `_meta` 签名断言鉴权，由 LCA 内置的 `MCPClient` 统一驱动；
 - 智能问数 Agent 挂载为 MCP Server 或 A2A 协议代理。
 
 ---
 
-## 7. 声明式编排与插件元数据规范 (M1, M2, M3)
+## 6. 声明式编排与插件元数据规范 (M1, M2, M3, R2, R7)
 
-### 7.1 标准 Bundle 定义 (`bundles/mangli-enterprise.yaml`) (M1)
-遵循 [source.py#L243](file:///h:/Workspace/KLTB/SourceCode/tongbao-ai/layered-cognitive-agent/lca/harness/profile/resolve/source.py#L243) 的 `entries:` 结构：
+### 6.1 标准 Bundle 定义 (`bundles/mangli-enterprise.yaml`) (M1, R7)
+遵循解析器 `entries:` 结构，严格钉死插件 ID：
 ```yaml
 entries:
   - id: mangli-enterprise-playground-route
@@ -193,8 +188,8 @@ entries:
     config: {}
 ```
 
-### 7.2 生产级 Profile 声明 (`profiles/mangli-enterprise.yaml`) (M2)
-完整挂载生产级所需的 14 个 bundles（保证 `route_registry` 与 5 阶段认知子图就绪），并在末尾挂载专属 bundle：
+### 6.2 生产级 Profile 声明 (`profiles/mangli-enterprise.yaml`) (M2, R2)
+挂载生产级所需的 14 个 bundles + `assistant-runtime.yaml`，并在末尾挂载专属 bundle，同时关闭 dev 模式：
 ```yaml
 bundles:
   - bundles/base.yaml
@@ -211,6 +206,7 @@ bundles:
   - bundles/perceive/perceive_subgraph.yaml
   - bundles/reflect/reflect_subgraph.yaml
   - bundles/remember/remember_subgraph.yaml
+  - bundles/assistant-runtime.yaml
   - bundles/mangli-enterprise.yaml
 
 patch:
@@ -220,16 +216,19 @@ patch:
       runs_root: {from_env: LCA_RUNS_ROOT}
   - id: lca-effect-permission-manifest-default
     disabled: true
+  - id: lca-assistant-ownership
+    config:
+      dev_mode: false
 ```
 
-### 7.3 `@plugin` 完整装饰器契约 (M3)
-所有新增插件严格满足 `layer="L1"`、`kind=PluginKind.PROVIDER`、`effects="none"`、`contract=PluginContract(...)`、`ownership=OwnershipDeclaration(...)`，确保通过 `./scripts/lca-ops audit-plugin-shape` 门禁。
+### 6.3 `@plugin` 完整装饰器契约 (M3, R7)
+所有新增插件严格满足 `layer="L1"`、`kind=PluginKind.PROVIDER`、`effects="none"`、`contract=PluginContract(...)`、`ownership=OwnershipDeclaration(...)`，插件 ID 严格与 Bundle 保持一致。
 
 ---
 
-## 8. 边界划分与 Owns 清单 (AP-01 & M8)
+## 7. 边界划分与 Owns 清单 (AP-01 & M8)
 
-### 8.1 负向边界 (Does NOT own)
+### 7.1 负向边界 (Does NOT own)
 严禁触碰任何核心层代码：
 - `lca/contracts/`
 - `lca/cognition/`
@@ -239,11 +238,12 @@ patch:
 - `lca_kernel/`
 - `vendor/`
 
-### 8.2 正向职责 (Owns)
+### 7.2 正向职责 (Owns)
 本次集成仅允许修改或创建以下范围内的文件：
-- **鉴权与中间件**：
+- **身份模型与鉴权中间件**：
+  - `lca/plugins/transport/webserver/handlers/auth/principal.py` (新增)
   - `lca/plugins/transport/webserver/handlers/auth/mangli_auth.py` (新增)
-  - `lca/plugins/transport/webserver/server/server.py` (修改：挂载中间件 Seam)
+  - `lca/plugins/transport/webserver/server/server.py` (修改：规范挂载中间件 Seam)
 - **多租户去重安全修复**：
   - `lca/plugins/transport/webserver/handlers/runs/session/index/index.py` (修改：加入 user_id)
   - `lca/plugins/transport/webserver/handlers/runs/terminal/registry/commands.py` (修改：透传 user_id)
@@ -263,14 +263,14 @@ patch:
 
 ---
 
-## 9. 自动化测试不变量矩阵 (AP-02, M7, N5)
+## 8. 自动化测试不变量矩阵 (AP-02, M7, R17, R18)
 
 | 不变量编号 | 守护规则与断言 | 验证用例 |
 |---|---|---|
 | **INV-01** | Java 原生静态密文向量解密一致性（包含 16 字节 Hex 密钥主路与固定 Java 向量三元组） | `test_java_cross_compatibility_vector` |
-| **INV-02** | 权限微服务 5 分钟 TTL 缓存命中与 Fail-Closed 阻断（服务异常返回 502） | `test_permission_cache_ttl_and_error_handling` |
-| **INV-03** | 自适应双轨鉴权隔离（无头放行；有头解密 + 注入合法 Bearer Token + 提取 ContextVar）与非法密文 401 阻断 | `test_adaptive_auth_double_track` |
+| **INV-02** | 权限微服务 5 分钟 TTL 缓存命中与 Fail-Closed 阻断（服务异常返回 502；ticket 错误返回 401） | `test_permission_cache_ttl_and_error_handling` |
+| **INV-03** | 自适应双轨鉴权隔离（生产无 Token 拦截、有网关头解密 + 伪造头剥离 + 合法 Bearer 注入 + 建立 Principal） | `test_adaptive_auth_double_track` |
 | **INV-04** | 多租户 In-flight Run 并发去重隔离（不同用户的相同提问互不干扰） | `test_multitenant_inflight_run_dedup_isolation` |
-| **INV-05** | 真实工具契约符合性（继承 `Tool`，声明 `parameters`，返回 `Observation`，沙箱文件写入生成 `FileStore` 凭证） | `test_tool_conforms_to_lca_contract` |
-| **INV-06** | Playground 离线自包含（纯原生 CSS，无外网 CDN，`GET /playground` 严格返回 200） | `test_playground_offline_render` |
+| **INV-05** | 真实工具契约符合性（继承 `Tool`，声明 7 项 ClassVar，返回 `Observation`，沙箱文件写入生成 `FileStore` 凭证） | `test_tool_conforms_to_lca_contract` |
+| **INV-06** | Playground 离线自包含与真实 200 响应（通过 TestClient 真实调用 `GET /playground` 返回 200，且无外网 CDN） | `test_playground_offline_render` |
 | **INV-07** | **分支基线零修改铁律**：`git diff --name-only origin/main...HEAD -- lca/contracts lca/cognition lca/runtime lca/loop lca/framework lca_kernel vendor` 退出码必为 0 且输出必为空！ | `test_core_zero_mutation_against_merge_base` |
