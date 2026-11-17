@@ -1,6 +1,6 @@
 | Task ID | Description | Status | Evidence |
 |---|---|---|---|
-| MANGLI-TASK-1 | 标准 Principal 模型、智能自适应鉴权中间件与服务挂载 (Java 静态向量对齐 + 伪造头剥离 + Fail-Closed 权限服务 + server.py 中间件挂载) | Pending | 待设计与计划确认后执行 |
+| MANGLI-TASK-1 | 标准 Principal 模型、智能自适应鉴权中间件与服务挂载 (Java 静态向量对齐 + 伪造头剥离 + Fail-Closed 权限服务 + server.py 中间件挂载) | Completed | 8/8 单测 100% 通过（INV-01/02/03），ruff check 干净，commit 已生成 |
 | MANGLI-TASK-2 | 多租户 Run 并发去重隔离安全修复 (index.py 加入 user_id 维度 + commands.py 透传 + 跨租户隔离测试) | Pending | 待执行 |
 | MANGLI-TASK-3 | 真实 LCA Tool 契约实现与企业能力 (继承 Tool 协议 7 项 ClassVar + LocalFileStore 沙箱导出 + 预留 project_id 扩展槽位) | Pending | 待执行 |
 | MANGLI-TASK-4 | 离线自包含的 Playground 验证控制台单页 (纯原生 CSS + 无外部 CDN + 首帧 JWT 鉴权与心跳 WS 通信 + 真实 200 HTTP 测试) | Pending | 待执行 |

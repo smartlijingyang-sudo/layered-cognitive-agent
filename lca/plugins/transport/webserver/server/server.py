@@ -175,6 +175,9 @@ async def setup(ctx: PluginContext, config: Any) -> None:
     """
     from starlette.applications import Starlette
 
+    from lca.plugins.transport.webserver.handlers.auth.mangli_auth import (
+        install_adaptive_auth_middleware,
+    )
     from lca.plugins.transport.webserver.lifespan.adapter import install_trace_middleware
 
     # 1. 解析 config(支持 dict 或 LcaWebServerConfig)
@@ -204,9 +207,10 @@ async def setup(ctx: PluginContext, config: Any) -> None:
     registry = ctx.require("route_registry")
     registry.install(app)
 
-    # 3d. 装 trace_id 上下文隔离中间件(ADR-0183 §3.9 / PR-12)。
-    # 必须在 routes 之后:lifespan_adapter.install_trace_middleware 是
-    # ``app.add_middleware(...)`` 的最早入口 = ASGI 最外层,跨所有请求隔离。
+    # 3d. 装自适应双轨鉴权中间件与 trace_id 上下文隔离中间件 (ADR-0183 §3.9 / ADR-0252 D4)。
+    # Starlette add_middleware 倒序执行 (insert(0)):
+    # 先装 Auth 中间件, 后装 TraceId 中间件, 使得请求进入时 TraceId 优先执行, 随后进入 Auth 中间件。
+    install_adaptive_auth_middleware(app)
     install_trace_middleware(app)
 
     # 3c. 装 Starlette lifespan 协议(让 TestClient(app).lifespan_context(app) 工作)
