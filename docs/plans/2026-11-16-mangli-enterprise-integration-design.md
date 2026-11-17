@@ -1,7 +1,7 @@
 # 企业级应用集成与统一接口封装设计 (Mangli Enterprise Integration Design)
 
-> **设计状态：** Approved (深度审查收敛版：全量吸收 M1~M9 架构与安全防护结论)  
-> **设计日期：** 2026-11-16  
+> **设计状态：** Approved (聚焦核心闭环：Projects 暂缓但前瞻预留，全盘复用原生端点)  
+> **设计日期：** 2026-11-17  
 > **自治等级：** DRAFT (外围插件 Seam/Provider 范式，严格守护底层核心单向依赖)  
 > **宪法约束：** 遵照根目录 `AGENTS.md`（C1 认知闭集、C2 双平面、C4 Reducer单写、C5 能力单调、C6 最小化、C10 执行窄门、C11 事件闭集、C13 信息血统闭合、C14 图与业务隔离）。
 
@@ -17,11 +17,15 @@
 - **人机交互答复**：`POST /runs/{id}/answer`（直接复用 `answer_run`）
 - **文件下载**：`GET /files/{attachment_id}`（直接复用 `download_file`）
 - **模型枚举**：`GET /v1/models`（直接复用 `list_models`）
+- **验证控制台**：`GET /playground`（纯静态 HTML 控制台，兼测两套身份与 WebSocket 打字机）
 
-**仅增量新增全仓缺失的企业级项目与会话管理领域实体**：
-- **`Projects` 领域端点**：`GET /projects`、`POST /projects`、`GET /projects/{id}`、`DELETE /projects/{id}`（由 `ProjectStore` 支撑）；
-- **企业会话管理端点**：`GET /projects/{id}/sessions`、`POST /projects/{id}/sessions`，以及个人游离会话 `GET /sessions?unassigned=true`；
-- **验证控制台**：`GET /playground`（纯静态 HTML 控制台，挂载在 `lca/plugins/transport/webserver/static/mangli_playground.html`，兼测两套身份与 WebSocket 打字机）。
+### 1.2 范围决策：Projects 功能暂缓实施，但完成前瞻性架构预留
+- **当前阶段**：Projects 实体表和独立 CRUD 接口暂不实施，简化交付路径，聚焦在鉴权打通、流式对话、数据源与工具调用闭环；
+- **架构预留（提前考虑，保证未来无缝支持）**：
+  1. **上下文槽位预留**：`MangliUserContext` 预留 `project_id: str | None = None`，中间件支持可选解析 `X-Mangli-Project-Id` 请求头；
+  2. **Run 请求扩展预留**：`POST /runs` 的 `options` 字段天然支持传递 `{"project_id": "..."}`，无缝进入 Session 元数据；
+  3. **工具层注入槽位预留**：企业工具与文件导出工厂接收可选的 `project_id` 参数，未来开启多项目时无需重构工具逻辑；
+  4. **数据存储模型预留**：在 §4 归档标准 DDL 设计，后续启用时可直接作为独立模块加入。
 
 ---
 
@@ -40,7 +44,7 @@ flowchart TD
     subgraph MangliTrack [公司专属鉴权]
         HexDec[1. Hex解码 + AES/ECB/PKCS5Padding 解密<br>提取 user_id, 部门, 姓名]
         PermFetch[2. 透传 ticket 异步查权限微服务<br>标准库 ExpiringLruCache 5min 缓存]
-        ContextInject["3. 身份自动桥接:<br>将工号自动注入 scope['state']['user_id']<br>以及 x-lca-user-id / Bearer 请求头<br>注入 MangliUserContext 到 ContextVar"]
+        ContextInject["3. 身份自动桥接:<br>将工号自动注入 scope['state']['user_id']<br>以及 x-lca-user-id / Bearer 请求头<br>注入 MangliUserContext(含可选 project_id) 到 ContextVar"]
         HexDec --> PermFetch --> ContextInject
     end
 
@@ -59,6 +63,7 @@ flowchart TD
 2. **公司 Gateway 流量透明桥接**：
    - 提取 `X-Mangli-User` 完成 AES 解密，提取用户工号；
    - 中间件将该工号无缝桥接赋给底层的 `x-lca-user-id`；
+   - 若请求头带有 `X-Mangli-Project-Id`，同步解析存入 `MangliUserContext.project_id`，为未来项目级权限与数据隔离打好桩；
    - 底层复用的 `create_run`、Session 事实流在完全不改动的情况下，自然将本次运行归属于该员工，实现数据隔离与审计；
 3. **加解密规范与安全假设 (M7)**：
    - **安全假设**：`AES/ECB` 模式无 MAC/Tag，方案严格建立在“公司 Spring Cloud Gateway 与 LCA 后端部署在受信任内网”的前提下；
@@ -85,12 +90,12 @@ flowchart TD
 
 ---
 
-## 4. Projects 领域模型与存储架构
+## 4. Projects 架构预留与未来演进设计 (暂缓实施，架构预留)
 
-因全仓当前无 Project 概念，在 `lca/infrastructure/persistence/project_store.py` 中实现 `ProjectStore`，严格遵循 LCA 已验证的双后端模式（参考 `UserAssistantStore`）：
+为保证未来无缝支持 Projects 体系，本次设计提前锁定扩展规范：
 
-### 4.1 数据库 Schema
-- **本地/开发（SQLite `~/.lca/lca.sqlite3`）与生产（Postgres `LCA_DATABASE_URL`）**：
+### 4.1 预留 Schema 设计
+未来启用多项目时，将在 `lca/infrastructure/persistence/project_store.py` 中直接挂载该 Schema：
 ```sql
 CREATE TABLE IF NOT EXISTS lca_projects (
     project_id    TEXT PRIMARY KEY,
@@ -110,27 +115,26 @@ CREATE INDEX IF NOT EXISTS idx_lca_projects_owner ON lca_projects(owner_user_id)
 CREATE INDEX IF NOT EXISTS idx_lca_project_sessions_proj ON lca_project_sessions(project_id);
 ```
 
-### 4.2 项目与游离会话隔离规则
-1. **项目会话**：创建会话时传入 `project_id`，写入 `lca_project_sessions` 关系表。项目内仅允许创建者及同部门成员访问；
-2. **游离会话（个人独立会话）**：创建会话时 `project_id` 为空，不写入关系表。通过 `GET /sessions?unassigned=true` 仅返回当前用户的游离会话；通过 `GET /projects/{project_id}/sessions` 查询指定项目的会话。
+### 4.2 架构接入点预留
+1. **上下文层**：`MangliUserContext.project_id` 字段现已就位，中间件随时可承接前端或 Gateway 传入的 `X-Mangli-Project-Id`；
+2. **工具层**：`MangliWorkspaceExportTool` 构造时支持注入 `project_id: str | None = None`，后续一旦启用项目体系，直接按 `project_id` 进行目录与命名空间隔离，业务代码 0 修改；
+3. **前端控制台**：Playground 界面预留 Project 扩展槽位。
 
 ---
 
-## 5. 接口规范全景 (全盘复用 + 增量补齐)
+## 5. 接口规范全景 (全盘复用成熟端点)
 
-| 路径 | 方法 | 说明 | 实现归属 |
-|---|---|---|---|
-| **`/projects`** | `GET/POST` | 项目列表查询 / 项目创建 | **新增**：读写 `ProjectStore` |
-| **`/projects/{id}`** | `GET/DELETE` | 单个项目详情 / 删除项目 | **新增**：读写 `ProjectStore` |
-| **`/projects/{id}/sessions`** | `GET/POST` | 项目会话列表查询 / 项目下创建会话 | **新增**：`ProjectStore` 会话关系维护 |
-| **`/sessions`** | `GET/POST` | 用户会话列表（`?unassigned=true` 查个人游离会话） / 创建会话 | **新增**：`ProjectStore` 企业会话服务 |
-| **`/runs`** | `POST` | 发起提问与任务执行（返回 `run_id` 与 `ws_token`） | **原生复用**：`command_endpoints:create_run` |
-| **`/v1/runs/{id}/ws`** | `WS` | WebSocket 实时全双工流式打字机（带 30s 双向心跳防超时） | **原生复用**：`routes_agent_gateway_ws.py` |
-| **`/runs/{id}/cancel`**| `POST` | 取消任务运行 | **原生复用**：`cancel_run` |
-| **`/runs/{id}/answer`**| `POST` | 人机交互确认 / 回复继续执行 | **原生复用**：`answer_run` |
-| **`/files/{attachment_id}`** | `GET` | 下载生成的文件 | **原生复用**：`download_file` |
-| **`/v1/models`** | `GET` | 可用模型枚举 | **原生复用**：`list_models` |
-| **`/playground`** | `GET` | 离线自包含的单页验证控制台 | **新增静态挂载** |
+| 路径 | 方法 | 状态 | 说明 | 实现归属 |
+|---|---|---|---|---|
+| **`/runs`** | `POST` | **当前生效** | 发起提问与任务执行（返回 `run_id` 与 `ws_token`） | **原生复用**：`command_endpoints:create_run` |
+| **`/v1/runs/{id}/ws`** | `WS` | **当前生效** | WebSocket 实时全双工流式打字机（带 30s 双向心跳防超时） | **原生复用**：`routes_agent_gateway_ws.py` |
+| **`/runs/{id}/cancel`**| `POST` | **当前生效** | 取消任务运行 | **原生复用**：`cancel_run` |
+| **`/runs/{id}/answer`**| `POST` | **当前生效** | 人机交互确认 / 回复继续执行 | **原生复用**：`answer_run` |
+| **`/files/{attachment_id}`** | `GET` | **当前生效** | 下载生成的文件 | **原生复用**：`download_file` |
+| **`/v1/models`** | `GET` | **当前生效** | 可用模型枚举 | **原生复用**：`list_models` |
+| **`/playground`** | `GET` | **当前生效** | 离线自包含的单页验证控制台 | **新增静态挂载** |
+| `/projects` | `GET/POST` | *暂缓预留* | 未来项目列表查询与创建 | 架构已预留，后续开启 |
+| `/projects/{id}` | `GET/DELETE` | *暂缓预留* | 未来单个项目详情与删除 | 架构已预留，后续开启 |
 
 ---
 
@@ -177,9 +181,9 @@ class MangliEnterpriseTool(Tool):
 遵循 [source.py#L243](file:///h:/Workspace/KLTB/SourceCode/tongbao-ai/layered-cognitive-agent/lca/harness/profile/resolve/source.py#L243) 的 `entries:` 结构：
 ```yaml
 entries:
-  - id: mangli-enterprise-routes
-    name: mangli_enterprise_routes
-    $module: lca.plugins.transport.webserver.routes_mangli_projects
+  - id: mangli-enterprise-playground-route
+    name: mangli_enterprise_playground_route
+    $module: lca.plugins.transport.webserver.routes_mangli_playground
     config: {}
   - id: mangli-enterprise-tools
     name: mangli_enterprise_tools
@@ -241,22 +245,18 @@ patch:
 - **多租户去重安全修复**：
   - `lca/plugins/transport/webserver/handlers/runs/session/index/index.py` (修改：加入 user_id)
   - `lca/plugins/transport/webserver/handlers/runs/terminal/registry/commands.py` (修改：透传 user_id)
-- **领域持久化与路由**：
-  - `lca/infrastructure/persistence/project_store.py` (新增)
-  - `lca/plugins/transport/webserver/routes_mangli_projects.py` (新增)
 - **工具与静态控制台**：
   - `lca/plugins/tools/mangli_enterprise_tools.py` (新增)
+  - `lca/plugins/transport/webserver/routes_mangli_playground.py` (新增：挂载 /playground 路由)
   - `lca/plugins/transport/webserver/static/mangli_playground.html` (新增)
 - **编排配置**：
   - `bundles/mangli-enterprise.yaml` (新增)
   - `profiles/mangli-enterprise.yaml` (新增)
 - **测试套件**：
   - `tests/plugins/transport/test_mangli_auth.py`
-  - `tests/plugins/persistence/test_project_store.py`
-  - `tests/plugins/transport/test_routes_mangli_projects.py`
+  - `tests/plugins/transport/test_multitenant_inflight_run_dedup.py`
   - `tests/plugins/tools/test_mangli_enterprise_tools.py`
   - `tests/plugins/transport/test_mangli_playground.py`
-  - `tests/plugins/transport/test_multitenant_inflight_run_dedup.py`
   - `tests/scenario/test_mangli_enterprise_bundle_invariants.py`
 
 ---
@@ -269,7 +269,6 @@ patch:
 | **INV-02** | 权限微服务 5 分钟 TTL 缓存命中与容灾（纯标准库 `ExpiringLruCache`） | `test_permission_cache_ttl_and_error_handling` |
 | **INV-03** | 自适应双轨鉴权隔离（无 `X-Mangli-User` 时 LobeHub 100% 原生放行；有 `X-Mangli-User` 时公司解密与桥接） | `test_adaptive_auth_double_track` |
 | **INV-04** | 多租户 In-flight Run 并发去重隔离（不同用户的相同提问互不干扰） | `test_multitenant_inflight_run_dedup_isolation` |
-| **INV-05** | Projects 持久化 CRUD、游离会话与项目成员权限隔离 | `test_project_isolation_and_unassigned_sessions` |
-| **INV-06** | 真实工具契约符合性（继承 `Tool`，声明 `parameters`，返回 `Observation`，沙箱文件写入生成 `FileStore` 凭证） | `test_tool_conforms_to_lca_contract` |
-| **INV-07** | Playground 离线自包含（纯原生 CSS，无外网 CDN，`GET /playground` 严格返回 200） | `test_playground_offline_render` |
-| **INV-08** | **分支基线零修改铁律**：`git diff --name-only origin/main...HEAD -- lca/contracts lca/cognition lca/runtime lca/loop lca/framework lca_kernel vendor` 退出码必为 0 且输出必为空！ | `test_core_zero_mutation_against_merge_base` |
+| **INV-05** | 真实工具契约符合性（继承 `Tool`，声明 `parameters`，返回 `Observation`，沙箱文件写入生成 `FileStore` 凭证） | `test_tool_conforms_to_lca_contract` |
+| **INV-06** | Playground 离线自包含（纯原生 CSS，无外网 CDN，`GET /playground` 严格返回 200） | `test_playground_offline_render` |
+| **INV-07** | **分支基线零修改铁律**：`git diff --name-only origin/main...HEAD -- lca/contracts lca/cognition lca/runtime lca/loop lca/framework lca_kernel vendor` 退出码必为 0 且输出必为空！ | `test_core_zero_mutation_against_merge_base` |
