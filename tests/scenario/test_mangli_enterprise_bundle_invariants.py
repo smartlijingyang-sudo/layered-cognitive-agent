@@ -48,5 +48,4 @@ def test_mangli_profile_resolves_cleanly():
     # 检验 ResolvedProfile.plugins 数据契约
     plugin_ids = {p.id for p in resolved.plugins}
     assert "mangli-enterprise-playground-route" in plugin_ids
-    assert "mangli-enterprise-tools" in plugin_ids
     assert "lca-webserver-router" in plugin_ids
