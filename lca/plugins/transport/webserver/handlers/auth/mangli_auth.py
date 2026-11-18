@@ -222,6 +222,15 @@ class SmartAdaptiveAuthMiddleware:
             await self.app(scope, receive, send)
             return
 
+        if scope.get("method") == "OPTIONS":
+            await self.app(scope, receive, send)
+            return
+
+        path = scope.get("path", "")
+        if path in {"/playground", "/health", "/favicon.ico"}:
+            await self.app(scope, receive, send)
+            return
+
         headers = list(scope.get("headers", []))
         headers_dict = {k.lower(): v for k, v in headers}
 
