@@ -4,7 +4,7 @@
 | MANGLI-TASK-2 | 多租户 Run 并发去重隔离安全修复 (index.py 加入 user_id 维度 + commands.py 透传 + 跨租户隔离测试) | Completed | 2/2 单测 100% 通过（INV-04），多租户 In-flight 指纹与 SessionIndex 严格隔离，commit 已生成 |
 | MANGLI-TASK-3 | 真实 LCA Tool 契约实现与企业能力 (继承 Tool 协议 7 项 ClassVar + LocalFileStore 沙箱导出 + 预留 project_id 扩展槽位) | Completed | 单测 100% 通过（INV-05），完备实现 7 项 ClassVar 契约与 LocalFileStore 落地，commit 已生成 |
 | MANGLI-TASK-4 | 离线自包含的 Playground 验证控制台单页 (纯原生 CSS + 无外部 CDN + 首帧 JWT 鉴权与心跳 WS 通信 + 真实 200 HTTP 测试) | Completed | 单测 100% 通过（INV-06），TestClient 实测 GET /playground 返回 200，零外部 CDN，commit 已生成 |
-| MANGLI-TASK-5 | 声明式编排配置与真实 Merge-Base 零修改门禁 (规范 entries 语法 + 生产 bundle 继承 + dev_mode 关闭 + origin/main...HEAD 对比门禁) | Pending | 待执行 |
+| MANGLI-TASK-5 | 声明式编排配置与真实 Merge-Base 零修改门禁 (规范 entries 语法 + 生产 bundle 继承 + dev_mode 关闭 + origin/main...HEAD 对比门禁) | Completed | 2/2 单测 100% 通过（INV-07），git diff origin/main...HEAD 核心目录 0 修改，resolve_profile 成功，commit 已生成 |
 | MANGLI-FOLLOWUP-R9 | [二期规划] 企业 MCP 集群统一鉴权 (_meta 签名断言与健康检查) | Pending | 跟踪：设计与计划中已规约，二期实施 |
 | MANGLI-FOLLOWUP-R10 | [二期规划] FileStore 与 Topic 租户隔离 (owner_principal 校验与命名空间隔离) | Pending | 跟踪：设计与计划中已规约，二期实施 |
 | MANGLI-FOLLOWUP-R11 | [二期规划] 异步与长任务身份语义 (HITL 审批与 Cron 触发时 Principal 继承) | Pending | 跟踪：设计与计划中已规约，二期实施 |

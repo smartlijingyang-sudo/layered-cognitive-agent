@@ -1,0 +1,9 @@
+entries:
+  - id: mangli-enterprise-playground-route
+    name: mangli-enterprise-playground-route
+    $module: lca.plugins.transport.webserver.routes_mangli_playground
+    config: {}
+  - id: mangli-enterprise-tools
+    name: mangli-enterprise-tools
+    $module: lca.plugins.tools.mangli_enterprise_tools
+    config: {}

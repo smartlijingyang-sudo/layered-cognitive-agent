@@ -1,0 +1,40 @@
+name: mangli-enterprise
+description: |
+  Mangli Enterprise Integration profile.
+  Inherits full 14 production bundles from web-standard + assistant-runtime.yaml
+  plus mangli-enterprise.yaml bundle, with fail-closed production ownership patch.
+
+bundles:
+  - bundles/base.yaml
+  - bundles/observability-default.yaml
+  - bundles/observation-9module.yaml
+  - bundles/web-app.yaml
+  - bundles/scenario-cordis-creator.yaml
+  - bundles/loop_cursor.spine_default.yaml
+  - bundles/session-runtime.yaml
+  - bundles/event-bus-components.yaml
+  - bundles/outer/phase_main.yaml
+  - bundles/think/think_subgraph.yaml
+  - bundles/act/act_subgraph.yaml
+  - bundles/perceive/perceive_subgraph.yaml
+  - bundles/reflect/reflect_subgraph.yaml
+  - bundles/remember/remember_subgraph.yaml
+  - bundles/assistant-runtime.yaml
+  - bundles/mangli-enterprise.yaml
+
+patch:
+  - id: lca-effect-permission-manifest-default
+    disabled: true
+  - id: spine.sink.console
+    config:
+      format: graph_timeline
+  - id: lca.plugins.assistant.catalog.catalog
+    config:
+      assistants_root: "~/.lca/assistants"
+  - id: lca.plugins.assistant.webserver.bridge
+    config:
+      lobehub_url: ""
+  - id: lca.plugins.assistant.ownership
+    config:
+      dev_mode: false
+      expected_token: "lca-local"
