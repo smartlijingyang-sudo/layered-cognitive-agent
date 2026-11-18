@@ -223,3 +223,76 @@ async def test_adaptive_auth_invalid_ticket_returns_401():
     assert len(sent_messages) >= 1
     assert sent_messages[0]["type"] == "http.response.start"
     assert sent_messages[0]["status"] == 401
+
+
+@pytest.mark.asyncio
+async def test_java_user_principal_9_fields_and_embedded_ticket():
+    captured_principal = None
+
+    async def dummy_app(scope, receive, send):
+        nonlocal captured_principal
+        captured_principal = get_current_principal()
+
+    class FakeAppState:
+        lca_auth_expected_token = "secret-token-123"  # noqa: S105
+        lca_auth_dev_mode = False
+
+    class FakeApp:
+        state = FakeAppState()
+
+    mw = SmartAdaptiveAuthMiddleware(dummy_app)
+
+    # 模拟真实 Java Spring Cloud Gateway 传出的 UserPrincipal JSON
+    import json
+    gateway_payload = {
+        "userId": "10001",
+        "name": "李四",
+        "mobile": "13912345678",
+        "email": "lisi@mangli.com",
+        "jobNumber": "E9999",
+        "jobName": "资深开发",
+        "department": "平台架构部",
+        "clockInType": 1,
+        "ticket": "TKT-EMBEDDED-VALID",
+    }
+    key = bytes.fromhex("0123456789abcdef0123456789abcdef")
+    cipher_hex = encrypt_mangli_user_header_for_test(json.dumps(gateway_payload), key)
+
+    scope_gateway = {
+        "type": "http",
+        "path": "/runs",
+        "app": FakeApp(),
+        "headers": [
+            (b"x-mangli-user", cipher_hex.encode()),
+        ],
+    }
+    await mw(scope_gateway, None, None)
+
+    assert isinstance(captured_principal, Principal)
+    assert captured_principal.issuer == "mangli"
+    assert captured_principal.subject == "10001"
+    assert captured_principal.user_id == "10001"
+    assert captured_principal.name == "李四"
+    assert captured_principal.mobile == "13912345678"
+    assert captured_principal.email == "lisi@mangli.com"
+    assert captured_principal.job_number == "E9999"
+    assert captured_principal.job_name == "资深开发"
+    assert captured_principal.department == "平台架构部"
+    assert captured_principal.clock_in_type == 1
+    assert captured_principal.ticket == "TKT-EMBEDDED-VALID"
+
+
+def test_get_configured_aes_key_resolution(monkeypatch):
+    from lca.plugins.transport.webserver.handlers.auth.mangli_auth import get_configured_aes_key
+
+    # 1. 默认密钥 (未配置 env)
+    monkeypatch.delenv("MANGLI_AUTH_AES_KEY", raising=False)
+    assert get_configured_aes_key() == bytes.fromhex("0123456789abcdef0123456789abcdef")
+
+    # 2. 32 位 Hex 密钥
+    monkeypatch.setenv("MANGLI_AUTH_AES_KEY", "fedcba9876543210fedcba9876543210")
+    assert get_configured_aes_key() == bytes.fromhex("fedcba9876543210fedcba9876543210")
+
+    # 3. 密码字符串 (走 SHA1PRNG 派生)
+    monkeypatch.setenv("MANGLI_AUTH_AES_KEY", "custom_gateway_password")
+    assert get_configured_aes_key() == derive_sha1prng_key(b"custom_gateway_password")

@@ -11,8 +11,17 @@ class Principal(BaseModel):
     model_config = ConfigDict(frozen=True, extra="forbid")
 
     issuer: str  # "mangli" | "lobehub" | "system"
-    subject: str  # 用户工号或身份唯一标识 (例如 "U888" 或 "usr_lobe")
-    dept_id: str | None = None
+    subject: str  # 用户唯一标识 (对应 userId 或工号)
+    user_id: str = ""  # 用户ID (userId)
+    name: str = ""  # 用户姓名
+    mobile: str = ""  # 用户手机号码
+    email: str = ""  # 用户邮箱地址
+    job_number: str = ""  # 用户工号 (jobNumber)
+    job_name: str = ""  # 岗位名称 (jobName)
+    department: str = ""  # 部门 (department)
+    clock_in_type: int | None = None  # 考勤打卡类型 (clockInType)
+    ticket: str = ""  # 用户当前登录令牌 (ticket)
+    dept_id: str | None = None  # 部门ID兼容字段
     roles: tuple[str, ...] = ()
     project_id: str | None = None  # 外部租户项目标签
 

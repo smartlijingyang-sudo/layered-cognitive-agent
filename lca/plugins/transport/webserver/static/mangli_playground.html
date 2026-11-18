@@ -3,18 +3,19 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Mangli 企业级集成验证控制台</title>
+  <title>Mangli 企业级应用集成控制台</title>
   <style>
     :root {
       --bg: #0f172a;
       --card-bg: #1e293b;
       --card-border: #334155;
-      --text: #f8fafc;
-      --text-muted: #94a3b8;
       --primary: #3b82f6;
       --primary-hover: #2563eb;
+      --text: #f8fafc;
+      --text-muted: #94a3b8;
       --success: #10b981;
       --danger: #ef4444;
+      --warning: #f59e0b;
       --code-bg: #090d16;
     }
     * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -25,15 +26,44 @@
       line-height: 1.5;
       padding: 24px;
     }
-    .container { max-width: 1200px; margin: 0 auto; display: flex; flex-direction: column; gap: 20px; }
-    header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--card-border); padding-bottom: 16px; }
-    h1 { font-size: 22px; font-weight: 600; }
-    .badge { background: #1e3a8a; color: #93c5fd; padding: 4px 10px; border-radius: 9999px; font-size: 12px; font-weight: 500; }
+    .container { max-width: 1280px; margin: 0 auto; }
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding-bottom: 16px;
+      margin-bottom: 20px;
+      border-bottom: 1px solid var(--card-border);
+    }
+    .badge {
+      display: inline-block;
+      padding: 3px 8px;
+      font-size: 11px;
+      font-weight: 600;
+      border-radius: 4px;
+      background: rgba(59, 130, 246, 0.2);
+      color: #60a5fa;
+      border: 1px solid rgba(59, 130, 246, 0.4);
+    }
     .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
-    @media (max-width: 900px) { .grid { grid-template-columns: 1fr; } }
-    .card { background: var(--card-bg); border: 1px solid var(--card-border); border-radius: 8px; padding: 20px; display: flex; flex-direction: column; gap: 14px; }
-    .card-title { font-size: 16px; font-weight: 600; color: #e2e8f0; display: flex; align-items: center; gap: 8px; }
-    label { font-size: 13px; font-weight: 500; color: var(--text-muted); display: block; margin-bottom: 4px; }
+    .card {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 8px;
+      padding: 18px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+    .card-title {
+      font-size: 15px;
+      font-weight: 600;
+      color: #e2e8f0;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    label { display: block; font-size: 12px; color: var(--text-muted); margin-bottom: 4px; }
     input, select, textarea {
       width: 100%;
       background: var(--code-bg);
@@ -41,7 +71,7 @@
       border-radius: 6px;
       padding: 8px 12px;
       color: var(--text);
-      font-size: 14px;
+      font-size: 13px;
       outline: none;
       transition: border-color 0.2s;
     }
@@ -59,6 +89,12 @@
     }
     button:hover { background: var(--primary-hover); }
     button:disabled { background: #475569; cursor: not-allowed; }
+    .btn-secondary {
+      background: #334155;
+      font-size: 12px;
+      padding: 6px 12px;
+    }
+    .btn-secondary:hover { background: #475569; }
     .stream-box {
       background: var(--code-bg);
       border: 1px solid var(--card-border);
@@ -66,8 +102,8 @@
       padding: 14px;
       font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
       font-size: 13px;
-      min-height: 260px;
-      max-height: 480px;
+      min-height: 280px;
+      max-height: 520px;
       overflow-y: auto;
       white-space: pre-wrap;
       word-break: break-all;
@@ -75,20 +111,32 @@
     .status-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
     .status-online { background: var(--success); }
     .status-offline { background: var(--danger); }
-    .file-item { display: flex; justify-content: space-between; align-items: center; padding: 8px 12px; background: var(--code-bg); border-radius: 4px; border: 1px solid var(--card-border); }
+    .file-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 8px 12px;
+      background: var(--code-bg);
+      border-radius: 4px;
+      border: 1px solid var(--card-border);
+    }
     .file-link { color: #60a5fa; text-decoration: none; font-size: 13px; }
     .file-link:hover { text-decoration: underline; }
+    .form-row-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .form-row-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
   </style>
 </head>
 <body>
   <div class="container">
     <header>
       <div>
-        <h1>Mangli 企业级集成验证控制台</h1>
-        <p style="font-size: 13px; color: var(--text-muted); margin-top: 4px;">纯内网离线自包含单页 · 双轨身份认证 · WebSocket 流式交互</p>
+        <h1>Mangli 企业级应用集成控制台</h1>
+        <p style="font-size: 13px; color: var(--text-muted); margin-top: 4px;">
+          对齐 Spring Cloud Gateway AES 密文透传 · 真实 UserPrincipal 9大属性 · 自适应双轨鉴权
+        </p>
       </div>
       <div style="display: flex; gap: 10px; align-items: center;">
-        <span class="badge">LCA Enterprise Seam</span>
+        <span class="badge">Spring Cloud Gateway Adapter</span>
         <div style="display: flex; align-items: center; gap: 6px; font-size: 13px;">
           <span id="wsStatusDot" class="status-dot status-offline"></span>
           <span id="wsStatusText">WS 离线</span>
@@ -97,62 +145,124 @@
     </header>
 
     <div class="grid">
-      <!-- 左栏：鉴权配置与请求参数 -->
+      <!-- 左栏：网关配置与请求参数 -->
       <div style="display: flex; flex-direction: column; gap: 20px;">
+        
+        <!-- 1. 网关流量与 AES 密钥配置 -->
         <div class="card">
-          <div class="card-title">1. 身份认证配置（自适应双轨）</div>
+          <div class="card-title">1. 网关 AES 加密与身份配置</div>
           <div>
-            <label>认证轨道类型</label>
+            <label>鉴权通道选择</label>
             <select id="authTrack" onchange="toggleAuthTrack()">
-              <option value="gateway">公司网关流量 (X-Mangli-User AES 加密)</option>
-              <option value="direct">本地直接直连 (Bearer Token)</option>
+              <option value="gateway">公司网关流量 (透传 X-Mangli-User AES 加密头)</option>
+              <option value="direct">本地测试端直连 (Authorization Bearer Token)</option>
             </select>
           </div>
-          <div id="gatewayFields">
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 8px;">
-              <div>
-                <label>用户工号 (user_id)</label>
-                <input id="userId" type="text" value="U888" placeholder="例如 U888">
-              </div>
-              <div>
-                <label>部门编码 (dept_id)</label>
-                <input id="deptId" type="text" value="D01" placeholder="例如 D01">
+
+          <div id="gatewaySection" style="display: flex; flex-direction: column; gap: 12px;">
+            <!-- AES 密钥配置 -->
+            <div style="padding: 10px; background: rgba(15, 23, 42, 0.6); border-radius: 6px; border: 1px dashed var(--card-border);">
+              <div style="font-size: 13px; font-weight: 600; color: #93c5fd; margin-bottom: 8px;">AES 加密密钥配置</div>
+              <div class="form-row-2">
+                <div>
+                  <label>AES 密钥 / 密码 (与后端 .env 对齐)</label>
+                  <input id="aesKey" type="text" value="0123456789abcdef0123456789abcdef" placeholder="32位Hex或Java密码文本">
+                </div>
+                <div>
+                  <label>密钥派生模式</label>
+                  <select id="aesKeyMode">
+                    <option value="hex">32 位 Hex (16 字节原生 AES-128)</option>
+                    <option value="sha1prng">Java SHA1PRNG 密码文本派生</option>
+                    <option value="raw">16 字节原始 UTF-8 文本</option>
+                  </select>
+                </div>
               </div>
             </div>
-            <div style="margin-bottom: 8px;">
-              <div>
-                <label>用户姓名 (name)</label>
-                <input id="userName" type="text" value="zhangsan" placeholder="例如 zhangsan">
-              </div>
-            </div>
+
+            <!-- 真实 UserPrincipal 9大字段 -->
             <div>
-              <label>网关通行 Ticket</label>
-              <input id="ticket" type="text" value="ticket_test_2026" placeholder="透传微服务票据">
+              <div style="font-size: 13px; font-weight: 600; color: #cbd5e1; margin-bottom: 8px;">网关 UserPrincipal 载荷</div>
+              <div class="form-row-3" style="margin-bottom: 8px;">
+                <div>
+                  <label>用户ID (userId)</label>
+                  <input id="userId" type="text" value="10001" placeholder="例如 10001">
+                </div>
+                <div>
+                  <label>用户姓名 (name)</label>
+                  <input id="userName" type="text" value="张三" placeholder="例如 张三">
+                </div>
+                <div>
+                  <label>用户工号 (jobNumber)</label>
+                  <input id="jobNumber" type="text" value="E10001" placeholder="例如 E10001">
+                </div>
+              </div>
+              <div class="form-row-2" style="margin-bottom: 8px;">
+                <div>
+                  <label>手机号码 (mobile)</label>
+                  <input id="mobile" type="text" value="13800138000" placeholder="例如 13800138000">
+                </div>
+                <div>
+                  <label>邮箱地址 (email)</label>
+                  <input id="email" type="text" value="zhangsan@company.com" placeholder="例如 zhangsan@company.com">
+                </div>
+              </div>
+              <div class="form-row-3" style="margin-bottom: 8px;">
+                <div>
+                  <label>岗位名称 (jobName)</label>
+                  <input id="jobName" type="text" value="高级系统架构师" placeholder="例如 高级架构师">
+                </div>
+                <div>
+                  <label>部门 (department)</label>
+                  <input id="department" type="text" value="技术研发部" placeholder="例如 技术研发部">
+                </div>
+                <div>
+                  <label>考勤打卡类型 (clockInType)</label>
+                  <input id="clockInType" type="number" value="1" placeholder="1:标准打卡">
+                </div>
+              </div>
+              <div>
+                <label>登录令牌 (ticket - 封装在 UserPrincipal 内部)</label>
+                <input id="ticket" type="text" value="TKT-MANGLI-001" placeholder="微服务验证票据">
+              </div>
+            </div>
+
+            <!-- 密文透传与高级选项 -->
+            <div style="margin-top: 4px;">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+                <label style="margin: 0;">生成的 X-Mangli-User 密文 Hex 预览</label>
+                <label style="display: flex; align-items: center; gap: 4px; font-size: 11px; cursor: pointer;">
+                  <input id="customCipherToggle" type="checkbox" style="width: auto;" onchange="toggleCustomCipher()">
+                  直接手工输入已有网关密文
+                </label>
+              </div>
+              <textarea id="cipherPreview" rows="2" style="font-family: monospace; font-size: 11px;" placeholder="点击下方发起或自动生成密文"></textarea>
             </div>
           </div>
-          <div id="directFields" style="display: none;">
+
+          <div id="directSection" style="display: none;">
             <div>
-              <label>Authorization Token</label>
-              <input id="directToken" type="text" value="lca-local" placeholder="Bearer Token">
+              <label>Authorization Token (Bearer)</label>
+              <input id="directToken" type="text" value="lca-local" placeholder="例如 lca-local">
             </div>
           </div>
         </div>
 
+        <!-- 2. 任务发起 -->
         <div class="card">
           <div class="card-title">2. 对话发起与任务调度</div>
           <div>
             <label>提问内容 (user_text)</label>
-            <textarea id="promptInput" rows="3" placeholder="请输入提问内容...">请导出上月华东区销售报表并落地到工作区文件</textarea>
+            <textarea id="promptInput" rows="3" placeholder="请输入提问内容...">请确认我的工号、岗位和部门信息，并帮我生成一份企业月度报告并落盘。</textarea>
           </div>
-          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+          <div class="form-row-2">
             <div>
-              <label>租户项目标识 (project_id 扩展预留)</label>
+              <label>外部租户项目标识 (project_id)</label>
               <input id="projectId" type="text" value="proj_mangli_01" placeholder="选填，租户标签">
             </div>
             <div>
               <label>执行模式 (mode)</label>
               <select id="runMode">
-                <option value="solo">solo (单 Agent 对话)</option>
+                <option value="solo">solo (单 Agent 认知驱动)</option>
               </select>
             </div>
           </div>
@@ -186,8 +296,49 @@
 
     function toggleAuthTrack() {
       const track = document.getElementById('authTrack').value;
-      document.getElementById('gatewayFields').style.display = track === 'gateway' ? 'block' : 'none';
-      document.getElementById('directFields').style.display = track === 'direct' ? 'block' : 'none';
+      document.getElementById('gatewaySection').style.display = track === 'gateway' ? 'flex' : 'none';
+      document.getElementById('directSection').style.display = track === 'direct' ? 'block' : 'none';
+    }
+
+    function toggleCustomCipher() {
+      const isCustom = document.getElementById('customCipherToggle').checked;
+      const preview = document.getElementById('cipherPreview');
+      preview.readOnly = !isCustom;
+      if (isCustom) {
+        preview.focus();
+      }
+    }
+
+    async function generateCipher() {
+      const key = document.getElementById('aesKey').value.trim();
+      const keyMode = document.getElementById('aesKeyMode').value;
+      const payload = {
+        userId: document.getElementById('userId').value.trim(),
+        name: document.getElementById('userName').value.trim(),
+        mobile: document.getElementById('mobile').value.trim(),
+        email: document.getElementById('email').value.trim(),
+        jobNumber: document.getElementById('jobNumber').value.trim(),
+        jobName: document.getElementById('jobName').value.trim(),
+        department: document.getElementById('department').value.trim(),
+        clockInType: parseInt(document.getElementById('clockInType').value, 10) || 1,
+        ticket: document.getElementById('ticket').value.trim()
+      };
+
+      try {
+        const res = await fetch('/playground/encrypt', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ payload, key, key_mode: keyMode })
+        });
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          throw new Error(err.error || `HTTP ${res.status}`);
+        }
+        const data = await res.json();
+        return data.cipher_hex;
+      } catch (err) {
+        throw new Error('加密 UserPrincipal 失败: ' + err.message);
+      }
     }
 
     async function dispatchRun() {
@@ -209,12 +360,31 @@
       const headers = { 'Content-Type': 'application/json' };
 
       if (track === 'gateway') {
-        // 演示环境生成固定 Java 测试兼容向量密文
-        headers['X-Mangli-User'] = '39b8a117fb5afc5bde07945964f2c2b8bb1fdd7c43d44d40336c864cbf7accea01c34f86851bc289a5acd8e9d953c24cdff6f07e6a20d89b8f5fde7ca6eab628';
-        headers['ticket'] = document.getElementById('ticket').value.trim() || 'ticket_test';
+        try {
+          let cipherHex = '';
+          const isCustom = document.getElementById('customCipherToggle').checked;
+          if (isCustom) {
+            cipherHex = document.getElementById('cipherPreview').value.trim();
+            if (!cipherHex) {
+              alert('请在密文框中输入网关加密后的 Hex 字符串');
+              sendBtn.disabled = false;
+              return;
+            }
+          } else {
+            cipherHex = await generateCipher();
+            document.getElementById('cipherPreview').value = cipherHex;
+          }
+          headers['X-Mangli-User'] = cipherHex;
+          consoleBox.textContent += `[网关流量] 生成 X-Mangli-User 密文(${cipherHex.substring(0, 16)}...)\n`;
+        } catch (err) {
+          consoleBox.textContent += `[加密失败]: ${err.message}\n`;
+          sendBtn.disabled = false;
+          return;
+        }
       } else {
         const token = document.getElementById('directToken').value.trim();
         headers['Authorization'] = `Bearer ${token}`;
+        consoleBox.textContent += `[本地直连] 携带 Bearer Token\n`;
       }
 
       try {
@@ -240,7 +410,7 @@
         const runId = data.run_id;
         const wsToken = data.ws_token;
         document.getElementById('currentRunId').textContent = `Run ID: ${runId}`;
-        consoleBox.textContent += `[创建成功] run_id: ${runId}\n[连接 WS] 建立 WebSocket 流式通道...\n`;
+        consoleBox.textContent += `[任务创建成功] run_id: ${runId}\n[建立 WebSocket 通道] 启动流式监听...\n`;
 
         initWebSocket(runId, wsToken);
       } catch (err) {
@@ -269,13 +439,11 @@
         text.textContent = 'WS 在线';
         consoleBox.textContent += `[WS 已建连] 发送首帧 JWT 鉴权...\n`;
 
-        // 规范：首帧发送认证帧
         activeWs.send(JSON.stringify({
           type: "auth",
           token: wsToken
         }));
 
-        // 规范：启动 30s 双向心跳
         heartbeatTimer = setInterval(() => {
           if (activeWs && activeWs.readyState === WebSocket.OPEN) {
             activeWs.send(JSON.stringify({ type: "heartbeat" }));
@@ -290,11 +458,11 @@
             consoleBox.textContent += msg.text;
             consoleBox.scrollTop = consoleBox.scrollHeight;
           } else if (msg.type === 'tool_called') {
-            consoleBox.textContent += `\n[调用工具]: ${msg.tool_name}\n`;
+            consoleBox.textContent += `\n[工具调用]: ${msg.tool_name}\n`;
           } else if (msg.type === 'file_generated') {
             addFileAttachment(msg.name, msg.attachment_id);
           } else if (msg.type === 'done') {
-            consoleBox.textContent += `\n[执行完毕]\n`;
+            consoleBox.textContent += `\n[认知循环执行完毕]\n`;
           }
         } catch (e) {
           consoleBox.textContent += event.data;
@@ -307,8 +475,8 @@
         clearInterval(heartbeatTimer);
       };
 
-      activeWs.onerror = function (err) {
-        consoleBox.textContent += `\n[WS 错误发生]\n`;
+      activeWs.onerror = function () {
+        consoleBox.textContent += `\n[WebSocket 传输异常]\n`;
       };
     }
 
@@ -321,7 +489,7 @@
       item.className = 'file-item';
       item.innerHTML = `
         <span style="font-size: 13px;">${name}</span>
-        <a class="file-link" href="/files/${attachmentId}" target="_blank">下载凭证 (${attachmentId})</a>
+        <a class="file-link" href="/files/${attachmentId}" target="_blank">下载产物凭证 (${attachmentId})</a>
       `;
       fileList.appendChild(item);
     }

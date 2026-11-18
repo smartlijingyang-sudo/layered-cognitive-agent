@@ -55,7 +55,7 @@ def derive_sha1prng_key(password: bytes) -> bytes:
 
 def get_configured_aes_key() -> bytes:
     """获取当前配置的 AES 密钥。"""
-    key_env = os.environ.get("MANGLI_AUTH_AES_KEY")
+    key_env = os.environ.get("MANGLI_AUTH_AES_KEY", "").strip()
     if not key_env:
         return DEFAULT_AES_KEY
     try:
@@ -64,6 +64,8 @@ def get_configured_aes_key() -> bytes:
             return raw_bytes
     except ValueError:
         pass
+    if len(key_env.encode("utf-8")) == 16:
+        return key_env.encode("utf-8")
     return derive_sha1prng_key(key_env.encode())
 
 
@@ -227,7 +229,7 @@ class SmartAdaptiveAuthMiddleware:
             return
 
         path = scope.get("path", "")
-        if path in {"/playground", "/health", "/favicon.ico"}:
+        if path == "/playground" or path.startswith("/playground/") or path in {"/health", "/favicon.ico"}:
             await self.app(scope, receive, send)
             return
 
@@ -255,22 +257,43 @@ class SmartAdaptiveAuthMiddleware:
                 )
                 return
 
-            user_id = str(user_info.get("user_id", "")).strip()
-            if not user_id:
+            # 兼容 Java UserPrincipal 驼峰与下划线命名
+            user_id = str(user_info.get("userId") or user_info.get("user_id", "")).strip()
+            name = str(user_info.get("name", "")).strip()
+            mobile = str(user_info.get("mobile", "")).strip()
+            email = str(user_info.get("email", "")).strip()
+            job_number = str(user_info.get("jobNumber") or user_info.get("job_number", "")).strip()
+            job_name = str(user_info.get("jobName") or user_info.get("job_name", "")).strip()
+            department = str(user_info.get("department") or user_info.get("dept_id", "")).strip()
+
+            raw_clock_in = user_info.get("clockInType") or user_info.get("clock_in_type")
+            clock_in_type: int | None = None
+            if raw_clock_in is not None:
+                try:
+                    clock_in_type = int(raw_clock_in)
+                except (ValueError, TypeError):
+                    clock_in_type = None
+
+            effective_user_id = user_id or job_number
+            if not effective_user_id:
                 await _send_json_response(
-                    send, 401, "unauthorized", "missing user_id in cipher payload"
+                    send, 401, "unauthorized", "missing userId or jobNumber in cipher payload"
                 )
                 return
 
-            dept_id = user_info.get("dept_id")
-            ticket_bytes = headers_dict.get(b"ticket")
-            ticket = (
-                ticket_bytes.decode("utf-8", errors="replace") if ticket_bytes else ""
-            )
+            # ticket 提取：优先从 UserPrincipal 内部提取，兼容 Header 中的 ticket
+            ticket = str(user_info.get("ticket", "")).strip()
+            if not ticket:
+                ticket_bytes = headers_dict.get(b"ticket")
+                ticket = (
+                    ticket_bytes.decode("utf-8", errors="replace").strip()
+                    if ticket_bytes
+                    else ""
+                )
 
             # 权限微服务查询与 Fail-Closed 保护
             try:
-                _perms, roles = await self.auth_service.get_permissions(ticket, user_id)
+                _perms, roles = await self.auth_service.get_permissions(ticket, effective_user_id)
             except PermissionServiceUnavailableError:
                 await _send_json_response(
                     send, 502, "bad_gateway", "permission service unavailable"
@@ -288,7 +311,7 @@ class SmartAdaptiveAuthMiddleware:
             ]
 
             # 注入真实身份与合法 Bearer
-            cleaned_headers.append((b"x-lca-user-id", user_id.encode()))
+            cleaned_headers.append((b"x-lca-user-id", effective_user_id.encode()))
             cleaned_headers.append(
                 (b"authorization", f"Bearer {expected_token}".encode())
             )
@@ -297,8 +320,17 @@ class SmartAdaptiveAuthMiddleware:
             # 构造不可变 Principal 并绑定
             principal = Principal(
                 issuer="mangli",
-                subject=user_id,
-                dept_id=dept_id,
+                subject=effective_user_id,
+                user_id=user_id,
+                name=name,
+                mobile=mobile,
+                email=email,
+                job_number=job_number,
+                job_name=job_name,
+                department=department,
+                clock_in_type=clock_in_type,
+                ticket=ticket,
+                dept_id=department or None,
                 roles=tuple(roles),
             )
             set_current_principal(principal)
