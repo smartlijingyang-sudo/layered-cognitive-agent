@@ -38,3 +38,6 @@ patch:
     config:
       dev_mode: false
       expected_token: "lca-local"
+  - id: lca-avatar
+    config:
+      api_key: "dummy"

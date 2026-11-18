@@ -231,7 +231,7 @@ class RoutingFileStorage:
         ensure_run_dir(Path(run_dir))
         self._fd = os.open(
             str(self._path),
-            os.O_WRONLY | os.O_APPEND | os.O_CREAT | os.O_CLOEXEC,
+            os.O_WRONLY | os.O_APPEND | os.O_CREAT | getattr(os, "O_CLOEXEC", 0),
             RUN_ARTIFACT_MODE,
         )
 
