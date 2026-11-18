@@ -392,6 +392,7 @@
           method: 'POST',
           headers: headers,
           body: JSON.stringify({
+            messages: [{ role: 'user', content: userText }],
             question: userText,
             user_text: userText,
             mode: mode,
