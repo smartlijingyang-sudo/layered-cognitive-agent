@@ -116,3 +116,17 @@ def test_load_layered_env_allows_avatar_image_prefix_keys(tmp_path: Path) -> Non
     assert "AVATAR_IMAGE_BASE_URL" in snapshot.allowed_keys
     assert "AVATAR_IMAGE_API_KEY" in snapshot.allowed_keys
     assert "AVATAR_IMAGE_BASE_URL" in snapshot.dotenv
+
+
+def test_load_layered_env_allows_mangli_gateway_aes_key(tmp_path: Path) -> None:
+    """MANGLI_ prefix keys from .env are allowed.
+
+    网关中间件用 ``os.environ["MANGLI_AUTH_AES_KEY"]`` 解密 X-Mangli-User；
+    白名单缺这个前缀时，.env 里配了也进不了 ``os.environ``，本地联调只能靠
+    ambient 环境变量，运维容易漏。
+    """
+    _write_dotenv(tmp_path / ".env", "MANGLI_AUTH_AES_KEY=fedcba9876543210fedcba9876543210\n")
+    snapshot = load_layered_env("test-bin", tmp_path)
+    assert "MANGLI_" in BOOTSTRAP_PREFIXES
+    assert "MANGLI_AUTH_AES_KEY" in snapshot.allowed_keys
+    assert snapshot.dotenv["MANGLI_AUTH_AES_KEY"] == "fedcba9876543210fedcba9876543210"

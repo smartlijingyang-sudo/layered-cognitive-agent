@@ -103,6 +103,10 @@ BOOTSTRAP_PREFIXES: tuple[str, ...] = (
     "TAVILY_",
     "TYPESAFE_",
     "CPK_",
+    # Mangli gateway adapter: MANGLI_AUTH_AES_KEY is read by the webserver auth
+    # middleware (os.environ) to decrypt X-Mangli-User. Same class as the
+    # third-party keys above — a deployment secret supplied per environment.
+    "MANGLI_",
 )
 
 BOOTSTRAP_FORBIDDEN: frozenset[str] = frozenset(

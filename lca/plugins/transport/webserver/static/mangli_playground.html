@@ -1,0 +1,1628 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mangli 企业级应用集成控制台</title>
+  <style>
+    :root {
+      --bg: #0f172a;
+      --card-bg: #1e293b;
+      --card-border: #334155;
+      --primary: #3b82f6;
+      --primary-hover: #2563eb;
+      --text: #f8fafc;
+      --text-muted: #94a3b8;
+      --success: #10b981;
+      --danger: #ef4444;
+      --warning: #f59e0b;
+      --code-bg: #090d16;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.5;
+      padding: 24px;
+    }
+    .container { max-width: 1280px; margin: 0 auto; }
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding-bottom: 16px;
+      margin-bottom: 20px;
+      border-bottom: 1px solid var(--card-border);
+    }
+    .badge {
+      display: inline-block;
+      padding: 3px 8px;
+      font-size: 11px;
+      font-weight: 600;
+      border-radius: 4px;
+      background: rgba(59, 130, 246, 0.2);
+      color: #60a5fa;
+      border: 1px solid rgba(59, 130, 246, 0.4);
+    }
+    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+    .card {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 8px;
+      padding: 18px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+    .card-title {
+      font-size: 15px;
+      font-weight: 600;
+      color: #e2e8f0;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    label { display: block; font-size: 12px; color: var(--text-muted); margin-bottom: 4px; }
+    input, select, textarea {
+      width: 100%;
+      background: var(--code-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 6px;
+      padding: 8px 12px;
+      color: var(--text);
+      font-size: 13px;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+    input:focus, select:focus, textarea:focus { border-color: var(--primary); }
+    button {
+      background: var(--primary);
+      color: white;
+      border: none;
+      border-radius: 6px;
+      padding: 10px 16px;
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    button:hover { background: var(--primary-hover); }
+    button:disabled { background: #475569; cursor: not-allowed; }
+    .btn-secondary {
+      background: #334155;
+      font-size: 12px;
+      padding: 6px 12px;
+    }
+    .btn-secondary:hover { background: #475569; }
+    .stream-box {
+      background: var(--code-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 6px;
+      padding: 14px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      font-size: 13px;
+      min-height: 280px;
+      max-height: 520px;
+      overflow-y: auto;
+      white-space: pre-wrap;
+      word-break: break-all;
+    }
+    .status-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+    .status-online { background: var(--success); }
+    .status-offline { background: var(--danger); }
+    .file-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 8px 12px;
+      background: var(--code-bg);
+      border-radius: 4px;
+      border: 1px solid var(--card-border);
+    }
+    .file-link { color: #60a5fa; text-decoration: none; font-size: 13px; }
+    .file-link:hover { text-decoration: underline; }
+    .form-row-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .form-row-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
+    .drop-zone {
+      border: 1px dashed var(--card-border);
+      border-radius: 6px;
+      background: var(--code-bg);
+      padding: 14px;
+      text-align: center;
+      font-size: 13px;
+      color: var(--text-muted);
+      cursor: pointer;
+      transition: border-color 0.2s, background 0.2s;
+    }
+    .drop-zone:hover { border-color: var(--primary); }
+    .drop-zone.dragover { border-color: var(--primary); background: rgba(59, 130, 246, 0.08); }
+    .drop-zone-hint { margin-top: 4px; font-size: 11px; color: #64748b; }
+    .drop-zone-pick { color: #60a5fa; text-decoration: underline; }
+    .attachment-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 10px;
+      padding: 6px 10px;
+      background: var(--code-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 4px;
+      font-size: 12px;
+    }
+    .attachment-name { word-break: break-all; }
+    .attachment-remove {
+      flex: none;
+      background: transparent;
+      color: var(--danger);
+      border: none;
+      font-size: 12px;
+      padding: 2px 6px;
+      cursor: pointer;
+    }
+    .attachment-remove:hover { background: rgba(239, 68, 68, 0.12); }
+    .upload-notice { font-size: 12px; color: var(--danger); }
+    .upload-notice.info { color: var(--text-muted); }
+    .approval-panel {
+      border: 1px solid var(--warning);
+      background: rgba(245, 158, 11, 0.08);
+      border-radius: 6px;
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .approval-title { font-size: 13px; font-weight: 600; color: var(--warning); }
+    .approval-body { font-size: 12px; color: var(--text-muted); white-space: pre-wrap; word-break: break-all; max-height: 220px; overflow-y: auto; }
+    .approval-tool { color: #e2e8f0; font-weight: 600; }
+    .btn-danger { background: var(--danger); }
+    .btn-danger:hover { background: #dc2626; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <div>
+        <h1>Mangli 企业级应用集成控制台</h1>
+        <p style="font-size: 13px; color: var(--text-muted); margin-top: 4px;">
+          对齐 Spring Cloud Gateway AES 密文透传 · 真实 UserPrincipal 9大属性 · 自适应双轨鉴权
+        </p>
+      </div>
+      <div style="display: flex; gap: 10px; align-items: center;">
+        <span class="badge">Spring Cloud Gateway Adapter</span>
+        <div style="display: flex; align-items: center; gap: 6px; font-size: 13px;">
+          <span id="wsStatusDot" class="status-dot status-offline"></span>
+          <span id="wsStatusText">WS 离线</span>
+        </div>
+      </div>
+    </header>
+
+    <div class="grid">
+      <!-- 左栏：网关配置与请求参数 -->
+      <div style="display: flex; flex-direction: column; gap: 20px;">
+        
+        <!-- 1. 网关流量与 AES 密钥配置 -->
+        <div class="card">
+          <div class="card-title">1. 网关 AES 加密与身份配置</div>
+          <div>
+            <label>鉴权通道选择</label>
+            <select id="authTrack" onchange="toggleAuthTrack()">
+              <option value="gateway">公司网关流量 (透传 X-Mangli-User AES 加密头)</option>
+              <option value="proxy">经网关访问 (本服务代理转发 + ticket)</option>
+              <option value="direct">本地测试端直连 (Authorization Bearer Token)</option>
+            </select>
+          </div>
+
+          <div id="gatewaySection" style="display: flex; flex-direction: column; gap: 12px;">
+            <!-- AES 密钥配置：只影响「本页生成密文」，手工密文模式下整块隐藏，
+                 避免让人误以为服务端解密用的是这里填的密钥。 -->
+            <div id="aesKeySection" style="padding: 10px; background: rgba(15, 23, 42, 0.6); border-radius: 6px; border: 1px dashed var(--card-border);">
+              <div style="font-size: 13px; font-weight: 600; color: #93c5fd; margin-bottom: 8px;">AES 加密密钥配置（仅用于生成密文）</div>
+              <div class="form-row-2">
+                <div>
+                  <label>AES 密钥 / 密码（仅用于在本页生成密文）</label>
+                  <input id="aesKey" type="text" value="0123456789abcdef0123456789abcdef" placeholder="32位Hex或Java密码文本">
+                </div>
+                <div>
+                  <label>密钥派生模式</label>
+                  <select id="aesKeyMode" onchange="toggleKeyMode()">
+                    <option value="server" selected>使用服务端已配置密钥 (MANGLI_AUTH_AES_KEY)</option>
+                    <option value="hex">32 位 Hex (16 字节原生 AES-128)</option>
+                    <option value="sha1prng">Java SHA1PRNG 密码文本派生</option>
+                    <option value="raw">16 字节原始 UTF-8 文本</option>
+                  </select>
+                </div>
+              </div>
+              <div class="drop-zone-hint" style="margin-top: 8px;">
+                输入框里的密钥只参与「生成密文」。请求头的密文始终由服务端环境变量
+                <code>MANGLI_AUTH_AES_KEY</code>（未配置则用内置默认密钥）解密 ——
+                手工粘贴的密文必须是用那把密钥加密的。
+              </div>
+            </div>
+
+            <!-- 真实 UserPrincipal 9大字段：只在「本页生成密文」时被加密进载荷，
+                 手工密文模式下身份已在粘贴的密文里，因此整块隐藏。 -->
+            <div id="principalSection">
+              <div style="font-size: 13px; font-weight: 600; color: #cbd5e1; margin-bottom: 8px;">网关 UserPrincipal 载荷（仅用于生成密文）</div>
+              <div class="form-row-3" style="margin-bottom: 8px;">
+                <div>
+                  <label>用户ID (userId)</label>
+                  <input id="userId" type="text" value="10001" placeholder="例如 10001">
+                </div>
+                <div>
+                  <label>用户姓名 (name)</label>
+                  <input id="userName" type="text" value="张三" placeholder="例如 张三">
+                </div>
+                <div>
+                  <label>用户工号 (jobNumber)</label>
+                  <input id="jobNumber" type="text" value="E10001" placeholder="例如 E10001">
+                </div>
+              </div>
+              <div class="form-row-2" style="margin-bottom: 8px;">
+                <div>
+                  <label>手机号码 (mobile)</label>
+                  <input id="mobile" type="text" value="13800138000" placeholder="例如 13800138000">
+                </div>
+                <div>
+                  <label>邮箱地址 (email)</label>
+                  <input id="email" type="text" value="zhangsan@company.com" placeholder="例如 zhangsan@company.com">
+                </div>
+              </div>
+              <div class="form-row-3" style="margin-bottom: 8px;">
+                <div>
+                  <label>岗位名称 (jobName)</label>
+                  <input id="jobName" type="text" value="高级系统架构师" placeholder="例如 高级架构师">
+                </div>
+                <div>
+                  <label>部门 (department)</label>
+                  <input id="department" type="text" value="技术研发部" placeholder="例如 技术研发部">
+                </div>
+                <div>
+                  <label>考勤打卡类型 (clockInType)</label>
+                  <input id="clockInType" type="number" value="1" placeholder="1:标准打卡">
+                </div>
+              </div>
+              <div>
+                <label>登录令牌 (ticket - 封装在 UserPrincipal 内部)</label>
+                <input id="ticket" type="text" value="TKT-MANGLI-001" placeholder="微服务验证票据">
+              </div>
+            </div>
+            </div>
+
+            <!-- 密文透传与高级选项 -->
+            <div style="margin-top: 4px;">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+                <label id="cipherPreviewLabel" style="margin: 0;">生成的 X-Mangli-User 密文 Hex 预览</label>
+                <label style="display: flex; align-items: center; gap: 4px; font-size: 11px; cursor: pointer;">
+                  <input id="customCipherToggle" type="checkbox" style="width: auto;" onchange="toggleCustomCipher()">
+                  直接手工输入已有网关密文
+                </label>
+              </div>
+              <textarea id="cipherPreview" rows="2" style="font-family: monospace; font-size: 11px;" placeholder="点击下方发起或自动生成密文"></textarea>
+              <div style="display: flex; align-items: center; gap: 8px; margin-top: 6px;">
+                <button type="button" class="btn-secondary" style="flex: none;" onclick="verifyCipher()">校验密文 (用服务端密钥试解)</button>
+                <span class="drop-zone-hint" style="margin: 0;">粘贴后先点这里，比发请求拿到 401 更快定位</span>
+              </div>
+              <div id="cipherNotice" class="upload-notice info" style="margin-top: 6px;"></div>
+            </div>
+          </div>
+
+          <div id="directSection" style="display: none;">
+            <div>
+              <label>Authorization Token (Bearer)</label>
+              <input id="directToken" type="text" value="lca-local" placeholder="例如 lca-local">
+            </div>
+          </div>
+
+          <!-- 经网关：浏览器不能跨域直连网关（网关无 CORS），这里走本服务转发。 -->
+          <div id="proxySection" style="display: none; flex-direction: column; gap: 12px;">
+            <div class="drop-zone-hint" style="margin: 0;">
+              浏览器只访问本服务，由本服务带 ticket 转发到网关 —— 请求真实经过
+              网关再到 agent。身份由网关决定，上面的身份表单在本模式下不生效。
+            </div>
+            <div>
+              <label>网关 Host（含协议，可带路径前缀）</label>
+              <input id="gatewayHost" type="text" placeholder="https://gw.company.com 或 https://gw.company.com/lca-api">
+            </div>
+            <div>
+              <label>Ticket（由代理注入为 ticket 请求头）</label>
+              <input id="gatewayTicket" type="text" placeholder="粘贴门户登录票据">
+            </div>
+            <div class="form-row-2">
+              <button type="button" class="btn-secondary" onclick="testGateway()">连接测试</button>
+              <button type="button" class="btn-secondary" onclick="refreshWhoami()">查询当前身份</button>
+            </div>
+            <div id="proxyNotice" class="upload-notice"></div>
+            <div id="whoamiNotice" class="upload-notice"></div>
+          </div>
+        </div>
+
+        <!-- 2. 任务发起 -->
+        <div class="card">
+          <div class="card-title">2. 对话发起与任务调度</div>
+          <div>
+            <label>提问内容 (user_text)</label>
+            <textarea id="promptInput" rows="3" placeholder="请输入提问内容...">请确认我的工号、岗位和部门信息，并帮我生成一份企业月度报告并落盘。</textarea>
+          </div>
+          <div class="form-row-2">
+            <div>
+              <label>外部租户项目标识 (project_id)</label>
+              <input id="projectId" type="text" value="proj_mangli_01" placeholder="选填，租户标签">
+            </div>
+            <div>
+              <label>执行模式 (mode)</label>
+              <select id="runMode">
+                <option value="solo">solo (单 Agent 认知驱动)</option>
+              </select>
+            </div>
+          </div>
+          <div>
+            <label>附件上传 (可选，上传后随本次任务一起提交)</label>
+            <div
+              id="dropZone"
+              class="drop-zone"
+              onclick="pickFiles()"
+              ondragover="onDragOver(event)"
+              ondragleave="onDragLeave(event)"
+              ondrop="onDrop(event)"
+            >
+              <div>拖拽文件到此区域，或 <span class="drop-zone-pick">点击选择文件</span></div>
+              <div class="drop-zone-hint">单文件 ≤ 100MB · 单次最多 50 个 · 上传后进入 FileStore</div>
+            </div>
+            <input id="fileInput" type="file" multiple style="display: none;" onchange="handleFileSelect(event)">
+            <div id="attachmentList" style="display: flex; flex-direction: column; gap: 6px; margin-top: 8px;"></div>
+            <div id="uploadNotice" class="upload-notice" style="margin-top: 6px;"></div>
+          </div>
+          <div class="form-row-2">
+            <button id="sendBtn" onclick="dispatchRun()">发起任务 (POST /runs)</button>
+            <button id="stopBtn" class="btn-danger" onclick="cancelRun()" disabled>停止任务 (cancel)</button>
+          </div>
+          <div>
+            <label>接续 / 回放既有 run（验证历史任务的唯一入口）</label>
+            <div style="display: flex; gap: 8px;">
+              <input id="attachRunId" type="text" placeholder="粘贴 run_id，例如 run_1a2b3c4d">
+              <button class="btn-secondary" style="flex: none;" onclick="attachExistingRun()">回放</button>
+            </div>
+            <div class="drop-zone-hint" style="margin-top: 6px;">
+              回放会从头重播该 run 的全部事件；run 已结束且 Redis 流已失效时，自动回退到 GET /runs/{id} 摘要。
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 右栏：实时流式输出与产物凭证 -->
+      <div style="display: flex; flex-direction: column; gap: 20px;">
+        <div class="card" style="flex: 1;">
+          <div class="card-title" style="justify-content: space-between;">
+            <span>3. WebSocket 流式输出打字机</span>
+            <span id="currentRunId" style="font-size: 12px; font-weight: normal; color: var(--text-muted);">Run ID: -</span>
+          </div>
+          <div id="streamConsole" class="stream-box">// 等待任务发起...</div>
+          <div id="approvalPanel" class="approval-panel" style="display: none;">
+            <div class="approval-title">等待人工审批 (human_approval)</div>
+            <div id="approvalBody" class="approval-body"></div>
+            <div>
+              <label>答复 / 审批意见</label>
+              <textarea id="approvalAnswer" rows="2" placeholder="批准时作为人工回答提交；拒绝时作为拒绝理由"></textarea>
+            </div>
+            <div class="form-row-2">
+              <button id="approveBtn" onclick="submitApproval(false)">批准并继续</button>
+              <button id="rejectBtn" class="btn-danger" onclick="submitApproval(true)">拒绝</button>
+            </div>
+            <div id="approvalNotice" class="upload-notice"></div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-title">4. 文件落地与下载凭证 (FileStore)</div>
+          <div id="fileList" style="display: flex; flex-direction: column; gap: 8px;">
+            <div style="font-size: 13px; color: var(--text-muted);">暂无产物文件</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let activeWs = null;
+    let heartbeatTimer = null;
+    // 思考流是否已开段：reasoning 是增量 delta，只在首块打一次前缀。
+    let reasoningOpen = false;
+    // 已在 /files 落地、等待随本次 run 提交的附件（顺序即用户选择顺序）。
+    let attachments = [];
+    // 在途上传批次数：为 0 才允许发起任务，避免漏带附件。
+    let uploadsInFlight = 0;
+    const MAX_UPLOAD_FILES = 50;
+    // 当前接续的 run 及其 WS 凭据。run 暂停后服务端会关闭事件流，
+    // 审批通过必须用同一个 run_id 重新建连，因此这两个值跨重连保留。
+    let currentRunId = '';
+    let currentWsToken = '';
+    // 已消费到的 Redis 流事件 id：重连时作为 resume.lastEventId，避免整段重播。
+    let lastEventId = '';
+    // 暂停中的审批：null 表示当前没有待处理审批。
+    let pendingApproval = null;
+    // 本页已完成轮次（user/assistant 成对），作为下一次 /runs 的 messages 前缀。
+    let transcript = [];
+    // 本轮 assistant 输出累积，用于轮次结束时补齐 transcript。
+    let assistantBuffer = '';
+    // run 是否处于可停止状态：创建/重连后置 true，收到终态或停止后置 false。
+    let runActive = false;
+
+    // 经网关轨道：浏览器只访问本服务，业务请求由本服务转发到页面指定的网关。
+    const PROXY_TRACK = 'proxy';
+    const PROXY_SESSION_HEADER_NAME = 'x-playground-session';
+    let proxySessionId = '';
+
+    function currentTrack() {
+      return document.getElementById('authTrack').value;
+    }
+
+    function isProxyTrack() {
+      return currentTrack() === PROXY_TRACK;
+    }
+
+    function toggleAuthTrack() {
+      const track = currentTrack();
+      document.getElementById('gatewaySection').style.display = track === 'gateway' ? 'flex' : 'none';
+      document.getElementById('directSection').style.display = track === 'direct' ? 'block' : 'none';
+      document.getElementById('proxySection').style.display = track === PROXY_TRACK ? 'flex' : 'none';
+      // 换轨道即作废旧会话，避免沿用上一套 host/ticket 继续转发。
+      proxySessionId = '';
+    }
+
+    // 只有经网关模式改写路径；另两条轨道仍是同源直连 agent。
+    function apiUrl(path) {
+      return isProxyTrack() ? `/playground/proxy${path}` : path;
+    }
+
+    function wsUrl(runId) {
+      const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
+      if (!isProxyTrack()) {
+        return `${protocol}//${location.host}/v1/runs/${runId}/ws`;
+      }
+      // session 走 query：浏览器无法给 new WebSocket 加自定义请求头。
+      const query = proxySessionId
+        ? `?${PROXY_SESSION_HEADER_NAME}=${encodeURIComponent(proxySessionId)}`
+        : '';
+      return `${protocol}//${location.host}/playground/proxy/v1/runs/${runId}/ws${query}`;
+    }
+
+    function setProxyNotice(text, isError) {
+      const notice = document.getElementById('proxyNotice');
+      notice.textContent = text || '';
+      notice.className = isError ? 'upload-notice' : 'upload-notice info';
+    }
+
+    function setWhoamiNotice(text, isError) {
+      const notice = document.getElementById('whoamiNotice');
+      notice.textContent = text || '';
+      notice.className = isError ? 'upload-notice' : 'upload-notice info';
+    }
+
+    // 代理会话把「网关地址 + ticket」绑定成一次会话 id：后续请求只带 id，
+    // ticket 既不出现在 URL 里，也不出现在访问日志里。
+    async function ensureProxySession() {
+      if (!isProxyTrack()) {
+        return '';
+      }
+      if (proxySessionId) {
+        return proxySessionId;
+      }
+      const gateway = document.getElementById('gatewayHost').value.trim();
+      const ticket = document.getElementById('gatewayTicket').value.trim();
+      if (!gateway) {
+        throw new Error('经网关模式需要先填写网关 Host');
+      }
+      rememberProxyInputs();
+      const res = await fetch('/playground/proxy/session', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ gateway: gateway, ticket: ticket })
+      });
+      const data = await res.json().catch(function () {
+        return {};
+      });
+      if (!res.ok) {
+        const err = (data && data.error) || {};
+        throw new Error(err.message || `HTTP ${res.status}`);
+      }
+      proxySessionId = data.session_id || '';
+      return proxySessionId;
+    }
+
+    // 失败原因必须落到「Host 错 / 网关没放行 / ticket 无效」三者之一，
+    // 否则页面只能显示一个 Failed to fetch。
+    function describeGatewayFailure(status, text) {
+      let payload = {};
+      try {
+        payload = JSON.parse(text || '{}');
+      } catch (err) {
+        payload = {};
+      }
+      const err = (payload && payload.error) || {};
+      const code = err.code || '';
+      const message = err.message || err.detail || (typeof err === 'string' ? err : '');
+      if (code === 'proxy_upstream_error') {
+        return `网关连不上：${message}（检查 Host 是否可解析、是否漏了路径前缀）`;
+      }
+      if (code === 'proxy_session_missing') {
+        return '代理会话已失效，请重新点「连接测试」';
+      }
+      if (status === 401) {
+        return `网关拒绝 401：${message || '凭据未通过'}（ticket 是否有效、是否还要求 cookie）`;
+      }
+      if (status === 404) {
+        return '404：网关上没有这个路径，检查 Host 是否漏了前缀（如 /lca-api）';
+      }
+      return `HTTP ${status} ${message}`;
+    }
+
+    async function testGateway() {
+      setWhoamiNotice('', false);
+      try {
+        proxySessionId = '';
+        setProxyNotice('建立代理会话…', false);
+        await ensureProxySession();
+        setProxyNotice('会话已建立，正在经网关请求 /health …', false);
+        const res = await fetch(apiUrl('/health'), { headers: await buildAuthHeaders() });
+        const text = await res.text();
+        if (res.ok) {
+          setProxyNotice(`链路通：HTTP ${res.status} ${text.slice(0, 100)}`, false);
+        } else {
+          setProxyNotice(describeGatewayFailure(res.status, text), true);
+        }
+      } catch (err) {
+        setProxyNotice(`连接失败：${err.message}`, true);
+      }
+    }
+
+    async function refreshWhoami() {
+      try {
+        const res = await fetch(apiUrl('/whoami'), { headers: await buildAuthHeaders() });
+        const data = await res.json().catch(function () {
+          return {};
+        });
+        if (!res.ok) {
+          setWhoamiNotice(
+            `身份查询失败：HTTP ${res.status} ${apiErrorMessage(res.status, data)}`,
+            true
+          );
+          return;
+        }
+        if (!data.authenticated) {
+          setWhoamiNotice('后端没识别到身份：网关未注入，或当前轨道没有身份头', true);
+          return;
+        }
+        const fields = (data.fields || []).join(', ');
+        setWhoamiNotice(
+          `userId=${data.userId || '(空)'} · 来源=${data.issuer || '-'}` +
+            ` · ticket=${data.ticket_present ? '有' : '无'} · 字段=[${fields}]`,
+          false
+        );
+      } catch (err) {
+        setWhoamiNotice(`身份查询失败：${err.message}`, true);
+      }
+    }
+
+    // AES 是对称的：加密密钥必须等于服务端解密用的那一把，否则必然 401。
+    // 与其让页面和服务端各存一份同一个密钥（会漂移），不如让服务端用自己的
+    // 密钥加密（请求 key 传空），页面永不持有密钥 —— 这是默认模式。
+    function toggleKeyMode() {
+      const mode = document.getElementById('aesKeyMode').value;
+      const keyInput = document.getElementById('aesKey');
+      const usingServerKey = mode === 'server';
+      keyInput.disabled = usingServerKey;
+      keyInput.style.opacity = usingServerKey ? '0.45' : '1';
+      keyInput.placeholder = usingServerKey
+        ? '此模式不用填写：服务端用自己的密钥加密'
+        : '32位Hex或Java密码文本';
+    }
+
+    function toggleCustomCipher() {
+      const isCustom = document.getElementById('customCipherToggle').checked;
+      const preview = document.getElementById('cipherPreview');
+      const label = document.getElementById('cipherPreviewLabel');
+      // 手工密文模式下，AES 密钥与 UserPrincipal 都已封装在那串密文里，
+      // 留着这两块表单只会让人以为它们参与解密/鉴权 —— 直接隐藏。
+      document.getElementById('aesKeySection').style.display = isCustom ? 'none' : 'block';
+      document.getElementById('principalSection').style.display = isCustom ? 'none' : 'block';
+      preview.readOnly = !isCustom;
+      label.textContent = isCustom
+        ? '手工粘贴的 X-Mangli-User 密文 Hex（网关原样输出）'
+        : '生成的 X-Mangli-User 密文 Hex 预览';
+      preview.placeholder = isCustom
+        ? '粘贴网关透传的密文（可含换行，提交前自动折叠空白）'
+        : '点击下方发起或自动生成密文';
+      if (isCustom) {
+        preview.focus();
+      } else {
+        setCipherNotice('', false);
+      }
+    }
+
+    // 服务端解密口径：bytes.fromhex 不接受内部空白，也不认 0x 前缀。
+    // 手工粘贴常带换行/空格，这里先折叠成规范 hex，再判断形态。
+    function normalizeCipherHex(raw) {
+      let compact = String(raw || '').replace(/\s+/g, '');
+      if (compact.slice(0, 2).toLowerCase() === '0x') {
+        compact = compact.slice(2);
+      }
+      return compact.toLowerCase();
+    }
+
+    function cipherHexProblem(normalized) {
+      if (!normalized) {
+        return '密文为空';
+      }
+      if (!/^[0-9a-f]+$/.test(normalized)) {
+        return '含非十六进制字符（只允许 0-9 a-f；不要带换行、空格、0x 前缀或引号）';
+      }
+      if (normalized.length % 32 !== 0) {
+        return `长度 ${normalized.length} 个 hex 字符，不是 AES 16 字节块（32 hex）的整数倍`;
+      }
+      return '';
+    }
+
+    function setCipherNotice(text, isError) {
+      const notice = document.getElementById('cipherNotice');
+      notice.textContent = text || '';
+      notice.className = isError ? 'upload-notice' : 'upload-notice info';
+    }
+
+    // 用服务端实际解密的密钥试解一次：把 401 一句话拆成可定位的结论。
+    async function verifyCipher() {
+      const raw = document.getElementById('cipherPreview').value;
+      const cipher = normalizeCipherHex(raw);
+      const problem = cipherHexProblem(cipher);
+      if (problem) {
+        setCipherNotice(`密文形态不合法：${problem}`, true);
+        return;
+      }
+      setCipherNotice('校验中…', false);
+      try {
+        const res = await fetch('/playground/decrypt', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ cipher: cipher })
+        });
+        const data = await res.json().catch(function () {
+          return {};
+        });
+        if (!res.ok) {
+          throw new Error(data.message || `HTTP ${res.status}`);
+        }
+        const origin = data.key_origin === 'env' ? 'MANGLI_AUTH_AES_KEY' : '内置默认密钥';
+        if (data.ok) {
+          setCipherNotice(
+            `校验通过：服务端（${origin}）可解密，共 ${data.field_count} 个字段 [${(data.fields || []).join(', ')}]`,
+            false
+          );
+          return;
+        }
+        if (data.reason === 'decrypt_failed') {
+          await diagnoseCipher(cipher, origin, data);
+          return;
+        }
+        setCipherNotice(`校验失败：${data.message || data.reason || 'unknown'}`, true);
+      } catch (err) {
+        setCipherNotice(`校验请求失败：${err.message}`, true);
+      }
+    }
+
+    // 解密失败后的第二级诊断：把「密钥不对 / 分组模式不对 / padding 不对」
+    // 分开，而不是让用户对着一句 decrypt_failed 反复换密钥。
+    async function diagnoseCipher(cipher, origin, failed) {
+      const info = (failed && failed.key_info) || {};
+      const bits = info.key_bits ? `AES-${info.key_bits}` : 'AES';
+      const inner = failed && failed.message ? `（底层：${failed.message}）` : '';
+      // 先摆事实：服务端究竟把你的值读成了多长、当成了什么。
+      const seen =
+        info.env_value_len == null
+          ? ''
+          : `服务端读到的值 ${info.env_value_len} 字节，按 ${info.interpreted_as} 解释为 ${bits}；`;
+      setCipherNotice(`解密失败：${seen}密钥解不开这段密文${inner}，正在深度诊断…`, true);
+      try {
+        const res = await fetch('/playground/diagnose', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ cipher: cipher })
+        });
+        const data = await res.json().catch(function () {
+          return {};
+        });
+        if (!res.ok || !data.ok) {
+          const notes = (data.notes || []).join('；') || data.message || `HTTP ${res.status}`;
+          const sources = (data.key_sources || []).join(' / ');
+          const diagInfo = data.key_info || {};
+          const len = diagInfo.env_value_len;
+          const interpreted = diagInfo.interpreted_as;
+          // 长度不是合法 AES 密钥长度时，问题在"进程读到的值"，不在算法。
+          const lengthHint =
+            interpreted === 'sha1prng' && len != null
+              ? `注意：${len} 字节既不是 16/24/32 字节原文，也不是 32/48/64 位 Hex，` +
+                '服务端只能拿它做 SHA1PRNG 派生。你填的若是"原始 key"，它的长度不可能是这个值 —— ' +
+                '说明内核进程读到的内容与 .env 里写的不一致（检查引号、行内注释、回车符，或改完没重启）。'
+              : '';
+          setCipherNotice(
+            `解密失败：${notes}。已试密钥形态 [${sources}] —— 密钥值本身对不上，与格式无关` +
+              '（只要密文真是用这把密钥按 ECB 或 CBC（IV=零/前缀/密钥）加密的，必有一条命中）。' +
+              lengthHint,
+            true
+          );
+          return;
+        }
+        const match = data.match || {};
+        const where = `${match.mode}${match.iv && match.iv !== 'none' ? `（IV=${match.iv}）` : ''}/${match.padding}`;
+        if (match.key_source && match.key_source !== 'configured') {
+          const howto = {
+            env_hex: '把 .env 里的值写成 32/48/64 位 Hex（当前值被当成了原文/密码）',
+            env_text: '把 .env 里的值写成 16/24/32 字节原文（当前值被当成了 Hex）',
+            env_base64: '把 .env 里的值改成 Base64 解码后的 32 位 Hex',
+            sha1prng: '网关用 Java SHA1PRNG(密码) 派生，直接把原始密码填进 .env 即可（服务端按 Java 口径派生）',
+            md5_16: '网关用 MD5(密码) 派生，请把 MD5 结果的 32 位 Hex 写入 .env',
+            sha256_32: '网关用 SHA-256(密码) 派生，请把 SHA-256 结果的 64 位 Hex 写入 .env',
+            sha256_16: '网关用 SHA-256(密码) 前 16 字节，请把该 32 位 Hex 写入 .env',
+            substring_16: '网关只用了值的前 16 字节当密钥，请把这 16 字节原样写入 .env',
+            substring_32: '网关只用了值的前 32 字节当密钥（AES-256），请把这 32 字节原样写入 .env'
+          }[match.key_source] || '请按该派生结果的 Hex 重配 .env';
+          setCipherNotice(
+            `诊断：同一份配置值按「${match.key_source}」解释才解得开（AES-${match.key_bits}）—— ${howto}`,
+            true
+          );
+          return;
+        }
+        if (match.mode === 'ECB' && match.padding === 'pkcs7') {
+          setCipherNotice('诊断：ECB/PKCS7 口径本可解开但校验失败，请重新点一次「校验密文」', true);
+          return;
+        }
+        setCipherNotice(
+          `诊断：网关密文是 ${where}（${origin}，AES-${match.key_bits}）才解得开，` +
+            '而服务端中间件只实现 AES/ECB/PKCS7 —— 这是实现口径不一致，需改鉴权代码，换密钥无用',
+          true
+        );
+      } catch (err) {
+        setCipherNotice(`诊断请求失败：${err.message}`, true);
+      }
+    }
+
+    async function generateCipher() {
+      const key = document.getElementById('aesKey').value.trim();
+      const keyMode = document.getElementById('aesKeyMode').value;
+      const payload = {
+        userId: document.getElementById('userId').value.trim(),
+        name: document.getElementById('userName').value.trim(),
+        mobile: document.getElementById('mobile').value.trim(),
+        email: document.getElementById('email').value.trim(),
+        jobNumber: document.getElementById('jobNumber').value.trim(),
+        jobName: document.getElementById('jobName').value.trim(),
+        department: document.getElementById('department').value.trim(),
+        clockInType: parseInt(document.getElementById('clockInType').value, 10) || 1,
+        ticket: document.getElementById('ticket').value.trim()
+      };
+
+      // key 为空 = 让服务端按自己解密的密钥加密，生成即自洽。
+      const effectiveKey = keyMode === 'server' ? '' : key;
+      try {
+        const res = await fetch('/playground/encrypt', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ payload, key: effectiveKey, key_mode: keyMode })
+        });
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          throw new Error(err.error || `HTTP ${res.status}`);
+        }
+        const data = await res.json();
+        return data.cipher_hex;
+      } catch (err) {
+        throw new Error('加密 UserPrincipal 失败: ' + err.message);
+      }
+    }
+
+    // 鉴权双轨的唯一出口：/files 与 /runs 必须携带同一份头，避免"页面能开、
+    // 上传 401"的两套逻辑。返回头部对象，失败时抛错。
+    async function buildAuthHeaders(base) {
+      const headers = Object.assign({}, base || {});
+      const track = currentTrack();
+      if (track === PROXY_TRACK) {
+        // 经网关轨不带任何身份头：身份只能来自网关，伪造也无效。
+        // session 头只用于本服务定位「打哪个网关、带哪张 ticket」，不会被转发。
+        headers[PROXY_SESSION_HEADER_NAME] = await ensureProxySession();
+        return headers;
+      }
+      if (track === 'gateway') {
+        const isCustom = document.getElementById('customCipherToggle').checked;
+        const preview = document.getElementById('cipherPreview');
+        let cipherHex = '';
+        if (isCustom) {
+          // 粘贴内容先折叠空白：bytes.fromhex 遇到内部换行/空格会直接报错，
+          // 而中间件只会回一句 "invalid mangli user cipher"。
+          cipherHex = normalizeCipherHex(preview.value);
+          if (!cipherHex) {
+            throw new Error('请在密文框中输入网关加密后的 Hex 字符串');
+          }
+          const problem = cipherHexProblem(cipherHex);
+          if (problem) {
+            throw new Error(`手工密文不合法：${problem}`);
+          }
+          preview.value = cipherHex;
+        } else {
+          cipherHex = normalizeCipherHex(await generateCipher());
+          preview.value = cipherHex;
+        }
+        headers['X-Mangli-User'] = cipherHex;
+      } else {
+        const token = document.getElementById('directToken').value.trim();
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+      // run 归属与 ws-token 铸造在非 dev 模式下要求 x-lca-user-id；网关轨由
+      // 中间件强制剥离并注入真实值，直连轨用表单里的 userId，两条轨一致。
+      const userId = document.getElementById('userId').value.trim();
+      if (userId) {
+        headers['x-lca-user-id'] = userId;
+      }
+      return headers;
+    }
+
+    function pickFiles() {
+      document.getElementById('fileInput').click();
+    }
+
+    function onDragOver(ev) {
+      ev.preventDefault();
+      document.getElementById('dropZone').classList.add('dragover');
+    }
+
+    function onDragLeave() {
+      document.getElementById('dropZone').classList.remove('dragover');
+    }
+
+    function onDrop(ev) {
+      ev.preventDefault();
+      document.getElementById('dropZone').classList.remove('dragover');
+      const dropped = ev.dataTransfer ? Array.from(ev.dataTransfer.files) : [];
+      if (dropped.length) {
+        uploadFiles(dropped);
+      }
+    }
+
+    function handleFileSelect(ev) {
+      const picked = Array.from(ev.target.files || []);
+      // 清空 value：同一个文件被移除后可再次选择。
+      ev.target.value = '';
+      if (picked.length) {
+        uploadFiles(picked);
+      }
+    }
+
+    function setUploadNotice(text, isError) {
+      const notice = document.getElementById('uploadNotice');
+      notice.textContent = text || '';
+      notice.className = isError ? 'upload-notice' : 'upload-notice info';
+    }
+
+    // 后端错误码是事实，前端不再猜：503 未配置凭据与 502 上游失败给不同提示。
+    function describeUploadError(status, payload) {
+      const err = (payload && payload.error) || {};
+      const code = err.code || '';
+      const message = err.detail || err.message || `HTTP ${status}`;
+      if (code === 'fileservice_unconfigured') {
+        return '上传通道未启用：后端缺少公司文件服务凭据 (LCA_FILESERVICE_*)，请检查 serving profile 配置';
+      }
+      if (code === 'file_store_unavailable') {
+        return '上传失败：后端 FileStore 未挂载';
+      }
+      return `${message}${authHint(status, payload)}`;
+    }
+
+    // 401 的 detail 只说 "invalid mangli user cipher"，真正原因通常是密钥
+    // 不匹配。这里把下一步动作直接给出来，避免用户反复重试同一段密文。
+    function authHint(status, payload) {
+      if (status !== 401) {
+        return '';
+      }
+      const err = (payload && payload.error) || {};
+      const detail = String(err.detail || err.message || '');
+      if (detail.indexOf('invalid mangli user cipher') !== -1) {
+        return '（密文与服务端 MANGLI_AUTH_AES_KEY 不匹配：先点「校验密文」自检，或把密钥派生模式改成「使用服务端已配置密钥」重新生成）';
+      }
+      return '';
+    }
+
+    // 统一解包错误体：鉴权中间件回 {error:{code,type,detail}}，业务回 {error:"..."}。
+    function apiErrorMessage(status, data) {
+      const err = (data && data.error) || {};
+      if (typeof err === 'string') {
+        return err;
+      }
+      const text = err.detail || err.message || `HTTP ${status}`;
+      return `${text}${authHint(status, data)}`;
+    }
+
+    function formatBytes(size) {
+      const value = Number(size);
+      if (!isFinite(value) || value <= 0) {
+        return '0 B';
+      }
+      const units = ['B', 'KB', 'MB', 'GB'];
+      let index = 0;
+      let scaled = value;
+      while (scaled >= 1024 && index < units.length - 1) {
+        scaled /= 1024;
+        index += 1;
+      }
+      return `${scaled.toFixed(index === 0 ? 0 : 1)} ${units[index]}`;
+    }
+
+    function renderAttachments() {
+      const list = document.getElementById('attachmentList');
+      list.innerHTML = '';
+      attachments.forEach(function (item, index) {
+        const row = document.createElement('div');
+        row.className = 'attachment-item';
+        const name = document.createElement('span');
+        name.className = 'attachment-name';
+        name.textContent = `${item.name} · ${formatBytes(item.size_bytes)}`;
+        const remove = document.createElement('button');
+        remove.type = 'button';
+        remove.className = 'attachment-remove';
+        remove.textContent = '移除';
+        remove.onclick = function () {
+          attachments.splice(index, 1);
+          renderAttachments();
+        };
+        row.appendChild(name);
+        row.appendChild(remove);
+        list.appendChild(row);
+      });
+      setUploadNotice(
+        attachments.length ? `已就绪 ${attachments.length} 个附件，将随本次任务提交` : '',
+        false
+      );
+    }
+
+    async function uploadFiles(files) {
+      const room = MAX_UPLOAD_FILES - attachments.length;
+      if (room <= 0) {
+        setUploadNotice(`最多 ${MAX_UPLOAD_FILES} 个附件，请先移除已上传的文件`, true);
+        return;
+      }
+      const batch = files.slice(0, room);
+      if (batch.length < files.length) {
+        setUploadNotice(`单次最多 ${MAX_UPLOAD_FILES} 个附件，已忽略多余文件`, true);
+      }
+
+      const form = new FormData();
+      batch.forEach(function (file) {
+        // 字段名由后端契约固定为 files，重复同名字段承载多文件。
+        form.append('files', file);
+      });
+
+      uploadsInFlight += 1;
+      setUploadNotice(`上传中… (${batch.length} 个文件)`, false);
+      try {
+        const headers = await buildAuthHeaders();
+        const res = await fetch(apiUrl('/files'), { method: 'POST', headers: headers, body: form });
+        const data = await res.json().catch(function () {
+          return {};
+        });
+        if (!res.ok) {
+          throw new Error(describeUploadError(res.status, data));
+        }
+        (data.files || []).forEach(function (item) {
+          attachments.push(item);
+        });
+        renderAttachments();
+      } catch (err) {
+        setUploadNotice(`上传失败：${err.message}`, true);
+      } finally {
+        uploadsInFlight -= 1;
+      }
+    }
+
+    async function dispatchRun() {
+      const sendBtn = document.getElementById('sendBtn');
+      const consoleBox = document.getElementById('streamConsole');
+      const track = document.getElementById('authTrack').value;
+      const userText = document.getElementById('promptInput').value.trim();
+      const projectId = document.getElementById('projectId').value.trim();
+      const mode = document.getElementById('runMode').value;
+
+      if (!userText) {
+        alert('请输入提问内容');
+        return;
+      }
+      if (uploadsInFlight > 0) {
+        alert('附件仍在上传中，请等待上传完成后再发起任务');
+        return;
+      }
+      if (runActive && !confirm('当前 run 仍在进行或等待审批，发起新任务会切换接续目标。继续？')) {
+        return;
+      }
+
+      sendBtn.disabled = true;
+      reasoningOpen = false;
+      // 不重置控制台：同一页面内的多轮历史要能连续读，轮次之间用分隔行隔开。
+      consoleBox.textContent +=
+        (consoleBox.textContent ? '\n\n' : '') +
+        `[${new Date().toLocaleTimeString()}] 发起任务中...\n`;
+      document.getElementById('fileList').innerHTML = '<div style="font-size: 13px; color: var(--text-muted);">暂无产物文件</div>';
+      clearApprovalPanel();
+      assistantBuffer = '';
+
+      let headers;
+      try {
+        headers = await buildAuthHeaders({ 'Content-Type': 'application/json' });
+      } catch (err) {
+        consoleBox.textContent += `[加密失败]: ${err.message}\n`;
+        sendBtn.disabled = false;
+        return;
+      }
+      if (track === PROXY_TRACK) {
+        consoleBox.textContent += `[经网关] 经本服务转发到 ${document.getElementById('gatewayHost').value.trim()}\n`;
+      } else if (track === 'gateway') {
+        const cipherHex = headers['X-Mangli-User'] || '';
+        consoleBox.textContent += `[网关流量] 生成 X-Mangli-User 密文(${cipherHex.substring(0, 16)}...)\n`;
+      } else {
+        consoleBox.textContent += `[本地直连] 携带 Bearer Token\n`;
+      }
+
+      // 附件以 /files/{id} 的相对 URL 声明；后端 try_resolve_local_file 命中
+      // 本地分支，运行期不再回源文件服务。
+      const userMessage = { role: 'user', content: userText };
+      if (attachments.length) {
+        userMessage.files = attachments.map(function (item) {
+          return {
+            url: item.url,
+            name: item.name,
+            mime_type: item.mime_type,
+            size: item.size_bytes
+          };
+        });
+        consoleBox.textContent += `[附件] 本次携带 ${attachments.length} 个文件\n`;
+      }
+
+      // 多轮上下文：把本页已完成的轮次作为 messages 前缀一起提交，后端
+      // extract_prior_turns 据此还原上下文；单条 messages 等于每轮重新开始。
+      const messages = transcript.concat([userMessage]);
+      if (transcript.length) {
+        consoleBox.textContent += `[上下文] 携带 ${transcript.length} 条历史消息\n`;
+      }
+
+      try {
+        const res = await fetch(apiUrl('/runs'), {
+          method: 'POST',
+          headers: headers,
+          body: JSON.stringify({
+            messages: messages,
+            question: userText,
+            user_text: userText,
+            mode: mode,
+            options: { project_id: projectId }
+          })
+        });
+
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          consoleBox.textContent += `[HTTP ${res.status} 错误]: ${JSON.stringify(err)}${authHint(res.status, err)}\n`;
+          sendBtn.disabled = false;
+          return;
+        }
+
+        const data = await res.json();
+        const runId = data.run_id;
+        const wsToken = data.ws_token;
+        currentRunId = runId;
+        currentWsToken = wsToken || '';
+        lastEventId = '';
+        transcript.push({ role: 'user', content: userText });
+        document.getElementById('currentRunId').textContent = `Run ID: ${runId}`;
+        consoleBox.textContent += `[任务创建成功] run_id: ${runId}\n[建立 WebSocket 通道] 启动流式监听...\n`;
+
+        setRunActive(true);
+        initWebSocket(runId, wsToken, { fromScratch: true });
+      } catch (err) {
+        consoleBox.textContent += `[网络异常]: ${err.message}\n`;
+      } finally {
+        sendBtn.disabled = false;
+      }
+    }
+
+    function setApprovalNotice(text, isError) {
+      const notice = document.getElementById('approvalNotice');
+      notice.textContent = text || '';
+      notice.className = isError ? 'upload-notice' : 'upload-notice info';
+    }
+
+    function clearApprovalPanel() {
+      pendingApproval = null;
+      document.getElementById('approvalPanel').style.display = 'none';
+      document.getElementById('approvalBody').textContent = '';
+      document.getElementById('approvalAnswer').value = '';
+      setApprovalNotice('', true);
+    }
+
+    // pendingToolsCalling 是网关 step_start 暴露的唯一审批线索：
+    // [{tool_name, call_id, arguments}]。审批 id 沿用 LobeHub 约定 ——
+    // 有具体工具时用工具名，纯 widget 审批用 'widget'。
+    function buildPendingApproval(tools) {
+      const list = Array.isArray(tools) ? tools.filter(function (item) {
+        return item && typeof item === 'object';
+      }) : [];
+      const firstName = list.length
+        ? String(list[0].tool_name || list[0].toolName || '').trim()
+        : '';
+      return { approvalId: firstName || 'widget', tools: list };
+    }
+
+    function renderApprovalPanel() {
+      const panel = document.getElementById('approvalPanel');
+      const body = document.getElementById('approvalBody');
+      const tools = pendingApproval ? pendingApproval.tools : [];
+      body.textContent = '';
+      if (!tools.length) {
+        body.textContent = '本次审批没有附带工具信息（widget 审批）。请直接填写答复后提交。';
+      }
+      tools.forEach(function (tool) {
+        const name = String(tool.tool_name || tool.toolName || 'unknown');
+        const args = tool.arguments && typeof tool.arguments === 'object' ? tool.arguments : {};
+        const row = document.createElement('div');
+        row.style.marginBottom = '8px';
+        const title = document.createElement('div');
+        title.className = 'approval-tool';
+        title.textContent = name;
+        row.appendChild(title);
+        if (typeof args.question === 'string' && args.question.trim()) {
+          const question = document.createElement('div');
+          question.textContent = `问题：${args.question.trim()}`;
+          row.appendChild(question);
+        }
+        const options = Array.isArray(args.options) ? args.options : [];
+        if (options.length) {
+          const wrap = document.createElement('div');
+          wrap.style.display = 'flex';
+          wrap.style.flexWrap = 'wrap';
+          wrap.style.gap = '6px';
+          wrap.style.marginTop = '6px';
+          options.forEach(function (option) {
+            if (!option || typeof option !== 'object') {
+              return;
+            }
+            const label = String(option.label || option.value || option.id || '').trim();
+            if (!label) {
+              return;
+            }
+            const button = document.createElement('button');
+            button.type = 'button';
+            button.className = 'btn-secondary';
+            button.textContent = label;
+            button.onclick = function () {
+              document.getElementById('approvalAnswer').value = label;
+            };
+            wrap.appendChild(button);
+          });
+          row.appendChild(wrap);
+        }
+        const detail = document.createElement('div');
+        detail.style.marginTop = '6px';
+        detail.textContent = `参数：${JSON.stringify(args)}`;
+        row.appendChild(detail);
+        body.appendChild(row);
+      });
+      panel.style.display = 'flex';
+      setApprovalNotice('', true);
+    }
+
+    async function submitApproval(isRejection) {
+      const consoleBox = document.getElementById('streamConsole');
+      if (!currentRunId) {
+        setApprovalNotice('没有可恢复的 run_id，请先发起任务或接续既有 run', true);
+        return;
+      }
+      const approveBtn = document.getElementById('approveBtn');
+      const rejectBtn = document.getElementById('rejectBtn');
+      const answer = document.getElementById('approvalAnswer').value.trim();
+      // payload 必须非空：批准时是人类回答，拒绝时是拒绝理由。
+      const payloadText = answer || (isRejection ? '人工拒绝该操作' : '同意执行');
+      const approvalId = (pendingApproval && pendingApproval.approvalId) || 'widget';
+      const idempotencyKey = `${currentRunId}:${approvalId}:${Date.now()}`;
+
+      approveBtn.disabled = true;
+      rejectBtn.disabled = true;
+      setApprovalNotice('提交审批中…', false);
+      try {
+        const headers = await buildAuthHeaders({ 'Content-Type': 'application/json' });
+        const body = {
+          approval_id: approvalId,
+          payload: payloadText,
+          idempotency_key: idempotencyKey
+        };
+        if (isRejection) {
+          body.rejection_reason = payloadText;
+        }
+        const res = await fetch(apiUrl(`/runs/${currentRunId}/answer`), {
+          method: 'POST',
+          headers: headers,
+          body: JSON.stringify(body)
+        });
+        const data = await res.json().catch(function () {
+          return {};
+        });
+        if (!res.ok) {
+          throw new Error(apiErrorMessage(res.status, data));
+        }
+        consoleBox.textContent += `\n[审批已提交] approval_id=${approvalId} mode=${
+          isRejection ? 'reject' : 'approve'
+        } status=${data.status || 'resumed'}\n`;
+        clearApprovalPanel();
+        await reattachRun(currentRunId);
+      } catch (err) {
+        setApprovalNotice(`审批提交失败：${err.message}`, true);
+      } finally {
+        approveBtn.disabled = false;
+        rejectBtn.disabled = false;
+      }
+    }
+
+    // 停止按钮的唯一开关：只有存在可停止的 run 才允许点。
+    function setRunActive(active) {
+      runActive = !!active;
+      document.getElementById('stopBtn').disabled = !runActive;
+    }
+
+    // 停止走 HTTP cancel（不是 WS interrupt）：run 暂停时事件流已断开，
+    // 只有 HTTP 通道还能触达 registry 里的 session。
+    async function cancelRun() {
+      const consoleBox = document.getElementById('streamConsole');
+      if (!currentRunId) {
+        consoleBox.textContent += '\n[停止失败] 当前没有 run_id\n';
+        return;
+      }
+      const stopBtn = document.getElementById('stopBtn');
+      stopBtn.disabled = true;
+      consoleBox.textContent += `\n[停止任务] 请求取消 run ${currentRunId}...\n`;
+      try {
+        const res = await fetch(apiUrl(`/runs/${currentRunId}/cancel`), {
+          method: 'POST',
+          headers: await buildAuthHeaders()
+        });
+        const data = await res.json().catch(function () {
+          return {};
+        });
+        if (!res.ok) {
+          throw new Error(apiErrorMessage(res.status, data));
+        }
+        consoleBox.textContent += `[已取消] status=${data.status || 'canceled'}，服务端将发送终态事件\n`;
+        clearApprovalPanel();
+        setRunActive(false);
+      } catch (err) {
+        consoleBox.textContent += `[停止失败] ${err.message}\n`;
+        // 失败时保留可重试入口：run 可能仍在跑。
+        setRunActive(runActive);
+      }
+      consoleBox.scrollTop = consoleBox.scrollHeight;
+    }
+
+    // 重新建连：run 暂停后服务端已关闭事件流，必须用 ws-token 换取新 JWT。
+    async function reattachRun(runId) {
+      const consoleBox = document.getElementById('streamConsole');
+      let token = '';
+      try {
+        const res = await fetch(apiUrl(`/v1/runs/${runId}/ws-token`), {
+          method: 'POST',
+          headers: await buildAuthHeaders()
+        });
+        if (res.ok) {
+          const data = await res.json();
+          token = data.token || '';
+        }
+      } catch (err) {
+        // 落到下面的兜底：沿用创建时的 token。
+        consoleBox.textContent += `[ws-token 刷新失败] ${err.message}\n`;
+      }
+      if (!token && runId === currentRunId) {
+        token = currentWsToken;
+      }
+      if (!token) {
+        throw new Error('无法获取 WS token（run 可能已结束，Redis 流已失效）');
+      }
+      currentRunId = runId;
+      currentWsToken = token;
+      document.getElementById('currentRunId').textContent = `Run ID: ${runId}`;
+      consoleBox.textContent += '[重新建立 WebSocket 通道] 从 lastEventId 继续...\n';
+      setRunActive(true);
+      initWebSocket(runId, token, {});
+    }
+
+    async function attachExistingRun() {
+      const consoleBox = document.getElementById('streamConsole');
+      const runId = document.getElementById('attachRunId').value.trim();
+      if (!runId) {
+        alert('请输入要回放的 run_id');
+        return;
+      }
+      currentRunId = runId;
+      lastEventId = '';
+      document.getElementById('currentRunId').textContent = `Run ID: ${runId}`;
+      consoleBox.textContent +=
+        (consoleBox.textContent ? '\n\n' : '') +
+        `[接续既有 run] ${runId}，从 0 开始回放全部事件...\n`;
+      try {
+        await reattachRun(runId);
+      } catch (err) {
+        consoleBox.textContent += `[接续失败] ${err.message}\n[回退] 读取 run 摘要...\n`;
+        await renderRunSummary(runId);
+      }
+    }
+
+    // 事件流已失效时的只读兜底：GET /runs/{id} 返回 status/output/steps。
+    async function renderRunSummary(runId) {
+      const consoleBox = document.getElementById('streamConsole');
+      try {
+        const res = await fetch(apiUrl(`/runs/${runId}`), {
+          headers: await buildAuthHeaders()
+        });
+        const data = await res.json().catch(function () {
+          return {};
+        });
+        if (!res.ok) {
+          throw new Error(apiErrorMessage(res.status, data));
+        }
+        const steps = Array.isArray(data.steps) ? data.steps.length : 0;
+        consoleBox.textContent +=
+          `[run 摘要] status=${data.status || data.session_status || 'unknown'} ` +
+          `steps=${steps}\n[输出] ${data.output || '(空)'}\n`;
+        (data.steps || []).forEach(function (step) {
+          consoleBox.textContent += `  - ${JSON.stringify(step)}\n`;
+        });
+      } catch (err) {
+        consoleBox.textContent += `[摘要读取失败] ${err.message}\n`;
+      }
+    }
+
+    function sendWs(payload) {
+      if (activeWs && activeWs.readyState === WebSocket.OPEN) {
+        activeWs.send(JSON.stringify(payload));
+      }
+    }
+
+    function renderArtifacts(closure) {
+      const files = (closure && closure.files) || [];
+      files.forEach(function (file) {
+        addFileAttachment(file.name || 'file', file.attachmentId || '');
+      });
+    }
+
+    // 网关真实事件词表：stream_start / stream_chunk / tool_start / tool_end /
+    // step_start / stream_end / agent_runtime_end / error。data 不带 type 字段，
+    // 子类型看 chunkType。
+    function renderAgentEvent(ev) {
+      const consoleBox = document.getElementById('streamConsole');
+      const type = ev && ev.type;
+      const data = (ev && ev.data) || {};
+      if (type === 'stream_chunk') {
+        if (data.chunkType === 'text' && data.content) {
+          assistantBuffer += data.content;
+          consoleBox.textContent += data.content;
+        } else if (data.chunkType === 'reasoning' && data.reasoning) {
+          if (!reasoningOpen) {
+            consoleBox.textContent += '\n[思考] ';
+            reasoningOpen = true;
+          }
+          consoleBox.textContent += data.reasoning;
+        } else if (data.chunkType === 'tools_calling') {
+          reasoningOpen = false;
+          consoleBox.textContent += `\n[准备调用工具] ${(data.toolsCalling || []).length} 个\n`;
+        }
+        consoleBox.scrollTop = consoleBox.scrollHeight;
+        return;
+      }
+      reasoningOpen = false;
+      if (type === 'tool_start') {
+        const tc = data.toolCalling || {};
+        const label = [tc.identifier, tc.apiName].filter(Boolean).join(' / ') || 'unknown';
+        consoleBox.textContent += `\n[工具调用] ${label}\n`;
+      } else if (type === 'tool_end') {
+        consoleBox.textContent += `\n[工具完成] success=${data.isSuccess !== false}\n`;
+      } else if (type === 'step_start') {
+        if (data.phase) {
+          consoleBox.textContent += `\n[阶段] ${data.phase}\n`;
+        }
+        // 暂停的唯一可操作信号：phase=human_approval / requiresApproval。
+        // 服务端随后会发 agent_runtime_end 并关闭事件流，不回审批就永远停在这里。
+        if (data.phase === 'human_approval' || data.requiresApproval) {
+          pendingApproval = buildPendingApproval(data.pendingToolsCalling);
+          renderApprovalPanel();
+          consoleBox.textContent += '[等待人工审批] 请在下方审批面板提交批准或拒绝\n';
+        }
+      } else if (type === 'agent_runtime_end') {
+        const reason = data.reason || (data.finalState || {}).status || 'completed';
+        const paused = reason === 'waiting_for_human' || reason === 'waiting_input';
+        if (paused) {
+          consoleBox.textContent += `\n[认知循环暂停] reason=${reason}，等待人工审批\n`;
+          if (!pendingApproval) {
+            pendingApproval = buildPendingApproval(data.pendingToolsCalling);
+          }
+          renderApprovalPanel();
+          // 暂停的 run 仍在 registry 里，仍可用「停止任务」放弃。
+          setRunActive(true);
+        } else {
+          consoleBox.textContent += `\n[认知循环执行完毕] reason=${reason}\n`;
+          if (assistantBuffer) {
+            transcript.push({ role: 'assistant', content: assistantBuffer });
+          }
+          clearApprovalPanel();
+          setRunActive(false);
+        }
+        renderArtifacts(data.artifactClosure);
+      } else if (type === 'error') {
+        consoleBox.textContent += `\n[运行时错误] ${data.message || JSON.stringify(data)}\n`;
+      }
+      consoleBox.scrollTop = consoleBox.scrollHeight;
+    }
+
+    // options.fromScratch=true 用于新 run（全量回放）；否则用 lastEventId 续传，
+    // 避免暂停→审批→重连时把整段历史再打一遍。
+    function initWebSocket(runId, wsToken, options) {
+      const opts = options || {};
+      const resumeFrom = opts.fromScratch ? '0' : (lastEventId || '0');
+      if (activeWs) {
+        clearInterval(heartbeatTimer);
+        activeWs.close();
+      }
+
+      activeWs = new WebSocket(wsUrl(runId));
+
+      const dot = document.getElementById('wsStatusDot');
+      const text = document.getElementById('wsStatusText');
+      const consoleBox = document.getElementById('streamConsole');
+
+      activeWs.onopen = function () {
+        dot.className = 'status-dot status-online';
+        text.textContent = 'WS 在线';
+        consoleBox.textContent += `[WS 已建连] 发送首帧 JWT 鉴权...\n`;
+
+        activeWs.send(JSON.stringify({
+          type: "auth",
+          token: wsToken
+        }));
+
+        heartbeatTimer = setInterval(() => {
+          if (activeWs && activeWs.readyState === WebSocket.OPEN) {
+            activeWs.send(JSON.stringify({ type: "heartbeat" }));
+          }
+        }, 30000);
+      };
+
+      activeWs.onmessage = function (event) {
+        let msg;
+        try {
+          msg = JSON.parse(event.data);
+        } catch (e) {
+          consoleBox.textContent += event.data;
+          return;
+        }
+        if (msg.type === 'auth_success') {
+          // 协议要求 auth 之后紧跟 resume；不发这一帧服务端会阻塞在第二次 recv，
+          // 直到 30s 心跳被误当作 resume 才回放历史。
+          consoleBox.textContent += `[鉴权成功] 发送 resume 帧（lastEventId=${resumeFrom}）...\n`;
+          sendWs({ type: 'resume', lastEventId: resumeFrom, wantStatus: true });
+        } else if (msg.type === 'auth_failed') {
+          consoleBox.textContent += `[鉴权失败] ${msg.reason || 'unknown'}\n`;
+          dot.className = 'status-dot status-offline';
+          text.textContent = 'WS 鉴权失败';
+        } else if (msg.type === 'resume_complete') {
+          consoleBox.textContent += `[历史回放完成] status=${msg.status}\n`;
+        } else if (msg.type === 'session_complete') {
+          consoleBox.textContent += pendingApproval
+            ? '[会话暂停] 服务端已关闭事件流，请在审批面板提交处理结果\n'
+            : '[会话结束] 服务端已关闭事件流\n';
+          if (!pendingApproval) {
+            setRunActive(false);
+          }
+        } else if (msg.type === 'heartbeat_ack') {
+          // 心跳应答无需展示
+        } else if (msg.type === 'agent_event') {
+          if (msg.id) {
+            lastEventId = String(msg.id);
+          }
+          renderAgentEvent(msg.event);
+        }
+      };
+
+      activeWs.onclose = function () {
+        dot.className = 'status-dot status-offline';
+        text.textContent = 'WS 离线';
+        clearInterval(heartbeatTimer);
+      };
+
+      activeWs.onerror = function () {
+        consoleBox.textContent += `\n[WebSocket 传输异常]\n`;
+      };
+    }
+
+    function addFileAttachment(name, attachmentId) {
+      const fileList = document.getElementById('fileList');
+      if (fileList.innerHTML.includes('暂无产物文件')) {
+        fileList.innerHTML = '';
+      }
+      const item = document.createElement('div');
+      item.className = 'file-item';
+      const label = document.createElement('span');
+      label.style.fontSize = '13px';
+      label.textContent = name;
+      const link = document.createElement('button');
+      link.type = 'button';
+      link.className = 'file-link';
+      link.textContent = `下载产物凭证 (${attachmentId})`;
+      link.onclick = function () {
+        downloadArtifact(name, attachmentId);
+      };
+      item.appendChild(label);
+      item.appendChild(link);
+      fileList.appendChild(item);
+    }
+
+    // <a href> 是独立导航请求，带不上页面里的凭据（经网关时还会被网关拦），
+    // 所以下载统一走 fetch 取 blob 再触发。
+    async function downloadArtifact(name, attachmentId) {
+      const consoleBox = document.getElementById('streamConsole');
+      try {
+        const res = await fetch(apiUrl(`/files/${attachmentId}`), {
+          headers: await buildAuthHeaders()
+        });
+        if (!res.ok) {
+          throw new Error(`HTTP ${res.status}`);
+        }
+        const blob = await res.blob();
+        const objectUrl = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = objectUrl;
+        link.download = name || attachmentId;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        URL.revokeObjectURL(objectUrl);
+      } catch (err) {
+        consoleBox.textContent += `\n[产物下载失败] ${name} ${err.message}\n`;
+      }
+    }
+
+    // 网关地址与 ticket 只留在这台测试机上；隐私模式下 localStorage 不可用时
+    // 只是不记忆，不影响功能。
+    function restoreProxyInputs() {
+      try {
+        const host = localStorage.getItem('lca.playground.gateway') || '';
+        const ticket = localStorage.getItem('lca.playground.ticket') || '';
+        if (host) {
+          document.getElementById('gatewayHost').value = host;
+        }
+        if (ticket) {
+          document.getElementById('gatewayTicket').value = ticket;
+        }
+      } catch (err) {
+        // localStorage 被禁用：忽略。
+      }
+    }
+
+    function rememberProxyInputs() {
+      try {
+        localStorage.setItem(
+          'lca.playground.gateway',
+          document.getElementById('gatewayHost').value.trim()
+        );
+        localStorage.setItem(
+          'lca.playground.ticket',
+          document.getElementById('gatewayTicket').value.trim()
+        );
+      } catch (err) {
+        // localStorage 被禁用：忽略。
+      }
+    }
+
+    // 初始态同步：默认密钥模式是「使用服务端已配置密钥」，密钥框应保持禁用。
+    toggleKeyMode();
+    restoreProxyInputs();
+  </script>
+</body>
+</html>

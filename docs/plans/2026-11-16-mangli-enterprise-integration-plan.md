@@ -1,0 +1,555 @@
+# 企业级应用集成与统一接口封装实施计划 (Mangli Enterprise Integration Plan)
+
+> **For Antigravity:** REQUIRED WORKFLOW: Use `.agent/workflows/execute-plan.md` to execute this plan in single-flow mode.
+
+**Goal:** 基于 LCA 插件化微内核，在零修改底层核心代码的前提下，构建自适应双轨鉴权中间件（无侵入兼容 LobeHub 原生测试与公司 Gateway 鉴权）、标准 `Principal` 身份模型、多租户 Run 并发去重隔离安全防护、真实的 Tool 协议与 MCP 集群配置、纯内网离线自包含的 Playground 验证单页，并完成 Projects 领域能力的前瞻性架构预留。
+
+**Architecture:** 纯外围插件扩展（Seam/Provider 范式）。全盘复用成熟的原生端点（`/runs`、`/v1/runs/{id}/ws`、`/files`、`/v1/models` 等），不建平行 URL 副本；通过在 `server.py` 挂载 `SmartAdaptiveAuthMiddleware` 智能识别流量、剥离伪造头并完成身份桥接；修复 Transport 层的多租户并发去重隔离；外部数据通过原生 `mcp_servers` 声明式挂载；实体归属严格遵循方案 A（LCA 不建 ProjectStore）。
+
+**Tech Stack:** Python 3.12, Starlette, Pydantic (frozen + extra="forbid"), Cryptography (AES-ECB-PKCS7), HTTPX (Async Permissions), WebSocket (First-frame JWT), HTML5/Native CSS (离线自包含).
+
+---
+
+### Task 1: 标准 Principal 模型、智能自适应鉴权中间件与服务挂载 (M4, M7, M8, N1, N2, N6, N7, N8, R1, R3, R5, R16, R18)
+
+**Files:**
+- Create: `lca/plugins/transport/webserver/handlers/auth/principal.py`
+- Create: `lca/plugins/transport/webserver/handlers/auth/mangli_auth.py`
+- Modify: `lca/plugins/transport/webserver/server/server.py` (在 `install_trace_middleware` 之前挂载中间件 Seam)
+- Test: `tests/plugins/transport/test_mangli_auth.py`
+- Does NOT own: `lca/contracts/`, `lca/cognition/`, `lca/runtime/`, `lca/loop/`, `lca/framework/`, `lca_kernel/`, `vendor/` (AP-01)
+- Invariants to test:
+  - INV-01: Java 原生编译运行生成的静态密文向量解密一致性（固定 Java 三元组：Plaintext, Key, Hex Ciphertext）；
+  - INV-02: 权限微服务 5 分钟 TTL 缓存命中与 Fail-Closed 阻断（服务不可用时严禁放行，返回 502；ticket 错误返回 401）；
+  - INV-03: 自适应双轨鉴权与安全防护：
+    - 公司网关流量：解密 `X-Mangli-User`，**强制剥离伪造头**（`x-lca-user-id`, `authorization`, `x-lca-token`），注入合法 `x-lca-user-id` 与 `Authorization: Bearer <expected_token>`，绑定 `Principal` 到 ContextVar；
+    - 内网直连流量：在生产配置（`dev_mode=False`）下，缺少合法 Bearer 直接返回 401，阻断任意冒充。
+
+**Step 1: Write the failing test**
+
+```python
+# tests/plugins/transport/test_mangli_auth.py
+import pytest
+from lca.plugins.transport.webserver.handlers.auth.mangli_auth import (
+    ExpiringLruCache,
+    MangliAuthService,
+    PermissionServiceUnavailableError,
+    SmartAdaptiveAuthMiddleware,
+    decrypt_mangli_user_header,
+    derive_sha1prng_key,
+    encrypt_mangli_user_header_for_test,
+    get_current_principal,
+)
+from lca.plugins.transport.webserver.handlers.auth.principal import Principal
+
+
+def test_java_cross_compatibility_vector():
+  key_hex = "0123456789abcdef0123456789abcdef"
+  key = bytes.fromhex(key_hex)
+  expected_cipher_hex = "39b8a117fb5afc5bde07945964f2c2b8bb1fdd7c43d44d40336c864cbf7accea01c34f86851bc289a5acd8e9d953c24cdff6f07e6a20d89b8f5fde7ca6eab628"
+
+  info = decrypt_mangli_user_header(expected_cipher_hex, key)
+  assert info["user_id"] == "U888"
+  assert info["name"] == "zhangsan"
+  assert info["dept_id"] == "D01"
+
+  re_enc = encrypt_mangli_user_header_for_test(
+      '{"user_id":"U888","name":"zhangsan","dept_id":"D01"}', key
+  )
+  assert re_enc == expected_cipher_hex
+
+
+def test_sha1prng_fallback_derivation():
+  password = b"mangli_test_key_2026"
+  key = derive_sha1prng_key(password)
+  assert len(key) == 16
+
+
+def test_expiring_lru_cache_standard_library():
+  cache = ExpiringLruCache(maxsize=10, ttl_seconds=1)
+  cache.set("k1", "v1")
+  assert cache.get("k1") == "v1"
+  assert cache.get("k2") is None
+
+
+@pytest.mark.asyncio
+async def test_permission_cache_ttl_and_error_handling():
+  call_count = 0
+
+  async def mock_fetch_permissions(ticket: str, user_id: str):
+    nonlocal call_count
+    call_count += 1
+    if ticket == "invalid":
+      raise ValueError("invalid ticket")
+    if ticket == "down":
+      raise PermissionServiceUnavailableError("service timeout")
+    return ["user:read", "project:access"], ["engineer"]
+
+  service = MangliAuthService(fetch_fn=mock_fetch_permissions)
+  perms, roles = await service.get_permissions("ticket_123", "U1001")
+  assert call_count == 1
+  assert "user:read" in perms
+
+  # 命中 5min 缓存
+  perms2, roles2 = await service.get_permissions("ticket_123", "U1001")
+  assert call_count == 1
+  assert perms2 == perms
+
+  # Fail-Closed 异常阻断
+  with pytest.raises(PermissionServiceUnavailableError):
+    await service.get_permissions("down", "U1002")
+
+
+@pytest.mark.asyncio
+async def test_adaptive_auth_double_track():
+  captured_headers = {}
+  captured_principal = None
+
+  async def dummy_app(scope, receive, send):
+    nonlocal captured_headers, captured_principal
+    captured_headers = dict(scope.get("headers", []))
+    captured_principal = get_current_principal()
+
+  class FakeAppState:
+    lca_auth_expected_token = "secret-token-123"
+    lca_auth_dev_mode = False
+
+  class FakeApp:
+    state = FakeAppState()
+
+  mw = SmartAdaptiveAuthMiddleware(dummy_app)
+
+  # 1. 带有伪造头的公司 Gateway 流量：验证解密、剥离伪造头并注入合法 Bearer
+  key = bytes.fromhex("0123456789abcdef0123456789abcdef")
+  enc = encrypt_mangli_user_header_for_test(
+      '{"user_id":"U888","name":"zhangsan","dept_id":"D01"}', key
+  )
+  scope_gateway = {
+      "type": "http",
+      "path": "/runs",
+      "app": FakeApp(),
+      "headers": [
+          (b"x-mangli-user", enc.encode()),
+          (b"ticket", b"t123"),
+          (b"x-lca-user-id", b"malicious_spoofed_id"),  # 伪造头
+          (b"authorization", b"Bearer fake"),  # 伪造 Token
+      ],
+  }
+  await mw(scope_gateway, None, None)
+  # 验证伪造头被彻底剔除，真实工号生效
+  assert captured_headers.get(b"x-lca-user-id") == b"U888"
+  assert (
+      captured_headers.get(b"authorization") == b"Bearer secret-token-123"
+  )
+  assert isinstance(captured_principal, Principal)
+  assert captured_principal.issuer == "mangli"
+  assert captured_principal.subject == "U888"
+
+
+@pytest.mark.asyncio
+async def test_unauthenticated_traffic_rejected_when_prod_mode():
+  sent_messages = []
+
+  async def dummy_app(scope, receive, send):
+    pass
+
+  async def mock_send(message):
+    sent_messages.append(message)
+
+  class FakeAppState:
+    lca_auth_expected_token = "secret-token-123"
+    lca_auth_dev_mode = False
+
+  class FakeApp:
+    state = FakeAppState()
+
+  mw = SmartAdaptiveAuthMiddleware(dummy_app)
+  # 生产模式下未带网关头且未带合法 Bearer 的请求必须直接被 401 拦截
+  scope_unauth = {
+      "type": "http",
+      "path": "/runs",
+      "app": FakeApp(),
+      "headers": [(b"x-lca-user-id", b"intruder")],
+  }
+  await mw(scope_unauth, None, mock_send)
+  assert len(sent_messages) >= 1
+  assert sent_messages[0]["type"] == "http.response.start"
+  assert sent_messages[0]["status"] == 401
+
+
+@pytest.mark.asyncio
+async def test_adaptive_auth_decryption_failure_returns_401():
+  sent_messages = []
+
+  async def dummy_app(scope, receive, send):
+    pass
+
+  async def mock_send(message):
+    sent_messages.append(message)
+
+  class FakeAppState:
+    lca_auth_expected_token = "secret-token-123"
+    lca_auth_dev_mode = False
+
+  class FakeApp:
+    state = FakeAppState()
+
+  mw = SmartAdaptiveAuthMiddleware(dummy_app)
+  scope_bad_cipher = {
+      "type": "http",
+      "path": "/runs",
+      "app": FakeApp(),
+      "headers": [
+          (b"x-mangli-user", b"not_valid_hex_or_bad_padding"),
+      ],
+  }
+  await mw(scope_bad_cipher, None, mock_send)
+  assert len(sent_messages) >= 1
+  assert sent_messages[0]["type"] == "http.response.start"
+  assert sent_messages[0]["status"] == 401
+
+
+@pytest.mark.asyncio
+async def test_adaptive_auth_invalid_ticket_returns_401():
+  sent_messages = []
+
+  async def dummy_app(scope, receive, send):
+    pass
+
+  async def mock_send(message):
+    sent_messages.append(message)
+
+  async def mock_fetch_invalid(ticket: str, user_id: str):
+    raise ValueError("invalid ticket")
+
+  class FakeAppState:
+    lca_auth_expected_token = "secret-token-123"
+    lca_auth_dev_mode = False
+
+  class FakeApp:
+    state = FakeAppState()
+
+  service = MangliAuthService(fetch_fn=mock_fetch_invalid)
+  mw = SmartAdaptiveAuthMiddleware(dummy_app, auth_service=service)
+
+  key = bytes.fromhex("0123456789abcdef0123456789abcdef")
+  enc = encrypt_mangli_user_header_for_test(
+      '{"user_id":"U888","name":"zhangsan","dept_id":"D01"}', key
+  )
+  scope_invalid_ticket = {
+      "type": "http",
+      "path": "/runs",
+      "app": FakeApp(),
+      "headers": [
+          (b"x-mangli-user", enc.encode()),
+          (b"ticket", b"bad_ticket"),
+      ],
+  }
+  await mw(scope_invalid_ticket, None, mock_send)
+  assert len(sent_messages) >= 1
+  assert sent_messages[0]["type"] == "http.response.start"
+  assert sent_messages[0]["status"] == 401
+```
+
+**Step 2: Run test to verify it fails**
+Run: `.\.venv\Scripts\pytest tests/plugins/transport/test_mangli_auth.py -v`
+Expected: FAIL.
+
+**Step 3: Write minimal implementation**
+- 实现 `lca/plugins/transport/webserver/handlers/auth/principal.py`：定义 `Principal` 模型；
+- 实现 `lca/plugins/transport/webserver/handlers/auth/mangli_auth.py`：
+  - 加解密与标准库 LRU 缓存；
+  - 伪造头剥离逻辑（`FORBIDDEN_CLIENT_HEADERS`）；
+  - `SmartAdaptiveAuthMiddleware` 与 `install_adaptive_auth_middleware(app)`；
+- 修改 `lca/plugins/transport/webserver/server/server.py`：在 `install_trace_middleware(app)` 之前调用 `install_adaptive_auth_middleware(app)`。
+
+**Step 4: Run test to verify it passes**
+Run: `.\.venv\Scripts\pytest tests/plugins/transport/test_mangli_auth.py -v`
+Expected: PASS.
+
+**Step 5: Commit**
+```bash
+git add lca/plugins/transport/webserver/handlers/auth/principal.py lca/plugins/transport/webserver/handlers/auth/mangli_auth.py lca/plugins/transport/webserver/server/server.py tests/plugins/transport/test_mangli_auth.py
+git commit -m "feat(auth): implement Principal model, adaptive auth middleware and install in server"
+```
+
+---
+
+### Task 2: 多租户 In-Flight Run 并发去重隔离安全修复 (M9)
+
+**Files:**
+- Modify: `lca/plugins/transport/webserver/handlers/runs/session/index/index.py`
+- Modify: `lca/plugins/transport/webserver/handlers/runs/terminal/registry/commands.py`
+- Test: `tests/plugins/transport/test_multitenant_inflight_run_dedup.py`
+- Does NOT own: `lca/contracts/`, `lca/cognition/`, `lca/runtime/`, `lca/loop/`, `lca/framework/`, `lca_kernel/`, `vendor/` (AP-01)
+- Invariants to test:
+  - INV-04: 多租户并发去重隔离：不同用户发送相同内容的提问，计算出的 In-flight 指纹必须不同，绝不合并进同一 Run。
+
+**Step 1: Write the failing test**
+
+```python
+# tests/plugins/transport/test_multitenant_inflight_run_dedup.py
+import pytest
+from lca.plugins.transport.webserver.handlers.runs.session.index.index import (
+    run_dedup_key,
+)
+
+
+def test_multitenant_inflight_run_dedup_isolation():
+  key_user_a = run_dedup_key(
+      user_id="user_A",
+      user_text="查上月华东区销售额",
+      mode="solo",
+      agent_id="asst_1",
+  )
+  key_user_b = run_dedup_key(
+      user_id="user_B",
+      user_text="查上月华东区销售额",
+      mode="solo",
+      agent_id="asst_1",
+  )
+  assert key_user_a != key_user_b
+```
+
+**Step 2: Run test to verify it fails**
+Run: `.\.venv\Scripts\pytest tests/plugins/transport/test_multitenant_inflight_run_dedup.py -v`
+Expected: FAIL.
+
+**Step 3: Write minimal implementation**
+- 修改 `lca/plugins/transport/webserver/handlers/runs/session/index/index.py`：`run_dedup_key` 与 `find_inflight_run` 引入 `user_id`；
+- 修改 `lca/plugins/transport/webserver/handlers/runs/terminal/registry/commands.py`：`create_and_dispatch` 传参 `user_id=request.user_id`。
+
+**Step 4: Run test to verify it passes**
+Run: `.\.venv\Scripts\pytest tests/plugins/transport/test_multitenant_inflight_run_dedup.py -v`
+Expected: PASS.
+
+**Step 5: Commit**
+```bash
+git add lca/plugins/transport/webserver/handlers/runs/session/index/index.py lca/plugins/transport/webserver/handlers/runs/terminal/registry/commands.py tests/plugins/transport/test_multitenant_inflight_run_dedup.py
+git commit -m "fix(security): incorporate user_id into in-flight run dedup to prevent multi-tenant data leak"
+```
+
+---
+
+### Task 3: 真实 LCA Tool 契约实现与企业能力 (M5, M6, R8)
+
+**Files:**
+- Create: `lca/plugins/tools/mangli_enterprise_tools.py`
+- Test: `tests/plugins/tools/test_mangli_enterprise_tools.py`
+- Does NOT own: `lca/contracts/`, `lca/cognition/`, `lca/runtime/`, `lca/loop/`, `lca/framework/`, `lca_kernel/`, `vendor/` (AP-01)
+- Invariants to test:
+  - INV-05: 严格继承 LCA `Tool(Protocol)`，声明 7 项 ClassVar；模型参数不暴露租户 ID；文件写入通过真实 `LocalFileStore` 生成不可变凭证；钉死 `@plugin(id="mangli-enterprise-tools")`。
+
+**Step 1: Write the failing test**
+
+```python
+# tests/plugins/tools/test_mangli_enterprise_tools.py
+from typing import Any
+import pytest
+from lca.contracts.models.core.execution.decision import Observation
+from lca.contracts.protocols import Tool
+from lca.infrastructure.file.store import LocalFileStore
+from lca.plugins.tools.mangli_enterprise_tools import MangliWorkspaceExportTool
+
+
+@pytest.mark.asyncio
+async def test_tool_conforms_to_lca_contract(tmp_path):
+  file_store = LocalFileStore(tmp_path / "files")
+  tool = MangliWorkspaceExportTool(
+      file_store=file_store,
+      user_id="U888",
+      project_id="proj_reserved_01",
+      session_id="sess_01",
+  )
+
+  # 1. 契约符合性（7 项 ClassVar 必验）
+  assert isinstance(tool, Tool)
+  assert tool.name == "mangli_workspace_export"
+  assert tool.namespace == "workspace"
+  assert isinstance(tool.description, str)
+  assert isinstance(tool.parameters, dict)
+  assert isinstance(tool.is_idempotent, bool)
+  assert tool.effect_kind in ("ephemeral", "persistent", "stateful_once")
+  assert isinstance(tool.default_timeout_s, int)
+
+  # 2. 租户参数严禁暴露在模型参数中
+  assert "project_id" not in tool.parameters["properties"]
+  assert "session_id" not in tool.parameters["properties"]
+
+  # 3. 执行并生成 Observation 与 FileStore 凭证
+  obs = await tool.execute({"path": "report.txt", "content": "hello mangli"})
+  assert isinstance(obs, Observation)
+  assert obs.payload["status"] == "ok"
+  assert "attachment_id" in obs.payload
+```
+
+**Step 2: Run test to verify it fails**
+Run: `.\.venv\Scripts\pytest tests/plugins/tools/test_mangli_enterprise_tools.py -v`
+Expected: FAIL.
+
+**Step 3: Write minimal implementation**
+实现 `lca/plugins/tools/mangli_enterprise_tools.py`：
+- 严格遵循 `Tool(Protocol)` 实现 `MangliWorkspaceExportTool`；
+- 文件持久化至 `LocalFileStore`；
+- 声明标准的 `@plugin(id="mangli-enterprise-tools", layer="L1", kind=PluginKind.PROVIDER, effects="none", ...)` 挂载工具工厂。
+
+**Step 4: Run test to verify it passes**
+Run: `.\.venv\Scripts\pytest tests/plugins/tools/test_mangli_enterprise_tools.py -v`
+Expected: PASS.
+
+**Step 5: Commit**
+```bash
+git add lca/plugins/tools/mangli_enterprise_tools.py tests/plugins/tools/test_mangli_enterprise_tools.py
+git commit -m "feat(tools): implement enterprise export tool conforming to Tool protocol and LocalFileStore"
+```
+
+---
+
+### Task 4: 离线自包含的 Playground 验证控制台 (M8, R6, R7, R17)
+
+**Files:**
+- Create: `lca/plugins/transport/webserver/static/mangli_playground.html`
+- Create: `lca/plugins/transport/webserver/routes_mangli_playground.py`
+- Test: `tests/plugins/transport/test_mangli_playground.py`
+- Does NOT own: `lca/contracts/`, `lca/cognition/`, `lca/runtime/`, `lca/loop/`, `lca/framework/`, `lca_kernel/`, `vendor/` (AP-01)
+- Invariants to test:
+  - INV-06: 纯原生自包含 CSS，无外网 CDN，内网离线渲染；钉死 `@plugin(id="mangli-enterprise-playground-route")`；通过 `TestClient` 发起真实的 `GET /playground` 严格返回 200 HTTP 响应。
+
+**Step 1: Write the failing test**
+
+```python
+# tests/plugins/transport/test_mangli_playground.py
+import pytest
+from starlette.applications import Starlette
+from starlette.testclient import TestClient
+from lca.plugins.transport.webserver.routes_mangli_playground import (
+    PLAYGROUND_ROUTE_SPECS,
+)
+
+
+def test_playground_offline_render():
+  app = Starlette()
+  for spec in PLAYGROUND_ROUTE_SPECS:
+    app.add_route(spec.path, spec.handler, methods=list(spec.methods))
+
+  client = TestClient(app)
+  res = client.get("/playground")
+  assert res.status_code == 200
+  assert "text/html" in res.headers["content-type"]
+  assert "cdn.tailwindcss.com" not in res.text
+  assert "unpkg.com" not in res.text
+  assert "<style>" in res.text
+  # 验证界面包含 WebSocket 首帧认证逻辑
+  assert 'type: "auth"' in res.text
+```
+
+**Step 2: Run test to verify it fails**
+Run: `.\.venv\Scripts\pytest tests/plugins/transport/test_mangli_playground.py -v`
+Expected: FAIL.
+
+**Step 3: Write minimal implementation**
+- 创建 `lca/plugins/transport/webserver/static/mangli_playground.html`：
+  - 纯原生自包含 CSS；
+  - 严格遵循 LCA WebSocket 原生协议：建连后发送第一帧 `{"type": "auth", "token": ws_token}`，每 30s 发送心跳帧 `{"type": "heartbeat"}`；
+- 创建 `lca/plugins/transport/webserver/routes_mangli_playground.py`：
+  - 钉死 `@plugin(id="mangli-enterprise-playground-route", layer="L1", kind=PluginKind.PROVIDER, effects="none", ...)` 挂载 `GET /playground` 路由。
+
+**Step 4: Run test to verify it passes**
+Run: `.\.venv\Scripts\pytest tests/plugins/transport/test_mangli_playground.py -v`
+Expected: PASS.
+
+**Step 5: Commit**
+```bash
+git add lca/plugins/transport/webserver/static/mangli_playground.html lca/plugins/transport/webserver/routes_mangli_playground.py tests/plugins/transport/test_mangli_playground.py
+git commit -m "feat(ui): add self-contained offline playground single page and route plugin"
+```
+
+**Step 6 (补充): HITL 审批与历史/回放**
+
+原实现把 `agent_runtime_end` 当终点，而服务端在暂停时会发 `step_start{phase: human_approval}` + `agent_runtime_end{reason: waiting_for_human}` 后按协议关闭事件流，页面因此永远停在 `waiting_for_human`；同时页面只提交单条 user message，无法验证跨轮次与历史 run。
+
+- **审批面板**：识别 `step_start.phase === 'human_approval'` 或 `requiresApproval`，渲染 `pendingToolsCalling`（工具名 + arguments）；提交走既有 `POST /runs/{run_id}/answer`，`approval_id` 有具体工具时用工具名、纯 widget 用 `widget`（与 LobeHub 约定一致），`payload`/`idempotency_key` 必填，拒绝时带 `rejection_reason`。
+- **重连**：run 暂停后事件流已关闭，审批成功后必须 `POST /v1/runs/{id}/ws-token` 换新 JWT 再建连；`resume.lastEventId` 用已消费到的事件 id 续传，避免整段重播（JWT TTL 仅 5 分钟，不能沿用创建时的 token）。
+- **多轮上下文**：本页已完成轮次（user/assistant）累积为 `messages` 前缀，后端 `extract_prior_turns` 据此还原上下文。
+- **历史验证**：输入 run_id 可从头回放该 run 的全部事件；Redis 流已失效（2h TTL 过期）时回退 `GET /runs/{id}` 读 status/output/steps。
+- **鉴权头**：`/files`、`/runs`、`/answer`、`/v1/runs/{id}/ws-token` 共用 `buildAuthHeaders()`，并统一带上 `x-lca-user-id`（非 dev 模式的 run 归属与 ws-token 铸造要求该头）。
+- **停止任务**：`POST /runs/{run_id}/cancel`（不是 WS `interrupt`——暂停态下事件流已断开，控制帧发不出去）。创建/重连/暂停后启用，终态或取消成功后禁用；run 未结束前再次发起任务会先确认，避免误把接续目标切走。
+- **密文自检**：新增 `POST /playground/decrypt`，用中间件实际使用的 `MANGLI_AUTH_AES_KEY`（未配置则内置默认密钥）试解手工密文，返回 `ok` / `reason`（`empty_cipher` / `not_hex` / `bad_block_length` / `decrypt_failed`）+ `key_origin`，不回明文。页面在提交前折叠空白/`0x`/大小写，并把 `/runs` 的 `401 invalid mangli user cipher` 翻译成"密钥不匹配"的可执行提示。`/playground/encrypt` 的 `key` 留空 = 用服务端解密的那把密钥加密，避免生成/解密两套密钥。
+- **模式互斥的 UI 事实**：勾选「直接手工输入已有网关密文」后，AES 密钥块与 UserPrincipal 载荷块整块隐藏（`#aesKeySection` / `#principalSection`），预览框标题改为"手工粘贴的密文"。这两块只是「生成」的输入，手工密文模式下身份与密钥都已在密文里，留着展示等于暗示它们参与解密/鉴权。
+- **失败归因**：`/playground/decrypt` 失败后页面自动调 `POST /playground/diagnose`，枚举「密钥形态（configured / env_hex / env_text / sha1prng）× 分组模式（ECB / CBC-zeroIV / CBC-prefixIV）× padding（PKCS7 / 无）」，返回 `match` 与 `notes`，把"解不开"拆成三类结论：密钥值不匹配、同一份 env 值的解释形态不一致、分组模式不一致（换密钥无效，需改实现）。
+- **密钥长度**：`get_configured_aes_key()` 接受 16/24/32 字节（AES-128/192/256）。早期只认 16 字节，64 位 Hex 会静默掉进 SHA1PRNG 派生出另一把密钥 —— 网关用 AES-256 时表现为永久 401 且无任何线索。
+- **SHA1PRNG 派生修正（真实故障根因）**：网关加密源码为 `SecureRandom.getInstance("SHA1PRNG").setSeed(password)` → `KeyGenerator(AES).init(128, random)` → `AES/ECB/PKCS5Padding` → Hex。OpenJDK 的 `setSeed` 先把种子哈希一次存为 state，首次 `nextBytes` 再取 `SHA1(state)`，故密钥是 **`SHA1(SHA1(seed))[:16]`**；旧实现算 `SHA1(seed)[:16]`，两者不等 → 所有密码派生的网关流量永远 401，且换任何密钥都救不回来。真值由 JDK 8u261 与 JDK 21 各跑一遍确认一致，`test_sha1prng_derivation_matches_java_keygenerator_vector` 用 Java 产出的密钥 + 密文做端到端回归锁。注意 `password.getBytes()` 用平台默认字符集（中文密码在 GBK 机器上与 UTF-8 不同）。
+- **`.env` 通道**：`MANGLI_` 加入 `BOOTSTRAP_PREFIXES`（沿用 ADR-0117 三层白名单机制，先例同 ADR-0269 的 `AVATAR_IMAGE_`）。此前 `MANGLI_AUTH_AES_KEY` 只能靠 ambient 环境变量注入，`.env` 里写了会被白名单丢弃且不合并进 `os.environ`，中间件读不到 → 静默回落内置默认密钥。
+
+---
+
+### Task 5: 声明式编排配置与真实 Merge-Base 零修改门禁 (M1, M2, M3, M7, R2, R7)
+
+**Files:**
+- Create: `bundles/mangli-enterprise.yaml`
+- Create: `profiles/mangli-enterprise.yaml`
+- Test: `tests/scenario/test_mangli_enterprise_bundle_invariants.py`
+- Does NOT own: `lca/contracts/`, `lca/cognition/`, `lca/runtime/`, `lca/loop/`, `lca/framework/`, `lca_kernel/`, `vendor/` (AP-01)
+- Invariants to test:
+  - INV-07: **分支基线零修改铁律**：`git diff --name-only origin/main...HEAD -- lca/contracts lca/cognition lca/runtime lca/loop lca/framework lca_kernel vendor` 退出码必为 0 且输出必为空！
+  - Profile 成功解析（包含 14 生产 bundle + `assistant-runtime.yaml` + mangli bundle），且通过 `{p.id for p in resolved.plugins}` 准确断言两个 mangli 插件 ID，关闭生产 dev_mode。
+
+**Step 1: Write the failing test**
+
+```python
+# tests/scenario/test_mangli_enterprise_bundle_invariants.py
+from pathlib import Path
+import subprocess
+import pytest
+from lca.harness.profile.resolve.resolve import resolve_profile
+
+
+def test_core_zero_mutation_against_merge_base():
+  cmd = [
+      "git",
+      "diff",
+      "--name-only",
+      "origin/main...HEAD",
+      "--",
+      "lca/contracts",
+      "lca/cognition",
+      "lca/runtime",
+      "lca/loop",
+      "lca/framework",
+      "lca_kernel",
+      "vendor",
+  ]
+  res = subprocess.run(cmd, capture_output=True, text=True, check=True)
+  assert res.stdout.strip() == "", (
+      f"Core files were mutated against origin/main:\n{res.stdout}"
+  )
+
+
+def test_mangli_profile_resolves_cleanly():
+  profile_path = Path("profiles/mangli-enterprise.yaml")
+  assert profile_path.exists()
+  resolved = resolve_profile(profile_path)
+  # 正确使用 ResolvedProfile.plugins 数据契约
+  plugin_ids = {p.id for p in resolved.plugins}
+  assert "mangli-enterprise-playground-route" in plugin_ids
+  assert "mangli-enterprise-tools" in plugin_ids
+  assert "lca-webserver-router" in plugin_ids
+```
+
+**Step 2: Run test to verify it fails**
+Run: `.\.venv\Scripts\pytest tests/scenario/test_mangli_enterprise_bundle_invariants.py -v`
+Expected: FAIL.
+
+**Step 3: Write minimal implementation**
+- 编写 `bundles/mangli-enterprise.yaml`（`entries:` 规范格式，声明两个插件条目）；
+- 编写 `profiles/mangli-enterprise.yaml`（挂载全量生产 bundle，patch 声明 `dev_mode: false`）。
+
+**Step 4: Run test to verify it passes**
+Run: `.\.venv\Scripts\pytest tests/scenario/test_mangli_enterprise_bundle_invariants.py -v`
+Expected: PASS.
+
+**Step 5: Commit**
+```bash
+git add bundles/mangli-enterprise.yaml profiles/mangli-enterprise.yaml tests/scenario/test_mangli_enterprise_bundle_invariants.py
+git commit -m "feat(orchestration): declare mangli-enterprise bundle and profile with zero core mutation guard"
+```

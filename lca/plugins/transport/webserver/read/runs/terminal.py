@@ -9,7 +9,6 @@ Consolidates:
 from __future__ import annotations
 
 import contextlib
-import fcntl
 import hashlib
 import json
 import time
@@ -17,6 +16,11 @@ import traceback
 from collections.abc import AsyncIterator, Iterator
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
+
+try:
+    import fcntl
+except ImportError:
+    fcntl = None  # type: ignore[assignment]
 
 import structlog
 
@@ -76,11 +80,13 @@ def _materialization_lock(manifest_path: Path) -> Iterator[None]:
     lock_path.parent.mkdir(parents=True, exist_ok=True)
     fp = lock_path.open("w", encoding="utf-8")
     try:
-        fcntl.flock(fp.fileno(), fcntl.LOCK_EX)
+        if fcntl is not None:
+            fcntl.flock(fp.fileno(), fcntl.LOCK_EX)
         yield
     finally:
         try:
-            fcntl.flock(fp.fileno(), fcntl.LOCK_UN)
+            if fcntl is not None:
+                fcntl.flock(fp.fileno(), fcntl.LOCK_UN)
         finally:
             fp.close()
 

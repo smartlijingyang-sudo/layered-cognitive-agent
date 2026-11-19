@@ -30,6 +30,7 @@ def run_dedup_key(
     mode: str,
     attachment_ids: Sequence[str] = (),
     agent_id: str = "",
+    user_id: str = "",
 ) -> str:
     """Fingerprint concurrent duplicate carrier requests for one principal."""
 
@@ -38,7 +39,8 @@ def run_dedup_key(
         sorted(str(item).strip() for item in attachment_ids if str(item).strip())
     )
     principal = agent_id.strip() or "solo"
-    payload = f"{mode}\0{principal}\0{normalized}\0{attachments}"
+    tenant = user_id.strip()
+    payload = f"{tenant}\0{mode}\0{principal}\0{normalized}\0{attachments}"
     return canonical_digest(payload, length=24, prefix="")
 
 
@@ -79,6 +81,7 @@ class RunSessionIndex:
         mode: str,
         attachment_ids: Sequence[str] = (),
         agent_id: str = "",
+        user_id: str = "",
     ) -> RunSession | None:
         """Return an active duplicate request, clearing stale index entries."""
 
@@ -87,6 +90,7 @@ class RunSessionIndex:
             mode=mode,
             attachment_ids=attachment_ids,
             agent_id=agent_id,
+            user_id=user_id,
         )
         run_id = self._inflight_by_key.get(key)
         if run_id is None:
@@ -174,6 +178,7 @@ def _session_dedup_key(session: RunSession) -> str:
         mode=session.mode,
         attachment_ids=session.attachment_ids,
         agent_id=session.agent.agent_id,
+        user_id=getattr(session, "user_id", "") or "",
     )
 
 

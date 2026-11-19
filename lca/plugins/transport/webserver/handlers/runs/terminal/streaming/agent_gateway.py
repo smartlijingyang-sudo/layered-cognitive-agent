@@ -19,6 +19,13 @@ Wire behaviour:
 After the run's `agent_runtime_end` is published, the server emits
 `{type:'session_complete'}` and closes the socket.
 
+Why the handshake carries a per-run JWT instead of reusing the gateway's
+`X-Mangli-User` / ticket: `SmartAdaptiveAuthMiddleware` returns early for
+`scope["type"] != "http"`, and the frame protocol above is fixed by the
+LobeHub `AgentStreamClient` we must stay compatible with. Moving WS auth
+onto gateway headers or cookies would break that client — do not "unify"
+the two paths without an ADR.
+
 Live-loop design (Task 7):
 The subscribe generator is a long-running XREAD BLOCK consumer. We
 cannot `await` it and `ws.receive_text` at the same time, so we
