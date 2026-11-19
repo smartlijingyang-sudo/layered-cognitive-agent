@@ -296,3 +296,110 @@ def test_get_configured_aes_key_resolution(monkeypatch):
     # 3. 密码字符串 (走 SHA1PRNG 派生)
     monkeypatch.setenv("MANGLI_AUTH_AES_KEY", "custom_gateway_password")
     assert get_configured_aes_key() == derive_sha1prng_key(b"custom_gateway_password")
+
+    # 4. AES-256：64 位 Hex 必须当成 32 字节密钥，不能掉进 SHA1PRNG 派生出另一把
+    monkeypatch.setenv("MANGLI_AUTH_AES_KEY", "ab" * 32)
+    assert get_configured_aes_key() == b"\xab" * 32
+
+    # 5. AES-192：48 位 Hex → 24 字节
+    monkeypatch.setenv("MANGLI_AUTH_AES_KEY", "cd" * 24)
+    assert get_configured_aes_key() == b"\xcd" * 24
+
+    # 6. 32 字节原文密钥（非 Hex 字符）
+    monkeypatch.setenv("MANGLI_AUTH_AES_KEY", "x" * 32)
+    assert get_configured_aes_key() == b"x" * 32
+
+
+def test_sha1prng_derivation_matches_java_keygenerator_vector() -> None:
+    """真值由与网关加密源码等价的 Java 程序产出（JDK 8u261 与 JDK 21 结果一致）。
+
+    网关侧::
+
+        SecureRandom r = SecureRandom.getInstance("SHA1PRNG");
+        r.setSeed(password.getBytes());
+        KeyGenerator kgen = KeyGenerator.getInstance("AES");
+        kgen.init(128, r);
+        Cipher.getInstance("AES/ECB/PKCS5Padding").doFinal(json)
+
+    派生是 ``SHA1(SHA1(seed))[:16]``；旧实现算 ``SHA1(seed)[:16]``，导致
+    所有走密码派生的网关流量永远 401（本用例即该 bug 的回归锁）。
+    """
+    from lca.plugins.transport.webserver.handlers.auth.mangli_auth import (
+        decrypt_mangli_user_header,
+        derive_sha1prng_key,
+    )
+
+    # (password, java key hex, java cipher hex of {"userId":"10001"})
+    vectors = [
+        (
+            b"mangli-secret",
+            "3baeb6bd8ac53998aa6342e9f8bd2ab2",
+            "b6ec44745ab27cecd4f068d10537bfedc9ae8a7c533771f848af221dbd11ad9e",
+        ),
+        (
+            b"Mangli2026Key!",
+            "b978c5d1ba87145c43b8a8e0672085c7",
+            "b62960a430bee910e5e342212fc123332f54d138b4101791bdf25565f4f532ad",
+        ),
+        (
+            b"company_gateway_password",
+            "3b7b7bd8bee126e7dea63dacb5ac9741",
+            "6483ad3dc71850b06884f343c7b38b42fbf6a092cce2c67fa44c2530303aab71",
+        ),
+    ]
+    for password, key_hex, cipher_hex in vectors:
+        assert derive_sha1prng_key(password).hex() == key_hex
+        # 端到端：Java 加出来的密文，服务端必须能解开
+        assert decrypt_mangli_user_header(cipher_hex, key=bytes.fromhex(key_hex))["userId"] == "10001"
+
+
+def test_password_env_follows_java_sha1prng(monkeypatch) -> None:
+    """``MANGLI_AUTH_AES_KEY`` 填密码时，服务端必须按 Java 口径派生成网关那把密钥。"""
+    from lca.plugins.transport.webserver.handlers.auth.mangli_auth import get_configured_aes_key
+
+    monkeypatch.setenv("MANGLI_AUTH_AES_KEY", "mangli-secret")
+    assert (
+        get_configured_aes_key().hex() == "3baeb6bd8ac53998aa6342e9f8bd2ab2"
+    ), "密码派生必须等于 Java KeyGenerator(SHA1PRNG) 产出的密钥"
+
+
+def test_describe_configured_aes_key_reports_interpretation(monkeypatch):
+    """诊断必须能说清"服务端把你的值当成了什么"，否则长度不对时无从发现。"""
+    from lca.plugins.transport.webserver.handlers.auth.mangli_auth import (
+        describe_configured_aes_key,
+    )
+
+    monkeypatch.setenv("MANGLI_AUTH_AES_KEY", "fedcba9876543210fedcba9876543210")
+    info = describe_configured_aes_key()
+    assert info["interpreted_as"] == "env_hex"
+    assert info["key_bits"] == 128
+    assert info["env_value_len"] == 32
+
+    monkeypatch.setenv("MANGLI_AUTH_AES_KEY", "0123456789abcdeZ")  # 16 字节原文
+    info = describe_configured_aes_key()
+    assert info["interpreted_as"] == "env_text"
+    assert info["env_value_len"] == 16
+
+    # 长度不合法的密码 → 服务端只能 SHA1PRNG 派生，长度本身即诊断事实
+    monkeypatch.setenv("MANGLI_AUTH_AES_KEY", "mangli-secret")
+    info = describe_configured_aes_key()
+    assert info["interpreted_as"] == "sha1prng"
+    assert info["env_value_len"] == len("mangli-secret")
+    assert info["key_bits"] == 128
+
+    monkeypatch.delenv("MANGLI_AUTH_AES_KEY", raising=False)
+    info = describe_configured_aes_key()
+    assert info["interpreted_as"] == "default"
+    assert info["env_value_len"] == 0
+
+
+def test_aes_256_key_roundtrip(monkeypatch):
+    """AES-256 密钥下的加解密必须自洽（同 32 字节密钥）。"""
+    from lca.plugins.transport.webserver.handlers.auth.mangli_auth import (
+        decrypt_mangli_user_header,
+        encrypt_mangli_user_header_for_test,
+    )
+
+    monkeypatch.setenv("MANGLI_AUTH_AES_KEY", "ab" * 32)
+    cipher = encrypt_mangli_user_header_for_test('{"userId":"10001"}', key=b"\xab" * 32)
+    assert decrypt_mangli_user_header(cipher, key=b"\xab" * 32)["userId"] == "10001"

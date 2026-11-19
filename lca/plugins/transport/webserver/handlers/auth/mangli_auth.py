@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import base64
+import contextlib
 import hashlib
 import json
 import os
@@ -49,24 +51,73 @@ def set_current_principal(principal: Principal | None) -> None:
 
 
 def derive_sha1prng_key(password: bytes) -> bytes:
-    """兼容 Java SecureRandom.getInstance('SHA1PRNG') 派生的 128 位 AES 密钥。"""
-    return hashlib.sha1(password).digest()[:16]  # noqa: S324 — Java SHA1PRNG derivation compatibility
+    """兼容 Java ``SecureRandom.getInstance("SHA1PRNG").setSeed(pwd)`` 的 128 位 AES 密钥。
+
+    网关侧代码等价于::
+
+        SecureRandom random = SecureRandom.getInstance("SHA1PRNG");
+        random.setSeed(password.getBytes());
+        KeyGenerator kgen = KeyGenerator.getInstance("AES");
+        kgen.init(128, random);
+
+    OpenJDK ``sun.security.provider.SecureRandom`` 里 ``setSeed`` 会把种子先哈希一次
+    存为 state，首次 ``nextBytes`` 再取 ``SHA1(state)``，所以密钥是
+    ``SHA1(SHA1(seed))`` 的前 16 字节 —— **不是** ``SHA1(seed)[:16]``。
+
+    历史实现漏了这一次迭代，导致所有走密码派生的网关流量永远 401。
+    真值由 JDK 8u261 与 JDK 21 各跑一遍确认一致。
+    """
+    inner = hashlib.sha1(password).digest()  # noqa: S324 — Java SHA1PRNG derivation compatibility
+    return hashlib.sha1(inner).digest()[:16]  # noqa: S324 — Java SHA1PRNG derivation compatibility
+
+
+def resolve_configured_aes_key() -> tuple[str, bytes]:
+    """解析 ``MANGLI_AUTH_AES_KEY``，返回 ``(解释方式, 密钥字节)``。
+
+    解释方式是诊断事实的一部分：``default`` / ``env_hex`` / ``env_text`` /
+    ``sha1prng``。调用方据此判断"服务端到底把你的值当成了什么"。
+    """
+    key_env = os.environ.get("MANGLI_AUTH_AES_KEY", "").strip()
+    if not key_env:
+        return "default", DEFAULT_AES_KEY
+    try:
+        raw_bytes = bytes.fromhex(key_env)
+    except ValueError:
+        raw_bytes = b""
+    if len(raw_bytes) in (16, 24, 32):
+        return "env_hex", raw_bytes
+    text_bytes = key_env.encode("utf-8")
+    if len(text_bytes) in (16, 24, 32):
+        return "env_text", text_bytes
+    return "sha1prng", derive_sha1prng_key(text_bytes)
 
 
 def get_configured_aes_key() -> bytes:
-    """获取当前配置的 AES 密钥。"""
+    """获取当前配置的 AES 密钥。
+
+    AES-128/192/256 都支持：32/48/64 位 Hex 或 16/24/32 字节原文直接当密钥；
+    其余形态按 Java SHA1PRNG 派生 128 位（历史兼容行为）。
+
+    早期只认 16 字节，64 位 Hex（AES-256）会掉进 SHA1PRNG 分支派生出**另一把
+    密钥**，表现为网关密文永远 401 且毫无线索 —— 这是必须区分的静默错误。
+    """
+    return resolve_configured_aes_key()[1]
+
+
+def describe_configured_aes_key() -> dict[str, Any]:
+    """诊断用：报告服务端如何解释这个配置值（不回传值本身）。
+
+    ``env_value_len`` 是 **UTF-8 字节长度**：值被引号/注释/换行污染、或长度
+    不是 16/24/32 时，靠它一眼看出来。
+    """
     key_env = os.environ.get("MANGLI_AUTH_AES_KEY", "").strip()
-    if not key_env:
-        return DEFAULT_AES_KEY
-    try:
-        raw_bytes = bytes.fromhex(key_env)
-        if len(raw_bytes) == 16:
-            return raw_bytes
-    except ValueError:
-        pass
-    if len(key_env.encode("utf-8")) == 16:
-        return key_env.encode("utf-8")
-    return derive_sha1prng_key(key_env.encode())
+    source, key = resolve_configured_aes_key()
+    return {
+        "interpreted_as": source,
+        "key_bits": len(key) * 8,
+        "env_value_len": len(key_env.encode("utf-8")),
+        "env_value_chars": len(key_env),
+    }
 
 
 def decrypt_mangli_user_header(
@@ -98,6 +149,135 @@ def encrypt_mangli_user_header_for_test(
     encryptor = cipher.encryptor()
     ciphertext = encryptor.update(padded_data) + encryptor.finalize()
     return ciphertext.hex()
+
+
+def _try_decrypt_variant(
+    ciphertext: bytes,
+    key: bytes,
+    mode_name: str,
+    iv: bytes,
+    use_pkcs7: bool,
+) -> str | None:
+    """尝试单条假设，成功返回解出的文本，失败返回 ``None``。
+
+    诊断只关心"能否解出 JSON"，不关心具体异常，所以不向上传播。
+    """
+    cipher_mode = modes.ECB() if mode_name == "ECB" else modes.CBC(iv)  # noqa: S305
+    try:
+        decryptor = Cipher(algorithms.AES(key), cipher_mode).decryptor()
+        plaintext = decryptor.update(ciphertext) + decryptor.finalize()
+        if use_pkcs7:
+            unpadder = padding.PKCS7(128).unpadder()
+            plaintext = unpadder.update(plaintext) + unpadder.finalize()
+        else:
+            # 零填充/无填充的实现尾部会带 \x00，去掉再判 JSON。
+            plaintext = plaintext.rstrip(b"\x00")
+        return plaintext.decode("utf-8")
+    except Exception:
+        # 假设失败即负结论，异常类型不参与判定。
+        return None
+
+
+def _parse_json_object(text: str | None) -> dict[str, Any] | None:
+    if not text:
+        return None
+    try:
+        data = json.loads(text)
+    except ValueError:
+        return None
+    return data if isinstance(data, dict) else None
+
+
+def probe_mangli_cipher_hypotheses(cipher_hex: str, configured_key: bytes) -> dict[str, Any]:
+    """诊断用：枚举「密钥形态 × 分组模式 × padding」，报告哪一种能解出 JSON 对象。
+
+    中间件只支持 AES-ECB/PKCS7。网关侧实现常见 CBC（IV 固定或 IV 前缀）、
+    PKCS5 零填充。把"解不开"拆成可判定的结论，而不是让调用方对着一句
+    ``invalid mangli user cipher`` 猜。
+
+    只在密钥候选上做*形态*枚举（同一份 ``MANGLI_AUTH_AES_KEY`` 的几种解释），
+    不做密钥爆破。
+    """
+    try:
+        ciphertext = bytes.fromhex(cipher_hex.strip())
+    except ValueError:
+        return {"matched": None, "attempted": 0, "notes": ["密文不是合法 Hex"]}
+
+    raw = os.environ.get("MANGLI_AUTH_AES_KEY", "").strip()
+    candidates: list[tuple[str, bytes]] = [("configured", configured_key)]
+
+    def _add(source: str, key: bytes) -> None:
+        """同一份配置值的另一种「形态解释」，去重后最多保留 6 个候选。"""
+        if len(key) in (16, 24, 32) and all(key != known for _, known in candidates):
+            candidates.append((source, key))
+
+    if raw:
+        text_bytes = raw.encode("utf-8")
+        with contextlib.suppress(ValueError):
+            _add("env_hex", bytes.fromhex(raw))
+        _add("env_text", text_bytes)
+        # 企业网关最常见的密钥处理：Java SHA1PRNG、MD5(16 字节)、SHA-256，
+        # 以及"配置值长于 16 位就取前 16/32 位"的土办法。
+        _add("sha1prng", derive_sha1prng_key(text_bytes))
+        _add("substring_16", text_bytes[:16])
+        _add("substring_32", text_bytes[:32])
+        _add("md5_16", hashlib.md5(text_bytes).digest()[:16])  # noqa: S324 — 兼容网关派生，非安全用途
+        _add("sha256_32", hashlib.sha256(text_bytes).digest())
+        _add("sha256_16", hashlib.sha256(text_bytes).digest()[:16])
+        with contextlib.suppress(ValueError, TypeError):
+            _add("env_base64", base64.b64decode(raw, validate=True))
+    candidates = candidates[:8]
+
+    matched: dict[str, Any] | None = None
+    attempted = 0
+    for source, key in candidates:
+        variants: list[tuple[str, str, bytes]] = [
+            ("ECB", "none", b""),
+            ("CBC", "zero16", b"\x00" * 16),
+            ("CBC", "prefix16", b""),
+            # IvParameterSpec(key.getBytes())：企业代码里最常见的复制粘贴写法。
+            ("CBC", "key16", key[:16]),
+        ]
+        for mode_name, iv_kind, zero_iv in variants:
+            body = ciphertext
+            iv = zero_iv
+            if iv_kind == "prefix16":
+                if len(ciphertext) <= 16:
+                    continue
+                iv = ciphertext[:16]
+                body = ciphertext[16:]
+            for use_pkcs7 in (True, False):
+                attempted += 1
+                text = _try_decrypt_variant(body, key, mode_name, iv, use_pkcs7)
+                data = _parse_json_object(text)
+                if data is not None and matched is None:
+                    matched = {
+                        "key_source": source,
+                        "key_bits": len(key) * 8,
+                        "mode": mode_name,
+                        "iv": iv_kind,
+                        "padding": "pkcs7" if use_pkcs7 else "none",
+                        "field_count": len(data),
+                        "fields": sorted(str(item) for item in data),
+                    }
+        if matched is not None:
+            break
+
+    sources = [source for source, _ in candidates]
+    notes: list[str] = []
+    if matched is None:
+        notes.append(
+            f"已尝试 {attempted} 种组合（{len(sources)} 种密钥形态 {sources} × 3 种分组模式 × 2 种 padding）全部失败"
+        )
+    elif matched["mode"] != "ECB" or matched["padding"] != "pkcs7":
+        notes.append("网关密文能用非 ECB-PKCS7 的方式解开，说明服务端实现的模式与网关不一致")
+    elif matched["key_source"] != "configured":
+        notes.append(
+            f"同一份配置值按 {matched['key_source']} 解释才解得开，服务端派生规则与网关不一致"
+        )
+    else:
+        notes.append("网关密文与中间件口径一致（AES-ECB/PKCS7），可直接使用")
+    return {"matched": matched, "attempted": attempted, "notes": notes, "key_sources": sources}
 
 
 class ExpiringLruCache:
