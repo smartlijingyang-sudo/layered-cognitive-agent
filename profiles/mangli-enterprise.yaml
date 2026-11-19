@@ -1,8 +1,9 @@
 name: mangli-enterprise
 description: |
-  Mangli Enterprise Integration profile.
-  Inherits full 14 production bundles from web-standard + assistant-runtime.yaml
-  plus mangli-enterprise.yaml bundle, with fail-closed production ownership patch.
+  Mangli Enterprise Integration profile (production assembly).
+  Inherits 14 production bundles from web-standard + assistant-runtime.yaml,
+  with fail-closed production ownership patch. The /playground console and its
+  forwarding proxy are deliberately absent; see profiles/mangli-enterprise-dev.yaml.
 
 bundles:
   - bundles/base.yaml
@@ -20,7 +21,8 @@ bundles:
   - bundles/reflect/reflect_subgraph.yaml
   - bundles/remember/remember_subgraph.yaml
   - bundles/assistant-runtime.yaml
-  - bundles/mangli-enterprise.yaml
+  # The /playground console and its forwarding proxy are dev-only and must not
+  # ship here; use profiles/mangli-enterprise-dev.yaml when you need them.
 
 patch:
   - id: lca-effect-permission-manifest-default
@@ -41,3 +43,12 @@ patch:
   - id: lca-avatar
     config:
       api_key: "dummy"
+  # 公司文件服务上传接缝。凭据一律 required: false：插件挂在公共 bundle
+  # (bundles/web-app.yaml) 上，声明为必需会让所有没有凭据的 profile 启动失败。
+  # 缺配置时路由仍注册，请求返回 503 fileservice_unconfigured。
+  - id: lca-gateway-routes-company-files
+    config:
+      base_url: {from_env: LCA_FILESERVICE_BASE_URL, required: false}
+      app_id: {from_env: LCA_FILESERVICE_APP_ID, required: false}
+      pwd: {from_env: LCA_FILESERVICE_PWD, required: false}
+      timeout_s: {from_env: LCA_FILESERVICE_TIMEOUT_S, required: false}

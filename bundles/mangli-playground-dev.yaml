@@ -1,0 +1,12 @@
+# Dev / test only: the Mangli integration console.
+#
+# This plugin carries an HTTP/WS forwarding proxy that accepts a page-supplied
+# target and has no authentication of its own (it lives under the auth-bypassed
+# /playground prefix). Its only safety boundary is assembly scoping: it must
+# never appear in a production profile. The reverse assertion lives in
+# tests/scenario/test_mangli_enterprise_bundle_invariants.py.
+entries:
+  - id: mangli-enterprise-playground-route
+    name: mangli-enterprise-playground-route
+    $module: lca.plugins.transport.webserver.routes_mangli_playground
+    config: {}

@@ -464,6 +464,23 @@ git add lca/plugins/transport/webserver/static/mangli_playground.html lca/plugin
 git commit -m "feat(ui): add self-contained offline playground single page and route plugin"
 ```
 
+**Step 6 (补充): HITL 审批与历史/回放**
+
+原实现把 `agent_runtime_end` 当终点，而服务端在暂停时会发 `step_start{phase: human_approval}` + `agent_runtime_end{reason: waiting_for_human}` 后按协议关闭事件流，页面因此永远停在 `waiting_for_human`；同时页面只提交单条 user message，无法验证跨轮次与历史 run。
+
+- **审批面板**：识别 `step_start.phase === 'human_approval'` 或 `requiresApproval`，渲染 `pendingToolsCalling`（工具名 + arguments）；提交走既有 `POST /runs/{run_id}/answer`，`approval_id` 有具体工具时用工具名、纯 widget 用 `widget`（与 LobeHub 约定一致），`payload`/`idempotency_key` 必填，拒绝时带 `rejection_reason`。
+- **重连**：run 暂停后事件流已关闭，审批成功后必须 `POST /v1/runs/{id}/ws-token` 换新 JWT 再建连；`resume.lastEventId` 用已消费到的事件 id 续传，避免整段重播（JWT TTL 仅 5 分钟，不能沿用创建时的 token）。
+- **多轮上下文**：本页已完成轮次（user/assistant）累积为 `messages` 前缀，后端 `extract_prior_turns` 据此还原上下文。
+- **历史验证**：输入 run_id 可从头回放该 run 的全部事件；Redis 流已失效（2h TTL 过期）时回退 `GET /runs/{id}` 读 status/output/steps。
+- **鉴权头**：`/files`、`/runs`、`/answer`、`/v1/runs/{id}/ws-token` 共用 `buildAuthHeaders()`，并统一带上 `x-lca-user-id`（非 dev 模式的 run 归属与 ws-token 铸造要求该头）。
+- **停止任务**：`POST /runs/{run_id}/cancel`（不是 WS `interrupt`——暂停态下事件流已断开，控制帧发不出去）。创建/重连/暂停后启用，终态或取消成功后禁用；run 未结束前再次发起任务会先确认，避免误把接续目标切走。
+- **密文自检**：新增 `POST /playground/decrypt`，用中间件实际使用的 `MANGLI_AUTH_AES_KEY`（未配置则内置默认密钥）试解手工密文，返回 `ok` / `reason`（`empty_cipher` / `not_hex` / `bad_block_length` / `decrypt_failed`）+ `key_origin`，不回明文。页面在提交前折叠空白/`0x`/大小写，并把 `/runs` 的 `401 invalid mangli user cipher` 翻译成"密钥不匹配"的可执行提示。`/playground/encrypt` 的 `key` 留空 = 用服务端解密的那把密钥加密，避免生成/解密两套密钥。
+- **模式互斥的 UI 事实**：勾选「直接手工输入已有网关密文」后，AES 密钥块与 UserPrincipal 载荷块整块隐藏（`#aesKeySection` / `#principalSection`），预览框标题改为"手工粘贴的密文"。这两块只是「生成」的输入，手工密文模式下身份与密钥都已在密文里，留着展示等于暗示它们参与解密/鉴权。
+- **失败归因**：`/playground/decrypt` 失败后页面自动调 `POST /playground/diagnose`，枚举「密钥形态（configured / env_hex / env_text / sha1prng）× 分组模式（ECB / CBC-zeroIV / CBC-prefixIV）× padding（PKCS7 / 无）」，返回 `match` 与 `notes`，把"解不开"拆成三类结论：密钥值不匹配、同一份 env 值的解释形态不一致、分组模式不一致（换密钥无效，需改实现）。
+- **密钥长度**：`get_configured_aes_key()` 接受 16/24/32 字节（AES-128/192/256）。早期只认 16 字节，64 位 Hex 会静默掉进 SHA1PRNG 派生出另一把密钥 —— 网关用 AES-256 时表现为永久 401 且无任何线索。
+- **SHA1PRNG 派生修正（真实故障根因）**：网关加密源码为 `SecureRandom.getInstance("SHA1PRNG").setSeed(password)` → `KeyGenerator(AES).init(128, random)` → `AES/ECB/PKCS5Padding` → Hex。OpenJDK 的 `setSeed` 先把种子哈希一次存为 state，首次 `nextBytes` 再取 `SHA1(state)`，故密钥是 **`SHA1(SHA1(seed))[:16]`**；旧实现算 `SHA1(seed)[:16]`，两者不等 → 所有密码派生的网关流量永远 401，且换任何密钥都救不回来。真值由 JDK 8u261 与 JDK 21 各跑一遍确认一致，`test_sha1prng_derivation_matches_java_keygenerator_vector` 用 Java 产出的密钥 + 密文做端到端回归锁。注意 `password.getBytes()` 用平台默认字符集（中文密码在 GBK 机器上与 UTF-8 不同）。
+- **`.env` 通道**：`MANGLI_` 加入 `BOOTSTRAP_PREFIXES`（沿用 ADR-0117 三层白名单机制，先例同 ADR-0269 的 `AVATAR_IMAGE_`）。此前 `MANGLI_AUTH_AES_KEY` 只能靠 ambient 环境变量注入，`.env` 里写了会被白名单丢弃且不合并进 `os.environ`，中间件读不到 → 静默回落内置默认密钥。
+
 ---
 
 ### Task 5: 声明式编排配置与真实 Merge-Base 零修改门禁 (M1, M2, M3, M7, R2, R7)
