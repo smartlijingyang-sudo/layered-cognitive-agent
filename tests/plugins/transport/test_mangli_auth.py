@@ -3,6 +3,7 @@
 import pytest
 
 from lca.plugins.transport.webserver.handlers.auth.mangli_auth import (
+    DEFAULT_AES_KEY,
     ExpiringLruCache,
     MangliAuthService,
     PermissionServiceUnavailableError,
@@ -13,6 +14,11 @@ from lca.plugins.transport.webserver.handlers.auth.mangli_auth import (
     get_current_principal,
 )
 from lca.plugins.transport.webserver.handlers.auth.principal import Principal
+
+
+async def _allow_all(ticket: str, user_id: str) -> tuple[list[str], list[str]]:
+    """测试替身：显式注入"票有效"，代替已删除的生产默认放行。"""
+    return ["user:read"], ["user"]
 
 
 def test_java_cross_compatibility_vector():
@@ -91,10 +97,13 @@ async def test_adaptive_auth_double_track():
     class FakeApp:
         state = FakeAppState()
 
-    mw = SmartAdaptiveAuthMiddleware(dummy_app)
+    key = bytes.fromhex("0123456789abcdef0123456789abcdef")
+    # aes_key 与 ticket 校验器必须显式注入：生产默认值已改为 fail-closed。
+    mw = SmartAdaptiveAuthMiddleware(
+        dummy_app, auth_service=MangliAuthService(fetch_fn=_allow_all), aes_key=key
+    )
 
     # 1. 带有伪造头的公司 Gateway 流量：验证解密、剥离伪造头并注入合法 Bearer
-    key = bytes.fromhex("0123456789abcdef0123456789abcdef")
     enc = encrypt_mangli_user_header_for_test(
         '{"user_id":"U888","name":"zhangsan","dept_id":"D01"}', key
     )
@@ -168,7 +177,7 @@ async def test_adaptive_auth_decryption_failure_returns_401():
     class FakeApp:
         state = FakeAppState()
 
-    mw = SmartAdaptiveAuthMiddleware(dummy_app)
+    mw = SmartAdaptiveAuthMiddleware(dummy_app, aes_key=DEFAULT_AES_KEY)
     scope_bad_cipher = {
         "type": "http",
         "path": "/runs",
@@ -203,10 +212,10 @@ async def test_adaptive_auth_invalid_ticket_returns_401():
     class FakeApp:
         state = FakeAppState()
 
-    service = MangliAuthService(fetch_fn=mock_fetch_invalid)
-    mw = SmartAdaptiveAuthMiddleware(dummy_app, auth_service=service)
-
     key = bytes.fromhex("0123456789abcdef0123456789abcdef")
+    service = MangliAuthService(fetch_fn=mock_fetch_invalid)
+    mw = SmartAdaptiveAuthMiddleware(dummy_app, auth_service=service, aes_key=key)
+
     enc = encrypt_mangli_user_header_for_test(
         '{"user_id":"U888","name":"zhangsan","dept_id":"D01"}', key
     )
@@ -240,7 +249,10 @@ async def test_java_user_principal_9_fields_and_embedded_ticket():
     class FakeApp:
         state = FakeAppState()
 
-    mw = SmartAdaptiveAuthMiddleware(dummy_app)
+    key = bytes.fromhex("0123456789abcdef0123456789abcdef")
+    mw = SmartAdaptiveAuthMiddleware(
+        dummy_app, auth_service=MangliAuthService(fetch_fn=_allow_all), aes_key=key
+    )
 
     # 模拟真实 Java Spring Cloud Gateway 传出的 UserPrincipal JSON
     import json
@@ -255,7 +267,6 @@ async def test_java_user_principal_9_fields_and_embedded_ticket():
         "clockInType": 1,
         "ticket": "TKT-EMBEDDED-VALID",
     }
-    key = bytes.fromhex("0123456789abcdef0123456789abcdef")
     cipher_hex = encrypt_mangli_user_header_for_test(json.dumps(gateway_payload), key)
 
     scope_gateway = {
@@ -285,9 +296,9 @@ async def test_java_user_principal_9_fields_and_embedded_ticket():
 def test_get_configured_aes_key_resolution(monkeypatch):
     from lca.plugins.transport.webserver.handlers.auth.mangli_auth import get_configured_aes_key
 
-    # 1. 默认密钥 (未配置 env)
+    # 1. 未配置 env → 没有密钥，绝不回落到公开默认值
     monkeypatch.delenv("MANGLI_AUTH_AES_KEY", raising=False)
-    assert get_configured_aes_key() == bytes.fromhex("0123456789abcdef0123456789abcdef")
+    assert get_configured_aes_key() is None
 
     # 2. 32 位 Hex 密钥
     monkeypatch.setenv("MANGLI_AUTH_AES_KEY", "fedcba9876543210fedcba9876543210")
@@ -389,8 +400,9 @@ def test_describe_configured_aes_key_reports_interpretation(monkeypatch):
 
     monkeypatch.delenv("MANGLI_AUTH_AES_KEY", raising=False)
     info = describe_configured_aes_key()
-    assert info["interpreted_as"] == "default"
+    assert info["interpreted_as"] == "unconfigured"
     assert info["env_value_len"] == 0
+    assert info["key_bits"] == 0
 
 
 def test_aes_256_key_roundtrip(monkeypatch):
@@ -403,3 +415,162 @@ def test_aes_256_key_roundtrip(monkeypatch):
     monkeypatch.setenv("MANGLI_AUTH_AES_KEY", "ab" * 32)
     cipher = encrypt_mangli_user_header_for_test('{"userId":"10001"}', key=b"\xab" * 32)
     assert decrypt_mangli_user_header(cipher, key=b"\xab" * 32)["userId"] == "10001"
+
+
+# ── fail-closed 回归（Q2/Q3/Q4）──────────────────────────────────────
+
+
+@pytest.mark.asyncio
+async def test_missing_aes_key_rejects_gateway_track(monkeypatch):
+    """Q2 回归：未配置密钥时不得用公开默认密钥解密网关流量。"""
+    monkeypatch.delenv("MANGLI_AUTH_AES_KEY", raising=False)
+    sent = []
+
+    async def dummy_app(scope, receive, send):
+        raise AssertionError("gateway track must not reach the app")
+
+    async def mock_send(message):
+        sent.append(message)
+
+    class FakeAppState:
+        lca_auth_expected_token = "secret-token-123"  # noqa: S105
+        lca_auth_dev_mode = False
+
+    class FakeApp:
+        state = FakeAppState()
+
+    mw = SmartAdaptiveAuthMiddleware(
+        dummy_app, auth_service=MangliAuthService(fetch_fn=_allow_all)
+    )
+    enc = encrypt_mangli_user_header_for_test('{"userId":"10001"}', DEFAULT_AES_KEY)
+    scope = {
+        "type": "http",
+        "path": "/runs",
+        "app": FakeApp(),
+        "headers": [(b"x-mangli-user", enc.encode()), (b"ticket", b"t")],
+    }
+    await mw(scope, None, mock_send)
+    assert sent[0]["status"] == 503
+    assert b"auth_not_configured" in sent[1]["body"]
+
+
+@pytest.mark.asyncio
+async def test_unconfigured_permission_backend_passes_with_empty_roles(monkeypatch):
+    """Q3 回归：查询器未接入时权限为空、身份放行，不伪造角色也不 502。"""
+    monkeypatch.setenv("MANGLI_AUTH_AES_KEY", "fedcba9876543210fedcba9876543210")
+    monkeypatch.delenv("MANGLI_PERMISSIONS_ENABLED", raising=False)
+    key = bytes.fromhex("fedcba9876543210fedcba9876543210")
+    sent = []
+    captured = {}
+
+    async def dummy_app(scope, receive, send):
+        captured["headers"] = dict(scope.get("headers", []))
+        captured["principal"] = get_current_principal()
+        await send({"type": "http.response.start", "status": 200, "headers": []})
+        await send({"type": "http.response.body", "body": b"ok"})
+
+    async def mock_send(message):
+        sent.append(message)
+
+    class FakeAppState:
+        lca_auth_expected_token = "secret-token-123"  # noqa: S105
+        lca_auth_dev_mode = False
+
+    class FakeApp:
+        state = FakeAppState()
+
+    mw = SmartAdaptiveAuthMiddleware(dummy_app, aes_key=key)
+    enc = encrypt_mangli_user_header_for_test('{"userId":"10001"}', key)
+    scope = {
+        "type": "http",
+        "path": "/runs",
+        "app": FakeApp(),
+        "headers": [(b"x-mangli-user", enc.encode()), (b"ticket", b"any-ticket")],
+    }
+    await mw(scope, None, mock_send)
+    assert sent[0]["status"] == 200
+    assert captured["principal"].roles == ()
+    assert captured["headers"][b"x-lca-user-id"] == b"10001"
+
+
+@pytest.mark.asyncio
+async def test_permission_query_failure_degrades_to_empty_roles(monkeypatch):
+    """Q3 回归：权限接口报错时降级为空权限，不把身份层一起打死。"""
+    monkeypatch.setenv("MANGLI_AUTH_AES_KEY", "fedcba9876543210fedcba9876543210")
+    key = bytes.fromhex("fedcba9876543210fedcba9876543210")
+    sent = []
+    captured = {}
+
+    async def failing_fetch(ticket: str, user_id: str):
+        raise TimeoutError("permission service timeout")
+
+    async def dummy_app(scope, receive, send):
+        captured["principal"] = get_current_principal()
+        await send({"type": "http.response.start", "status": 200, "headers": []})
+        await send({"type": "http.response.body", "body": b"ok"})
+
+    async def mock_send(message):
+        sent.append(message)
+
+    class FakeAppState:
+        lca_auth_expected_token = "secret-token-123"  # noqa: S105
+        lca_auth_dev_mode = False
+
+    class FakeApp:
+        state = FakeAppState()
+
+    mw = SmartAdaptiveAuthMiddleware(
+        dummy_app,
+        auth_service=MangliAuthService(fetch_fn=failing_fetch),
+        aes_key=key,
+    )
+    enc = encrypt_mangli_user_header_for_test('{"userId":"10001"}', key)
+    scope = {
+        "type": "http",
+        "path": "/runs",
+        "app": FakeApp(),
+        "headers": [(b"x-mangli-user", enc.encode()), (b"ticket", b"any-ticket")],
+    }
+    await mw(scope, None, mock_send)
+    assert sent[0]["status"] == 200
+    assert captured["principal"].roles == ()
+
+
+@pytest.mark.asyncio
+async def test_auth_service_without_fetcher_returns_empty():
+    """Q3 回归：无 fetch_fn 时不返回任何权限，也不抛异常阻断请求。"""
+    perms, roles = await MangliAuthService().get_permissions("ticket", "user")
+    assert perms == []
+    assert roles == []
+
+
+@pytest.mark.asyncio
+async def test_missing_auth_config_defaults_to_fail_closed():
+    """Q4 回归：未装配 dev_mode/expected_token 时不得放行。"""
+    sent = []
+
+    async def dummy_app(scope, receive, send):
+        raise AssertionError("unconfigured auth must not pass through")
+
+    async def mock_send(message):
+        sent.append(message)
+
+    class EmptyState:
+        pass
+
+    class FakeApp:
+        state = EmptyState()
+
+    mw = SmartAdaptiveAuthMiddleware(dummy_app, aes_key=DEFAULT_AES_KEY)
+    scope = {
+        "type": "http",
+        "path": "/runs",
+        "app": FakeApp(),
+        "headers": [
+            (b"authorization", b"Bearer lca-local"),
+            (b"x-lca-user-id", b"intruder"),
+        ],
+    }
+    await mw(scope, None, mock_send)
+    assert sent[0]["status"] == 401
+    assert b"auth_not_configured" in sent[1]["body"]

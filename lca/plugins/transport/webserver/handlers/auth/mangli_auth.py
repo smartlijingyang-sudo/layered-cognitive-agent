@@ -6,6 +6,7 @@ import base64
 import contextlib
 import hashlib
 import json
+import logging
 import os
 import time
 from collections import OrderedDict
@@ -18,13 +19,14 @@ from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 from starlette.types import ASGIApp, Receive, Scope, Send
 
 from lca.plugins.transport.webserver.handlers.auth.principal import Principal
-from lca.plugins.transport.webserver.handlers.auth.user import (
-    DEFAULT_DEV_USER_ID,
-    DEFAULT_EXPECTED_TOKEN,
-)
+from lca.plugins.transport.webserver.handlers.auth.user import DEFAULT_DEV_USER_ID
 from lca.plugins.transport.webserver.handlers.cors.cors import CORS_HEADERS
 
-# 默认测试/备用密钥 (16字节 Hex 主路)
+log = logging.getLogger(__name__)
+
+# 公开的测试向量密钥（Java 兼容用例与诊断演示用）。**绝不作为生产兜底**：
+# ``MANGLI_AUTH_AES_KEY`` 未配置时中间件拒绝网关轨请求（503），不会用这把
+# 公开钥匙解密任何真实流量。
 DEFAULT_AES_KEY = bytes.fromhex("0123456789abcdef0123456789abcdef")
 
 # 网关流量进入时必须强制剔除的伪造客户端头
@@ -71,15 +73,21 @@ def derive_sha1prng_key(password: bytes) -> bytes:
     return hashlib.sha1(inner).digest()[:16]  # noqa: S324 — Java SHA1PRNG derivation compatibility
 
 
-def resolve_configured_aes_key() -> tuple[str, bytes]:
+def _env_bool(name: str) -> bool:
+    """读取布尔型环境变量（``1/true/yes/on`` 为真）。"""
+    return os.environ.get(name, "").strip().lower() in ("1", "true", "yes", "on")
+
+
+def resolve_configured_aes_key() -> tuple[str, bytes | None]:
     """解析 ``MANGLI_AUTH_AES_KEY``，返回 ``(解释方式, 密钥字节)``。
 
-    解释方式是诊断事实的一部分：``default`` / ``env_hex`` / ``env_text`` /
-    ``sha1prng``。调用方据此判断"服务端到底把你的值当成了什么"。
+    解释方式是诊断事实的一部分：``unconfigured`` / ``env_hex`` / ``env_text``
+    / ``sha1prng``。未配置时密钥为 ``None`` —— 调用方必须显式拒绝，绝不能
+    回落到公开的 :data:`DEFAULT_AES_KEY`。
     """
     key_env = os.environ.get("MANGLI_AUTH_AES_KEY", "").strip()
     if not key_env:
-        return "default", DEFAULT_AES_KEY
+        return "unconfigured", None
     try:
         raw_bytes = bytes.fromhex(key_env)
     except ValueError:
@@ -92,8 +100,8 @@ def resolve_configured_aes_key() -> tuple[str, bytes]:
     return "sha1prng", derive_sha1prng_key(text_bytes)
 
 
-def get_configured_aes_key() -> bytes:
-    """获取当前配置的 AES 密钥。
+def get_configured_aes_key() -> bytes | None:
+    """获取当前配置的 AES 密钥；未配置返回 ``None``（不回落公开默认值）。
 
     AES-128/192/256 都支持：32/48/64 位 Hex 或 16/24/32 字节原文直接当密钥；
     其余形态按 Java SHA1PRNG 派生 128 位（历史兼容行为）。
@@ -114,15 +122,13 @@ def describe_configured_aes_key() -> dict[str, Any]:
     source, key = resolve_configured_aes_key()
     return {
         "interpreted_as": source,
-        "key_bits": len(key) * 8,
+        "key_bits": len(key) * 8 if key is not None else 0,
         "env_value_len": len(key_env.encode("utf-8")),
         "env_value_chars": len(key_env),
     }
 
 
-def decrypt_mangli_user_header(
-    cipher_hex: str, key: bytes = DEFAULT_AES_KEY
-) -> dict[str, Any]:
+def decrypt_mangli_user_header(cipher_hex: str, key: bytes) -> dict[str, Any]:
     """解密网关传入的 AES-ECB-PKCS7 密文 Hex 字符串。"""
     try:
         ciphertext = bytes.fromhex(cipher_hex.strip())
@@ -188,7 +194,9 @@ def _parse_json_object(text: str | None) -> dict[str, Any] | None:
     return data if isinstance(data, dict) else None
 
 
-def probe_mangli_cipher_hypotheses(cipher_hex: str, configured_key: bytes) -> dict[str, Any]:
+def probe_mangli_cipher_hypotheses(
+    cipher_hex: str, configured_key: bytes | None
+) -> dict[str, Any]:
     """诊断用：枚举「密钥形态 × 分组模式 × padding」，报告哪一种能解出 JSON 对象。
 
     中间件只支持 AES-ECB/PKCS7。网关侧实现常见 CBC（IV 固定或 IV 前缀）、
@@ -204,7 +212,9 @@ def probe_mangli_cipher_hypotheses(cipher_hex: str, configured_key: bytes) -> di
         return {"matched": None, "attempted": 0, "notes": ["密文不是合法 Hex"]}
 
     raw = os.environ.get("MANGLI_AUTH_AES_KEY", "").strip()
-    candidates: list[tuple[str, bytes]] = [("configured", configured_key)]
+    candidates: list[tuple[str, bytes]] = (
+        [("configured", configured_key)] if configured_key is not None else []
+    )
 
     def _add(source: str, key: bytes) -> None:
         """同一份配置值的另一种「形态解释」，去重后最多保留 6 个候选。"""
@@ -307,14 +317,26 @@ class ExpiringLruCache:
 
 
 class PermissionServiceUnavailableError(Exception):
-    """权限微服务超时或宕机（Fail-Closed 阻断）。"""
+    """上游权限 Code 接口超时或宕机。
+
+    由注入的 ``fetch_fn`` 抛出；中间件捕获后降级为"权限为空"并记 warning，
+    不阻断已通过 AES 校验的网关身份（票据有效性由网关负责）。
+    """
 
 
 FetchPermFn = Callable[[str, str], Awaitable[tuple[list[str], list[str]]]]
 
 
 class MangliAuthService:
-    """企业权限微服务客户端适配层（带 5min LRU 缓存与 Fail-Closed 保护）。"""
+    """权限 Code 查询缓存（``/inner/api/app/permissions`` 适配层）。
+
+    这里查的是**权限 Code**，不是登录鉴权：票据是否有效由网关判定，LCA 不解
+    释、也不伪造。``fetch_fn`` 由装配方注入；未注入（或 ``MANGLI_PERMISSIONS_ENABLED``
+    关闭）时权限恒为空，**不返回任何默认角色**。
+
+    缓存只保存非空结果：空权限不缓存，授权变更可以尽快生效；查询失败由中间件
+    降级为空权限并记日志，不把故障固化进缓存。
+    """
 
     def __init__(
         self,
@@ -327,19 +349,18 @@ class MangliAuthService:
     async def get_permissions(
         self, ticket: str, user_id: str
     ) -> tuple[list[str], list[str]]:
-        """查询用户权限与角色，优先命中 5 分钟 LRU 缓存。"""
+        """查询用户权限 Code；未接入查询器时返回空权限。"""
+        if self._fetch_fn is None:
+            return [], []
+
         cache_key = f"{ticket}:{user_id}"
         cached = self._cache.get(cache_key)
         if cached is not None:
             return cached
 
-        if self._fetch_fn is not None:
-            perms, roles = await self._fetch_fn(ticket, user_id)
-        else:
-            # 真实生产环境微服务调用兜底（若未注入 mock）
-            perms, roles = ["user:read"], ["user"]
-
-        self._cache.set(cache_key, (perms, roles))
+        perms, roles = await self._fetch_fn(ticket, user_id)
+        if perms or roles:
+            self._cache.set(cache_key, (perms, roles))
         return perms, roles
 
 
@@ -379,13 +400,16 @@ class SmartAdaptiveAuthMiddleware:
     """自适应双轨鉴权中间件。
 
     1. 公司网关流量 (带 x-mangli-user)：
-       - Hex 解码 + AES-ECB 解密；解密失败返回 401；
-       - 透传 ticket 校验权限服务；服务宕机返回 502，ticket 无效返回 401；
+       - ``MANGLI_AUTH_AES_KEY`` 未配置 → 503，绝不用公开默认密钥解密；
+       - Hex 解码 + AES 解密；解密失败返回 401；
+       - 权限 Code 查询默认关闭（``MANGLI_PERMISSIONS_ENABLED``）；关闭或未接入
+         查询器时权限恒为空；查询报错降级为空权限 + warning，不阻断身份；
        - 强制剥离客户端伪造的 x-lca-user-id / authorization / x-lca-token；
        - 注入真实 x-lca-user-id 与合法 Bearer token；
        - 构造 Principal(issuer='mangli') 写入 request.state 与 ContextVar。
     2. 内网直连 / LobeHub 流量 (无 x-mangli-user)：
-       - 生产模式 (dev_mode=False)：无合法 Bearer 直接拦截返回 401；
+       - 生产模式 (dev_mode=False，**缺省值**)：无合法 Bearer 直接拦截返回 401；
+       - ``dev_mode`` / ``expected_token`` 未装配时按 fail-closed 处理；
        - 构造 Principal(issuer='lobehub') 写入 request.state 与 ContextVar。
     """
 
@@ -396,8 +420,35 @@ class SmartAdaptiveAuthMiddleware:
         aes_key: bytes | None = None,
     ) -> None:
         self.app = app
-        self.auth_service = auth_service or MangliAuthService()
-        self.aes_key = aes_key or get_configured_aes_key()
+        # 权限 Code 查询默认关闭：目前没有路由消费权限集合，开着只是多一次外部调用。
+        self.permissions_enabled = _env_bool("MANGLI_PERMISSIONS_ENABLED")
+        if auth_service is not None:
+            self.auth_service = auth_service
+        else:
+            self.auth_service = MangliAuthService()
+            if self.permissions_enabled:
+                log.warning(
+                    "mangli_auth.permissions_enabled_without_client: "
+                    "MANGLI_PERMISSIONS_ENABLED is on but no fetch_fn is wired; "
+                    "permissions stay empty"
+                )
+        if aes_key is not None:
+            self.aes_key: bytes | None = aes_key
+            self._aes_key_source = "injected"
+        else:
+            self._aes_key_source, resolved_key = resolve_configured_aes_key()
+            self.aes_key = resolved_key
+        if self.aes_key is None:
+            log.warning(
+                "mangli_auth.aes_key_unconfigured: MANGLI_AUTH_AES_KEY is not set; "
+                "gateway-track requests are rejected instead of being decrypted "
+                "with the public default key"
+            )
+        if not self.permissions_enabled:
+            log.info(
+                "mangli_auth.permissions_disabled: MANGLI_PERMISSIONS_ENABLED is off; "
+                "gateway-track principals carry empty permissions"
+            )
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
         if scope["type"] != "http":
@@ -416,18 +467,33 @@ class SmartAdaptiveAuthMiddleware:
         headers = list(scope.get("headers", []))
         headers_dict = {k.lower(): v for k, v in headers}
 
-        # 读取运行时配置
+        # 读取运行时配置；未装配 auth 时缺省 fail-closed（不静默放行）。
         app_obj = scope.get("app")
         state_obj = getattr(app_obj, "state", None) if app_obj else None
-        expected_token = str(
-            getattr(state_obj, "lca_auth_expected_token", DEFAULT_EXPECTED_TOKEN)
-        )
-        dev_mode = bool(getattr(state_obj, "lca_auth_dev_mode", True))
+        expected_token = str(getattr(state_obj, "lca_auth_expected_token", "") or "")
+        dev_mode = bool(getattr(state_obj, "lca_auth_dev_mode", False))
+
+        if not dev_mode and not expected_token:
+            await _send_json_response(
+                send,
+                401,
+                "auth_not_configured",
+                "no expected bearer token configured; refusing requests in production mode",
+            )
+            return
 
         mangli_user_bytes = headers_dict.get(b"x-mangli-user")
 
         if mangli_user_bytes:
             # === 公司网关流量主路 ===
+            if self.aes_key is None:
+                await _send_json_response(
+                    send,
+                    503,
+                    "auth_not_configured",
+                    "MANGLI_AUTH_AES_KEY is not configured; refusing the public default key",
+                )
+                return
             cipher_hex = mangli_user_bytes.decode("utf-8", errors="replace")
             try:
                 user_info = decrypt_mangli_user_header(cipher_hex, key=self.aes_key)
@@ -471,19 +537,22 @@ class SmartAdaptiveAuthMiddleware:
                     else ""
                 )
 
-            # 权限微服务查询与 Fail-Closed 保护
+            # 权限 Code 查询：默认关闭；失败降级为空权限（票据有效性由网关负责）。
             try:
-                _perms, roles = await self.auth_service.get_permissions(ticket, effective_user_id)
-            except PermissionServiceUnavailableError:
-                await _send_json_response(
-                    send, 502, "bad_gateway", "permission service unavailable"
+                _perms, roles = await self.auth_service.get_permissions(
+                    ticket, effective_user_id
                 )
+            except ValueError:
+                await _send_json_response(send, 401, "unauthorized", "invalid ticket")
                 return
-            except Exception:
-                await _send_json_response(
-                    send, 401, "unauthorized", "invalid ticket"
+            except Exception as exc:
+                log.warning(
+                    "mangli_auth.permissions_query_failed user_id=%s error=%s; "
+                    "degrade to empty permissions",
+                    effective_user_id,
+                    type(exc).__name__,
                 )
-                return
+                _perms, roles = [], []
 
             # 强制剥离客户端可能伪造的身份头
             cleaned_headers = [

@@ -91,6 +91,12 @@ async def playground_encrypt_endpoint(request: Request) -> Response:
         # 空密钥 = "按服务端解密的密钥来加密"，生成即自洽，不会出现
         # "页面生成成功、/runs 却 401 invalid mangli user cipher"。
         key_bytes = get_configured_aes_key()
+        if key_bytes is None and not key_str:
+            return JSONResponse(
+                {"error": "MANGLI_AUTH_AES_KEY 未配置；请填写密钥，或先配置服务端密钥"},
+                status_code=400,
+                headers=cors_headers(),
+            )
         if key_str:
             if key_mode == "sha1prng":
                 key_bytes = derive_sha1prng_key(key_str.encode("utf-8"))
@@ -169,9 +175,21 @@ async def playground_decrypt_endpoint(request: Request) -> Response:
     if raw is None:
         raw = body.get("cipher_hex") if isinstance(body, dict) else ""
     normalized = _normalize_cipher_hex(raw or "")
-    key_origin = "env" if os.environ.get("MANGLI_AUTH_AES_KEY", "").strip() else "default"
+    key_origin = "env" if os.environ.get("MANGLI_AUTH_AES_KEY", "").strip() else "unconfigured"
     key = get_configured_aes_key()
     key_info = describe_configured_aes_key()
+
+    if key is None:
+        return JSONResponse(
+            {
+                "ok": False,
+                "reason": "key_not_configured",
+                "message": "MANGLI_AUTH_AES_KEY 未配置；中间件会拒绝网关轨请求，不会回落到公开默认密钥",
+                "key_origin": key_origin,
+                "key_info": key_info,
+            },
+            headers=cors_headers(),
+        )
 
     problem = _cipher_hex_problem(normalized)
     if problem is not None:
@@ -259,6 +277,18 @@ async def playground_diagnose_endpoint(request: Request) -> Response:
         )
 
     key = get_configured_aes_key()
+    if key is None:
+        return JSONResponse(
+            {
+                "ok": False,
+                "reason": "key_not_configured",
+                "message": "MANGLI_AUTH_AES_KEY 未配置；中间件会拒绝网关轨请求，不会回落到公开默认密钥",
+                "key_origin": "unconfigured",
+                "key_info": describe_configured_aes_key(),
+                "cipher_hex_length": len(normalized),
+            },
+            headers=cors_headers(),
+        )
     probe = probe_mangli_cipher_hypotheses(normalized, key)
     return JSONResponse(
         {
@@ -267,7 +297,7 @@ async def playground_diagnose_endpoint(request: Request) -> Response:
             "attempted": probe["attempted"],
             "key_sources": probe["key_sources"],
             "notes": probe["notes"],
-            "key_origin": "env" if os.environ.get("MANGLI_AUTH_AES_KEY", "").strip() else "default",
+            "key_origin": "env" if os.environ.get("MANGLI_AUTH_AES_KEY", "").strip() else "unconfigured",
             "key_info": describe_configured_aes_key(),
             "configured_key_bits": len(key) * 8,
             "cipher_hex_length": len(normalized),

@@ -258,6 +258,14 @@ def test_playground_decrypt_api(monkeypatch):
     )
 
 
+def test_playground_decrypt_reports_unconfigured_key(monkeypatch):
+    """回归：未配置密钥时诊断必须直说，不能暗示可以用公开默认密钥解密。"""
+    monkeypatch.delenv("MANGLI_AUTH_AES_KEY", raising=False)
+    body = _client().post("/playground/decrypt", json={"cipher": "00" * 16}).json()
+    assert body["ok"] is False
+    assert body["reason"] == "key_not_configured"
+
+
 def test_playground_encrypt_defaults_to_server_key(monkeypatch):
     """页面留空密钥 = 用服务端解密的那把密钥加密，生成即可用。"""
     from lca.plugins.transport.webserver.handlers.auth.mangli_auth import decrypt_mangli_user_header
