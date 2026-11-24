@@ -162,6 +162,8 @@ def app() -> Starlette:
     asyncio.run(setup(ctx, None))
     app = Starlette()
     router.install(app)
+    # 单用户测试替身：auth 缺省已是 fail-closed，需显式声明 dev_mode。
+    app.state.lca_auth_dev_mode = True
     return app
 
 

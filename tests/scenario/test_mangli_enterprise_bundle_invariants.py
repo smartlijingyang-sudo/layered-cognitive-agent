@@ -46,7 +46,10 @@ PLAYGROUND_PLUGIN_ID = "mangli-enterprise-playground-route"
 
 def _resolved_plugin_ids(profile_path: Path) -> set[str]:
     assert profile_path.exists(), f"Profile not found: {profile_path}"
-    resolved = resolve_profile(profile_path)
+    # 生产 Bearer 口令必须由部署环境注入；profile 里没有公开默认值。
+    resolved = resolve_profile(
+        profile_path, env={"LCA_AUTH_EXPECTED_TOKEN": "test-token"}
+    )
     return {p.id for p in resolved.plugins}
 
 
@@ -71,3 +74,27 @@ def test_dev_profile_includes_playground_console():
     plugin_ids = _resolved_plugin_ids(Path("profiles/mangli-enterprise-dev.yaml"))
     assert PLAYGROUND_PLUGIN_ID in plugin_ids
     assert "lca-webserver-router" in plugin_ids
+
+
+def test_profiles_do_not_hardcode_auth_token():
+    """回归：profile 不得写死 ``expected_token``，只能经 ``from_env`` 注入。
+
+    公开字面量（如 ``lca-local``）一旦进生产，等于把入口口令挂在仓库里。
+    """
+    offenders: list[str] = []
+    for path in sorted(Path("profiles").glob("*.yaml")):
+        text = path.read_text(encoding="utf-8")
+        for lineno, line in enumerate(text.splitlines(), 1):
+            stripped = line.strip()
+            if not stripped.startswith("expected_token:"):
+                continue
+            value = stripped.split(":", 1)[1].strip()
+            if not value or value.startswith("#"):
+                continue
+            if value.startswith("{") and "from_env" in value:
+                continue
+            offenders.append(f"{path}:{lineno}: {stripped}")
+    assert not offenders, (
+        "expected_token must be injected from env, not hardcoded:\n"
+        + "\n".join(offenders)
+    )

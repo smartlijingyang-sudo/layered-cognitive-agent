@@ -10,6 +10,9 @@
   required:false；空字符串 = SQLite（``~/.lca/lca.sqlite3``）。
 - ``dev_mode`` —— ``True`` 时归属检查放行（映射 ``local-dev-user``），
   保持存量单用户行为；``False`` 时缺身份返回 401（fail-closed）。
+- ``expected_token`` —— 只经 ``{from_env: LCA_AUTH_EXPECTED_TOKEN}`` 注入。
+  **没有公开默认值**：``dev_mode=False`` 且注入为空时 setup fail-loud，
+  避免"门装上、钥匙挂门上"。
 
 插件代码禁止直接读 ``os.environ``（ADR-0202 纪律）。
 """
@@ -19,7 +22,7 @@ from __future__ import annotations
 from typing import Any
 
 import structlog
-from pydantic import BaseModel, ConfigDict, field_validator
+from pydantic import BaseModel, ConfigDict, SecretStr, field_validator
 
 from lca.contracts.atoms.functional.group import FunctionalGroup
 from lca.contracts.atoms.scope.scope import Scope
@@ -40,6 +43,9 @@ from lca.infrastructure.persistence.user_store import build_user_assistant_store
 
 log = structlog.get_logger(__name__)
 
+# 历史本地开发 token；公开值，只可能出现在 dev_mode=True 的单用户环境。
+_PUBLIC_DEV_TOKEN = "lca-local"  # noqa: S105 — documented dev value, never an accepted production secret
+
 
 class Config(BaseModel):
     """ownership 插件配置。"""
@@ -52,8 +58,11 @@ class Config(BaseModel):
     dev_mode: bool = False
     """True = 归属检查放行（存量单用户行为）；False = fail-closed。"""
 
-    expected_token: str = "lca-local"  # noqa: S105 — empty default; real value injected from env (see docstring)
-    """``Authorization: Bearer`` / ``X-LCA-Token`` 期望值（dev_mode=False 时校验）。"""
+    expected_token: SecretStr | str | None = None
+    """``LCA_AUTH_EXPECTED_TOKEN`` 展开值；``None`` = 未配置。
+
+    没有公开默认值：``dev_mode=False`` 且为空时 setup fail-loud。
+    """
 
     @field_validator("dev_mode", mode="before")
     @classmethod
@@ -63,6 +72,15 @@ class Config(BaseModel):
         if isinstance(v, str):
             return v.strip().lower() in ("1", "true", "yes", "on")
         return bool(v)
+
+
+def _secret_value(value: SecretStr | str | None) -> str:
+    """展开 ``SecretStr`` / ``str``，两侧去空白；``None`` 视为未配置。"""
+    if value is None:
+        return ""
+    if isinstance(value, SecretStr):
+        return value.get_secret_value().strip()
+    return str(value).strip()
 
 
 @plugin(
@@ -97,11 +115,27 @@ async def setup(ctx: PluginContext, config: Config) -> None:
     store = build_user_assistant_store(database_url=config.database_url or "")
     ctx.provide(ASSISTANT_OWNERSHIP.key, store)
 
+    expected_token = _secret_value(config.expected_token)
+    if not config.dev_mode and not expected_token:
+        raise RuntimeError(
+            "assistant.ownership: expected_token is empty while dev_mode=False. "
+            "Set LCA_AUTH_EXPECTED_TOKEN and inject it via "
+            "`expected_token: {from_env: LCA_AUTH_EXPECTED_TOKEN}`. "
+            "Refusing to boot with an implicit/public bearer token."
+        )
+    if not config.dev_mode and expected_token == _PUBLIC_DEV_TOKEN:
+        raise RuntimeError(
+            "assistant.ownership: expected_token equals the public dev value "
+            f"{_PUBLIC_DEV_TOKEN!r} while dev_mode=False. "
+            "Use a deployment-specific LCA_AUTH_EXPECTED_TOKEN, or set "
+            "LCA_DEV_MODE=true for single-user development."
+        )
+
     handle = ctx.require("web_server")
     app = getattr(handle, "app", None)
     if app is not None and hasattr(app, "state"):
         app.state.assistant_ownership = store
-        app.state.lca_auth_expected_token = config.expected_token
+        app.state.lca_auth_expected_token = expected_token
         app.state.lca_auth_dev_mode = config.dev_mode
     log.info("assistant.ownership.installed", dev_mode=config.dev_mode)
 

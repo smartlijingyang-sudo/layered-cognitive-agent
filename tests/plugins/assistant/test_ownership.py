@@ -138,9 +138,33 @@ async def test_setup_installs_app_state() -> None:
 
     server = _FakeWebServer()
     ctx = _FakeCtx(server)
-    await plugin.setup(ctx, Config())
+    await plugin.setup(ctx, Config(expected_token="test-token"))  # noqa: S106
     assert ctx._provided["assistant.ownership"] is not None
     assert server.app.state.assistant_ownership is not None
+    assert server.app.state.lca_auth_expected_token == "test-token"  # noqa: S105
+    assert server.app.state.lca_auth_dev_mode is False
+
+
+@pytest.mark.asyncio
+async def test_setup_refuses_empty_token_in_prod_mode() -> None:
+    """回归：dev_mode=False 且未注入 token 时必须 fail-loud，不得回落到公开值。"""
+    from lca.plugins.assistant.ownership.plugin import Config
+    from lca.plugins.assistant.ownership.plugin import setup as plugin
+
+    with pytest.raises(RuntimeError, match="LCA_AUTH_EXPECTED_TOKEN"):
+        await plugin.setup(_FakeCtx(_FakeWebServer()), Config())
+
+
+@pytest.mark.asyncio
+async def test_setup_refuses_public_dev_token_in_prod_mode() -> None:
+    """回归：生产模式不接受公开的 lca-local，必须换部署专属值。"""
+    from lca.plugins.assistant.ownership.plugin import Config
+    from lca.plugins.assistant.ownership.plugin import setup as plugin
+
+    with pytest.raises(RuntimeError, match="public dev value"):
+        await plugin.setup(
+            _FakeCtx(_FakeWebServer()), Config(expected_token="lca-local")  # noqa: S106
+        )
 
 
 def test_config_rejects_unknown_fields() -> None:

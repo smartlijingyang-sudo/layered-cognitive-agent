@@ -34,13 +34,15 @@ patch:
   - id: lca.plugins.assistant.webserver.bridge
     config:
       lobehub_url: ""
+  # 联调 profile 同样不写死口令：缺 LCA_AUTH_EXPECTED_TOKEN 时启动失败。
   - id: lca.plugins.assistant.ownership
     config:
       dev_mode: false
-      expected_token: "lca-local"
-  - id: lca-avatar
-    config:
-      api_key: "dummy"
+      expected_token:
+        from_env: LCA_AUTH_EXPECTED_TOKEN
+        required: true
+  # lca-avatar 的 api_key 沿用 bundle 的 AVATAR_IMAGE_API_KEY 注入。
+
   # Company file-service upload seam. Credentials are optional
   # (required: false): the plugin is mounted from the shared
   # bundles/web-app.yaml, so declaring them mandatory would break every profile

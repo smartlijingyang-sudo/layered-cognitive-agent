@@ -10,9 +10,11 @@ from starlette.responses import JSONResponse
 
 from lca.plugins.transport.webserver.handlers.auth.user import (
     DEFAULT_DEV_USER_ID,
-    DEFAULT_EXPECTED_TOKEN,
     user_id_from_request,
 )
+
+# 配置值由 profile 注入；测试显式声明，避免依赖任何库内默认 token。
+TOKEN = "lca-local"  # noqa: S105 — 测试专用
 
 
 def _make_request(headers: dict[str, str]) -> Request:
@@ -30,7 +32,7 @@ def _make_request(headers: dict[str, str]) -> Request:
 def test_dev_mode_missing_user_falls_back_to_local_dev() -> None:
     request = _make_request({})
     user_id, error = user_id_from_request(
-        request, expected_token=DEFAULT_EXPECTED_TOKEN, dev_mode=True
+        request, expected_token=TOKEN, dev_mode=True
     )
     assert error is None
     assert user_id == DEFAULT_DEV_USER_ID
@@ -39,7 +41,7 @@ def test_dev_mode_missing_user_falls_back_to_local_dev() -> None:
 def test_dev_mode_accepts_wrong_token() -> None:
     request = _make_request({"authorization": "Bearer wrong", "x-lca-user-id": "alice"})
     user_id, error = user_id_from_request(
-        request, expected_token=DEFAULT_EXPECTED_TOKEN, dev_mode=True
+        request, expected_token=TOKEN, dev_mode=True
     )
     assert error is None
     assert user_id == "alice"
@@ -48,7 +50,7 @@ def test_dev_mode_accepts_wrong_token() -> None:
 def test_non_dev_mode_requires_token() -> None:
     request = _make_request({"x-lca-user-id": "alice"})
     user_id, error = user_id_from_request(
-        request, expected_token=DEFAULT_EXPECTED_TOKEN, dev_mode=False
+        request, expected_token=TOKEN, dev_mode=False
     )
     assert user_id is None
     assert isinstance(error, JSONResponse)
@@ -58,7 +60,7 @@ def test_non_dev_mode_requires_token() -> None:
 def test_non_dev_mode_rejects_wrong_token() -> None:
     request = _make_request({"authorization": "Bearer wrong", "x-lca-user-id": "alice"})
     user_id, error = user_id_from_request(
-        request, expected_token=DEFAULT_EXPECTED_TOKEN, dev_mode=False
+        request, expected_token=TOKEN, dev_mode=False
     )
     assert user_id is None
     assert isinstance(error, JSONResponse)
@@ -68,7 +70,7 @@ def test_non_dev_mode_rejects_wrong_token() -> None:
 def test_non_dev_mode_requires_user_id() -> None:
     request = _make_request({"authorization": "Bearer lca-local"})
     user_id, error = user_id_from_request(
-        request, expected_token=DEFAULT_EXPECTED_TOKEN, dev_mode=False
+        request, expected_token=TOKEN, dev_mode=False
     )
     assert user_id is None
     assert isinstance(error, JSONResponse)
@@ -78,7 +80,7 @@ def test_non_dev_mode_requires_user_id() -> None:
 def test_non_dev_mode_accepts_valid_token_and_user() -> None:
     request = _make_request({"authorization": "Bearer lca-local", "x-lca-user-id": "alice"})
     user_id, error = user_id_from_request(
-        request, expected_token=DEFAULT_EXPECTED_TOKEN, dev_mode=False
+        request, expected_token=TOKEN, dev_mode=False
     )
     assert error is None
     assert user_id == "alice"
@@ -87,10 +89,29 @@ def test_non_dev_mode_accepts_valid_token_and_user() -> None:
 def test_x_lca_token_header_accepted() -> None:
     request = _make_request({"x-lca-token": "lca-local", "x-lca-user-id": "alice"})
     user_id, error = user_id_from_request(
-        request, expected_token=DEFAULT_EXPECTED_TOKEN, dev_mode=False
+        request, expected_token=TOKEN, dev_mode=False
     )
     assert error is None
     assert user_id == "alice"
+
+
+def test_empty_expected_token_rejects_even_empty_token() -> None:
+    """回归：未配置期望 token 时，空 token 不能因为"两边都是空"而通过。"""
+    request = _make_request({"x-lca-user-id": "alice"})
+    user_id, error = user_id_from_request(request, expected_token="", dev_mode=False)
+    assert user_id is None
+    assert isinstance(error, JSONResponse)
+    assert error.status_code == 401
+
+
+def test_auth_config_defaults_to_fail_closed() -> None:
+    """回归：app.state 没有 auth 配置时缺省不得进入 dev 模式。"""
+    from lca.plugins.transport.webserver.handlers.auth.user import auth_config_of
+
+    request = _make_request({})
+    expected_token, dev_mode = auth_config_of(request)
+    assert expected_token == ""
+    assert dev_mode is False
 
 
 # ── 归属隔离（ADR-0252 D6）────────────────────────────────────────────
@@ -113,7 +134,7 @@ def _make_request_with_state(
     request = _make_request({"x-lca-user-id": user_id, "Authorization": "Bearer lca-local"})
     state = request.app.state
     state.lca_auth_dev_mode = dev_mode
-    state.lca_auth_expected_token = DEFAULT_EXPECTED_TOKEN
+    state.lca_auth_expected_token = TOKEN
     state.assistant_ownership = _FakeOwnership(owner)
     return request
 

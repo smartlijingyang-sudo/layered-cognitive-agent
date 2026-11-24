@@ -143,6 +143,8 @@ def _app_with_routes(router: RouteRegistry) -> Starlette:
     """Materialise a Starlette app with the registered routes (catalog absent)."""
     app = Starlette()
     router.install(app)
+    # 单用户测试替身：auth 缺省已 fail-closed，显式声明 dev_mode。
+    app.state.lca_auth_dev_mode = True
     return app
 
 
@@ -799,6 +801,8 @@ def _app_with_catalog(tmp_path: Any) -> tuple[Starlette, Any]:
     _run_plugin_setup(plugin, ctx)
     app = Starlette()
     router.install(app)
+    # 单用户测试替身：auth 缺省已 fail-closed，显式声明 dev_mode。
+    app.state.lca_auth_dev_mode = True
     catalog = AssistantCatalogImpl(root=Path(tmp_path) / "assistants")
     app.state.assistant_catalog = catalog
     return app, catalog
@@ -859,6 +863,8 @@ def _app_with_catalog_and_role_resolver(tmp_path: Any) -> Starlette:
     _run_plugin_setup(plugin, ctx)
     app = Starlette()
     router.install(app)
+    # 单用户测试替身：auth 缺省已 fail-closed，显式声明 dev_mode。
+    app.state.lca_auth_dev_mode = True
     catalog = AssistantCatalogImpl(
         root=Path(tmp_path) / "assistants",
         role_resolver=_StubRoleResolverForRoutes(),
@@ -886,6 +892,8 @@ def test_onboarding_flow_default_soul_reaches_prompt(tmp_path: Any) -> None:
     _run_plugin_setup(plugin, ctx)
     app = Starlette()
     router.install(app)
+    # 单用户测试替身：auth 缺省已 fail-closed，显式声明 dev_mode。
+    app.state.lca_auth_dev_mode = True
     resolver = FileRoleCardResolver(root=roles)
     catalog = AssistantCatalogImpl(
         root=Path(tmp_path) / "assistants",

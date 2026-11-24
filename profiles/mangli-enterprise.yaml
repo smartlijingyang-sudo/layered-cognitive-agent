@@ -36,13 +36,16 @@ patch:
   - id: lca.plugins.assistant.webserver.bridge
     config:
       lobehub_url: ""
+  # 生产 Bearer 口令必须由部署环境注入；缺失时 ownership setup 直接失败，
+  # 不允许回落到仓库里公开的 lca-local。
   - id: lca.plugins.assistant.ownership
     config:
       dev_mode: false
-      expected_token: "lca-local"
-  - id: lca-avatar
-    config:
-      api_key: "dummy"
+      expected_token:
+        from_env: LCA_AUTH_EXPECTED_TOKEN
+        required: true
+  # lca-avatar 的 api_key 沿用 bundle 的 AVATAR_IMAGE_API_KEY 注入；
+  # 生产不配就是启动失败，不用 "dummy" 占位绕过启动门。
   # 公司文件服务上传接缝。凭据一律 required: false：插件挂在公共 bundle
   # (bundles/web-app.yaml) 上，声明为必需会让所有没有凭据的 profile 启动失败。
   # 缺配置时路由仍注册，请求返回 503 fileservice_unconfigured。

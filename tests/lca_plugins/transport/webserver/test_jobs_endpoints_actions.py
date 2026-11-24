@@ -44,7 +44,19 @@ def _make_request(
         "path_params": path_params,
         "headers": [(b"x-lca-user-id", b"user-1"), (b"content-type", b"application/json")],
         "app": type(
-            "App", (), {"state": type("State", (), {"assistant_catalog": _FakeCatalog(home)})()}
+            "App",
+            (),
+            {
+                "state": type(
+                    "State",
+                    (),
+                    {
+                        "assistant_catalog": _FakeCatalog(home),
+                        # 单用户测试替身：auth 缺省已 fail-closed。
+                        "lca_auth_dev_mode": True,
+                    },
+                )()
+            },
         ),
     }
     req = Request(scope)

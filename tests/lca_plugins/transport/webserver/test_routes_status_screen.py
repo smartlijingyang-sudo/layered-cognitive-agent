@@ -64,6 +64,8 @@ def _create_test_app(tmp_path: Path) -> tuple[Starlette, AssistantCatalogImpl, s
     asyncio.run(setup.setup(ctx, None))
     app = Starlette()
     router.install(app)
+    # 单用户测试替身：auth 缺省已 fail-closed，显式声明 dev_mode。
+    app.state.lca_auth_dev_mode = True
     catalog = AssistantCatalogImpl(root=Path(tmp_path) / "assistants")
     app.state.assistant_catalog = catalog
 
