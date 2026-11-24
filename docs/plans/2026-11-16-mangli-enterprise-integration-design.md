@@ -60,7 +60,7 @@ flowchart TD
 
     subgraph MangliTrack [公司网关流量处理]
         HexDec[a. Hex解码 + AES/ECB/PKCS5Padding 解密<br>失败直接拦截返回 401]
-        PermFetch[b. 透传 ticket 查权限微服务<br>5min LRU 缓存; 超时/故障 Fail-Closed 返回 502<br>ticket 无效返回 401]
+        PermFetch[b. 透传 ticket 查权限 Code（默认关闭）<br>5min LRU 缓存; 查询失败降级为空权限<br>ticket 明确无效返回 401]
         StripSpoof[c. 强制剥离客户端伪造的 x-lca-user-id / authorization]
         InjectReal[d. 注入真实 x-lca-user-id 与合法 Bearer expected_token<br>构造 Principal(issuer='mangli')<br>写入 request.state.principal 与 ContextVar]
         HexDec --> PermFetch --> StripSpoof --> InjectReal
@@ -84,7 +84,7 @@ Starlette 的 `app.add_middleware` 内部使用 `insert(0, ...)`，因此**后�
 1. 先执行 `install_adaptive_auth_middleware(app)`（挂载到内层）；
 2. 后执行 `install_trace_middleware(app)`（挂载到最外层）。  
 **实际执行顺序（从外到内）**：
-`TraceIdMiddleware`（最先进入，生成全局 `trace_id`） → `SmartAdaptiveAuthMiddleware`（安全守门，即使返回 401/502 也带有合法 `trace_id`） → 路由层 Handler。
+`TraceIdMiddleware`（最先进入，生成全局 `trace_id`） → `SmartAdaptiveAuthMiddleware`（安全守门，即使返回 401/503 也带有合法 `trace_id`） → 路由层 Handler。
 
 ### 2.3 伪造头剔除与 Bearer 注入规范 (R1, R5)
 1. **伪造头强制剥离（Header Spoofing 防御）**：
@@ -236,7 +236,7 @@ patch:
       dev_mode: false
       expected_token:
         from_env: LCA_AUTH_EXPECTED_TOKEN
-        default: lca-local
+        required: true
 ```
 
 ### 6.3 `@plugin` 完整装饰器契约 (M3, R7)
@@ -286,7 +286,7 @@ patch:
 | 不变量编号 | 守护规则与断言 | 验证用例 |
 |---|---|---|
 | **INV-01** | Java 原生静态密文向量解密一致性（包含 16 字节 Hex 密钥主路与固定 Java 向量三元组） | `test_java_cross_compatibility_vector` |
-| **INV-02** | 权限微服务 5 分钟 TTL 缓存命中与 Fail-Closed 阻断（服务异常返回 502；ticket 错误返回 401） | `test_permission_cache_ttl_and_error_handling` |
+| **INV-02** | 权限 Code 5 分钟 TTL 缓存命中与非阻断降级（查询失败降级为空权限、不阻断身份；ticket 明确无效返回 401） | `test_permission_cache_ttl_and_error_handling` |
 | **INV-03** | 自适应双轨鉴权隔离（生产无 Token 拦截、有网关头解密 + 伪造头剥离 + 合法 Bearer 注入 + 建立 Principal）与解密失败 401 阻断 | `test_adaptive_auth_double_track` |
 | **INV-04** | 多租户 In-flight Run 并发去重隔离（不同用户的相同提问互不干扰） | `test_multitenant_inflight_run_dedup_isolation` |
 | **INV-05** | 真实工具契约符合性（继承 `Tool`，声明 7 项 ClassVar，返回 `Observation`，沙箱文件写入生成 `FileStore` 凭证） | `test_tool_conforms_to_lca_contract` |
