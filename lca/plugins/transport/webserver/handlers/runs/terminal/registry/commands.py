@@ -71,6 +71,7 @@ class RegistryRunCommands:
             mode=request.mode,
             attachment_ids=request.attachment_ids,
             agent_id=request.agent.agent_id,
+            user_id=request.user_id or "",
         )
         if session is None:
             session = create_run_session(

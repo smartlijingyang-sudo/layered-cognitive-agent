@@ -59,3 +59,10 @@ patch:
   # consumed by ``effect.pre_dispatch.envelope_check``.
   - id: lca-effect-permission-manifest-default
     disabled: true
+
+  # 单用户部署显式 opt-in 免鉴权。web-standard 不装配 assistant.ownership，
+  # 因此没有用户身份模型；这里把"本地单用户"从隐式的中间件默认值改成
+  # profile 里看得见的事实。需要鉴权的部署不要写这一条（缺省 fail-closed）。
+  - id: lca-web-server
+    config:
+      dev_mode: true

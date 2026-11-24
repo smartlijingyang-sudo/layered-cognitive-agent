@@ -257,6 +257,7 @@ class RunRegistry:
         mode: str,
         attachment_ids: Sequence[str] = (),
         agent_id: str = "",
+        user_id: str = "",
     ) -> RunSession | None:
         """Return a coalescible in-flight session, if one exists."""
 
@@ -265,6 +266,7 @@ class RunRegistry:
             mode=mode,
             attachment_ids=attachment_ids,
             agent_id=agent_id,
+            user_id=user_id,
         )
 
     def clear_inflight(self, session_or_id: RunSession | str) -> None:

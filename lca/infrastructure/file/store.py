@@ -43,6 +43,10 @@ class StoredFile:
     url: str
     conversation_id: str | None = None
     previewable: bool = False
+    # Remote provenance for bytes uploaded through the company file service.
+    # Internal only: the long-lived clean URL (no signature, no expiry). The
+    # authorized ``valid`` projection is never stored.
+    source_url: str = ""
 
 
 class FileStore(Protocol):
@@ -57,6 +61,9 @@ class FileStore(Protocol):
         # FileRecord.origin (upload/agent_created/browser_download/artifact_build).
         # The caller knows the provenance -- the store must not guess.
         origin: str = "upload",
+        # Clean remote URL when the bytes were also handed to an external file
+        # service. Never the signed/expiring variant.
+        source_url: str = "",
     ) -> StoredFile: ...
 
     def get(self, attachment_id: str) -> StoredFile | None: ...
@@ -227,6 +234,7 @@ class LocalFileStore:
         mime_type: str,
         conversation_id: str | None = None,
         origin: str = "upload",
+        source_url: str = "",
     ) -> StoredFile:
         attachment_id = new_id("file")
         safe_name = _safe_filename(name)
@@ -262,6 +270,7 @@ class LocalFileStore:
             url=f"{self._url_prefix}/{attachment_id}",
             conversation_id=conversation_id,
             previewable=profile.ui_preview,
+            source_url=source_url,
         )
         write_sidecar_pair(directory / "meta.json", directory / "blob", asdict(stored), data)
 
@@ -312,6 +321,7 @@ class LocalFileStore:
                 url=str(raw.get("url") or f"{self._url_prefix}/{attachment_id}"),
                 conversation_id=raw.get("conversation_id"),
                 previewable=bool(raw.get("previewable", False)),
+                source_url=str(raw.get("source_url") or ""),
             )
         except (KeyError, TypeError, ValueError):
             return None

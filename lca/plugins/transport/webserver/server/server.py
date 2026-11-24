@@ -52,13 +52,26 @@ if TYPE_CHECKING:
 _log = structlog.get_logger(__name__)
 
 
+def _as_bool(value: Any) -> bool:
+    """Profile 配置的布尔归一化（YAML 可能给出字符串）。"""
+    if isinstance(value, str):
+        return value.strip().lower() in ("1", "true", "yes", "on")
+    return bool(value)
+
+
 @dataclass(frozen=True, slots=True)
 class LcaWebServerConfig:
-    """Plugin 配置 schema。host/port 来自 profile yaml 的 config 块。"""
+    """Plugin 配置 schema。host/port 来自 profile yaml 的 config 块。
+
+    ``dev_mode`` 是单用户部署的**显式** opt-in：``True`` 才跳过 Bearer 校验。
+    缺省 ``False`` = fail-closed；加载 ``assistant.ownership`` 的 profile 会在
+    其 setup 里覆盖该值（production profile 用它强制 ``false``）。
+    """
 
     host: str = "127.0.0.1"
     port: int = 8765
     log_level: str = "info"
+    dev_mode: bool = False
 
 
 @dataclass(frozen=True, slots=True)
@@ -175,6 +188,9 @@ async def setup(ctx: PluginContext, config: Any) -> None:
     """
     from starlette.applications import Starlette
 
+    from lca.plugins.transport.webserver.handlers.auth.mangli_auth import (
+        install_adaptive_auth_middleware,
+    )
     from lca.plugins.transport.webserver.lifespan.adapter import install_trace_middleware
 
     # 1. 解析 config(支持 dict 或 LcaWebServerConfig)
@@ -185,6 +201,7 @@ async def setup(ctx: PluginContext, config: Any) -> None:
             host=config.get("host", "127.0.0.1"),
             port=config.get("port", 8765),
             log_level=config.get("log_level", "info"),
+            dev_mode=_as_bool(config.get("dev_mode", False)),
         )
     else:
         cfg = LcaWebServerConfig()
@@ -204,9 +221,14 @@ async def setup(ctx: PluginContext, config: Any) -> None:
     registry = ctx.require("route_registry")
     registry.install(app)
 
-    # 3d. 装 trace_id 上下文隔离中间件(ADR-0183 §3.9 / PR-12)。
-    # 必须在 routes 之后:lifespan_adapter.install_trace_middleware 是
-    # ``app.add_middleware(...)`` 的最早入口 = ASGI 最外层,跨所有请求隔离。
+    # 3c-1. 声明式 auth 缺省：只有 profile 显式 opt-in 的 dev_mode 才跳过 Bearer。
+    # ``assistant.ownership`` 若在装配中，会在其后 setup 覆盖 dev_mode/expected_token。
+    app.state.lca_auth_dev_mode = cfg.dev_mode
+
+    # 3d. 装自适应双轨鉴权中间件与 trace_id 上下文隔离中间件 (ADR-0183 §3.9 / ADR-0252 D4)。
+    # Starlette add_middleware 倒序执行 (insert(0)):
+    # 先装 Auth 中间件, 后装 TraceId 中间件, 使得请求进入时 TraceId 优先执行, 随后进入 Auth 中间件。
+    install_adaptive_auth_middleware(app)
     install_trace_middleware(app)
 
     # 3c. 装 Starlette lifespan 协议(让 TestClient(app).lifespan_context(app) 工作)

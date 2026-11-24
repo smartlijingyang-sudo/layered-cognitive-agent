@@ -14,6 +14,18 @@ LCA 是一个 Python 实现的分层认知智能体框架，目标是主动、�
 
 层级单向依赖：下层不得反向依赖上层。详见 [ADR-0001](docs/adr/0001-five-layer-separation.md)。
 
+## 本地开发
+
+首次启动前复制环境模板：
+
+```bash
+cp .env.example .env
+```
+
+`.env.example` 默认 `LCA_DEV_MODE=true`，即单用户开发、不校验入口 Bearer。
+生产部署必须改为 `LCA_DEV_MODE=false` 并配置部署专属的
+`LCA_AUTH_EXPECTED_TOKEN`：该值缺失，或仍等于公开的 `lca-local`，都会拒绝启动。
+
 ## 入口指引
 
 | 你想找 | 去哪里 |

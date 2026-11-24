@@ -1,0 +1,56 @@
+name: mangli-enterprise-dev
+description: |
+  Mangli Enterprise Integration profile for dev / test only.
+  Identical to mangli-enterprise.yaml plus the /playground console bundle,
+  which carries a credential-forwarding proxy and must never ship to production.
+
+bundles:
+  - bundles/base.yaml
+  - bundles/observability-default.yaml
+  - bundles/observation-9module.yaml
+  - bundles/web-app.yaml
+  - bundles/scenario-cordis-creator.yaml
+  - bundles/loop_cursor.spine_default.yaml
+  - bundles/session-runtime.yaml
+  - bundles/event-bus-components.yaml
+  - bundles/outer/phase_main.yaml
+  - bundles/think/think_subgraph.yaml
+  - bundles/act/act_subgraph.yaml
+  - bundles/perceive/perceive_subgraph.yaml
+  - bundles/reflect/reflect_subgraph.yaml
+  - bundles/remember/remember_subgraph.yaml
+  - bundles/assistant-runtime.yaml
+  - bundles/mangli-playground-dev.yaml
+
+patch:
+  - id: lca-effect-permission-manifest-default
+    disabled: true
+  - id: spine.sink.console
+    config:
+      format: graph_timeline
+  - id: lca.plugins.assistant.catalog.catalog
+    config:
+      assistants_root: "~/.lca/assistants"
+  - id: lca.plugins.assistant.webserver.bridge
+    config:
+      lobehub_url: ""
+  # 联调 profile 同样不写死口令：缺 LCA_AUTH_EXPECTED_TOKEN 时启动失败。
+  - id: lca.plugins.assistant.ownership
+    config:
+      dev_mode: false
+      expected_token:
+        from_env: LCA_AUTH_EXPECTED_TOKEN
+        required: true
+  # lca-avatar 的 api_key 沿用 bundle 的 AVATAR_IMAGE_API_KEY 注入。
+
+  # Company file-service upload seam. Credentials are optional
+  # (required: false): the plugin is mounted from the shared
+  # bundles/web-app.yaml, so declaring them mandatory would break every profile
+  # without credentials. With no config the route still registers and answers
+  # 503 fileservice_unconfigured.
+  - id: lca-gateway-routes-company-files
+    config:
+      base_url: {from_env: LCA_FILESERVICE_BASE_URL, required: false}
+      app_id: {from_env: LCA_FILESERVICE_APP_ID, required: false}
+      pwd: {from_env: LCA_FILESERVICE_PWD, required: false}
+      timeout_s: {from_env: LCA_FILESERVICE_TIMEOUT_S, required: false}

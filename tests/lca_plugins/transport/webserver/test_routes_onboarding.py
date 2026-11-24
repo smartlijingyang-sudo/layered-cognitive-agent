@@ -125,6 +125,8 @@ async def test_onboarding_presets_returns_roles_and_skills(
 
     app = Starlette()
     router.install(app)
+    # 单用户测试替身：auth 缺省已 fail-closed，显式声明 dev_mode。
+    app.state.lca_auth_dev_mode = True
     app.state.role_card_resolver = _FakeResolver()
 
     client = TestClient(app)
@@ -171,6 +173,8 @@ def test_onboarding_welcome_handler_pending_and_completed() -> None:
         Route("/v1/onboarding/welcome", onboarding_welcome, methods=["GET", "OPTIONS"])
     )
     router.install(app)
+    # 单用户测试替身：auth 缺省已 fail-closed，显式声明 dev_mode。
+    app.state.lca_auth_dev_mode = True
 
     fake_store = _FakeOwnership()
     app.state.assistant_ownership = fake_store
@@ -222,6 +226,8 @@ async def test_onboarding_naming_settle_handler() -> None:
         Route("/v1/onboarding/naming/settle", onboarding_naming_settle, methods=["POST", "OPTIONS"])
     )
     router.install(app)
+    # 单用户测试替身：auth 缺省已 fail-closed，显式声明 dev_mode。
+    app.state.lca_auth_dev_mode = True
 
     fake_store = _FakeOwnership()
     fake_store.states["user_settle"] = "pending"

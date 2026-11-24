@@ -230,6 +230,8 @@ async def test_ws_handler_dev_mode_no_token_proceeds() -> None:
     redis = _FakeRedis(pubsub)
     ws = _FakeWebSocket(assistant_id=assistant_id)
     ws.headers = {"x-lca-user-id": "local-dev-user"}  # header 回退路径
+    # auth 缺省已改为 fail-closed，dev_mode 必须显式声明。
+    ws.app = SimpleNamespace(state=SimpleNamespace(lca_auth_dev_mode=True))
 
     handler = make_avatar_ws_handler(redis=redis)
     task = asyncio.create_task(handler(ws))
@@ -252,6 +254,8 @@ async def test_ws_handler_dev_mode_no_token_proceeds() -> None:
 @pytest.mark.asyncio
 async def test_ws_handler_unknown_assistant_closes_4404() -> None:
     ws = _FakeWebSocket(assistant_id="asst_missing")
+    # 单用户 dev 路径：auth 缺省已 fail-closed，dev_mode 必须显式声明。
+    ws.app = SimpleNamespace(state=SimpleNamespace(lca_auth_dev_mode=True))
     handler = make_avatar_ws_handler(redis=_FakeRedis(_FakePubSub()))
     await handler(ws)
     assert ws.accepted is True

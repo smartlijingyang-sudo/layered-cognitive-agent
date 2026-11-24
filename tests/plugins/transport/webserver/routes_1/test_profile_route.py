@@ -72,6 +72,8 @@ class _FakeApp:
     def __init__(self, catalog: _FakeCatalog) -> None:
         class _State:
             assistant_catalog = catalog
+            # 单用户测试替身：显式声明 dev_mode，auth 缺省已改为 fail-closed。
+            lca_auth_dev_mode = True
 
         self.state = _State()
 
@@ -87,8 +89,8 @@ class _FakeRequest:
         self.app = _FakeApp(catalog)
         self.method = "PATCH"
         self.path_params = {"assistant_id": assistant_id}
-        # Auth seam (handlers/auth/user) reads request.headers;
-        # empty dict -> dev-mode fallback to local-dev-user.
+        # Auth seam (handlers/auth/user) reads request.headers; 空头在显式
+        # dev_mode=True 的测试替身下映射到 local-dev-user。
         self.headers: dict[str, str] = {}
 
     async def json(self) -> Any:
